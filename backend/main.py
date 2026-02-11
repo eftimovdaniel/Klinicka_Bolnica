@@ -1,6 +1,5 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from routers import lekari, pacienti, termini, aparati, uslugi, kariera, admin
 
 app = FastAPI(title="Клиничка Болница Штип API")
@@ -13,29 +12,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-# Root endpoint
-@app.get("/")
-async def root():
-    """Root endpoint кој враќа информации за API-то"""
-    return JSONResponse(
-        content={
-            "message": "Клиничка Болница Штип API",
-            "version": "1.0.0",
-            "docs": "/docs",
-            "redoc": "/redoc",
-            "endpoints": {
-                "lekari": "/lekari",
-                "pacienti": "/pacienti",
-                "termini": "/termini",
-                "aparati": "/aparati",
-                "uslugi": "/uslugi",
-                "kariera": "/kariera",
-                "admin": "/admin"
-            }
-        },
-        media_type="application/json; charset=utf-8"
-    )
 
 # Регистрација на router-ите
 app.include_router(lekari.router)
