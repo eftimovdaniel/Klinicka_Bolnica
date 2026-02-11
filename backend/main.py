@@ -18,21 +18,24 @@ app.add_middleware(
 @app.get("/")
 async def root():
     """Root endpoint кој враќа информации за API-то"""
-    return JSONResponse({
-        "message": "Клиничка Болница Штип API",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "redoc": "/redoc",
-        "endpoints": {
-            "lekari": "/lekari",
-            "pacienti": "/pacienti",
-            "termini": "/termini",
-            "aparati": "/aparati",
-            "uslugi": "/uslugi",
-            "kariera": "/kariera",
-            "admin": "/admin"
-        }
-    })
+    return JSONResponse(
+        content={
+            "message": "Клиничка Болница Штип API",
+            "version": "1.0.0",
+            "docs": "/docs",
+            "redoc": "/redoc",
+            "endpoints": {
+                "lekari": "/lekari",
+                "pacienti": "/pacienti",
+                "termini": "/termini",
+                "aparati": "/aparati",
+                "uslugi": "/uslugi",
+                "kariera": "/kariera",
+                "admin": "/admin"
+            }
+        },
+        media_type="application/json; charset=utf-8"
+    )
 
 # Регистрација на router-ите
 app.include_router(lekari.router)
