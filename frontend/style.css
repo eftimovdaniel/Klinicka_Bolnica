@@ -1,0 +1,2531 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #ffffff;
+  color: #333;
+  line-height: 1.6;
+}
+
+.container {
+  width: 90%;
+  max-width: 1200px;
+  margin: auto;
+}
+
+/* Header */
+header {
+  background-color:white;
+  color: white;
+  padding: 1rem 0;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+}
+
+header .container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.red-cross {
+  color: #e74c3c;
+  font-size: 1.8rem;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.logo h1 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin: 0;
+  white-space: nowrap;
+  color: black;
+}
+
+nav {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+nav a {
+  color: black;
+  text-decoration: none;
+  font-weight: 500;
+  transition: opacity 0.3s;
+  padding: 0.5rem 0;
+}
+
+nav a.nav-link:hover {
+  opacity: 0.8;
+}
+
+.btn-contact {
+  background-color: #e74c3c;
+  color: white;
+  padding: 0.6rem 1.2rem;
+  border-radius: 4px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: background-color 0.3s;
+}
+
+.btn-contact:hover {
+  background-color: #c0392b;
+}
+
+/* Hero Section */
+.hero {
+  position: relative;
+  height: 720px; /* целиот екран */
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-family: Arial, sans-serif;
+}
+
+.hero-background {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.hero-bg-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.hero-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, rgba(139, 0, 0, 0.6) 0%, rgba(26, 26, 46, 0.7) 100%);
+  z-index: 1;
+}
+
+.hero .container {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.hero-content {
+  position: relative;
+  z-index: 2;
+  max-width: 600px;
+}
+
+.hero-content h1 {
+  font-size: 3.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+  text-shadow: 2px 2px 8px rgba(0,0,0,0.5);
+  line-height: 1.2;
+}
+
+.hero-content p {
+  font-size: 1.5rem;
+  margin-bottom: 2.5rem;
+  text-shadow: 1px 1px 4px rgba(0,0,0,0.5);
+}
+
+.btn-primary {
+  background-color: #e74c3c;
+  color: white;
+  padding: 1rem 2.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+  transition: background-color 0.3s, transform 0.2s;
+  box-shadow: 0 4px 15px rgba(231, 76, 60, 0.4);
+}
+.hero-background img.hero-bg-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover; /* сликата го пополнува целиот простор */
+  z-index: 1;
+}
+
+
+.btn-primary:hover {
+  background-color: #c0392b;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.5);
+}
+
+/* Features Section */
+.features-section {
+  padding: 0 1rem 4rem;
+  background-color: transparent;
+  margin-top: -150px;
+  position: relative;
+  z-index: 10;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+@media (max-width: 900px) {
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.feature-card {
+  background: white;
+  border-radius: 12px;
+  padding: 2.5rem 2rem;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.feature-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+}
+
+.feature-icon {
+  margin-bottom: 1.5rem;
+}
+
+.icon-circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: #e74c3c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.icon-cross {
+  color: white;
+  font-size: 2.5rem;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.icon-stethoscope {
+  color: white;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.icon-shield {
+  color: white;
+  font-size: 2.5rem;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.feature-card h3 {
+  font-size: 1.5rem;
+  color: #1a1a2e;
+  margin-bottom: 1rem;
+  font-weight: 700;
+}
+
+.feature-card p {
+  color: #666;
+  line-height: 1.6;
+  font-size: 1rem;
+}
+
+/* Sections */
+.section {
+  padding: 4rem 1rem;
+  background-color: white;
+  position: relative;
+  z-index: 1;
+}
+
+.section h2 {
+  font-size: 2.5rem;
+  margin-bottom: 2rem;
+  text-align: center;
+  color: #1a1a2e;
+  font-weight: 700;
+}
+
+/* Services Section */
+.services-section {
+  background-color: white;
+  padding: 4rem 1rem;
+  overflow: hidden;
+}
+
+.uslugi-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 3rem;
+  margin-top: 2rem;
+}
+
+/* Секции за медицински граници */
+.granka-section {
+  margin-bottom: 3rem;
+}
+
+.granka-section-title {
+  font-size: 1.8rem;
+  color: #1a1a2e;
+  margin-bottom: 1.5rem;
+  font-weight: 700;
+  text-align: center;
+  padding-bottom: 1rem;
+  border-bottom: 3px solid #e74c3c;
+  position: relative;
+}
+
+.granka-section-title::after {
+  content: '';
+  position: absolute;
+  bottom: -3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80px;
+  height: 3px;
+  background: #e74c3c;
+}
+
+/* Анимирана лента за услуги */
+.uslugi-marquee-wrapper {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  margin-top: 1rem;
+  padding: 2rem 0;
+}
+
+.uslugi-marquee-wrapper::before,
+.uslugi-marquee-wrapper::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  width: 150px;
+  height: 100%;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.uslugi-marquee-wrapper::before {
+  left: 0;
+  background: linear-gradient(to right, white, transparent);
+}
+
+.uslugi-marquee-wrapper::after {
+  right: 0;
+  background: linear-gradient(to left, white, transparent);
+}
+
+.uslugi-marquee-track {
+  display: flex;
+  gap: 1.5rem;
+  will-change: transform;
+  width: fit-content;
+  transition: transform 0.5s ease-out;
+}
+
+.usluga-marquee-card {
+  flex: 0 0 auto;
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s, box-shadow 0.3s;
+  min-width: 250px;
+  white-space: nowrap;
+  position: relative;
+  border-top: 4px solid #e74c3c;
+}
+
+.usluga-marquee-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.usluga-card-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.usluga-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  transition: color 0.3s;
+}
+
+.usluga-marquee-card:hover .usluga-name {
+  color: #e74c3c;
+}
+
+
+/* Копчиња за навигација */
+.uslugi-nav-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: white;
+  color: #e74c3c;
+  border: 2px solid #e74c3c;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.uslugi-marquee-wrapper:hover .uslugi-nav-btn {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.uslugi-nav-btn:hover {
+  background: #e74c3c;
+  color: white;
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.4);
+}
+
+.uslugi-nav-btn:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.uslugi-nav-btn-prev {
+  left: 20px;
+}
+
+.uslugi-nav-btn-next {
+  right: 20px;
+}
+
+@media (max-width: 768px) {
+  .uslugi-nav-btn {
+    width: 44px;
+    height: 44px;
+    opacity: 1;
+    pointer-events: all;
+  }
+  
+  .uslugi-nav-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+  
+  .uslugi-nav-btn-prev {
+    left: 10px;
+  }
+  
+  .uslugi-nav-btn-next {
+    right: 10px;
+  }
+  
+  .usluga-marquee-card {
+    min-width: 200px;
+    padding: 1.25rem 1.5rem;
+  }
+  
+  .usluga-name {
+    font-size: 1rem;
+  }
+  
+  .uslugi-marquee-wrapper::before,
+  .uslugi-marquee-wrapper::after {
+    width: 80px;
+  }
+  
+  .uslugi-marquee-track {
+    gap: 1rem;
+  }
+  
+  .uslugi-marquee-wrapper {
+    padding: 1.5rem 0;
+  }
+}
+
+.medicinska-granka {
+  margin-bottom: 3rem;
+}
+
+.granki-columns {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+.granka-column {
+  background: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.granka-title {
+  font-size: 1.2rem;
+  color: #e74c3c;
+  margin-bottom: 1rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.granka-uslugi-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.granka-uslugi-list li {
+  padding: 0.5rem 0;
+  color: #333;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.granka-uslugi-list li:last-child {
+  border-bottom: none;
+}
+
+/* Responsive стилови за анимираната лента */
+
+@media (max-width: 1200px) {
+  .granki-columns {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.usluga-card {
+  background: white;
+  border-radius: 12px;
+  padding: 2.5rem 2rem;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  transition: transform 0.3s, box-shadow 0.3s;
+  text-align: center;
+  border-top: 4px solid #e74c3c;
+}
+
+.usluga-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.usluga-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.usluga-card h3,
+.usluga-card h4 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+  color: #1a1a2e;
+  font-weight: 700;
+}
+
+.usluga-card h4 {
+  font-size: 1.3rem;
+}
+
+.usluga-card p {
+  color: #666;
+  line-height: 1.7;
+  font-size: 1rem;
+  text-align: left;
+}
+
+/* Doctors Section */
+.doctors-section {
+  background-color: #f8f9fa;
+}
+
+.filters {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+  padding: 1.5rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-width: 200px;
+}
+
+.filter-group label {
+  font-weight: 600;
+  color: #333;
+}
+
+.filter-group input,
+.filter-group select {
+  padding: 0.7rem;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  transition: border-color 0.3s;
+}
+
+.filter-group input:focus,
+.filter-group select:focus {
+  outline: none;
+  border-color: #e74c3c;
+}
+
+.lekari-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2rem;
+  margin-top: 2rem;
+  max-width: 120 px;    /*tuka*/
+  padding: 0 2 rem;     /*tuka*/
+}
+
+@media (max-width: 1200px) {
+  .lekari-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 900px) {
+  .lekari-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .lekari-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .hero-content h1 {
+    font-size: 2rem;
+  }
+  
+  .hero-content p {
+    font-size: 1.2rem;
+  }
+  
+  .logo h1 {
+    font-size: 1rem;
+  }
+}
+
+.lekar-card {
+  background: white;
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+  transition: transform 0.3s, box-shadow 0.3s;
+  text-align: center;
+  margin: 0 auto;       /*tuka*/
+  max-width: 280px;     /*tuka*/
+}
+
+
+.lekar-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+}
+
+.lekar-card h3 {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: #1a1a2e;
+  font-weight: 600;
+}
+
+.lekar-card .specialty {
+  color: #666;
+  font-size: 1rem;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.lekar-card .email {
+  color: #e74c3c;
+  text-decoration: none;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+  display: block;
+}
+
+.lekar-card .email:hover {
+  text-decoration: underline;
+}
+
+.btn-appointment-card {
+  background-color: #e74c3c;
+  color: white;
+  padding: 0.7rem 1.5rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  transition: background-color 0.3s;
+  margin-top: 1rem;
+}
+
+.btn-appointment-card:hover {
+  background-color: #c0392b;
+}
+
+.loading {
+  text-align: center;
+  padding: 2rem;
+  font-size: 1.2rem;
+  color: #666;
+  grid-column: 1 / -1;
+}
+
+/* Contact Section */
+.contact-section {
+  background-color: white;
+}
+
+.kontakt-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3rem;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.kontakt-info {
+  flex: 1 1 300px;
+}
+
+.kontakt-info h3 {
+  font-size: 1.8rem;
+  margin-bottom: 1.5rem;
+  color: #1a1a2e;
+}
+
+.kontakt-info p {
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+  line-height: 1.8;
+}
+
+.kontakt-forma {
+  flex: 1 1 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.kontakt-forma input,
+.kontakt-forma textarea {
+  padding: 0.8rem;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: border-color 0.3s;
+}
+
+.kontakt-forma input:focus,
+.kontakt-forma textarea:focus {
+  outline: none;
+  border-color: #e74c3c;
+}
+
+.kontakt-forma textarea {
+  min-height: 150px;
+  resize: vertical;
+}
+
+.kontakt-forma button {
+  background-color: #e74c3c;
+  color: white;
+  padding: 0.8rem 2rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.kontakt-forma button:hover {
+  background-color: #c0392b;
+}
+
+/* ============================================================================
+   СЕКЦИЈА ЗА КАРИЕРА - ОГЛАСИ ЗА РАБОТА
+   ============================================================================ */
+
+/* Секција за кариера */
+.career-section {
+  background-color: #f8f9fa;
+}
+
+/* Grid за прикажување на огласи за работа */
+.kariera-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+/* Картичка за поединечен оглас за работа */
+.pozicija-card {
+  background: white;
+  border: 1px solid #ddd;
+  padding: 2rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+/* Hover ефект за активни огласи (не истечени) */
+.pozicija-card:hover:not(.expired) {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+}
+
+/* Избран оглас (кога корисникот кликнал на него) */
+.pozicija-card.selected {
+  background: #e8f5e9;
+  border: 2px solid #4caf50;
+  box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+}
+
+/* Истечен оглас (рокот за пријавување е поминат, но помалку од 5 дена) */
+.pozicija-card.expired {
+  opacity: 0.6;
+  background-color: #f5f5f5;
+  border: 1px solid #ddd;
+  cursor: not-allowed !important;
+}
+
+/* Hover ефект за истечени огласи (без трансформација) */
+.pozicija-card.expired:hover {
+  transform: none;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+/* Badge за истечени огласи */
+.pozicija-card .expired-badge {
+  display: inline-block;
+  background-color: #e74c3c;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: bold;
+  margin-top: 0.5rem;
+  text-transform: uppercase;
+}
+
+.pozicija-card h3 {
+  color: #1a1a2e;
+  margin-bottom: 1rem;
+}
+
+/* Форма за аплицирање на оглас за работа */
+.kariera-forma {
+  max-width: 600px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Информација за избрана позиција (прикажана над формата) */
+#selected-pozicija-info {
+  text-align: center;
+  margin: 0 auto 1rem;
+  max-width: 600px;
+}
+
+/* Input полиња во формата за аплицирање */
+.kariera-forma input,
+.kariera-forma textarea {
+  padding: 0.8rem;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-family: inherit;
+}
+
+/* Копче за испраќање на апликација */
+.kariera-forma button {
+  background-color: #e74c3c;
+  color: white;
+  padding: 0.8rem 2rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.kariera-forma button:hover {
+  background-color: #c0392b;
+}
+
+/* Footer */
+footer {
+  background-color: #1a1a1a;
+  color: white;
+  padding: 3rem 1rem 1rem;
+}
+
+.footer-content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3rem;
+  justify-content: space-between;
+  margin-bottom: 2rem;
+}
+
+.footer-info h3 {
+  margin-bottom: 1rem;
+  font-size: 1.5rem;
+}
+
+.footer-info p {
+  margin-bottom: 0.5rem;
+  opacity: 0.9;
+}
+
+.footer-map {
+  flex: 1 1 400px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.footer-bottom {
+  text-align: center;
+  padding-top: 2rem;
+  border-top: 1px solid #333;
+  opacity: 0.8;
+}
+
+/* Modal */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 2000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.6);
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal-content {
+  background-color: white;
+  margin: 2% auto;
+  padding: 2rem;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 1000px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+  position: relative;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.close {
+  color: #999;
+  font-size: 2rem;
+  font-weight: bold;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  line-height: 1;
+  position: absolute;
+  right: 1.5rem;
+  top: 1rem;
+  z-index: 100;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.close:hover,
+.close:focus {
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.1);
+  transform: rotate(90deg) scale(1.1);
+}
+
+.modal-content h2 {
+  color: #1a1a2e;
+  margin-bottom: 1.5rem;
+  font-size: 2rem;
+}
+
+.doctor-info-modal {
+  background-color: #f8f9fa;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 2rem;
+}
+
+.doctor-info-modal h3 {
+  color: #1a1a2e;
+  margin-bottom: 0.5rem;
+}
+
+.appointment-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+@media (max-width: 900px) {
+  .appointment-container {
+    grid-template-columns: 1fr;
+  }
+}
+
+.calendar-section {
+  background-color: #f8f9fa;
+  padding: 1rem;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.calendar-section h3,
+.form-section h3 {
+  color: #1a1a2e;
+  margin-bottom: 1.5rem;
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+.form-section {
+  background-color: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+#calendar {
+  margin-bottom: 1.5rem;
+  background-color: white;
+  padding: 1.5rem;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.calendar-month {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.calendar-header {
+  text-align: center;
+  font-weight: 700;
+  padding: 0.5rem 0.5rem;
+  background-color: #e74c3c;
+  color: white;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+}
+
+.calendar-day {
+  text-align: center;
+  padding: 0.5rem 0.5rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background-color: white;
+  font-weight: 400;
+  font-size: 0.85rem;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.calendar-day:hover:not(.disabled):not(.past) {
+  background-color: #ffe8e8;
+  border-color: #e74c3c;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(231, 76, 60, 0.2);
+}
+
+.calendar-day.selected {
+  background-color: #e74c3c;
+  color: white;
+  border-color: #e74c3c;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+}
+
+.calendar-day.disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  background-color: #f5f5f5;
+  border-color: #e0e0e0;
+}
+
+.calendar-day.past {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background-color: #fafafa;
+}
+
+.calendar-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  background-color: white;
+  border-radius: 8px;
+}
+
+.calendar-nav button {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9 rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 6px rgba(231, 76, 60, 0.3);
+}
+
+.calendar-nav button:hover {
+  background-color: #c0392b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(231, 76, 60, 0.4);
+}
+
+.calendar-nav span {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  text-transform: capitalize;
+}
+
+.time-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 0.5rem;
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.time-slot {
+  padding: 0.7rem 0.5rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background-color: white;
+  font-weight: 500;
+  font-size: 0.85rem;
+}
+
+.time-slot.disabled{
+  background-color: #f2f2f2;
+  color: #ccc;
+  cursor: not-allowed;
+  border: 1px solid #ddd;
+  text-decoration: line-through;
+  pointer-events: none;
+}
+
+.time-slot:hover:not(.disabled) {
+  background-color: #ffe8e8;
+  border-color: #e74c3c;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(231, 76, 60, 0.2);
+}
+
+.time-slot.selected {
+  background-color: #e74c3c;
+  color: white;
+  border-color: #e74c3c;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+}
+
+.time-slot.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background-color: #f5f5f5;
+  border-color: #e0e0e0;
+}
+
+#appointment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+#appointment-form input,
+#appointment-form textarea {
+  padding: 0.8rem;
+  border: 2px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: border-color 0.3s;
+}
+
+#appointment-form input:focus,
+#appointment-form textarea:focus {
+  outline: none;
+  border-color: #e74c3c;
+}
+
+#appointment-form textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+#appointment-form button {
+  margin-top: 1rem;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+/* Додади ова во твојот CSS (без менување на другите стилови) */
+
+.features-section {
+  position: relative;
+  margin-top: -120px; /* делумно преклопување со hero сликата */
+  z-index: 10 ; /* осигура картите да бидат над сликата */
+  padding: 0 1rem;
+  background-color: transparent;
+}
+
+.features-grid {
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+}
+
+.feature-card {
+  background: white;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+  flex: 1;
+  text-align: center;
+  transition: transform 0.3s;
+}
+
+.feature-card:hover {
+  transform: translateY(-5px);
+}
+
+/* Doctor Login Button - Подобрен изглед */
+.btn-lekar-login {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  border: none;
+  padding: 0.7rem 1.4rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-lekar-login::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.btn-lekar-login:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+.btn-lekar-login:hover {
+  background: linear-gradient(135deg, #c0392b 0%, #a93226 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+}
+
+.btn-lekar-login:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(231, 76, 60, 0.3);
+}
+
+/* Split Login Modal - Два панели (лево: добредојде, десно: форма) */
+.login-split-modal {
+  max-width: 700px;
+  padding: 0;
+  background: white;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+  max-height: 85vh;
+}
+
+.login-split-container {
+  display: flex;
+  min-height: 450px;
+  max-height: 85vh;
+}
+
+/* Лева страна - Добредојде секција */
+.login-welcome-section {
+  flex: 0 0 30%;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.pacient-welcome {
+  background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+}
+
+.welcome-content {
+  position: relative;
+  z-index: 2;
+  text-align: center;
+  width: 100%;
+}
+
+.hospital-logo {
+  margin-bottom: 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.25);
+}
+
+.hospital-name {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 0.2rem;
+  letter-spacing: 0.5px;
+}
+
+.hospital-location {
+  font-size: 0.9rem;
+  font-weight: 600;
+  opacity: 0.95;
+  letter-spacing: 1px;
+}
+
+.welcome-title {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-bottom: 0.8rem;
+  color: white;
+  margin-top: 0.8rem;
+}
+
+.welcome-description {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  margin-bottom: 0.5rem;
+  opacity: 0.9;
+}
+
+.welcome-features {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  text-align: left;
+  margin-top: 0.8rem;
+}
+
+.feature-item {
+  font-size: 0.75rem;
+  opacity: 0.95;
+  padding: 0.2rem 0;
+}
+
+/* Десна страна - Форма секција */
+.login-form-section {
+  flex: 1;
+  padding: 2rem;
+  background: #ffffff;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.login-form-section .login-header {
+  margin-bottom: 1.25rem;
+  text-align: center;
+}
+
+.login-form-section .login-header h2 {
+  font-size: 1.4rem;
+  color: #1a1a2e;
+  margin-bottom: 0.4rem;
+  font-weight: 700;
+}
+
+.login-form-section .login-subtitle {
+  color: #666;
+  font-size: 0.85rem;
+}
+
+/* Doctor Login Modal - Подобрен изглед (за назад компатибилност) */
+.lekar-login-modal-content {
+  max-width: 500px;
+  padding: 3rem;
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05);
+  border-radius: 20px;
+  position: relative;
+  overflow-y: auto;
+  max-height: 90vh;
+}
+
+.lekar-login-modal-content::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #e74c3c 0%, #c0392b 50%, #e74c3c 100%);
+  background-size: 200% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+  z-index: 1;
+  pointer-events: none;
+}
+
+@keyframes shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+  position: relative;
+  z-index: 1;
+}
+
+.login-icon {
+  display: none;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.login-header h2 {
+  color: #1a1a2e;
+  margin-bottom: 0.75rem;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.login-subtitle {
+  color: #666;
+  font-size: 1rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+#lekar-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  position: relative;
+  z-index: 2;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+  position: relative;
+  z-index: 2;
+}
+
+.form-group label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #333;
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
+}
+
+.input-icon {
+  display: none;
+}
+
+.form-group input[type="text"],
+.form-group input[type="email"],
+.form-group input[type="password"],
+.form-group input[type="tel"] {
+  width: 100%;
+  padding: 0.85rem 1.1rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  background-color: #ffffff;
+  transition: all 0.3s ease;
+  outline: none;
+  position: relative;
+  z-index: 2;
+}
+
+.form-group input[type="text"]:focus,
+.form-group input[type="email"]:focus,
+.form-group input[type="password"]:focus,
+.form-group input[type="tel"]:focus {
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.1);
+  background-color: #fff;
+}
+
+.form-group input[type="text"]:hover,
+.form-group input[type="email"]:hover,
+.form-group input[type="password"]:hover,
+.form-group input[type="tel"]:hover {
+  border-color: #c0c0c0;
+}
+
+.form-group input[type="text"]::placeholder,
+.form-group input[type="email"]::placeholder,
+.form-group input[type="password"]::placeholder,
+.form-group input[type="tel"]::placeholder {
+  color: #999;
+  opacity: 1;
+}
+
+.form-hint {
+  display: block;
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 0.25rem;
+  line-height: 1.4;
+}
+
+#lekar-login-form input {
+  padding: 1rem 1.25rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: all 0.3s ease;
+  background-color: #fff;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#lekar-login-form input:hover {
+  border-color: #c0c0c0;
+}
+
+#lekar-login-form input:focus {
+  outline: none;
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.1);
+  transform: translateY(-1px);
+}
+
+#lekar-login-form input::placeholder {
+  color: #999;
+  opacity: 1;
+}
+
+/* Стилови за регистрациска форма за лекари - малку поголеми input полиња */
+#lekar-register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  position: relative;
+  z-index: 2;
+}
+
+#lekar-register-form input {
+  padding: 1.1rem 1.25rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-family: inherit;
+  transition: all 0.3s ease;
+  background-color: #fff;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 3;
+}
+
+#lekar-register-form input:hover {
+  border-color: #c0c0c0;
+}
+
+#lekar-register-form input:focus {
+  outline: none;
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.1);
+  transform: translateY(-1px);
+}
+
+#lekar-register-form input::placeholder {
+  color: #999;
+  opacity: 1;
+}
+
+#lekar-register-form .form-group label {
+  font-weight: 600;
+  color: #333;
+}
+
+/* Стилови за регистрациска форма за пациенти - малку поголеми input полиња */
+#pacient-register-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  position: relative;
+  z-index: 2;
+}
+
+#pacient-register-form input {
+  padding: 1.1rem 1.25rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-family: inherit;
+  transition: all 0.3s ease;
+  background-color: #fff;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 3;
+}
+
+#pacient-register-form input:hover {
+  border-color: #c0c0c0;
+}
+
+#pacient-register-form input:focus {
+  outline: none;
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.1);
+  transform: translateY(-1px);
+}
+
+#pacient-register-form input::placeholder {
+  color: #999;
+  opacity: 1;
+}
+
+#pacient-register-form .form-group label {
+  font-weight: 600;
+  color: #333;
+}
+
+.error-message {
+  background: linear-gradient(135deg, #fee 0%, #fdd 100%);
+  color: #c33;
+  padding: 1rem 1.25rem;
+  border-radius: 12px;
+  border-left: 4px solid #e74c3c;
+  font-size: 0.95rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 2px 8px rgba(231, 76, 60, 0.1);
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+.btn-login-submit {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  padding: 0.95rem 2rem;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 0.5rem;
+  width: 100%;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+}
+
+.btn-login-submit::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s;
+}
+
+.btn-login-submit:hover::before {
+  left: 100%;
+}
+
+.btn-login-submit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(231, 76, 60, 0.4);
+}
+
+.btn-login-submit:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+}
+
+.btn-login-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-loading {
+  display: inline-block;
+}
+
+.btn-text {
+  display: inline-block;
+}
+
+/* Стилови за линковите под формата */
+.modal-content p a {
+  color: #e74c3c;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.modal-content p a::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: #e74c3c;
+  transition: width 0.3s ease;
+}
+
+.modal-content p a:hover::after {
+  width: 100%;
+}
+
+.modal-content p a:hover {
+  color: #c0392b;
+}
+
+/* Responsive дизајн за модалот за најава */
+@media (max-width: 900px) {
+  .login-split-container {
+    flex-direction: column;
+    min-height: auto;
+  }
+  
+  .login-welcome-section {
+    flex: 0 0 auto;
+    padding: 2rem 1.5rem;
+    min-height: 200px;
+  }
+  
+  .hospital-name {
+    font-size: 1.4rem;
+  }
+  
+  .hospital-location {
+    font-size: 1.1rem;
+  }
+  
+  .welcome-title {
+    font-size: 1.8rem;
+    margin-top: 1rem;
+  }
+  
+  .welcome-subtitle {
+    font-size: 1rem;
+  }
+  
+  .welcome-description {
+    font-size: 0.9rem;
+  }
+  
+  .login-form-section {
+    padding: 2rem 1.5rem;
+  }
+  
+  .welcome-features {
+    display: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .lekar-login-modal-content {
+    padding: 1.5rem;
+    max-width: 90%;
+  }
+  
+  .login-welcome-section {
+    padding: 1.5rem;
+    min-height: 250px;
+  }
+  
+  .hospital-name {
+    font-size: 1.3rem;
+  }
+  
+  .hospital-location {
+    font-size: 1rem;
+  }
+  
+  .welcome-title {
+    font-size: 1.8rem;
+  }
+  
+  .welcome-description {
+    font-size: 0.9rem;
+  }
+  
+  .login-form-section {
+    padding: 1.5rem;
+  }
+  
+  .login-header h2 {
+    font-size: 1.5rem;
+  }
+  
+  .lekar-login-modal-content {
+    padding: 2rem;
+    max-height: 95vh;
+  }
+}
+
+/* Doctor Dashboard Modal - Главен интерфејс за лекари */
+.lekar-dashboard-content {
+  max-width: 1200px;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+/* Навигација со табови */
+.lekar-nav-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 0.5rem;
+}
+
+.nav-tab {
+  background: none;
+  border: none;
+  padding: 0.8rem 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -0.5rem;
+}
+
+.nav-tab:hover {
+  color: #e74c3c;
+  background-color: rgba(231, 76, 60, 0.05);
+}
+
+.nav-tab.active {
+  color: #e74c3c;
+  border-bottom-color: #e74c3c;
+}
+
+/* Таб содржина */
+.lekar-tab-content {
+  display: none;
+  padding: 1.5rem 0;
+}
+
+.lekar-tab-content.active {
+  display: block;
+}
+
+.lekar-tab-content h3 {
+  color: #1a1a2e;
+  margin-bottom: 1.5rem;
+  font-size: 1.5rem;
+  text-align: center; /* Центрирање на насловот */
+}
+
+/* Форма за закажување на апарати */
+.aparati-form {
+  max-width: 600px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin: 0 auto; /* Центрирање на формата */
+}
+
+.aparati-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: center; /* Центрирање на елементите во form-group */
+}
+
+.aparati-form label {
+  font-weight: 600;
+  color: #333;
+  text-align: center; /* Центрирање на текстот во лабелите */
+  width: 100%;
+}
+
+.aparati-form input,
+.aparati-form select,
+.aparati-form textarea {
+  padding: 0.8rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: all 0.3s ease;
+  text-align: center; /* Центрирање на текстот во полињата */
+  width: 100%;
+}
+
+.aparati-form input:focus,
+.aparati-form select:focus,
+.aparati-form textarea:focus {
+  outline: none;
+  border-color: #e74c3c;
+  box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.1);
+}
+
+.aparati-form textarea {
+  resize: vertical;
+  min-height: 100px;
+  text-align: left; /* За textarea, текстот останува лево-порамнет за подобро читање */
+}
+
+.aparati-form button[type="submit"],
+.aparati-form .btn-primary {
+  align-self: center; /* Центрирање на копчето */
+  margin-top: 0.5rem;
+}
+
+/* Дежурства */
+.dezurstva-list {
+  margin-top: 1rem;
+}
+
+.dezurstva-container {
+  margin-top: 1rem;
+}
+
+.dezurstva-section {
+  margin-bottom: 2.5rem;
+}
+
+.dezurstva-section h3 {
+  color: #1a1a2e;
+  font-size: 1.4rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e74c3c;
+}
+
+.dezurstva-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.dezurstvo-card {
+  background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.dezurstvo-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.dezurstvo-card h4 {
+  color: #e74c3c;
+  margin-bottom: 0.8rem;
+  font-size: 1.2rem;
+}
+
+.dezurstvo-card p {
+  margin: 0.5rem 0;
+  color: #555;
+}
+
+.dezurstvo-card em {
+  color: #e74c3c;
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+.dezurstva-info {
+  padding: 2rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  text-align: center;
+  color: #666;
+}
+
+/* Форма хинт */
+.form-hint {
+  font-size: 0.85rem;
+  color: #999;
+  margin-top: 0.3rem;
+  display: block;
+}
+
+.doctor-info-modal {
+  background-color: #f8f9fa;
+  padding: 1.5rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.doctor-info-modal h3 {
+  color: #e74c3c;
+  margin-bottom: 0.5rem;
+}
+
+.doctor-info-modal p {
+  margin: 0.3rem 0;
+  color: #555;
+}
+
+.termini-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.termin-card {
+  background-color: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.termin-header {
+  border-bottom: 2px solid #e74c3c;
+  padding-bottom: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.termin-header h4 {
+  color: #e74c3c;
+  margin-bottom: 0.5rem;
+}
+
+.termin-header p {
+  margin: 0.3rem 0;
+  color: #666;
+}
+
+.termin-contact {
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #eee;
+}
+
+.termin-contact h5 {
+  color: #e74c3c;
+  margin-bottom: 0.8rem;
+  font-size: 1.1rem;
+}
+
+.termin-contact p {
+  margin: 0.3rem 0;
+  color: #555;
+}
+
+.pacient-osnovni-podatoci {
+  background: #f8f9fa;
+  padding: 1rem;
+  border-radius: 6px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.termin-medical h5 {
+  color: #e74c3c;
+  margin-bottom: 1rem;
+  font-size: 1.1rem;
+}
+
+.termin-medical {
+  margin-top: 1rem;
+}
+
+.medical-field {
+  margin-bottom: 1rem;
+}
+
+.medical-field label {
+  display: block;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.5rem;
+}
+
+.dijagnoza-input,
+.terapija-input {
+  width: 100%;
+  padding: 0.8rem;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  min-height: 80px;
+  resize: vertical;
+}
+
+.dijagnoza-input:focus,
+.terapija-input:focus {
+  outline: none;
+  border-color: #e74c3c;
+}
+
+.btn-save-termin {
+  background-color: #27ae60;
+  color: white;
+  border: none;
+  padding: 0.7rem 1.5rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 600;
+  transition: background-color 0.3s;
+  margin-top: 0.5rem;
+}
+
+.btn-save-termin:hover {
+  background-color: #229954;
+}
+
+/* Show More/Less Doctors Buttons */
+.lekari-controls {
+  text-align: center;
+  margin-top: 2rem;
+  padding: 1rem 0;
+}
+
+.btn-show-more,
+.btn-show-less {
+  background-color: #e74c3c;
+  color: white;
+  border: none;
+  padding: 0.8rem 2rem;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: background-color 0.3s;
+  margin: 0 0.5rem;
+}
+
+.btn-show-more:hover,
+.btn-show-less:hover {
+  background-color: #c0392b;
+}
+
+.btn-show-more:active,
+.btn-show-less:active {
+  transform: scale(0.98);
+}
+
+/* ============================================================================
+   АДМИНИСТРАЦИЈА - СТИЛОВИ ЗА УПРАВУВАЊЕ СО ДЕЖУРСТВА И ОГЛАСИ
+   ============================================================================ */
+
+/* Под-табови во административниот панел (Управување со дежурства / Управување со огласи) */
+.admin-sub-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+/* Стил за под-таб копчињата */
+.admin-sub-tab {
+  padding: 0.5rem 1rem;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-size: 0.9rem;
+  color: #888;
+  transition: all 0.3s;
+}
+
+/* Hover ефект за под-таб копчињата */
+.admin-sub-tab:hover {
+  color: #c0392b;
+  border-bottom-color: #c0392b;
+  background-color: rgba(192, 57, 43, 0.05);
+}
+
+/* Активен под-таб (избран) */
+.admin-sub-tab.active {
+  color: #c0392b;
+  border-bottom-color: #c0392b;
+  font-weight: 500;
+  background-color: rgba(192, 57, 43, 0.08);
+}
+
+/* Содржина на под-табовите (скриена по default) */
+.admin-sub-tab-content {
+  display: none;
+}
+
+/* Активна содржина на под-таб (прикажана) */
+.admin-sub-tab-content.active {
+  display: block;
+}
+
+/* Листа на административни ставки (дежурства или огласи) */
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Поединечна административна ставка (дежурство или оглас) */
+.admin-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  transition: box-shadow 0.3s;
+}
+
+/* Hover ефект за административна ставка */
+.admin-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Содржина на административната ставка (податоци) */
+.admin-item-content {
+  flex: 1;
+}
+
+.admin-item-content h4 {
+  margin: 0 0 0.5rem 0;
+  color: #2c3e50;
+  font-size: 1.1rem;
+}
+
+.admin-item-content p {
+  margin: 0.25rem 0;
+  color: #666;
+  font-size: 0.9rem;
+}
+
+/* Дејства на административната ставка (копчиња за уредување и бришење) */
+.admin-item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-left: 1rem;
+  align-items: flex-end;
+}
+
+/* Копчиња за уредување и бришење */
+.btn-edit,
+.btn-delete {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+  min-width: 60px;
+  text-align: center;
+}
+
+/* Копче за уредување (сина боја) */
+.btn-edit {
+  background-color: #e8f4f8;
+  color: #2980b9;
+  border-color: #b3d9e6;
+}
+
+.btn-edit:hover {
+  background-color: #d4e8f1;
+  border-color: #2980b9;
+  color: #1f5f8b;
+}
+
+/* Копче за бришење (црвена боја) */
+.btn-delete {
+  background-color: #fdeaea;
+  color: #c0392b;
+  border-color: #f5c6cb;
+}
+
+.btn-delete:hover {
+  background-color: #fbd5d5;
+  border-color: #c0392b;
+  color: #a93226;
+}
+
+/* Секундарно копче (за откажување) */
+.btn-secondary {
+  background-color: #e8e8e8;
+  color: #555;
+  padding: 0.5rem 1rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  margin-left: 0.5rem;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background-color: #d8d8d8;
+  border-color: #aaa;
+}
+
+/* Копче за додавање нови записи во администрација (+ Додади ново дежурство / + Додади нов оглас) */
+.btn-admin-add {
+  padding: 0.5rem 1rem !important;
+  font-size: 0.85rem !important;
+  background-color: #e8f4f8 !important;
+  color: #2980b9 !important;
+  border: 1px solid #b3d9e6 !important;
+  margin-bottom: 1rem;
+}
+
+.btn-admin-add:hover {
+  background-color: #d4e8f1 !important;
+  border-color: #2980b9 !important;
+  color: #1f5f8b !important;
+}
+
+/* Модални прозорци за административни форми */
+#dezurstvo-form-modal .modal-content,
+#oglas-form-modal .modal-content {
+  max-width: 600px;
+}
+
+/* Форма групи во административните форми */
+#dezurstvo-form .form-group,
+#oglas-form .form-group {
+  margin-bottom: 1rem;
+}
+
+/* Лабели во административните форми */
+#dezurstvo-form label,
+#oglas-form label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+  color: #2c3e50;
+  font-size: 0.9rem;
+}
+
+/* Input полиња во административните форми */
+#dezurstvo-form input[type="text"],
+#dezurstvo-form input[type="date"],
+#dezurstvo-form input[type="time"],
+#dezurstvo-form select,
+#dezurstvo-form textarea,
+#oglas-form input[type="text"],
+#oglas-form input[type="date"],
+#oglas-form select {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+/* Textarea во формата за дежурство */
+#dezurstvo-form textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+/* Примарно копче во административните форми (Зачувај) */
+#dezurstvo-form .btn-primary,
+#oglas-form .btn-primary {
+  padding: 0.5rem 1rem !important;
+  font-size: 0.85rem !important;
+  background-color: #e8f4f8 !important;
+  color: #2980b9 !important;
+  border: 1px solid #b3d9e6 !important;
+  box-shadow: none !important;
+  text-transform: none !important;
+  font-weight: 500 !important;
+}
+
+#dezurstvo-form .btn-primary:hover,
+#oglas-form .btn-primary:hover {
+  background-color: #d4e8f1 !important;
+  border-color: #2980b9 !important;
+  color: #1f5f8b !important;
+  transform: none !important;
+}
+
+/* Секундарно копче во административните форми (Откажи) */
+#dezurstvo-form .btn-secondary,
+#oglas-form .btn-secondary {
+  padding: 0.5rem 1rem !important;
+  font-size: 0.85rem !important;
+}

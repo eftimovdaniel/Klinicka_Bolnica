@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="mk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Детали за оддел - Клиничка Болница Штип</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .oddel-details-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1rem;
+    }
+    
+    .oddel-header {
+      text-align: center;
+      margin-bottom: 3rem;
+      padding-bottom: 2rem;
+      border-bottom: 3px solid #e74c3c;
+    }
+    
+    .oddel-header h1 {
+      font-size: 2.5rem;
+      color: #1a1a2e;
+      margin-bottom: 1rem;
+    }
+    
+    .oddel-description {
+      background: white;
+      padding: 2rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+      margin-bottom: 3rem;
+    }
+    
+    .oddel-description h2 {
+      color: #e74c3c;
+      margin-bottom: 1rem;
+      font-size: 1.8rem;
+    }
+    
+    .oddel-description p {
+      color: #666;
+      line-height: 1.8;
+      font-size: 1.1rem;
+    }
+    
+    .lekari-section {
+      margin-top: 3rem;
+      width: 100%;
+    }
+    
+    .lekari-section h2 {
+      font-size: 2rem;
+      color: #1a1a2e;
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+    
+    .lekari-grid-details {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 2rem;
+      margin-top: 2rem;
+      justify-items: stretch;
+      width: 100%;
+    }
+    
+    /* 1 лекар - центриран */
+    .lekari-grid-details.lekari-single {
+      grid-template-columns: 1fr !important;
+      justify-items: center !important;
+      max-width: 400px !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+      width: 100%;
+      display: grid !important;
+    }
+    
+    .lekari-grid-details.lekari-single .lekar-card {
+      margin: 0 auto !important;
+      width: 100%;
+      max-width: 280px;
+    }
+    
+    /* 2 лекари - центрирани */
+    .lekari-grid-details.lekari-double {
+      grid-template-columns: repeat(2, 1fr) !important;
+      max-width: 800px !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+      width: 100%;
+      display: grid !important;
+    }
+    
+    /* 3 лекари - центрирани */
+    .lekari-grid-details.lekari-triple {
+      grid-template-columns: repeat(3, 1fr) !important;
+      max-width: 1000px !important;
+      margin-left: auto !important;
+      margin-right: auto !important;
+      width: 100%;
+      display: grid !important;
+    }
+    
+    /* 4+ лекари - не центрирани, цел ред */
+    .lekari-grid-details.lekari-multiple {
+      grid-template-columns: repeat(4, 1fr) !important;
+      justify-items: stretch !important;
+      max-width: 100% !important;
+      margin-left: 0 !important;
+      margin-right: 0 !important;
+    }
+    
+    @media (max-width: 1200px) {
+      .lekari-grid-details.lekari-multiple {
+        grid-template-columns: repeat(3, 1fr);
+      }
+      
+      .lekari-grid-details.lekari-triple {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+    
+    @media (max-width: 768px) {
+      .lekari-grid-details.lekari-multiple {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      .lekari-grid-details.lekari-triple {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      
+      .lekari-grid-details.lekari-double {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+    
+    @media (max-width: 480px) {
+      .lekari-grid-details {
+        grid-template-columns: 1fr;
+      }
+      
+      .lekari-grid-details.lekari-single,
+      .lekari-grid-details.lekari-double,
+      .lekari-grid-details.lekari-triple,
+      .lekari-grid-details.lekari-multiple {
+        grid-template-columns: 1fr;
+        max-width: 100%;
+      }
+    }
+    
+    .back-button {
+      display: inline-block;
+      margin-bottom: 2rem;
+      padding: 0.7rem 1.5rem;
+      background: #e74c3c;
+      color: white;
+      text-decoration: none;
+      border-radius: 4px;
+      font-weight: 600;
+      transition: background-color 0.3s;
+    }
+    
+    .back-button:hover {
+      background: #c0392b;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: 2rem;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="container">
+      <div class="nav-brand">
+        <a href="index.html">Клиничка Болница Штип</a>
+      </div>
+      <div class="nav-links">
+        <a href="index.html#uslugi" class="nav-link">Услуги</a>
+        <a href="index.html#lekari" class="nav-link">Лекари</a>
+        <a href="index.html#kontakt" class="nav-link">Контакт</a>
+      </div>
+    </div>
+  </nav>
+
+  <div class="oddel-details-container">
+    <a href="index.html#uslugi" class="back-button">← Назад кон услуги</a>
+    
+    <div class="oddel-header">
+      <h1 id="oddel-title">Вчитувам...</h1>
+    </div>
+    
+    <div class="oddel-description">
+      <h2>За одделот</h2>
+      <p id="oddel-description-text">Вчитувам опис...</p>
+    </div>
+    
+    <div class="lekari-section">
+      <h2>Наши лекари</h2>
+      <div id="lekari-list-details" class="lekari-grid-details">
+        <div class="loading">Вчитувам лекари...</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="oddel-details.js"></script>
+</body>
+</html>
