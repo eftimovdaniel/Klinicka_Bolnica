@@ -13,9 +13,11 @@ let currentPacient = null;  // Податоци за моментално нај
 let displayedDoctorsCount = 8;  // Почетно прикажуваме 8 лекари (2 реда x 4 колони), може да се зголеми со "Прикажи повеќе"
 
 
-// konstanda za da mi se avtomatski mene godinata vo footerot
+// Константа за автоматско менување на годината во footer-от
 const yearSpan = document.getElementById('year');
-yearSpan.textContent = new Date().getFullYear();
+if (yearSpan) {
+  yearSpan.textContent = new Date().getFullYear();
+}
 // ============================================================================
 // ФУНКЦИИ ЗА ВЧИТУВАЊЕ И ПРИКАЗУВАЊЕ НА ЛЕКАРИ
 // ============================================================================
@@ -2450,22 +2452,22 @@ async function registerLekar() {
     submitBtn.textContent = 'Вчитувам...';
     
     try {
-    const response = await fetch('http://localhost:8000/lekari/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        ime,
-        prezime,
-        specialty,
-        email,
-        password
-      })
-    });
-    
-    const data = await response.json();
-    
+      const response = await fetch('http://localhost:8000/lekari/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ime,
+          prezime,
+          specialty,
+          email,
+          password
+        })
+      });
+      
+      const data = await response.json();
+      
       if (!response.ok) {
         showLekarRegisterError(data.detail || 'Грешка при регистрација.');
         submitBtn.disabled = false;
@@ -2484,6 +2486,7 @@ async function registerLekar() {
       submitBtn.textContent = originalText;
     }
   } else {
+    // Ако нема submit button, испрати без loading state
     try {
       const response = await fetch('http://localhost:8000/lekari/register', {
         method: 'POST',
