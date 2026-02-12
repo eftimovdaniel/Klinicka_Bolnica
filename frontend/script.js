@@ -1083,6 +1083,19 @@ function showLekarTab(tabName) {
   // Додади active класа на избраното копче
   event.target.classList.add('active');
   
+  // Ако е табот за пациенти, вчитај го распоредот за денешниот датум
+  if (tabName === 'pacienti') {
+    if (currentLekar && currentLekar.doctor_ID) {
+      const datumInput = document.getElementById('raspored-datum-select');
+      if (datumInput) {
+        const today = new Date();
+        const todayStr = today.toISOString().split('T')[0];
+        datumInput.value = todayStr;
+        loadMojRaspored();
+      }
+    }
+  }
+  
   // Ако е табот за дежурства, вчитај ги податоците за дежурства
   if (tabName === 'dezurstva') {
     loadDezurstva();
@@ -1149,6 +1162,14 @@ function displayLekarDashboard(data) {
 
   // Прикажи ги термините на лекарот
   displayLekarTermini(data);
+  
+  // Автоматски вчитувај го распоредот за денешниот датум
+  if (document.getElementById('raspored-datum-select')) {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+    document.getElementById('raspored-datum-select').value = todayStr;
+    loadMojRaspored();
+  }
 }
 
 // Функција за вчитување на распоред на дежурства
@@ -1915,6 +1936,86 @@ function showLoginError(message) {
   setTimeout(() => {
     errorMessage.style.display = 'none';
   }, 5000);
+}
+
+// Функција за вчитување на распоред за одреден датум користејќи го новиот endpoint
+// Користи GET /lekari/moj-raspored/{lekar_id} за да го прикаже распоредот на лекарот
+window.loadMojRaspored = async function loadMojRaspored() {
+  if (!currentLekar || !currentLekar.doctor_ID) {
+    alert('Не сте најавени како лекар.');
+    return;
+  }
+
+  const datumInput = document.getElementById('raspored-datum-select');
+  const terminiList = document.getElementById('lekar-termini-list');
+  
+  if (!terminiList) {
+    return;
+  }
+
+  // Ако нема избран датум, користи денешен
+  let datum = '';
+  if (datumInput && datumInput.value) {
+    datum = datumInput.value;
+  } else {
+    const today = new Date();
+    datum = today.toISOString().split('T')[0];
+    if (datumInput) {
+      datumInput.value = datum;
+    }
+  }
+
+  terminiList.innerHTML = '<div class="loading">Вчитувам распоред...</div>';
+
+  try {
+    const url = `http://localhost:8000/lekari/moj-raspored/${currentLekar.doctor_ID}${datum ? `?datum=${datum}` : ''}`;
+    const res = await fetch(url);
+
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || 'Грешка при вчитување на распоред');
+    }
+
+    const data = await res.json();
+    
+    if (!data.raspored || data.raspored.length === 0) {
+      terminiList.innerHTML = `<div class="loading">Немате закажани термини за ${data.datum || datum}.</div>`;
+      return;
+    }
+
+    terminiList.innerHTML = '';
+    
+    // Прикажи датумот
+    const datumHeader = document.createElement('div');
+    datumHeader.style.cssText = 'margin-bottom: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;';
+    datumHeader.innerHTML = `<h4 style="margin: 0; color: #2c3e50;">Распоред за ${data.datum || datum}</h4>`;
+    terminiList.appendChild(datumHeader);
+
+    // Прикажи ги термините сортирани по време
+    data.raspored.forEach(termin => {
+      const terminDiv = document.createElement('div');
+      terminDiv.className = 'termin-card';
+      
+      terminDiv.innerHTML = `
+        <div class="termin-header">
+          <h4>${termin.ime_puno || termin.ime_pacient || 'Нема име'}</h4>
+          <p><strong>Време:</strong> ${termin.vreme}</p>
+          <p><strong>Статус:</strong> <span style="color: ${termin.status === 'закажан' ? '#27ae60' : '#e74c3c'}">${termin.status || 'закажан'}</span></p>
+        </div>
+        <div class="termin-contact">
+          <h5>Податоци за пациентот:</h5>
+          <div class="pacient-osnovni-podatoci">
+            <p><strong>Име:</strong> ${termin.ime_pacient || 'Нема'}</p>
+            <p><strong>Презиме:</strong> ${termin.prezime_pacient || 'Нема'}</p>
+            <p><strong>Е-пошта:</strong> ${termin.email_pacient || 'Нема'}</p>
+          </div>
+        </div>
+      `;
+      terminiList.appendChild(terminDiv);
+    });
+  } catch (err) {
+    terminiList.innerHTML = `<div class="loading" style="color: red;">Грешка: ${err.message}</div>`;
+  }
 }
 
 // Функција за прикажување на термини за најавениот лекар

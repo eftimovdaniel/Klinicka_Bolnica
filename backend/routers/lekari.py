@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, date
 import hashlib
 from database import get_connection
 from routers.utils import debug_log, transliterate_mk_to_lat
@@ -289,6 +289,116 @@ def get_lekari_termini(email: str):             # funkcija za vrakanje na termin
     except Exception as e:              # dokolku se javi bilo koja druga greska   
         raise HTTPException(status_code=500, detail=str(e))   # statusen kod 500 i objasnuvanje smesteno vo e
     finally:                        # se proveruva dali ima konekcija, ako ima se zatvara, se izvrasuva bez razlika dali ima ili nema greksa
+        if conn and conn.is_connected():
+            conn.close()
+
+
+@router.get("/moj-raspored/{lekar_id}")
+def get_moj_raspored(lekar_id: int, datum: Optional[str] = None):
+    """
+    Endpoint за приказ на распоред на термини за одреден лекар.
+    Прифаќа lekar_id и опционален параметар datum (ако нема датум, користи го денешниот).
+    Прави JOIN со табелата patient за да ги извлече името и презимето на пациентот.
+    Резултатот е сортиран по време.
+    """
+    conn = None
+    try:
+        # Ако нема датум, користи го денешниот
+        if not datum:
+            datum = datetime.now().date().strftime("%Y-%m-%d")
+        else:
+            # Проверка за ISO формат
+            if "T" in datum:
+                datum = datum.split("T")[0]
+        
+        # Валидација на датумот
+        try:
+            appointment_date = datetime.strptime(datum, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Неважечки формат на датум")
+        
+        conn = get_connection()
+        db_cursor = conn.cursor(dictionary=True)
+        
+        # Проверка дали лекарот постои
+        db_cursor.execute("SELECT doctor_ID, name, surname FROM Doctors WHERE doctor_ID = %s", (lekar_id,))
+        doctor = db_cursor.fetchone()
+        if not doctor:
+            raise HTTPException(status_code=404, detail="Лекар не е пронајден")
+        
+        # Земи ги термините за лекарот на одреден датум со JOIN со patient табелата
+        # JOIN преку email_pacient од Termin_pregled со email од patient табелата
+        db_cursor.execute("""
+            SELECT 
+                tp.termin_ID,
+                tp.datum_pregled,
+                TIME(tp.vreme_pregled) as vreme_pregled,
+                tp.status_pregled,
+                tp.Ime_pacient,
+                tp.email_pacient,
+                COALESCE(p.name_patient, '') AS ime_pacient,
+                COALESCE(p.surname_patient, '') AS prezime_pacient
+            FROM Termin_pregled tp
+            LEFT JOIN patient p ON LOWER(TRIM(tp.email_pacient)) = LOWER(TRIM(p.email))
+            WHERE tp.doctor_ID = %s 
+                AND DATE(tp.datum_pregled) = %s
+                AND (tp.status_pregled IS NULL OR tp.status_pregled != 'откажан')
+            ORDER BY tp.vreme_pregled ASC
+        """, (lekar_id, datum))
+        
+        rows = db_cursor.fetchall()
+        raspored = []
+        
+        for r in rows:
+            # Форматирање на времето
+            vreme = r.get("vreme_pregled")
+            if vreme and hasattr(vreme, "strftime"):
+                vreme_str = vreme.strftime("%H:%M")
+            elif vreme and hasattr(vreme, "total_seconds"):
+                s = int(vreme.total_seconds())
+                vreme_str = f"{s // 3600:02d}:{(s % 3600) // 60:02d}"
+            else:
+                vreme_str = str(vreme)[:5] if vreme else ""
+            
+            # Ако имаме име и презиме од patient табелата, користи ги, инаку користи Ime_pacient
+            ime_pacient = ""
+            prezime_pacient = ""
+            
+            if r.get("ime_pacient") and r.get("prezime_pacient"):
+                ime_pacient = r.get("ime_pacient", "").strip()
+                prezime_pacient = r.get("prezime_pacient", "").strip()
+            elif r.get("Ime_pacient"):
+                # Ако нема JOIN, користи го комбинираното име од Termin_pregled
+                ime_puno = r.get("Ime_pacient", "").strip()
+                parts = ime_puno.split(" ", 1)
+                ime_pacient = parts[0] if len(parts) > 0 else ""
+                prezime_pacient = parts[1] if len(parts) > 1 else ""
+            
+            raspored.append({
+                "termin_ID": r.get("termin_ID"),
+                "datum": datum,
+                "vreme": vreme_str,
+                "status": r.get("status_pregled") or "закажан",
+                "ime_pacient": ime_pacient,
+                "prezime_pacient": prezime_pacient,
+                "ime_puno": f"{ime_pacient} {prezime_pacient}".strip() or r.get("Ime_pacient", "").strip(),
+                "email_pacient": r.get("email_pacient", "").strip()
+            })
+        
+        return {
+            "lekar": {
+                "doctor_ID": doctor["doctor_ID"],
+                "ime": doctor["name"],
+                "prezime": doctor["surname"]
+            },
+            "datum": datum,
+            "raspored": raspored
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
         if conn and conn.is_connected():
             conn.close()
 

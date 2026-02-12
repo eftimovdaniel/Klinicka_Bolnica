@@ -1,6 +1,13 @@
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import Response
 from datetime import datetime
 from database import get_connection
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+from reportlab.lib import colors
+from io import BytesIO
 
 router = APIRouter(prefix="/termini", tags=["termini"])
 
@@ -161,4 +168,220 @@ async def update_termin_dijagnoza_terapija(termin_id: int, request: Request):   
         if conn and conn.is_connected():
             conn.close()
 
+
+@router.get("/izvestaj-pdf/{termin_id}")
+async def generate_izvestaj_pdf(termin_id: int):
+    """
+    Генерира PDF извештај за одреден термин.
+    Вклучува податоци за пациентот, лекарот, дијагноза и терапија.
+    """
+    conn = None
+    try:
+        conn = get_connection()
+        db_cursor = conn.cursor(dictionary=True)
+        
+        # Земи ги податоците за терминот со JOIN на Doctors и patient табелата
+        db_cursor.execute("""
+            SELECT 
+                tp.termin_ID,
+                tp.datum_pregled,
+                TIME(tp.vreme_pregled) as vreme_pregled,
+                tp.ime_pacient,
+                tp.email_pacient,
+                tp.telefon_pacient,
+                tp.dijagnoza,
+                tp.terapija,
+                tp.ime_lekar,
+                tp.specijalnost_termin,
+                d.name as lekar_ime,
+                d.surname as lekar_prezime,
+                d.email as lekar_email,
+                d.specialty as lekar_specijalnost,
+                COALESCE(p.name_patient, '') AS pacient_ime,
+                COALESCE(p.surname_patient, '') AS pacient_prezime
+            FROM Termin_pregled tp
+            LEFT JOIN Doctors d ON tp.doctor_ID = d.doctor_ID
+            LEFT JOIN patient p ON LOWER(TRIM(tp.email_pacient)) = LOWER(TRIM(p.email))
+            WHERE tp.termin_ID = %s
+        """, (termin_id,))
+        
+        termin = db_cursor.fetchone()
+        
+        if not termin:
+            raise HTTPException(status_code=404, detail="Термин не е пронајден")
+        
+        # Форматирај го времето
+        vreme = termin.get("vreme_pregled")
+        if vreme and hasattr(vreme, "strftime"):
+            vreme_str = vreme.strftime("%H:%M")
+        elif vreme and hasattr(vreme, "total_seconds"):
+            s = int(vreme.total_seconds())
+            vreme_str = f"{s // 3600:02d}:{(s % 3600) // 60:02d}"
+        else:
+            vreme_str = str(vreme)[:5] if vreme else ""
+        
+        # Форматирај го датумот
+        datum = termin.get("datum_pregled")
+        if datum:
+            if isinstance(datum, str):
+                datum_obj = datetime.strptime(datum, "%Y-%m-%d").date()
+            else:
+                datum_obj = datum if hasattr(datum, 'strftime') else datetime.strptime(str(datum), "%Y-%m-%d").date()
+            datum_str = datum_obj.strftime("%d.%m.%Y")
+        else:
+            datum_str = "Н/П"
+        
+        # Извлечи име и презиме на пациентот
+        if termin.get("pacient_ime") and termin.get("pacient_prezime"):
+            pacient_ime = termin.get("pacient_ime", "").strip()
+            pacient_prezime = termin.get("pacient_prezime", "").strip()
+            pacient_ime_puno = f"{pacient_ime} {pacient_prezime}".strip()
+        else:
+            # Ако нема JOIN, користи го комбинираното име од Termin_pregled
+            pacient_ime_puno = termin.get("ime_pacient", "").strip()
+            parts = pacient_ime_puno.split(" ", 1)
+            pacient_ime = parts[0] if len(parts) > 0 else ""
+            pacient_prezime = parts[1] if len(parts) > 1 else ""
+        
+        # Извлечи име и презиме на лекарот
+        if termin.get("lekar_ime") and termin.get("lekar_prezime"):
+            lekar_ime_puno = f"{termin.get('lekar_ime')} {termin.get('lekar_prezime')}".strip()
+        else:
+            lekar_ime_puno = termin.get("ime_lekar", "").strip()
+        
+        # Креирај PDF во меморија
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=A4, 
+                                rightMargin=72, leftMargin=72,
+                                topMargin=72, bottomMargin=72)
+        
+        # Стилови
+        styles = getSampleStyleSheet()
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=18,
+            textColor=colors.HexColor('#e74c3c'),
+            spaceAfter=30,
+            alignment=1,  # Center alignment
+            fontName='Helvetica-Bold'
+        )
+        
+        heading_style = ParagraphStyle(
+            'CustomHeading',
+            parent=styles['Heading2'],
+            fontSize=14,
+            textColor=colors.HexColor('#2c3e50'),
+            spaceAfter=12,
+            spaceBefore=12,
+            fontName='Helvetica-Bold'
+        )
+        
+        normal_style = styles['Normal']
+        normal_style.fontSize = 11
+        normal_style.leading = 14
+        
+        # Содржина на PDF-от
+        story = []
+        
+        # Наслов
+        story.append(Paragraph("Клиничка Болница Штип - Медицински Извештај", title_style))
+        story.append(Spacer(1, 0.3*inch))
+        
+        # Податоци за пациентот
+        story.append(Paragraph("Податоци за пациентот:", heading_style))
+        pacient_data = [
+            ["Име и презиме:", pacient_ime_puno or "Н/П"],
+            ["Е-пошта:", termin.get("email_pacient", "Н/П")],
+            ["Телефон:", termin.get("telefon_pacient", "Н/П")],
+        ]
+        pacient_table = Table(pacient_data, colWidths=[2*inch, 4*inch])
+        pacient_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8f9fa')),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+        ]))
+        story.append(pacient_table)
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Податоци за лекарот
+        story.append(Paragraph("Податоци за лекарот:", heading_style))
+        lekar_data = [
+            ["Име и презиме:", lekar_ime_puno or "Н/П"],
+            ["Специјалност:", termin.get("lekar_specijalnost") or termin.get("specijalnost_termin") or "Н/П"],
+            ["Е-пошта:", termin.get("lekar_email", "Н/П")],
+        ]
+        lekar_table = Table(lekar_data, colWidths=[2*inch, 4*inch])
+        lekar_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8f9fa')),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+        ]))
+        story.append(lekar_table)
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Податоци за терминот
+        story.append(Paragraph("Податоци за терминот:", heading_style))
+        termin_data = [
+            ["Датум:", datum_str],
+            ["Време:", vreme_str or "Н/П"],
+        ]
+        termin_table = Table(termin_data, colWidths=[2*inch, 4*inch])
+        termin_table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8f9fa')),
+            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+            ('FONTSIZE', (0, 0), (-1, -1), 11),
+            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+            ('TOPPADDING', (0, 0), (-1, -1), 8),
+            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+        ]))
+        story.append(termin_table)
+        story.append(Spacer(1, 0.3*inch))
+        
+        # Дијагноза
+        story.append(Paragraph("Дијагноза:", heading_style))
+        dijagnoza_text = termin.get("dijagnoza", "") or "Нема внесена дијагноза."
+        story.append(Paragraph(dijagnoza_text.replace('\n', '<br/>'), normal_style))
+        story.append(Spacer(1, 0.2*inch))
+        
+        # Терапија
+        story.append(Paragraph("Терапија:", heading_style))
+        terapija_text = termin.get("terapija", "") or "Нема внесена терапија."
+        story.append(Paragraph(terapija_text.replace('\n', '<br/>'), normal_style))
+        story.append(Spacer(1, 0.3*inch))
+        
+        # Генерирај PDF
+        doc.build(story)
+        buffer.seek(0)
+        pdf_content = buffer.getvalue()
+        buffer.close()
+        
+        # Врати PDF како Response
+        return Response(
+            content=pdf_content,
+            media_type='application/pdf',
+            headers={
+                "Content-Disposition": f'attachment; filename="izvestaj_termin_{termin_id}.pdf"'
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка при генерирање на PDF: {str(e)}")
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
 

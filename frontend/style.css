@@ -1459,29 +1459,34 @@ html {
 /* Десна страна - Форма секција */
 .login-form-section {
   flex: 1;
-  padding: 2rem;
-  background: #ffffff;
+  padding: 2.5rem;
+  background: linear-gradient(to bottom, #ffffff, #fafbfc);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  border-left: 1px solid #f0f0f0;
 }
 
 .login-form-section .login-header {
-  margin-bottom: 1.25rem;
+  margin-bottom: 2rem;
   text-align: center;
+  padding-bottom: 1.5rem;
+  border-bottom: 2px solid #f0f0f0;
 }
 
 .login-form-section .login-header h2 {
-  font-size: 1.4rem;
+  font-size: 1.6rem;
   color: #1a1a2e;
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.5rem;
   font-weight: 700;
+  letter-spacing: -0.5px;
 }
 
 .login-form-section .login-subtitle {
-  color: #666;
-  font-size: 0.85rem;
+  color: #64748b;
+  font-size: 0.9rem;
+  font-weight: 400;
 }
 
 /* Doctor Login Modal - Подобрен изглед (за назад компатибилност) */
@@ -1655,91 +1660,128 @@ html {
 }
 
 /* Стилови за регистрациска форма за лекари - малку поголеми input полиња */
+/* Стилови за регистрациска форма за лекари - модерен и убав дизајн */
 #lekar-register-form {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
   position: relative;
   z-index: 2;
+  padding: 0.5rem 0;
+}
+
+#lekar-register-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  position: relative;
 }
 
 #lekar-register-form input {
-  padding: 1.1rem 1.25rem;
-  border: 2px solid #e0e0e0;
+  padding: 1rem 1.25rem;
+  border: 2px solid #e1e8ed;
   border-radius: 12px;
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-family: inherit;
-  transition: all 0.3s ease;
-  background-color: #fff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(to bottom, #ffffff, #fafbfc);
   width: 100%;
   box-sizing: border-box;
   position: relative;
   z-index: 3;
+  color: #2c3e50;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
 #lekar-register-form input:hover {
-  border-color: #c0c0c0;
+  border-color: #cbd5e0;
+  background: linear-gradient(to bottom, #ffffff, #f7f9fa);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
 }
 
 #lekar-register-form input:focus {
   outline: none;
   border-color: #e74c3c;
-  box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.1);
-  transform: translateY(-1px);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.12), 0 4px 12px rgba(231, 76, 60, 0.15);
+  transform: translateY(-2px);
 }
 
 #lekar-register-form input::placeholder {
-  color: #999;
+  color: #94a3b8;
   opacity: 1;
+  font-size: 0.95rem;
+  font-weight: 400;
 }
 
 #lekar-register-form .form-group label {
   font-weight: 600;
-  color: #333;
+  color: #444;
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
 }
 
-/* Стилови за регистрациска форма за пациенти - малку поголеми input полиња */
+/* Стилови за регистрациска форма за пациенти - модерен и убав дизајн */
 #pacient-register-form {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
   position: relative;
   z-index: 2;
+  padding: 0.5rem 0;
+}
+
+#pacient-register-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  position: relative;
 }
 
 #pacient-register-form input {
-  padding: 1.1rem 1.25rem;
-  border: 2px solid #e0e0e0;
+  padding: 1rem 1.25rem;
+  border: 2px solid #e1e8ed;
   border-radius: 12px;
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-family: inherit;
-  transition: all 0.3s ease;
-  background-color: #fff;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  background: linear-gradient(to bottom, #ffffff, #fafbfc);
   width: 100%;
   box-sizing: border-box;
   position: relative;
   z-index: 3;
+  color: #2c3e50;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
 #pacient-register-form input:hover {
-  border-color: #c0c0c0;
+  border-color: #cbd5e0;
+  background: linear-gradient(to bottom, #ffffff, #f7f9fa);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
 }
 
 #pacient-register-form input:focus {
   outline: none;
   border-color: #e74c3c;
-  box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.1);
-  transform: translateY(-1px);
+  background: #ffffff;
+  box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.12), 0 4px 12px rgba(231, 76, 60, 0.15);
+  transform: translateY(-2px);
 }
 
 #pacient-register-form input::placeholder {
-  color: #999;
+  color: #94a3b8;
   opacity: 1;
+  font-size: 0.95rem;
+  font-weight: 400;
 }
 
 #pacient-register-form .form-group label {
   font-weight: 600;
-  color: #333;
+  color: #444;
+  font-size: 0.95rem;
+  margin-bottom: 0.25rem;
 }
 
 .error-message {
@@ -1774,18 +1816,20 @@ html {
 .btn-login-submit {
   background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
   color: white;
-  padding: 0.95rem 2rem;
+  padding: 1.1rem 2rem;
   border: none;
-  border-radius: 10px;
-  font-size: 1rem;
-  font-weight: 600;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
   cursor: pointer;
-  transition: all 0.3s ease;
-  margin-top: 0.5rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-top: 0.75rem;
   width: 100%;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+  box-shadow: 0 4px 15px rgba(231, 76, 60, 0.35), 0 2px 4px rgba(231, 76, 60, 0.2);
+  text-transform: uppercase;
 }
 
 .btn-login-submit::before {
@@ -1795,8 +1839,8 @@ html {
   left: -100%;
   width: 100%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.25), transparent);
+  transition: left 0.6s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-login-submit:hover::before {
@@ -1804,13 +1848,14 @@ html {
 }
 
 .btn-login-submit:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(231, 76, 60, 0.4);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(231, 76, 60, 0.45), 0 4px 8px rgba(231, 76, 60, 0.3);
+  background: linear-gradient(135deg, #ff5252 0%, #e74c3c 100%);
 }
 
 .btn-login-submit:active {
-  transform: translateY(0);
-  box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(231, 76, 60, 0.35);
 }
 
 .btn-login-submit:disabled {
@@ -2528,4 +2573,22 @@ html {
 #oglas-form .btn-secondary {
   padding: 0.5rem 1rem !important;
   font-size: 0.85rem !important;
+}
+
+/* Копче за вчитување на распоред - помало и без сјај */
+.btn-raspored-load {
+  background-color: #e74c3c;
+  color: white;
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  box-shadow: none;
+}
+
+.btn-raspored-load:hover {
+  background-color: #c0392b;
 }

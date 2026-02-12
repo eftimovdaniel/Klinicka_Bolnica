@@ -208,3 +208,4 @@ zalgolib==0.2.2
 zipp==3.23.0
 zope.interface==8.2
 zstandard==0.25.0
+reportlab==4.2.5
