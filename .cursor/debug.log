@@ -42,3 +42,7 @@
 {"location": "main.py:229", "message": "login_lekar: Data parsed", "data": {"username": "marija.hubreva", "has_password": true}, "timestamp": "2026-02-12T15:32:42.627777", "runId": "run1", "hypothesisId": "E"}
 {"location": "main.py:261", "message": "login_lekar: Doctor found", "data": {"doctor_id": 60, "has_stored_password": false}, "timestamp": "2026-02-12T15:32:42.640881", "runId": "run1", "hypothesisId": "E"}
 {"location": "main.py:314", "message": "login_lekar: Success", "data": {"doctor_id": 60, "termini_count": 1}, "timestamp": "2026-02-12T15:32:42.642522", "runId": "run1", "hypothesisId": "E"}
+{"location": "main.py:226", "message": "login_lekar: Request received", "data": {"timestamp": "2026-02-17T15:12:50.875915"}, "timestamp": "2026-02-17T15:12:50.875948", "runId": "run1", "hypothesisId": "E"}
+{"location": "main.py:229", "message": "login_lekar: Data parsed", "data": {"username": "marija.hubreva", "has_password": true}, "timestamp": "2026-02-17T15:12:50.877673", "runId": "run1", "hypothesisId": "E"}
+{"location": "main.py:261", "message": "login_lekar: Doctor found", "data": {"doctor_id": 60, "has_stored_password": false}, "timestamp": "2026-02-17T15:12:50.888317", "runId": "run1", "hypothesisId": "E"}
+{"location": "main.py:314", "message": "login_lekar: Success", "data": {"doctor_id": 60, "termini_count": 1}, "timestamp": "2026-02-17T15:12:50.894138", "runId": "run1", "hypothesisId": "E"}
