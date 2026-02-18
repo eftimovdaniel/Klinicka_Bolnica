@@ -1,6 +1,3 @@
-// ============================================================================
-// ГЛОБАЛНИ ПРОМЕНЛИВИ
-// ============================================================================
 // Овие променливи се користат низ целиот код за чување на состојбата на апликацијата
 
 let allDoctors = [];  // Листа на сите лекари вчитани од API-то
@@ -12,6 +9,18 @@ let currentLekar = null;  // Податоци за моментално наја
 let currentPacient = null;  // Податоци за моментално најавениот пациент (за закажување на прегледи)
 let displayedDoctorsCount = 8;  // Почетно прикажуваме 8 лекари (2 реда x 4 колони), може да се зголеми со "Прикажи повеќе"
 
+// Врати го најавениот пациент од sessionStorage (за да може да закаже по враќање од oddel-details)
+(function restorePacientSession() {
+  try {
+    var saved = sessionStorage.getItem('currentPacient');
+    if (saved) {
+      var parsed = JSON.parse(saved);
+      if (parsed && (parsed.pacient_ID || parsed.email)) {
+        currentPacient = parsed;
+      }
+    }
+  } catch (e) {}
+})();
 
 // Константа за автоматско менување на годината во footer-от
 const yearSpan = document.getElementById('year');
@@ -163,36 +172,51 @@ function setupFilters() {
     specialtySelect.addEventListener('change', filterDoctors);
   }
 }
+// ФУНКЦИИ ЗА ЗАКАЖУВАЊЕ НА ПРЕГЛЕД
 
-// ============================================================================
-// ФУНКЦИИ ЗА ЗАКАЖУВАЊЕ НА ПРЕГЛЕДИ
-// ============================================================================
+// Прикажи/скриј линк „Закажи преглед“ во навигацијата кога пациентот е најавен
+function updateNavForPacient() {
+  var navLink = document.getElementById('nav-zakazi-pregled');
+  if (navLink) navLink.style.display = currentPacient ? 'inline-block' : 'none';
+  var callout = document.getElementById('lekari-pacient-callout');
+  if (callout) {
+    var dismissed = sessionStorage.getItem('lekari_callout_dismissed');
+    callout.style.display = (currentPacient && !dismissed) ? 'block' : 'none';
+  }
+}
+
+function dismissLekariCallout() {
+  sessionStorage.setItem('lekari_callout_dismissed', '1');
+  var callout = document.getElementById('lekari-pacient-callout');
+  if (callout) callout.style.display = 'none';
+}
+
+function closeAppointmentSuccess() {
+  var el = document.getElementById('appointment-success-overlay');
+  if (el) el.style.display = 'none';
+  currentPacient = null;
+  try { sessionStorage.removeItem('currentPacient'); } catch (e) {}
+  updateNavForPacient();
+}
 
 // Функција за отворање на модален прозорец за закажување на преглед
 // Според PDF: "Пациентот по извршување на снимката, треба да се консултира со лекар"
 // Оваа функција отвора модал каде пациентот може да избере датум и време за преглед
 window.openAppointmentModal = function (doctorId) {
-  selectedDoctor = allDoctors.find(d => d.doctor_ID === doctorId);
-
-  if (!selectedDoctor) {
-    alert('Лекарот не е пронајден.');
+  var id = typeof doctorId === 'number' ? doctorId : parseInt(doctorId, 10);
+  if (isNaN(id)) {
+    alert('Неважечки избор на лекар.');
     return;
   }
 
-  // Проверка дали пациентот е најавен
   if (!currentPacient) {
-    // Ако не е најавен, прикажи модал за најава
-    const loginModal = document.getElementById('pacient-login-modal');
-    // Зачувај го ID на лекарот за да се отвори модалот за закажување после најава
-    sessionStorage.setItem('pending_appointment_doctor_id', doctorId);
-    if (loginModal) {
-      loginModal.style.display = 'block';
-    }
+    sessionStorage.setItem('pending_appointment_doctor_id', id);
+    openPacientLoginModal();
     return;
   }
 
-  // Ако е најавен, отвори го модалот за закажување
-  openAppointmentModalInternal(doctorId);
+  selectedDoctor = allDoctors.find(function (d) { return Number(d.doctor_ID) === id; });
+  openAppointmentModalInternal(id);
 };
 
 // Внатрешна функција за отворање на модалот за закажување (кога пациентот е најавен)
@@ -204,22 +228,23 @@ async function openAppointmentModalInternal(doctorId) {
   const pacientNameDisplay = document.getElementById('pacient-name-display');
   const pacientEmailDisplay = document.getElementById('pacient-email-display');
 
-  // Ако selectedDoctor не е поставено, вчитај го од allDoctors или од API
-  if (!selectedDoctor || selectedDoctor.doctor_ID !== doctorId) {
-    selectedDoctor = allDoctors.find(d => d.doctor_ID === doctorId);
-    
-    // Ако не е пронајден во allDoctors, вчитај го од API
+  var doctorIdNum = typeof doctorId === 'number' ? doctorId : parseInt(doctorId, 10);
+  if (isNaN(doctorIdNum)) {
+    alert('Неважечки избор на лекар.');
+    return;
+  }
+  if (!selectedDoctor || Number(selectedDoctor.doctor_ID) !== doctorIdNum) {
+    selectedDoctor = allDoctors.find(function (d) { return Number(d.doctor_ID) === doctorIdNum; });
     if (!selectedDoctor) {
       try {
-        const res = await fetch(`http://localhost:8000/lekari`);
+        const res = await fetch('http://localhost:8000/lekari');
         if (res.ok) {
           const lekari = await res.json();
-          selectedDoctor = lekari.find(d => d.doctor_ID === doctorId);
-          if (selectedDoctor) {
-            allDoctors = lekari;
-          }
+          selectedDoctor = lekari.find(function (d) { return Number(d.doctor_ID) === doctorIdNum; });
+          if (selectedDoctor) allDoctors = lekari;
         }
       } catch (err) {
+        console.error('Грешка при вчитување на лекари за закажување:', err);
       }
     }
   }
@@ -239,33 +264,30 @@ async function openAppointmentModalInternal(doctorId) {
     doctorIdInput.value = selectedDoctor.doctor_ID || '';
   }
 
-  // Прикажи информации за најавениот пациент
   if (currentPacient && pacientInfoDisplay && pacientNameDisplay && pacientEmailDisplay) {
     pacientInfoDisplay.style.display = 'block';
     pacientNameDisplay.textContent = `${currentPacient.ime || ''} ${currentPacient.prezime || ''}`.trim();
     pacientEmailDisplay.textContent = currentPacient.email || '';
-    
-    // Пополни ги полињата со податоците од најавениот пациент
     document.getElementById('patient-ime').value = currentPacient.ime || '';
     document.getElementById('patient-prezime').value = currentPacient.prezime || '';
     document.getElementById('patient-email').value = currentPacient.email || '';
     document.getElementById('patient-telefon').value = currentPacient.telefon || '';
     const pacientIdInput = document.getElementById('pacient-id');
-    if (pacientIdInput) {
-      pacientIdInput.value = currentPacient.pacient_ID || '';
-    }
+    if (pacientIdInput) pacientIdInput.value = currentPacient.pacient_ID || '';
   } else {
-    if (pacientInfoDisplay) {
-      pacientInfoDisplay.style.display = 'none';
-    }
+    if (pacientInfoDisplay) pacientInfoDisplay.style.display = 'none';
   }
 
   selectedDate = null;
   selectedTime = null;
+  if (modal) {
+    modal.style.display = 'block';
+    modal.setAttribute('aria-hidden', 'false');
+  }
+  var calendarSection = modal ? modal.querySelector('.calendar-section') : null;
+  if (calendarSection) calendarSection.style.display = 'block';
   renderCalendar();
   clearTimeSlots();
-
-  modal.style.display = 'block';
 }
 
 // Close appointment modal
@@ -297,10 +319,7 @@ function setupModal() {
     }
   });
 }
-
-// ============================================================================
 // ФУНКЦИИ ЗА КАЛЕНДАР И ИЗБОР НА ДАТУМ И ВРЕМЕ
-// ============================================================================
 
 // Функција за рендерирање на календар за избор на датум за преглед
 // Според PDF: "Не се закажуваат прегледи во сабота и недела"
@@ -546,32 +565,36 @@ function setupAppointmentForm() {
       try {
         const response = await fetch('http://localhost:8000/termini', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(appointmentData)
         });
 
-        const result = await response.json();
+        var result = {};
+        try {
+          result = await response.json();
+        } catch (_) {
+          result = { detail: response.statusText || 'Грешка од сервер' };
+        }
 
         if (response.ok) {
-          alert('Успешно закажавте термин!');
-          document.getElementById('appointment-modal').style.display = 'none';
+          var mod = document.getElementById('appointment-modal');
+          if (mod) mod.style.display = 'none';
           form.reset();
+          selectedDate = null;
+          selectedTime = null;
+          selectedDoctor = null;
+          var successEl = document.getElementById('appointment-success-overlay');
+          if (successEl) successEl.style.display = 'flex';
         } else {
-          alert('Грешка: ' + (result.detail || 'Неуспешно закажување'));
+          alert('Грешка при закажување: ' + (result.detail || result.message || 'Обидете се повторно.'));
         }
       } catch (err) {
-        alert('Серверот не е достапен.');
+        alert('Серверот не е достапен. Проверете дали backend работи на http://localhost:8000');
       }
     });
   }
 }
-
-
-// ============================================================================
 // ФУНКЦИИ ЗА ВЧИТУВАЊЕ НА УСЛУГИ И ОДДЕЛИ
-// ============================================================================
 
 // Функција за вчитување на услуги/оддели од API-то
 // Според PDF: "Обезбедуваме комплетна здравствена нега преку нашите специјализирани оддели"
@@ -747,19 +770,13 @@ async function loadUslugi() {
   }
 }
 
-// ============================================================================
 // ФУНКЦИИ ЗА КАРИЕРА И АПЛИКАЦИИ
-// ============================================================================
-
 // Глобална променлива за чување на избраната позиција од кариера
 let selectedOglas = null;
 
 // Функција за вчитување на отворени позиции за работа од API-то
 // Според PDF: "Сакаш да бидеш дел од нашиот тим? Погледни ги отворените позиции и аплицирај!"
-// ============================================================================
 // КАРИЕРА - ОГЛАСИ ЗА РАБОТА
-// ============================================================================
-
 // Вчитување на огласи за работа од API-то
 // Ги вчитува сите активни огласи и ги прикажува во секцијата за кариера
 // Автоматски ги филтрира истечените огласи (повеќе од 5 дена од истекот)
@@ -950,11 +967,7 @@ function setupSmoothScroll() {
     });
   });
 }
-
-// ============================================================================
 // ИНИЦИЈАЛИЗАЦИЈА НА АПЛИКАЦИЈАТА
-// ============================================================================
-
 // Главна функција за иницијализација на апликацијата при вчитување на страницата
 // Според PDF: "Системот би бил со едноставен интерфејс за полесно управување"
 // Оваа функција ги повикува сите потребни функции за вчитување на податоци и поставување на event listeners
@@ -993,6 +1006,18 @@ function initialize() {
   setupSmoothScroll();
   setupLekarLogin();
   setupPacientAuth();
+  if (typeof setupAuth === 'function') setupAuth();
+  updateNavForPacient();
+
+  var pendingId = sessionStorage.getItem('pending_appointment_doctor_id');
+  if (pendingId) {
+    if (currentPacient) {
+      sessionStorage.removeItem('pending_appointment_doctor_id');
+      setTimeout(function () { openAppointmentModalInternal(parseInt(pendingId, 10)); }, 300);
+    } else {
+      openPacientLoginModal();
+    }
+  }
 }
 
 // Check if DOM is already loaded
@@ -1002,11 +1027,7 @@ if (document.readyState === 'loading') {
   // DOM is already loaded
   initialize();
 }
-
-// ============================================================================
 // ФУНКЦИИ ЗА НАЈАВА НА ЛЕКАРИ
-// ============================================================================
-
 // Функција за отворање на модален прозорец за најава на лекари
 // Според PDF: "За прикачување на мрежата секој вработен ќе треба да го внесе својот ID идентификатор и соодветна лозинка"
 function openLekarLoginModal() {
@@ -2118,61 +2139,7 @@ async function saveTerminChanges(terminId) {
     alert('Грешка при зачувување. Проверете дали серверот работи.');
   }
 }
-
-// Функција за поставување на event listeners за најава на лекари
-// Прикачува слушатели на формата за најава и модалните прозорци
-function setupLekarLogin() {
-  const loginForm = document.getElementById('lekar-login-form');
-  const registerForm = document.getElementById('lekar-register-form');
-  const loginModal = document.getElementById('lekar-login-modal');
-  const registerModal = document.getElementById('lekar-register-modal');
-  const dashboardModal = document.getElementById('lekar-dashboard-modal');
-  
-  if (loginForm) {
-    loginForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      loginLekar();
-    });
-  }
-  
-  if (registerForm) {
-    registerForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      registerLekar();
-    });
-  }
-  
-  if (loginModal) {
-    window.addEventListener('click', (e) => {
-      if (e.target === loginModal) {
-        closeLekarLoginModal();
-      }
-    });
-  }
-  
-  if (registerModal) {
-    window.addEventListener('click', (e) => {
-      if (e.target === registerModal) {
-        closeLekarRegisterModal();
-      }
-    });
-  }
-
-  if (dashboardModal) {
-    window.addEventListener('click', (e) => {
-      if (e.target === dashboardModal) {
-        closeLekarDashboardModal();
-      }
-    });
-  }
-  
-  // Поставување на формата за апарати
-  setupAparatiForm();
-}
-
-// ============================================================================
 // ФУНКЦИИ ЗА ПРИКАЗУВАЊЕ НА ПОВЕЌЕ/ПОМАЛКУ ЛЕКАРИ
-// ============================================================================
 
 // Функција за прикажување на повеќе лекари (додава 8 нови лекари во приказот)
 function showMoreDoctors() {
@@ -2189,230 +2156,6 @@ function showLessDoctors() {
 window.loadLekari = loadLekari;
 window.loadKariera = loadKariera;
 window.loadUslugi = loadUslugi;
-// ============================================================================
-// ФУНКЦИИ ЗА НАЈАВА НА ПАЦИЕНТИ
-// ============================================================================
-
-// Функција за најава на пациент со е-пошта и лозинка
-// Според новата документација: "За пациенти: е-пошта + лозинка"
-async function loginPacient() {
-  const emailInput = document.getElementById('pacient-email-input');
-  const passwordInput = document.getElementById('pacient-password-input');
-  const submitBtn = document.getElementById('pacient-login-submit-btn');
-  const errorMessage = document.getElementById('pacient-login-error-message');
-  const btnText = submitBtn?.querySelector('.btn-text');
-  const btnLoading = submitBtn?.querySelector('.btn-loading');
-  
-  const email = emailInput.value.trim().toLowerCase();
-  const password = passwordInput.value;
-  
-  // Сокриј претходни грешки
-  if (errorMessage) {
-    errorMessage.style.display = 'none';
-    errorMessage.textContent = '';
-  }
-  
-  // Валидација
-  if (!email) {
-    showPacientLoginError('Внесете е-пошта');
-    emailInput?.focus();
-    return;
-  }
-  
-  // Email валидација
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    showPacientLoginError('Внесете валидна е-пошта');
-    emailInput?.focus();
-    return;
-  }
-  
-  if (!password) {
-    showPacientLoginError('Внесете лозинка');
-    passwordInput?.focus();
-    return;
-  }
-
-  // Прикажи loading state
-  if (submitBtn && btnText && btnLoading) {
-    submitBtn.disabled = true;
-    btnText.style.display = 'none';
-    btnLoading.style.display = 'inline-block';
-  }
-
-  try {
-    const res = await fetch('http://localhost:8000/pacienti/login', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        email: email,
-        password: password
-      })
-    });
-    
-    if (!res.ok) {
-      const error = await res.json();
-      showPacientLoginError(error.detail || 'Грешка при најава. Проверете ги вашите податоци.');
-      if (submitBtn && btnText && btnLoading) {
-        submitBtn.disabled = false;
-        btnText.style.display = 'inline-block';
-        btnLoading.style.display = 'none';
-      }
-      return;
-    }
-
-    const data = await res.json();
-    currentPacient = data.pacient;
-    
-    // Прикажи персонализирана порака за најавениот пациент
-    const pacientIme = `${data.pacient.ime} ${data.pacient.prezime}`;
-    
-    // Затвори модал за најава
-    closePacientLoginModal();
-    
-    // Провери дали има закажан преглед во чекање
-    const pendingDoctorId = sessionStorage.getItem('pending_appointment_doctor_id');
-    if (pendingDoctorId) {
-      sessionStorage.removeItem('pending_appointment_doctor_id');
-      openAppointmentModalInternal(parseInt(pendingDoctorId));
-    } else {
-      setTimeout(() => {
-        alert(`Добредојде, ${pacientIme}! Успешно се најавивте. Сега можете да закажете преглед.`);
-      }, 300);
-    }
-  } catch (err) {
-    showPacientLoginError('Грешка при најава. Проверете дали серверот работи.');
-    if (submitBtn && btnText && btnLoading) {
-      submitBtn.disabled = false;
-      btnText.style.display = 'inline-block';
-      btnLoading.style.display = 'none';
-    }
-  }
-}
-
-// Функција за регистрација на нов пациент
-async function registerPacient() {
-  const ime = document.getElementById('register-ime').value.trim();
-  const prezime = document.getElementById('register-prezime').value.trim();
-  const email = document.getElementById('register-email').value.trim();
-  const telefon = document.getElementById('register-telefon').value.trim();
-  const password = document.getElementById('register-password').value;
-  const passwordConfirm = document.getElementById('register-password-confirm').value;
-  const errorMessage = document.getElementById('pacient-register-error-message');
-  
-  // Сокриј претходни грешки
-  if (errorMessage) {
-    errorMessage.style.display = 'none';
-    errorMessage.textContent = '';
-  }
-  
-  // Валидација
-  if (!ime || !prezime || !email || !password) {
-    showPacientRegisterError('Пополнете ги сите задолжителни полиња');
-    return;
-  }
-  
-  // Email валидација
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    showPacientRegisterError('Внесете валидна е-пошта');
-    return;
-  }
-  
-  if (password !== passwordConfirm) {
-    showPacientRegisterError('Лозинките не се совпаѓаат');
-    return;
-  }
-  
-  if (password.length < 6) {
-    showPacientRegisterError('Лозинката мора да има најмалку 6 карактери');
-    return;
-  }
-
-  // Loading state
-  const submitBtn = document.querySelector('#pacient-register-form button[type="submit"]');
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    const originalText = submitBtn.textContent;
-    submitBtn.textContent = 'Вчитувам...';
-    
-    try {
-      const res = await fetch('http://localhost:8000/pacienti/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ime: ime,
-          prezime: prezime,
-          email: email,
-          telefon: telefon,
-          password: password
-        })
-      });
-      
-      if (!res.ok) {
-        const error = await res.json();
-        showPacientRegisterError(error.detail || 'Грешка при регистрација.');
-        submitBtn.disabled = false;
-        submitBtn.textContent = originalText;
-        return;
-      }
-
-      const data = await res.json();
-      alert('Успешно се регистриравте! Сега можете да се најавите.');
-      closePacientRegisterModal();
-      showPacientLogin();
-    } catch (err) {
-      showPacientRegisterError('Грешка при регистрација. Проверете дали серверот работи.');
-      submitBtn.disabled = false;
-      submitBtn.textContent = originalText;
-    }
-  } else {
-    try {
-      const res = await fetch('http://localhost:8000/pacienti/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ime: ime,
-          prezime: prezime,
-          email: email,
-          telefon: telefon,
-          password: password
-        })
-      });
-      
-      if (!res.ok) {
-        const error = await res.json();
-        showPacientRegisterError(error.detail || 'Грешка при регистрација.');
-        return;
-      }
-
-      const data = await res.json();
-      alert('Успешно се регистриравте! Сега можете да се најавите.');
-      closePacientRegisterModal();
-      showPacientLogin();
-    } catch (err) {
-      showPacientRegisterError('Грешка при регистрација. Проверете дали серверот работи.');
-    }
-  }
-}
-
-// Помошни функции за прикажување грешки
-function showPacientLoginError(message) {
-  const errorMessage = document.getElementById('pacient-login-error-message');
-  if (errorMessage) {
-    errorMessage.textContent = message;
-    errorMessage.style.display = 'block';
-    setTimeout(() => {
-      errorMessage.style.display = 'none';
-    }, 5000);
-  }
-}
 
 function showPacientRegisterError(message) {
   const errorMessage = document.getElementById('pacient-register-error-message');
@@ -2467,206 +2210,14 @@ function closePacientRegisterModal() {
     }
   }
 }
-
-// Поставување на event listeners за најава и регистрација на пациенти
-function setupPacientAuth() {
-  const loginForm = document.getElementById('pacient-login-form');
-  const registerForm = document.getElementById('pacient-register-form');
-  const loginModal = document.getElementById('pacient-login-modal');
-  const registerModal = document.getElementById('pacient-register-modal');
-  
-  if (loginForm) {
-    loginForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      loginPacient();
-    });
-  }
-  
-  if (registerForm) {
-    registerForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      registerPacient();
-    });
-  }
-  
-  if (loginModal) {
-    window.addEventListener('click', (e) => {
-      if (e.target === loginModal) {
-        closePacientLoginModal();
-      }
-    });
-  }
-  
-  if (registerModal) {
-    window.addEventListener('click', (e) => {
-      if (e.target === registerModal) {
-        closePacientRegisterModal();
-      }
-    });
-  }
-}
-
-// Функција за регистрација на нов лекар
-async function registerLekar() {
-  const ime = document.getElementById('register-lekar-ime')?.value.trim();
-  const prezime = document.getElementById('register-lekar-prezime')?.value.trim();
-  const specialty = document.getElementById('register-lekar-specialty')?.value.trim();
-  const email = document.getElementById('register-lekar-email')?.value.trim().toLowerCase();
-  const password = document.getElementById('register-lekar-password')?.value;
-  const passwordConfirm = document.getElementById('register-lekar-password-confirm')?.value;
-  const errorMessage = document.getElementById('lekar-register-error-message');
-  const submitBtn = document.querySelector('#lekar-register-form button[type="submit"]');
-  
-  // Ресетирај error message
-  if (errorMessage) {
-    errorMessage.style.display = 'none';
-    errorMessage.textContent = '';
-  }
-  
-  // Валидација
-  if (!ime || !prezime || !specialty || !email || !password) {
-    showLekarRegisterError('Пополнете ги сите задолжителни полиња');
-    return;
-  }
-  
-  // Email валидација
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    showLekarRegisterError('Внесете валидна е-пошта');
-    return;
-  }
-  
-  if (password !== passwordConfirm) {
-    showLekarRegisterError('Лозинките не се совпаѓаат');
-    return;
-  }
-  
-  if (password.length < 6) {
-    showLekarRegisterError('Лозинката мора да има најмалку 6 карактери');
-    return;
-  }
-  
-  // Loading state
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    const originalText = submitBtn.textContent;
-    submitBtn.textContent = 'Вчитувам...';
-    
-    try {
-      const response = await fetch('http://localhost:8000/lekari/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ime,
-          prezime,
-          specialty,
-          email,
-          password
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        showLekarRegisterError(data.detail || 'Грешка при регистрација.');
-        submitBtn.disabled = false;
-        submitBtn.textContent = originalText;
-        return;
-      }
-      
-      // Успешна регистрација
-      alert('Успешно се регистриравте! Сега можете да се најавите.');
-      closeLekarRegisterModal();
-      showLekarLogin();
-      
-    } catch (error) {
-      showLekarRegisterError('Грешка при регистрација. Проверете дали серверот работи.');
-      submitBtn.disabled = false;
-      submitBtn.textContent = originalText;
-    }
-  } else {
-    // Ако нема submit button, испрати без loading state
-    try {
-      const response = await fetch('http://localhost:8000/lekari/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ime,
-          prezime,
-          specialty,
-          email,
-          password
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        showLekarRegisterError(data.detail || 'Грешка при регистрација.');
-        return;
-      }
-      
-      // Успешна регистрација
-      alert('Успешно се регистриравте! Сега можете да се најавите.');
-      closeLekarRegisterModal();
-      showLekarLogin();
-      
-    } catch (error) {
-      showLekarRegisterError('Грешка при регистрација. Проверете дали серверот работи.');
-    }
-  }
-}
-
-function showLekarRegisterError(message) {
-  const errorMessage = document.getElementById('lekar-register-error-message');
-  if (errorMessage) {
-    errorMessage.textContent = message;
-    errorMessage.style.display = 'block';
-  }
-}
-
-function showLekarRegister() {
-  closeLekarLoginModal();
-  const registerModal = document.getElementById('lekar-register-modal');
-  if (registerModal) {
-    registerModal.style.display = 'block';
-  }
-}
-
-function showLekarLogin() {
-  closeLekarRegisterModal();
-  openLekarLoginModal();
-}
-
-function closeLekarRegisterModal() {
-  const modal = document.getElementById('lekar-register-modal');
-  if (modal) {
-    modal.style.display = 'none';
-    const form = document.getElementById('lekar-register-form');
-    if (form) {
-      form.reset();
-    }
-    const errorMessage = document.getElementById('lekar-register-error-message');
-    if (errorMessage) {
-      errorMessage.style.display = 'none';
-      errorMessage.textContent = '';
-    }
-  }
-}
-
 window.openLekarLoginModal = openLekarLoginModal;
 window.closeLekarLoginModal = closeLekarLoginModal;
 window.closeLekarDashboardModal = closeLekarDashboardModal;
 window.showLekarTab = showLekarTab;
 window.saveTerminChanges = saveTerminChanges;
 window.showMoreDoctors = showMoreDoctors;
-// ============================================================================
+
 // АДМИНИСТРАЦИЈА - УПРАВУВАЊЕ СО ДЕЖУРСТВА И ОГЛАСИ
-// ============================================================================
 // Овој дел содржи функции за управување со дежурства и огласи за работа.
 // Пристапот е ограничен само за директорот на болницата (Владко Захариев).
 
@@ -3062,7 +2613,7 @@ async function deleteOglas(oglasId) {
 
 // Поставување на event listeners за административните форми
 // Се извршува кога DOM е целосно вчитан
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', () =>{
   // Форма за дежурство - обработка на submit
   const dezurstvoForm = document.getElementById('dezurstvo-form');
   if (dezurstvoForm) {
@@ -3115,6 +2666,7 @@ document.addEventListener('DOMContentLoaded', function() {
         alert('Грешка: ' + err.message);
       }
     });
+    setupAuth();
   }
   
   // Форма за оглас - обработка на submit
@@ -3205,7 +2757,378 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
 });
+// ============================================================================
+// НОВИ ФУНКЦИИ ЗА ЕДИНСТВЕН AUTH МОДАЛ
+// ============================================================================
 
+let currentRole = 'pacient'; // 'pacient' или 'lekar'
+let currentAuthMode = 'login'; // 'login' или 'register'
+
+// Отворање на модалот за најава
+function openLoginModal() {
+  currentAuthMode = 'login';
+  document.getElementById('auth-subtitle').textContent = 'Најавете се на вашиот профил';
+  document.getElementById('login-form-container').style.display = 'block';
+  document.getElementById('register-form-container').style.display = 'none';
+  document.getElementById('auth-modal').style.display = 'block';
+  resetAuthForms();
+}
+
+// Отворање на модалот за регистрација
+function openRegisterModal() {
+  currentAuthMode = 'register';
+  document.getElementById('auth-subtitle').textContent = 'Креирајте нов профил';
+  document.getElementById('login-form-container').style.display = 'none';
+  document.getElementById('register-form-container').style.display = 'block';
+  document.getElementById('auth-modal').style.display = 'block';
+  updateRegisterFields();
+  resetAuthForms();
+}
+
+// Затворање на модалот
+function closeAuthModal() {
+  document.getElementById('auth-modal').style.display = 'none';
+  resetAuthForms();
+}
+
+// Префрлање на најава
+function showLogin() {
+  currentAuthMode = 'login';
+  document.getElementById('auth-subtitle').textContent = 'Најавете се на вашиот профил';
+  document.getElementById('login-form-container').style.display = 'block';
+  document.getElementById('register-form-container').style.display = 'none';
+  resetAuthForms();
+}
+
+// Префрлање на регистрација
+function showRegister() {
+  currentAuthMode = 'register';
+  document.getElementById('auth-subtitle').textContent = 'Креирајте нов профил';
+  document.getElementById('login-form-container').style.display = 'none';
+  document.getElementById('register-form-container').style.display = 'block';
+  updateRegisterFields();
+  resetAuthForms();
+}
+
+// Менаѓање на улога (Пациент/Лекар)
+function switchRole(role) {
+  currentRole = role;
+  
+  // Ажурирај табови
+  document.querySelectorAll('.role-tab').forEach(tab => tab.classList.remove('active'));
+  document.getElementById(`tab-${role}`).classList.add('active');
+  
+  // Ажурирај полиња за регистрација
+  if (currentAuthMode === 'register') {
+    updateRegisterFields();
+  }
+  
+  // Ажурирај placeholder за најава (идентификатор: е-пошта за пациент, корисничко име за лекар)
+  const identifierInput = document.getElementById('login-identifier');
+  if (identifierInput && role === 'lekar') {
+    identifierInput.placeholder = 'ime.prezime (од регистрацијата)';
+  } else if (identifierInput) {
+    identifierInput.placeholder = 'Овде внесете го вашиот mail';
+  }
+}
+
+// Ажурирање на полињата за регистрација според улогата
+function updateRegisterFields() {
+  const pacientFields = document.getElementById('pacient-only-fields');
+  const lekarFields = document.getElementById('lekar-only-fields');
+  const embgField = document.getElementById('embg-field');
+  
+  if (currentRole === 'lekar') {
+    if (pacientFields) pacientFields.style.display = 'none';
+    if (lekarFields) lekarFields.style.display = 'block';
+    if (embgField) embgField.style.display = 'none';
+  } else {
+    if (pacientFields) pacientFields.style.display = 'block';
+    if (lekarFields) lekarFields.style.display = 'none';
+    if (embgField) embgField.style.display = 'block';
+  }
+}
+
+// Ресетирање на формите
+function resetAuthForms() {
+  document.getElementById('auth-login-form')?.reset();
+  document.getElementById('auth-register-form')?.reset();
+  document.getElementById('login-error').style.display = 'none';
+  document.getElementById('register-error').style.display = 'none';
+}
+
+// Прикажување на грешка
+function showAuthError(elementId, message) {
+  const errorEl = document.getElementById(elementId);
+  errorEl.textContent = message;
+  errorEl.style.display = 'block';
+  setTimeout(() => {
+    errorEl.style.display = 'none';
+  }, 5000);
+}
+
+// ============================================================================
+// ОБРАБОТКА НА ФОРМИ
+// ============================================================================
+
+// Најава
+async function handleLogin(e) {
+  e.preventDefault();
+  
+  const identifierInput = document.getElementById('login-identifier');
+  const passwordInput = document.getElementById('login-password');
+  const submitBtn = e.target && e.target.querySelector('.btn-auth-submit');
+  const btnText = submitBtn && submitBtn.querySelector('.btn-text');
+  const btnLoading = submitBtn && submitBtn.querySelector('.btn-loading');
+  const identifier = (identifierInput && identifierInput.value.trim()) || '';
+  const password = passwordInput ? passwordInput.value : '';
+
+  if (!identifier || !password) {
+    showAuthError('login-error', currentRole === 'lekar' ? 'Внесете корисничко име и лозинка' : 'Внесете е-пошта и лозинка');
+    return;
+  }
+
+  if (submitBtn) submitBtn.disabled = true;
+  if (btnText) btnText.style.display = 'none';
+  if (btnLoading) btnLoading.style.display = 'inline-block';
+  
+  try {
+    let endpoint, body;
+    
+    if (currentRole === 'lekar') {
+      // За лекари: користи username (email без @...)
+      endpoint = 'http://localhost:8000/lekari/login';
+      let username = identifier.toLowerCase().trim();
+      // ako e vnesen email se dele kaj @ i se zema delot pred nego
+      if (username.includes('@')) {
+        username = username.split('@')[0];
+      }
+      if (!username.includes('.')) {
+        throw new Error('За да продолжите со најава, ве молиме внесете го вашето корисничко име во форма име.презиме(на латиница).');
+      }
+      body = { username: username, password: password };
+    } else {
+      // За пациенти: користи email
+      endpoint = 'http://localhost:8000/pacienti/login';
+      body = { email: identifier, password: password };
+    }
+    
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || 'Настана грешка при најава');
+    }
+    
+    const data = await res.json();
+    
+    if (currentRole === 'lekar') {
+      currentLekar = data.doctor;
+      closeAuthModal();
+      displayLekarDashboard(data);
+      openLekarDashboardModal();
+      setTimeout(() => {
+        alert(`Добредојде, Др. ${data.doctor.name} ${data.doctor.surname}!`);
+      }, 300);
+    } else {
+      currentPacient = data.pacient;
+      try { sessionStorage.setItem('currentPacient', JSON.stringify(data.pacient)); } catch (e) {}
+      closeAuthModal();
+      updateNavForPacient();
+
+      const pendingDoctorId = sessionStorage.getItem('pending_appointment_doctor_id');
+      if (pendingDoctorId) {
+        sessionStorage.removeItem('pending_appointment_doctor_id');
+        var doctorIdNum = parseInt(pendingDoctorId, 10);
+        setTimeout(function () { openAppointmentModalInternal(doctorIdNum); }, 200);
+      } else {
+        setTimeout(function () {
+          alert('Добредојде, ' + data.pacient.ime + ' ' + data.pacient.prezime + '! Одберете лекар во секцијата „Лекари“ подолу и кликнете „Закажи преглед“.');
+          var lekariEl = document.getElementById('lekari');
+          if (lekariEl) lekariEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 300);
+      }
+    }
+    
+  } catch (err) {
+    showAuthError('login-error', err.message);
+  } finally {
+    //submitBtn.disabled = false;
+    if(submitBtn) submitBtn.disabled = false;
+    //btnText.style.display = 'inline-block';
+    if(btnText) btnText.style.display = 'inline-block';
+    //btnLoading.style.display = 'none';
+    if(btnLoading) btnLoading.style.display = 'none';
+  }
+}
+
+// Регистрација
+async function handleRegister(e) {
+  e.preventDefault();
+  
+  const imeInput = document.getElementById('register-ime').value.trim();
+  const prezime = document.getElementById('register-prezime').value.trim();
+  const email = document.getElementById('register-email').value.trim();
+  const password = document.getElementById('register-password').value;
+  const passwordConfirm = document.getElementById('register-password-confirm').value;
+  const submitBtn = e.target.querySelector('.btn-auth-submit');
+  const btnText = submitBtn.querySelector('.btn-text');
+  const btnLoading = submitBtn.querySelector('.btn-loading');
+  
+  // Валидација
+  if (!ime || !prezime || !email || !password) {
+    showAuthError('register-error', 'Пополнете ги сите задолжителни полиња');
+    return;
+  }
+  
+  if (password !== passwordConfirm) {
+    showAuthError('register-error', 'Лозинките не се совпаѓаат');
+    return;
+  }
+  
+  if (password.length < 6) {
+    showAuthError('register-error', 'Лозинката мора да има најмалку 6 карактери');
+    return;
+  }
+  
+  // Loading state
+  submitBtn.disabled = true;
+  btnText.style.display = 'none';
+  btnLoading.style.display = 'inline-block';
+  
+  try {
+    let endpoint, body;
+    
+    if (currentRole === 'lekar') {
+      const specialty = document.getElementById('register-specialty').value.trim();
+      if (!specialty) {
+        throw new Error('Внесете специјалност');
+      }
+      
+      endpoint = 'http://localhost:8000/lekari/register';
+      body = {
+        ime,
+        prezime,
+        specialty,
+        email,
+        password
+      };
+    } else {
+      const telefon = document.getElementById('register-telefon').value.trim();
+      const embg = document.getElementById('register-embg').value.trim();
+      
+      endpoint = 'http://localhost:8000/pacienti/register';
+      body = {
+        ime,
+        prezime,
+        email,
+        telefon,
+        embg,
+        password
+      };
+    }
+    
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || 'Грешка при регистрација');
+    }
+    
+    alert('Успешно се регистриравте! Сега можете да се најавите.');
+    showLogin();
+    
+  } catch (err) {
+    showAuthError('register-error', err.message);
+  } finally {
+    submitBtn.disabled = false;
+    btnText.style.display = 'inline-block';
+    btnLoading.style.display = 'none';
+  }
+}
+
+// ============================================================================
+// ИНИЦИЈАЛИЗАЦИЈА
+// ============================================================================
+
+function setupAuth() {
+  // Event listeners за формите
+  document.getElementById('auth-login-form')?.addEventListener('submit', handleLogin);
+  document.getElementById('auth-register-form')?.addEventListener('submit', handleRegister);
+  
+  // Затворање при клик надвор
+  window.addEventListener('click', (e) => {
+    const modal = document.getElementById('auth-modal');
+    if (e.target === modal) {
+      closeAuthModal();
+    }
+  });
+}
+
+// Замени го initialize() со овој дел:
+// Во initialize() функцијата, замени ги повиците за најава со:
+// setupAuth();
+
+// ============================================================================
+// ЗАЧУВАЈ ГИ ОВИЕ ФУНКЦИИ ЗА НАЗАД КОМПАТИБИЛНОСТ
+// ============================================================================
+
+// Овие функции ги користат старите копчиња во header
+function openLekarLoginModal() {
+  currentRole = 'lekar';
+  switchRole('lekar');
+  openLoginModal();
+}
+
+function openPacientLoginModal() {
+  currentRole = 'pacient';
+  switchRole('pacient');
+  openLoginModal();
+}
+
+function showPacientRegister() {
+  currentRole = 'pacient';
+  switchRole('pacient');
+  openRegisterModal();
+}
+
+function showLekarRegister() {
+  currentRole = 'lekar';
+  switchRole('lekar');
+  openRegisterModal();
+}
+
+function closeLekarLoginModal() { closeAuthModal(); }
+function closePacientLoginModal() { closeAuthModal(); }
+function closeLekarRegisterModal() { closeAuthModal(); }
+function closePacientRegisterModal() { closeAuthModal(); }
+function showPacientLogin() { showLogin(); }
+function showLekarLogin() { showLogin(); }
+
+// Експортирај ги функциите глобално
+window.openAuthModal = openLoginModal;
+window.closeAuthModal = closeAuthModal;
+window.switchRole = switchRole;
+window.showLogin = showLogin;
+window.showRegister = showRegister;
+window.openLekarLoginModal = openLekarLoginModal;
+window.closeLekarLoginModal = closeLekarLoginModal;
+window.openPacientLoginModal = openPacientLoginModal;
+window.closePacientLoginModal = closePacientLoginModal;
+window.showPacientRegister = showPacientRegister;
+window.showLekarRegister = showLekarRegister;
+window.showPacientLogin = showPacientLogin;
+window.showLekarLogin = showLekarLogin;
+window.closeLekarRegisterModal = closeLekarRegisterModal;
+window.closePacientRegisterModal = closePacientRegisterModal;
 // ============================================================================
 // ЕКСПОРТИРАЊЕ НА ФУНКЦИИ ЗА ГЛОБАЛНА УПОТРЕБА
 // ============================================================================

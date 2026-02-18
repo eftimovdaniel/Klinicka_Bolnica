@@ -18,7 +18,8 @@
         <a href="#uslugi" class="nav-link">Услуги</a>
         <a href="#lekari" class="nav-link">Лекари</a>
         <a href="#kontakt" class="nav-link">Контакт</a>
-        <button id="lekar-login-btn" class="btn-lekar-login" onclick="openLekarLoginModal()">Најави се како лекар</button>
+        <a href="#lekari" id="nav-zakazi-pregled" class="nav-link nav-zakazi-pregled" style="display: none;">Закажи преглед</a>
+        <button id="auto-login_btn" class="btn-lekar-login" onclick="openLekarLoginModal()">Најави се како лекар</button>
       </nav>
     </div>
   </header>
@@ -87,7 +88,11 @@
   <section id="lekari" class="section doctors-section">
     <div class="container">
       <h2>Нашиот медицински тим</h2>
-      
+      <div id="lekari-pacient-callout" class="lekari-pacient-callout" style="display: none;">
+        <span class="lekari-callout-close" onclick="dismissLekariCallout()" title="Затвори">&times;</span>
+        <p>Најавени сте. Одберете лекар подолу и притиснете <strong>„Закажи преглед“</strong> за избор на датум и време.</p>
+        <button type="button" class="btn-callout-dismiss" onclick="dismissLekariCallout()">Затвори</button>
+      </div>
       <div class="filters">
         <div class="filter-group">
           <label for="filter-name">Пребарај по име:</label>
@@ -185,8 +190,8 @@
     </div>
   </footer>
 
-  <!-- Patient Login Modal - Најава за пациенти -->
-  <div id="pacient-login-modal" class="modal">
+  <!-- Стар модал – не се користи; најава за пациенти е во унифицираниот auth модал (таб Пациент, иста форма како за лекари) -->
+  <div id="pacient-login-modal" class="modal" style="display: none;">
     <div class="modal-content login-split-modal">
       <span class="close" onclick="closePacientLoginModal()">&times;</span>
       <div class="login-split-container">
@@ -251,102 +256,158 @@
     </div>
   </div>
 
-  <!-- Patient Register Modal - Регистрација за пациенти -->
-  <div id="pacient-register-modal" class="modal" style="display: none;">
-    <div class="modal-content login-split-modal">
-      <span class="close" onclick="closePacientRegisterModal()">&times;</span>
-      <div class="login-split-container">
-        <!-- Лева страна - Добредојде секција -->
-        <div class="login-welcome-section pacient-welcome">
-          <div class="welcome-content">
-            <div class="hospital-logo">
-              <div class="hospital-name">Клиничка Болница</div>
-              <div class="hospital-location">Штип</div>
-            </div>
-            <h1 class="welcome-title">Добредојде!</h1>
-            <p class="welcome-description">Регистрирај се за да закажуваш прегледи</p>
-            <div class="welcome-features">
-              <div class="feature-item">✓ Брза регистрација</div>
-              <div class="feature-item">✓ Лесно закажување</div>
-              <div class="feature-item">✓ Пристап до историја</div>
-            </div>
-          </div>
-        </div>
-        <!-- Десна страна - Форма за регистрација -->
-        <div class="login-form-section">
-          <div class="login-header">
-            <h2>Регистрација за пациенти</h2>
-            <p class="login-subtitle">Креирајте профил за да закажете преглед</p>
-          </div>
-          <form id="pacient-register-form">
+  <!-- Unified Auth Modal - Единствен модал за најава и регистрација -->
+<div id="auth-modal" class="modal">
+  <div class="modal-content auth-modal-content">
+    <span class="close" onclick="closeAuthModal()">&times;</span>
+    
+    <!-- Лого и наслов -->
+    <div class="auth-header">
+      <div class="auth-logo">
+        <span class="red-cross">+</span>
+      </div>
+      <h2>Клиничка Болница</h2>
+      <p id="auth-subtitle">Најавете се на вашиот профил</p>
+    </div>
+    
+    <!-- Табови за избор на улога -->
+    <div class="role-tabs">
+      <button class="role-tab active" onclick="switchRole('pacient')" id="tab-pacient">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+          <circle cx="12" cy="7" r="4"></circle>
+        </svg>
+        Пациент
+      </button>
+      <button class="role-tab" onclick="switchRole('lekar')" id="tab-lekar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+        </svg>
+        Лекар
+      </button>
+    </div>
+    
+    <!-- Форма за најава – иста структура за Пациент и Лекар (лабела, поле, појаснување, белешка) -->
+    <div id="login-form-container" class="auth-form-container">
+      <form id="auth-login-form">
         <div class="form-group">
-          <label for="register-ime">Име</label>
-          <input type="text" id="register-ime" placeholder="Вашето име" required />
+          <label for="login-identifier" id="login-identifier-label">Е-пошта</label>
+          <input type="text" id="login-identifier" placeholder="Овде внесете го вашиот mail" required autocomplete="email" />
+          <small class="form-hint" id="login-identifier-hint">Внесете ја е-поштата и лозинката од вашата регистрација. Немате профил? Регистрирајте се.</small>
         </div>
         <div class="form-group">
-          <label for="register-prezime">Презиме</label>
-          <input type="text" id="register-prezime" placeholder="Вашето презиме" required />
+          <label for="login-password">Лозинка</label>
+          <input type="password" id="login-password" placeholder="Внесете ја вашата лозинка" required autocomplete="current-password" />
+        </div>
+        <p class="auth-role-note" id="auth-pacient-note" style="font-size: 0.85rem; color: #666; margin-bottom: 1rem;">Најавете се со е-поштата и лозинката што ги поставивте при регистрација.</p>
+        <p class="auth-role-note" id="auth-doctor-note" style="display: none; font-size: 0.85rem; color: #666; margin-bottom: 1rem;">Нема пред-поставени кориснички имиња или лозинки за лекари. Регистрирајте го секој лекар (име, презиме, специјалност, е-пошта, лозинка), потоа најавете се со име.презиме и таа лозинка.</p>
+        <div id="login-error" class="auth-error" style="display: none;"></div>
+        <button type="submit" class="btn-auth-submit">
+          <span class="btn-text">Најави се</span>
+          <span class="btn-loading" style="display: none;">Вчитувам...</span>
+        </button>
+      </form>
+      <p class="auth-switch">
+        Немате профил? <a href="#" onclick="showRegister(); return false;">Регистрирајте се</a>
+      </p>
+    </div>
+    
+    <!-- Форма за регистрација -->
+    <div id="register-form-container" class="auth-form-container" style="display: none;">
+      <form id="auth-register-form">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="register-ime">Име</label>
+            <input type="text" id="register-ime" placeholder="Име" required />
+          </div>
+          <div class="form-group">
+            <label for="register-prezime">Презиме</label>
+            <input type="text" id="register-prezime" placeholder="Презиме" required />
+          </div>
         </div>
         <div class="form-group">
           <label for="register-email">Е-пошта</label>
-          <input type="email" id="register-email" placeholder="Овде внесете го вашиот mail" required />
+          <input type="email" id="register-email" placeholder="vashata@eposhta.mk" required />
         </div>
-        <div class="form-group">
+        <div class="form-group" id="pacient-only-fields">
           <label for="register-telefon">Телефон</label>
-          <input type="tel" id="register-telefon" placeholder="Ваш телефон" />
+          <input type="tel" id="register-telefon" placeholder="+389 7X XXX XXX" />
+        </div>
+        <div class="form-group" id="lekar-only-fields" style="display: none;">
+          <label for="register-specialty">Специјалност</label>
+          <input type="text" id="register-specialty" placeholder="Вашата специјалност" />
+        </div>
+        <div class="form-group" id="embg-field">
+          <label for="register-embg">ЕМБГ</label>
+          <input type="text" id="register-embg" placeholder="13-цифрен ЕМБГ" maxlength="13" />
         </div>
         <div class="form-group">
           <label for="register-password">Лозинка</label>
-          <input type="password" id="register-password" placeholder="Внесете лозинка" required minlength="6" />
+          <input type="password" id="register-password" placeholder="Мин. 8 знаци, 1 голема буква, 1 број, 1 знак" required minlength="8" />
         </div>
         <div class="form-group">
           <label for="register-password-confirm">Потврди лозинка</label>
-          <input type="password" id="register-password-confirm" placeholder="Повторно внесете лозинка" required />
+          <input type="password" id="register-password-confirm" placeholder="••••••••" required />
         </div>
-        <div id="pacient-register-error-message" class="error-message" style="display: none;"></div>
-        <button type="submit" class="btn-login-submit">Регистрирај се</button>
-        <p style="text-align: center; margin-top: 1rem; font-size: 0.9rem; color: #666;">
-          Веќе имате профил? <a href="#" onclick="showPacientLogin(); return false;" style="color: #e74c3c;">Најавете се</a>
-        </p>
+        <div id="register-error" class="auth-error" style="display: none;"></div>
+        <button type="submit" class="btn-auth-submit">
+          <span class="btn-text">Регистрирај се</span>
+          <span class="btn-loading" style="display: none;">Вчитувам...</span>
+        </button>
       </form>
-        </div>
-      </div>
+      <p class="auth-switch">
+        Веќе имате профил? <a href="#" onclick="showLogin(); return false;">Најавете се</a>
+      </p>
     </div>
   </div>
+</div>
 
-  <!-- Appointment Modal -->
+  <!-- Модал за закажување преглед кај лекар (иста логика како закажување термин на апарат) -->
   <div id="appointment-modal" class="modal">
-    <div class="modal-content">
-      <span class="close">&times;</span>
+    <div class="modal-content appointment-modal-content">
+      <span class="close" onclick="closeAppointmentModal()">&times;</span>
       <h2>Закажете преглед</h2>
       <div id="appointment-doctor-info" class="doctor-info-modal"></div>
-      
       <div class="appointment-container">
-        <div class="calendar-section">
-          <h3>Изберете датум и време</h3>
-          <div id="calendar"></div>
-          <div id="time-slots" class="time-slots"></div>
+        <div class="form-group" style="width: 100%;">
+          <label>Изберете датум и време:</label>
+          <div class="calendar-section aparati-calendar-section" style="margin-top: 1rem;">
+            <div id="calendar"></div>
+            <p class="calendar-hint">Изберете датум од календарот, потоа време од понудените слотови.</p>
+            <div id="time-slots" class="time-slots"></div>
+          </div>
         </div>
-        
         <div class="form-section">
           <h3>Ваши податоци</h3>
           <div id="pacient-info-display" style="display: none; background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
             <p><strong>Најавен како:</strong> <span id="pacient-name-display"></span></p>
             <p><strong>Е-пошта:</strong> <span id="pacient-email-display"></span></p>
           </div>
-          <form id="appointment-form">
+          <form id="appointment-form" class="appointment-form-fields">
             <input type="hidden" id="appointment-doctor-id" />
             <input type="hidden" id="appointment-date" />
             <input type="hidden" id="appointment-time" />
             <input type="hidden" id="pacient-id" />
-            
-           <input type="text" id="patient-ime" placeholder="Име" required />
-          <input type="text" id="patient-prezime" placeholder="Презиме" required />
-          <input type="email" id="patient-email" placeholder="Е-пошта" required />
-          <input type="tel" id="patient-telefon" placeholder="Телефон" required />
-          <textarea id="patient-napomena" placeholder="Напомена (опционално)"></textarea>
-          
-            
+            <div class="form-group">
+              <label for="patient-ime">Име</label>
+              <input type="text" id="patient-ime" placeholder="Вашето име" required />
+            </div>
+            <div class="form-group">
+              <label for="patient-prezime">Презиме</label>
+              <input type="text" id="patient-prezime" placeholder="Вашето презиме" required />
+            </div>
+            <div class="form-group">
+              <label for="patient-email">Е-пошта за контакт</label>
+              <input type="email" id="patient-email" placeholder="example@email.com" required />
+            </div>
+            <div class="form-group">
+              <label for="patient-telefon">Телефон за контакт</label>
+              <input type="tel" id="patient-telefon" placeholder="+389 7X XXX XXX" required />
+            </div>
+            <div class="form-group">
+              <label for="patient-napomena">Напомена (опционално)</label>
+              <textarea id="patient-napomena" placeholder="Дополнителни информации за лекарот..." rows="3"></textarea>
+            </div>
             <button type="submit" class="btn-primary">Закажи преглед</button>
           </form>
         </div>
@@ -354,145 +415,45 @@
     </div>
   </div>
 
-  <!-- Doctor Login Modal -->
-  <!-- Модален прозорец за најава на лекари - овозможува пристап до системот за преглед на термини -->
-  <div id="lekar-login-modal" class="modal">
-    <div class="modal-content login-split-modal">
-      <span class="close" onclick="closeLekarLoginModal()">&times;</span>
-      <div class="login-split-container">
-        <!-- Лева страна - Добредојде секција -->
-        <div class="login-welcome-section">
-          <div class="welcome-content">
-            <div class="hospital-logo">
-              <div class="hospital-name">Клиничка Болница</div>
-              <div class="hospital-location">Штип</div>
-            </div>
-            <h1 class="welcome-title">Добредојде!</h1>
-            <p class="welcome-description">Најави се за да пристапиш до системот</p>
-            <div class="welcome-features">
-              <div class="feature-item">✓ Преглед на термини</div>
-              <div class="feature-item">✓ Внесување дијагноза</div>
-              <div class="feature-item">✓ Управување со пациенти</div>
-            </div>
-          </div>
-        </div>
-        <!-- Десна страна - Форма за најава -->
-        <div class="login-form-section">
-          <div class="login-header">
-            <h2>Најава за лекари</h2>
-            <p class="login-subtitle">Внесете ги вашите податоци за пристап до системот</p>
-          </div>
-          <!-- Форма за најава: секој лекар мора да внесе корисничко име (име.презиме) и лозинка за пристап до системот -->
-          <!-- Според новата документација: "Се најавуваа со корисничко име и лозинка" -->
-          <!-- За лекари: корисничко име = име.презиме (напр. "ана.ивановска") -->
-          <form id="lekar-login-form">
-        <div class="form-group">
-          <label for="lekar-username-input">
-            Корисничко име
-          </label>
-          <input 
-            type="text" 
-            id="lekar-username-input" 
-            placeholder="ime.prezime (напр. ana.ivanovska)" 
-            required 
-            autocomplete="username"
-            pattern="[a-z]+\.[a-z]+"
-            title="Формат: ime.prezime на латиница (мали букви)"
-          />
-          <small class="form-hint">Внесете го вашето име и презиме на латиница разделени со точка (напр. ana.ivanovska)</small>
-        </div>
-        <div class="form-group">
-          <label for="lekar-password-input">
-            Лозинка
-          </label>
-          <input 
-            type="password" 
-            id="lekar-password-input" 
-            placeholder="Внесете ја вашата лозинка" 
-            required 
-            autocomplete="current-password"
-          />
-        </div>
-        <div id="login-error-message" class="error-message" style="display: none;"></div>
-        <button type="submit" class="btn-login-submit" id="login-submit-btn">
-          <span class="btn-text">Најави се</span>
-          <span class="btn-loading" style="display: none;">Вчитувам...</span>
-        </button>
-        <p style="text-align: center; margin-top: 1rem; font-size: 0.9rem; color: #666;">
-          Немате профил? <a href="#" onclick="showLekarRegister(); return false;" style="color: #e74c3c;">Регистрирајте се</a>
-        </p>
-      </form>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Doctor Register Modal - Регистрација за лекари -->
-  <div id="lekar-register-modal" class="modal" style="display: none;">
-    <div class="modal-content login-split-modal">
-      <span class="close" onclick="closeLekarRegisterModal()">&times;</span>
-      <div class="login-split-container">
-        <!-- Лева страна - Добредојде секција -->
-        <div class="login-welcome-section">
-          <div class="welcome-content">
-            <div class="hospital-logo">
-              <div class="hospital-name">Клиничка Болница</div>
-              <div class="hospital-location">Штип</div>
-            </div>
-            <h1 class="welcome-title">Добредојде!</h1>
-            <p class="welcome-description">Регистрирај се за да пристапиш до системот</p>
-            <div class="welcome-features">
-              <div class="feature-item">✓ Брза регистрација</div>
-              <div class="feature-item">✓ Управување со термини</div>
-              <div class="feature-item">✓ Пристап до системот</div>
-            </div>
-          </div>
-        </div>
-        <!-- Десна страна - Форма за регистрација -->
-        <div class="login-form-section">
-          <div class="login-header">
-            <h2>Регистрација за лекари</h2>
-            <p class="login-subtitle">Креирајте профил за пристап до системот</p>
-          </div>
-          <form id="lekar-register-form">
-        <div class="form-group">
-          <label for="register-lekar-ime">Име</label>
-          <input type="text" id="register-lekar-ime" placeholder="Вашето име" required />
-        </div>
-        <div class="form-group">
-          <label for="register-lekar-prezime">Презиме</label>
-          <input type="text" id="register-lekar-prezime" placeholder="Вашето презиме" required />
-        </div>
-        <div class="form-group">
-          <label for="register-lekar-specialty">Специјалност</label>
-          <input type="text" id="register-lekar-specialty" placeholder="Вашата специјалност" required />
-        </div>
-        <div class="form-group">
-          <label for="register-lekar-email">Е-пошта</label>
-          <input type="email" id="register-lekar-email" placeholder="Овде внесете го вашиот mail" required />
-        </div>
-        <div class="form-group">
-          <label for="register-lekar-password">Лозинка</label>
-          <input type="password" id="register-lekar-password" placeholder="Внесете лозинка" required minlength="6" />
-        </div>
-        <div class="form-group">
-          <label for="register-lekar-password-confirm">Потврди лозинка</label>
-          <input type="password" id="register-lekar-password-confirm" placeholder="Повторно внесете лозинка" required />
-        </div>
-        <div id="lekar-register-error-message" class="error-message" style="display: none;"></div>
-        <button type="submit" class="btn-login-submit">Регистрирај се</button>
-        <p style="text-align: center; margin-top: 1rem; font-size: 0.9rem; color: #666;">
-          Веќе имате профил? <a href="#" onclick="showLekarLogin(); return false;" style="color: #e74c3c;">Најавете се</a>
-        </p>
-      </form>
-        </div>
-      </div>
+  <!-- Порака по успешна резервација на термин (со копче Затвори) -->
+  <div id="appointment-success-overlay" class="appointment-success-overlay" style="display: none;">
+    <div class="appointment-success-box">
+      <p class="appointment-success-msg">Успешно закажавте термин! Ќе добиете потврда на е-пошта.</p>
+      <button type="button" class="btn-primary" onclick="closeAppointmentSuccess()">Затвори</button>
     </div>
   </div>
 
   <!-- Doctor Dashboard Modal - Главен интерфејс за лекари -->
   <div id="lekar-dashboard-modal" class="modal">
     <div class="modal-content lekar-dashboard-content">
+      <!-- При привремена лозинка – задолжителна смена веднаш, без пристап до податоци -->
+      <div id="lekar-first-login-overlay" class="lekar-first-login-overlay" style="display: none;">
+        <div class="lekar-first-login-box">
+          <p id="lekar-first-login-dobredojde" class="lekar-first-login-dobredojde">Добредојде!</p>
+          <div class="lekar-first-login-obavesti">
+            <strong>Морате да ја смените лозинката веднаш.</strong><br>
+            Немате пристап до податоците сè додека не ја смените привремената лозинка.
+          </div>
+          <p class="lekar-first-login-msg">Внесете ја тековната (привремена) лозинка и изберете нова лозинка за да продолжите.</p>
+          <form id="lekar-prva-najava-lozinka-form" class="postavki-form">
+            <div class="form-group">
+              <label for="prva-najava-tekovna">Тековна (привремена) лозинка</label>
+              <input type="password" id="prva-najava-tekovna" placeholder="Внесете ја привремената лозинка" required autocomplete="current-password" />
+            </div>
+            <div class="form-group">
+              <label for="prva-najava-nova">Нова лозинка</label>
+              <input type="password" id="prva-najava-nova" placeholder="Мин. 8 знаци, 1 голема буква, 1 број, 1 знак" required minlength="8" autocomplete="new-password" />
+            </div>
+            <div class="form-group">
+              <label for="prva-najava-potvrdi">Потврди нова лозинка</label>
+              <input type="password" id="prva-najava-potvrdi" placeholder="Повторно внесете ја новата лозинка" required minlength="8" autocomplete="new-password" />
+            </div>
+            <div id="prva-najava-lozinka-poraka" class="auth-error" style="display: none;"></div>
+            <button type="submit" class="btn-raspored-load">Смени лозинка и продолжи</button>
+          </form>
+        </div>
+      </div>
+      
       <span class="close" onclick="closeLekarDashboardModal()">&times;</span>
       <div id="lekar-info" class="doctor-info-modal"></div>
       
@@ -501,6 +462,7 @@
         <button class="nav-tab active" onclick="showLekarTab('pacienti')">Преглед на пациенти</button>
         <button class="nav-tab" onclick="showLekarTab('dezurstva')">Распоред на дежурства</button>
         <button class="nav-tab" onclick="showLekarTab('aparati')">Закажи термин на апарат</button>
+        <button class="nav-tab" onclick="showLekarTab('postavki')">Поставки</button>
         <button id="admin-tab-btn" class="nav-tab" onclick="showLekarTab('admin')" style="display: none;">Администрација</button>
       </div>
       
@@ -564,6 +526,29 @@
             <textarea id="aparati-opis-input" rows="4" placeholder="Опишете зошто е потребно користење на апаратот..." required></textarea>
           </div>
           <button type="submit" class="btn-primary">Закажи термин</button>
+        </form>
+      </div>
+      
+      <!-- Таб за поставки – смена на лозинка -->
+      <div id="tab-postavki" class="lekar-tab-content tab-postavki-wrapper">
+        <h3>Поставки</h3>
+        <p class="postavki-intro">Тука можете да ја смените вашата лозинка. Потребна е тековната лозинка за верификација.</p>
+        <form id="lekar-promeni-lozinka-form" class="postavki-form">
+          <div class="form-group">
+            <label for="lozinka-tekovna">Тековна лозинка</label>
+            <input type="password" id="lozinka-tekovna" placeholder="Внесете ја тековната лозинка" required autocomplete="current-password" />
+          </div>
+          <div class="form-group">
+            <label for="lozinka-nova">Нова лозинка</label>
+            <input type="password" id="lozinka-nova" placeholder="Мин. 8 знаци, 1 голема буква, 1 број, 1 знак" required minlength="8" autocomplete="new-password" />
+            <small class="form-hint">Најмалку 8 карактери, барем една голема буква, барем еден број и барем еден интерпункциски знак (на пр. . , ! ? -)</small>
+          </div>
+          <div class="form-group">
+            <label for="lozinka-nova-potvrdi">Потврди нова лозинка</label>
+            <input type="password" id="lozinka-nova-potvrdi" placeholder="Повторно внесете ја новата лозинка" required minlength="8" autocomplete="new-password" />
+          </div>
+          <div id="promeni-lozinka-poraka" class="auth-error" style="display: none;"></div>
+          <button type="submit" class="btn-raspored-load">Смени лозинка</button>
         </form>
       </div>
       

@@ -15,6 +15,7 @@ base2048==0.1.3
 bidict==0.23.1
 blinker==1.9.0
 boltons @ file:///home/conda/feedstock_root/build_artifacts/boltons_1749686179973/work
+bcrypt>=4.0.0
 boto3==1.42.37
 botocore==1.42.37
 Brotli @ file:///Users/runner/miniforge3/conda-bld/brotli-split_1764017116075/work

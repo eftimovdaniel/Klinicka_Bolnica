@@ -77,6 +77,14 @@ nav a.nav-link:hover {
   opacity: 0.8;
 }
 
+a.nav-zakazi-pregled {
+  color: #e74c3c;
+  font-weight: 600;
+}
+a.nav-zakazi-pregled:hover {
+  color: #c0392b;
+}
+
 .btn-contact {
   background-color: #e74c3c;
   color: white;
@@ -670,6 +678,83 @@ nav a.nav-link:hover {
   }
 }
 
+.lekari-pacient-callout {
+  position: relative;
+  background: #fff;
+  border: 1px solid #dee2e6;
+  border-radius: 10px;
+  padding: 1rem 2.5rem 1rem 1.25rem;
+  margin-bottom: 1.5rem;
+  color: #333;
+  font-size: 1rem;
+  line-height: 1.5;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.lekari-pacient-callout p {
+  margin: 0 0 0.75rem 0;
+}
+
+.lekari-pacient-callout strong {
+  color: #1a1a2e;
+}
+
+.lekari-callout-close {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.75rem;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #666;
+  cursor: pointer;
+}
+
+.lekari-callout-close:hover {
+  color: #333;
+}
+
+.btn-callout-dismiss {
+  background: #6c757d;
+  color: #fff;
+  border: none;
+  padding: 0.4rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.btn-callout-dismiss:hover {
+  background: #5a6268;
+}
+
+.appointment-success-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2100;
+}
+
+.appointment-success-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 400px;
+  text-align: center;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+}
+
+.appointment-success-msg {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.1rem;
+  color: #333;
+}
+
 .lekar-card {
   background: white;
   border-radius: 12px;
@@ -1080,6 +1165,12 @@ footer {
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
 }
 
+.calendar-hint {
+  font-size: 0.9rem;
+  color: #666;
+  margin: 0 0 1rem 0;
+}
+
 .calendar-section h3,
 .form-section h3 {
   color: #1a1a2e;
@@ -1093,6 +1184,42 @@ footer {
   padding: 1.5rem;
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.form-section-label {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 1rem 0 0.5rem 0;
+  padding-bottom: 0.25rem;
+}
+
+.appointment-form-fields .form-group {
+  margin-bottom: 1rem;
+}
+
+.appointment-form-fields .form-group label {
+  display: block;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 0.35rem;
+  font-size: 0.95rem;
+}
+
+.appointment-form-fields .form-group input,
+.appointment-form-fields .form-group textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
+.appointment-form-fields .form-group input:focus,
+.appointment-form-fields .form-group textarea:focus {
+  outline: none;
+  border-color: #e74c3c;
 }
 
 #calendar {
@@ -1990,6 +2117,7 @@ html {
   max-width: 1200px;
   max-height: 90vh;
   overflow-y: auto;
+  position: relative;
 }
 
 /* Навигација со табови */
@@ -2038,7 +2166,125 @@ html {
   color: #1a1a2e;
   margin-bottom: 1.5rem;
   font-size: 1.5rem;
-  text-align: center; /* Центрирање на насловот */
+  text-align: center;
+}
+
+/* Таб Поставки – центрирана форма и смена на лозинка */
+.tab-postavki-wrapper {
+  text-align: center;
+}
+.tab-postavki-wrapper .postavki-intro {
+  margin-bottom: 1.5rem;
+  color: #666;
+  max-width: 480px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.postavki-form {
+  max-width: 400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  text-align: left;
+}
+.postavki-form .form-group label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.35rem;
+}
+.postavki-form .form-hint {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+/* X за затворање на dashboard модалот – подобра видливост */
+/* X за затворање – исто како при најава: мало црвено круже како на MacBook, од лева страна */
+.lekar-dashboard-content .close {
+  left: 1rem;
+  right: auto;
+  top: 1rem;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  font-size: 0;
+  line-height: 16px;
+  color: rgba(0, 0, 0, 0.55);
+  background: #ff5f57;
+  border-radius: 50%;
+  box-shadow: none;
+  border: none;
+  z-index: 1000;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  transition: filter 0.2s ease, background 0.2s ease;
+}
+.lekar-dashboard-content .close::before {
+  content: '×';
+  font-size: 0.7rem;
+  font-weight: 600;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(0, 0, 0, 0.55);
+}
+.lekar-dashboard-content .close:hover,
+.lekar-dashboard-content .close:focus {
+  background: #e74c3c;
+  filter: brightness(1.05);
+  transform: none;
+}
+
+/* При прва најава – overlay за задолжителна смена на лозинка */
+.lekar-first-login-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.97);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 20px;
+}
+.lekar-first-login-box {
+  max-width: 420px;
+  padding: 2rem;
+  text-align: center;
+}
+.lekar-first-login-dobredojde {
+  color: #1a1a2e;
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+.lekar-first-login-obavesti {
+  background: #fff3cd;
+  border: 1px solid #e74c3c;
+  color: #856404;
+  padding: 1rem 1.25rem;
+  border-radius: 10px;
+  margin-bottom: 1.25rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+.lekar-first-login-obavesti strong {
+  color: #c0392b;
+}
+.lekar-first-login-msg {
+  color: #666;
+  font-size: 0.95rem;
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
 }
 
 /* Форма за закажување на апарати */
@@ -2591,4 +2837,312 @@ html {
 
 .btn-raspored-load:hover {
   background-color: #c0392b;
+}
+
+/* ============================================================================
+   НОВИ СТИЛОВИ ЗА НАЈАВА И РЕГИСТРАЦИЈА (Инспирирани од сликите)
+   ============================================================================ */
+
+/* Auth Modal - Центрирана карта */
+.auth-modal-content {
+  max-width: 480px;
+  padding: 2.5rem;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 25px 80px rgba(0, 0, 0, 0.15);
+  position: relative;
+  margin: 3% auto;
+  animation: authSlideUp 0.4s ease-out;
+}
+
+/* X за затворање – мало црвено круже како на MacBook, од лева страна */
+.auth-modal-content .close {
+  left: 1rem;
+  right: auto;
+  top: 1rem;
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  line-height: 16px;
+  color: rgba(0, 0, 0, 0.55);
+  background: #ff5f57;
+  border-radius: 50%;
+  box-shadow: none;
+  border: none;
+  z-index: 1000;
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  text-align: center;
+  box-sizing: border-box;
+  transition: filter 0.2s ease, background 0.2s ease;
+  font-size: 0;
+}
+.auth-modal-content .close::before {
+  content: '×';
+  font-size: 0.7rem;
+  font-weight: 600;
+  width: 16px;
+  height: 16px;
+  line-height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(0, 0, 0, 0.55);
+}
+.auth-modal-content .close:hover,
+.auth-modal-content .close:focus {
+  background: #e74c3c;
+  filter: brightness(1.05);
+  transform: none;
+}
+
+@keyframes authSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(40px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Хедер со лого */
+.auth-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.auth-logo {
+  width: 70px;
+  height: 70px;
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+  box-shadow: 0 8px 25px rgba(231, 76, 60, 0.3);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.auth-logo .red-cross {
+  color: white;
+  font-size: 2.5rem;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.auth-header h2 {
+  color: #1a1a2e;
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  letter-spacing: -0.5px;
+}
+
+.auth-header p {
+  color: #666;
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+/* Табови за улога */
+.role-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  background: #f5f5f5;
+  padding: 0.4rem;
+  border-radius: 12px;
+}
+
+.role-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.8rem 1rem;
+  border: none;
+  background: transparent;
+  color: #666;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.role-tab:hover {
+  color: #e74c3c;
+  background: rgba(231, 76, 60, 0.05);
+}
+
+.role-tab.active {
+  background: #e74c3c;
+  color: white;
+  box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+}
+
+.role-tab svg {
+  stroke-width: 2.5px;
+}
+
+/* Форма */
+.auth-form-container form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.auth-form-container .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.auth-form-container label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.auth-form-container input {
+  padding: 0.9rem 1rem;
+  border: 2px solid #e8e8e8;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-family: inherit;
+  background: #fafafa;
+  transition: all 0.3s ease;
+  width: 100%;
+}
+
+.auth-form-container input:focus {
+  outline: none;
+  border-color: #e74c3c;
+  background: white;
+  box-shadow: 0 0 0 4px rgba(231, 76, 60, 0.1);
+}
+
+.auth-form-container input::placeholder {
+  color: #aaa;
+  font-size: 0.95rem;
+}
+
+/* Ерор порака */
+.auth-error {
+  background: #fee2e2;
+  color: #dc2626;
+  padding: 0.8rem 1rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  text-align: center;
+  border-left: 4px solid #dc2626;
+  animation: shake 0.5s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+/* Копче за најава/регистрација */
+.btn-auth-submit {
+  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+  color: white;
+  border: none;
+  padding: 1rem;
+  border-radius: 12px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 0.5rem;
+  box-shadow: 0 4px 15px rgba(231, 76, 60, 0.35);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-auth-submit:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(231, 76, 60, 0.45);
+}
+
+.btn-auth-submit:active {
+  transform: translateY(0);
+}
+
+.btn-auth-submit:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Линк за префрлање најава/регистрација */
+.auth-switch {
+  text-align: center;
+  margin-top: 1.5rem;
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.auth-switch a {
+  color: #e74c3c;
+  text-decoration: none;
+  font-weight: 600;
+  transition: all 0.3s ease;
+}
+
+.auth-switch a:hover {
+  text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .auth-modal-content {
+    max-width: 90%;
+    padding: 1.5rem;
+    margin: 5% auto;
+  }
+  
+  .form-row {
+    grid-template-columns: 1fr;
+  }
+  
+  .role-tab {
+    font-size: 0.85rem;
+    padding: 0.7rem;
+  }
+  
+  .auth-logo {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .auth-logo .red-cross {
+    font-size: 2rem;
+  }
 }

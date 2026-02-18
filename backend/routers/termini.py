@@ -1,3 +1,11 @@
+import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.mime.text import MIMEText
+from email.header import Header
+from email import encoders
+
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from datetime import datetime
@@ -10,6 +18,195 @@ from reportlab.lib import colors
 from io import BytesIO
 
 router = APIRouter(prefix="/termini", tags=["termini"])
+
+
+def _poslati_potvrda_na_email(to_email: str, ime_pacient: str, ime_lekar: str, datum: str, vreme: str):
+    """Испрати потврда на е-пошта до пациентот по закажан термин. Ако SMTP не е поставен, се печати во конзола."""
+    if not to_email or "@" not in to_email:
+        return
+    subject = "Потврда за закажан термин – Клиничка Болница Штип"
+    body = f"""Почитуван/а {ime_pacient},
+
+Вашиот термин е успешно закажан.
+
+Лекар: {ime_lekar}
+Датум: {datum}
+Време: {vreme}
+
+Клиничка Болница Штип
+"""
+    smtp_host = os.environ.get("SMTP_HOST", "").strip()
+    smtp_user = os.environ.get("SMTP_USER", "").strip()
+    smtp_pass = os.environ.get("SMTP_PASSWORD", "").strip()
+    from_addr = os.environ.get("EMAIL_FROM", smtp_user or "noreply@kbstip.mk").strip()
+
+    if smtp_host and smtp_user and smtp_pass:
+        try:
+            smtp_port = int(os.environ.get("SMTP_PORT", "587") or "587")
+            msg = MIMEMultipart()
+            msg["From"] = from_addr
+            msg["To"] = to_email
+            msg["Subject"] = Header(subject, "utf-8")
+            msg.attach(MIMEText(body, "plain", "utf-8"))
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(from_addr, to_email, msg.as_string())
+            print(f"[EMAIL] Потврда испратена на {to_email}")
+        except Exception as e:
+            print(f"[EMAIL] Грешка при испраќање на {to_email}: {e}")
+    else:
+        # Без SMTP: прикажи ја пораката во конзола за да видите како изгледа
+        print("\n" + "=" * 60)
+        print("[EMAIL] (SMTP не е поставен – пораката би се испратила на)")
+        print("  До:", to_email)
+        print("  Наслов:", subject)
+        print("-" * 60)
+        print(body)
+        print("=" * 60 + "\n")
+
+
+def _get_termin_za_izvestaj(db_cursor, termin_id: int):
+    """Го зема терминот со податоци за пациент и лекар за извештај."""
+    db_cursor.execute("""
+        SELECT 
+            tp.termin_ID,
+            tp.datum_pregled,
+            TIME(tp.vreme_pregled) as vreme_pregled,
+            tp.ime_pacient,
+            tp.email_pacient,
+            tp.telefon_pacient,
+            tp.dijagnoza,
+            tp.terapija,
+            tp.ime_lekar,
+            tp.specijalnost_termin,
+            d.name as lekar_ime,
+            d.surname as lekar_prezime,
+            d.email as lekar_email,
+            d.specialty as lekar_specijalnost,
+            COALESCE(p.name_patient, '') AS pacient_ime,
+            COALESCE(p.surname_patient, '') AS pacient_prezime
+        FROM Termin_pregled tp
+        LEFT JOIN Doctors d ON tp.doctor_ID = d.doctor_ID
+        LEFT JOIN patient p ON LOWER(TRIM(tp.email_pacient)) = LOWER(TRIM(p.email))
+        WHERE tp.termin_ID = %s
+    """, (termin_id,))
+    return db_cursor.fetchone()
+
+
+def _build_pdf_izvestaj(termin: dict, termin_id: int) -> bytes:
+    """Генерира PDF извештај од податоците на терминот. Враќа bytes."""
+    vreme = termin.get("vreme_pregled")
+    if vreme and hasattr(vreme, "strftime"):
+        vreme_str = vreme.strftime("%H:%M")
+    elif vreme and hasattr(vreme, "total_seconds"):
+        s = int(vreme.total_seconds())
+        vreme_str = f"{s // 3600:02d}:{(s % 3600) // 60:02d}"
+    else:
+        vreme_str = str(vreme)[:5] if vreme else ""
+
+    datum = termin.get("datum_pregled")
+    if datum:
+        if isinstance(datum, str):
+            datum_obj = datetime.strptime(datum, "%Y-%m-%d").date()
+        else:
+            datum_obj = datum if hasattr(datum, 'strftime') else datetime.strptime(str(datum), "%Y-%m-%d").date()
+        datum_str = datum_obj.strftime("%d.%m.%Y")
+    else:
+        datum_str = "Н/П"
+
+    if termin.get("pacient_ime") and termin.get("pacient_prezime"):
+        pacient_ime_puno = f"{termin.get('pacient_ime', '').strip()} {termin.get('pacient_prezime', '').strip()}".strip()
+    else:
+        pacient_ime_puno = termin.get("ime_pacient", "").strip()
+
+    if termin.get("lekar_ime") and termin.get("lekar_prezime"):
+        lekar_ime_puno = f"{termin.get('lekar_ime')} {termin.get('lekar_prezime')}".strip()
+    else:
+        lekar_ime_puno = termin.get("ime_lekar", "").strip()
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4, rightMargin=72, leftMargin=72, topMargin=72, bottomMargin=72)
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'CustomTitle', parent=styles['Heading1'],
+        fontSize=18, textColor=colors.HexColor('#e74c3c'), spaceAfter=30, alignment=1, fontName='Helvetica-Bold'
+    )
+    heading_style = ParagraphStyle(
+        'CustomHeading', parent=styles['Heading2'],
+        fontSize=14, textColor=colors.HexColor('#2c3e50'), spaceAfter=12, spaceBefore=12, fontName='Helvetica-Bold'
+    )
+    normal_style = styles['Normal']
+    normal_style.fontSize = 11
+    normal_style.leading = 14
+
+    story = []
+    story.append(Paragraph("Клиничка Болница Штип - Медицински Извештај", title_style))
+    story.append(Spacer(1, 0.3*inch))
+    story.append(Paragraph("Податоци за пациентот:", heading_style))
+    pacient_data = [
+        ["Име и презиме:", pacient_ime_puno or "Н/П"],
+        ["Е-пошта:", termin.get("email_pacient", "Н/П")],
+        ["Телефон:", termin.get("telefon_pacient", "Н/П")],
+    ]
+    t1 = Table(pacient_data, colWidths=[2*inch, 4*inch])
+    t1.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8f9fa')),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 11),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+    ]))
+    story.append(t1)
+    story.append(Spacer(1, 0.2*inch))
+    story.append(Paragraph("Податоци за лекарот:", heading_style))
+    lekar_data = [
+        ["Име и презиме:", lekar_ime_puno or "Н/П"],
+        ["Специјалност:", termin.get("lekar_specijalnost") or termin.get("specijalnost_termin") or "Н/П"],
+        ["Е-пошта:", termin.get("lekar_email", "Н/П")],
+    ]
+    t2 = Table(lekar_data, colWidths=[2*inch, 4*inch])
+    t2.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8f9fa')),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 11),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+    ]))
+    story.append(t2)
+    story.append(Spacer(1, 0.2*inch))
+    story.append(Paragraph("Податоци за терминот:", heading_style))
+    termin_data = [["Датум:", datum_str], ["Време:", vreme_str or "Н/П"]]
+    t3 = Table(termin_data, colWidths=[2*inch, 4*inch])
+    t3.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8f9fa')),
+        ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
+        ('FONTSIZE', (0, 0), (-1, -1), 11),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('TOPPADDING', (0, 0), (-1, -1), 8),
+        ('GRID', (0, 0), (-1, -1), 1, colors.grey),
+    ]))
+    story.append(t3)
+    story.append(Spacer(1, 0.3*inch))
+    story.append(Paragraph("Дијагноза:", heading_style))
+    story.append(Paragraph((termin.get("dijagnoza", "") or "Нема внесена дијагноза.").replace('\n', '<br/>'), normal_style))
+    story.append(Spacer(1, 0.2*inch))
+    story.append(Paragraph("Терапија:", heading_style))
+    story.append(Paragraph((termin.get("terapija", "") or "Нема внесена терапија.").replace('\n', '<br/>'), normal_style))
+    story.append(Spacer(1, 0.3*inch))
+    doc.build(story)
+    buffer.seek(0)
+    pdf_bytes = buffer.getvalue()
+    buffer.close()
+    return pdf_bytes
 
 @router.get("/dostapni")
 def get_dostapni_termini(lekar_id: int, datum: str):    # funkcija koja dava prikaz koj lekar ima sloboden termin, id na lekarot e od tip int, a datum e string
@@ -125,8 +322,15 @@ async def create_termini(request: Request):     # funkcija koja ceka podatoci od
         conn.commit()       # se pravi promena vo bazata, se zacuvuva sekoja promena
         appointment_id = db_cursor.lastrowid   #Se zima id to na novozakazaniot termin
 
+        # Испрати потврда на е-пошта до пациентот
+        patient_email = data.get("email", "").strip()
+        if patient_email:
+            ime_prezime = (data.get("ime", "") + " " + data.get("prezime", "")).strip()
+            doctor_full = doctor["name"] + " " + doctor["surname"]
+            _poslati_potvrda_na_email(patient_email, ime_prezime, doctor_full, datum_str, vreme_str)
+
         return {
-            "message": "Терминот е успешно закажан!",       # pecatenje na poraka deka imame uspesno zakazan termin
+            "message": "Терминот е успешно закажан! Ќе добиете потврда на вашата е-пошта.",
             "appointment_ID": appointment_id
         }
     except HTTPException:                   # formatirana greska
@@ -179,208 +383,91 @@ async def generate_izvestaj_pdf(termin_id: int):
     try:
         conn = get_connection()
         db_cursor = conn.cursor(dictionary=True)
-        
-        # Земи ги податоците за терминот со JOIN на Doctors и patient табелата
-        db_cursor.execute("""
-            SELECT 
-                tp.termin_ID,
-                tp.datum_pregled,
-                TIME(tp.vreme_pregled) as vreme_pregled,
-                tp.ime_pacient,
-                tp.email_pacient,
-                tp.telefon_pacient,
-                tp.dijagnoza,
-                tp.terapija,
-                tp.ime_lekar,
-                tp.specijalnost_termin,
-                d.name as lekar_ime,
-                d.surname as lekar_prezime,
-                d.email as lekar_email,
-                d.specialty as lekar_specijalnost,
-                COALESCE(p.name_patient, '') AS pacient_ime,
-                COALESCE(p.surname_patient, '') AS pacient_prezime
-            FROM Termin_pregled tp
-            LEFT JOIN Doctors d ON tp.doctor_ID = d.doctor_ID
-            LEFT JOIN patient p ON LOWER(TRIM(tp.email_pacient)) = LOWER(TRIM(p.email))
-            WHERE tp.termin_ID = %s
-        """, (termin_id,))
-        
-        termin = db_cursor.fetchone()
-        
+        termin = _get_termin_za_izvestaj(db_cursor, termin_id)
         if not termin:
             raise HTTPException(status_code=404, detail="Термин не е пронајден")
-        
-        # Форматирај го времето
-        vreme = termin.get("vreme_pregled")
-        if vreme and hasattr(vreme, "strftime"):
-            vreme_str = vreme.strftime("%H:%M")
-        elif vreme and hasattr(vreme, "total_seconds"):
-            s = int(vreme.total_seconds())
-            vreme_str = f"{s // 3600:02d}:{(s % 3600) // 60:02d}"
-        else:
-            vreme_str = str(vreme)[:5] if vreme else ""
-        
-        # Форматирај го датумот
-        datum = termin.get("datum_pregled")
-        if datum:
-            if isinstance(datum, str):
-                datum_obj = datetime.strptime(datum, "%Y-%m-%d").date()
-            else:
-                datum_obj = datum if hasattr(datum, 'strftime') else datetime.strptime(str(datum), "%Y-%m-%d").date()
-            datum_str = datum_obj.strftime("%d.%m.%Y")
-        else:
-            datum_str = "Н/П"
-        
-        # Извлечи име и презиме на пациентот
-        if termin.get("pacient_ime") and termin.get("pacient_prezime"):
-            pacient_ime = termin.get("pacient_ime", "").strip()
-            pacient_prezime = termin.get("pacient_prezime", "").strip()
-            pacient_ime_puno = f"{pacient_ime} {pacient_prezime}".strip()
-        else:
-            # Ако нема JOIN, користи го комбинираното име од Termin_pregled
-            pacient_ime_puno = termin.get("ime_pacient", "").strip()
-            parts = pacient_ime_puno.split(" ", 1)
-            pacient_ime = parts[0] if len(parts) > 0 else ""
-            pacient_prezime = parts[1] if len(parts) > 1 else ""
-        
-        # Извлечи име и презиме на лекарот
-        if termin.get("lekar_ime") and termin.get("lekar_prezime"):
-            lekar_ime_puno = f"{termin.get('lekar_ime')} {termin.get('lekar_prezime')}".strip()
-        else:
-            lekar_ime_puno = termin.get("ime_lekar", "").strip()
-        
-        # Креирај PDF во меморија
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4, 
-                                rightMargin=72, leftMargin=72,
-                                topMargin=72, bottomMargin=72)
-        
-        # Стилови
-        styles = getSampleStyleSheet()
-        title_style = ParagraphStyle(
-            'CustomTitle',
-            parent=styles['Heading1'],
-            fontSize=18,
-            textColor=colors.HexColor('#e74c3c'),
-            spaceAfter=30,
-            alignment=1,  # Center alignment
-            fontName='Helvetica-Bold'
-        )
-        
-        heading_style = ParagraphStyle(
-            'CustomHeading',
-            parent=styles['Heading2'],
-            fontSize=14,
-            textColor=colors.HexColor('#2c3e50'),
-            spaceAfter=12,
-            spaceBefore=12,
-            fontName='Helvetica-Bold'
-        )
-        
-        normal_style = styles['Normal']
-        normal_style.fontSize = 11
-        normal_style.leading = 14
-        
-        # Содржина на PDF-от
-        story = []
-        
-        # Наслов
-        story.append(Paragraph("Клиничка Болница Штип - Медицински Извештај", title_style))
-        story.append(Spacer(1, 0.3*inch))
-        
-        # Податоци за пациентот
-        story.append(Paragraph("Податоци за пациентот:", heading_style))
-        pacient_data = [
-            ["Име и презиме:", pacient_ime_puno or "Н/П"],
-            ["Е-пошта:", termin.get("email_pacient", "Н/П")],
-            ["Телефон:", termin.get("telefon_pacient", "Н/П")],
-        ]
-        pacient_table = Table(pacient_data, colWidths=[2*inch, 4*inch])
-        pacient_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8f9fa')),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 11),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-        ]))
-        story.append(pacient_table)
-        story.append(Spacer(1, 0.2*inch))
-        
-        # Податоци за лекарот
-        story.append(Paragraph("Податоци за лекарот:", heading_style))
-        lekar_data = [
-            ["Име и презиме:", lekar_ime_puno or "Н/П"],
-            ["Специјалност:", termin.get("lekar_specijalnost") or termin.get("specijalnost_termin") or "Н/П"],
-            ["Е-пошта:", termin.get("lekar_email", "Н/П")],
-        ]
-        lekar_table = Table(lekar_data, colWidths=[2*inch, 4*inch])
-        lekar_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8f9fa')),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 11),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-        ]))
-        story.append(lekar_table)
-        story.append(Spacer(1, 0.2*inch))
-        
-        # Податоци за терминот
-        story.append(Paragraph("Податоци за терминот:", heading_style))
-        termin_data = [
-            ["Датум:", datum_str],
-            ["Време:", vreme_str or "Н/П"],
-        ]
-        termin_table = Table(termin_data, colWidths=[2*inch, 4*inch])
-        termin_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#f8f9fa')),
-            ('TEXTCOLOR', (0, 0), (-1, -1), colors.black),
-            ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
-            ('FONTNAME', (0, 0), (-1, -1), 'Helvetica'),
-            ('FONTSIZE', (0, 0), (-1, -1), 11),
-            ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
-            ('TOPPADDING', (0, 0), (-1, -1), 8),
-            ('GRID', (0, 0), (-1, -1), 1, colors.grey),
-        ]))
-        story.append(termin_table)
-        story.append(Spacer(1, 0.3*inch))
-        
-        # Дијагноза
-        story.append(Paragraph("Дијагноза:", heading_style))
-        dijagnoza_text = termin.get("dijagnoza", "") or "Нема внесена дијагноза."
-        story.append(Paragraph(dijagnoza_text.replace('\n', '<br/>'), normal_style))
-        story.append(Spacer(1, 0.2*inch))
-        
-        # Терапија
-        story.append(Paragraph("Терапија:", heading_style))
-        terapija_text = termin.get("terapija", "") or "Нема внесена терапија."
-        story.append(Paragraph(terapija_text.replace('\n', '<br/>'), normal_style))
-        story.append(Spacer(1, 0.3*inch))
-        
-        # Генерирај PDF
-        doc.build(story)
-        buffer.seek(0)
-        pdf_content = buffer.getvalue()
-        buffer.close()
-        
-        # Врати PDF како Response
+        pdf_content = _build_pdf_izvestaj(termin, termin_id)
         return Response(
             content=pdf_content,
             media_type='application/pdf',
-            headers={
-                "Content-Disposition": f'attachment; filename="izvestaj_termin_{termin_id}.pdf"'
-            }
+            headers={"Content-Disposition": f'attachment; filename="izvestaj_termin_{termin_id}.pdf"'}
         )
-        
     except HTTPException:
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Грешка при генерирање на PDF: {str(e)}")
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
+
+
+@router.post("/{termin_id}/poslati-izvestaj")
+async def poslati_izvestaj_na_pacient(termin_id: int):
+    """
+    Генерира PDF извештај за терминот и го испраќа на е-поштата на пациентот
+    (email_pacient од терминот – истата адреса со која пациентот е најавен).
+    За конфигурација: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, FROM_EMAIL (опционално).
+    """
+    conn = None
+    try:
+        conn = get_connection()
+        db_cursor = conn.cursor(dictionary=True)
+        termin = _get_termin_za_izvestaj(db_cursor, termin_id)
+        if not termin:
+            raise HTTPException(status_code=404, detail="Термин не е пронајден")
+
+        email_pacient = (termin.get("email_pacient") or "").strip()
+        if not email_pacient or "@" not in email_pacient:
+            raise HTTPException(
+                status_code=400,
+                detail="Пациентот нема валидна е-пошта за испраќање на извештај."
+            )
+
+        pdf_bytes = _build_pdf_izvestaj(termin, termin_id)
+
+        smtp_host = os.environ.get("SMTP_HOST")
+        smtp_port = int(os.environ.get("SMTP_PORT", "587"))
+        smtp_user = os.environ.get("SMTP_USER")
+        smtp_password = os.environ.get("SMTP_PASSWORD")
+        from_email = os.environ.get("FROM_EMAIL") or smtp_user
+
+        if not smtp_host or not smtp_user or not smtp_password:
+            raise HTTPException(
+                status_code=503,
+                detail="Испраќањето е-пошта не е конфигурирано (SMTP_HOST, SMTP_USER, SMTP_PASSWORD)."
+            )
+
+        msg = MIMEMultipart()
+        msg["Subject"] = f"Медицински извештај - Клиничка Болница Штип (термин #{termin_id})"
+        msg["From"] = from_email
+        msg["To"] = email_pacient
+        msg.attach(MIMEText(
+            "Почитувани,\n\nВо прилог е вашиот медицински извештај од прегледот.\n\nПоздрав,\nКлиничка Болница Штип",
+            "plain",
+            "utf-8"
+        ))
+        part = MIMEBase("application", "pdf")
+        part.set_payload(pdf_bytes)
+        encoders.encode_base64(part)
+        part.add_header(
+            "Content-Disposition",
+            "attachment",
+            filename=f"izvestaj_termin_{termin_id}.pdf"
+        )
+        msg.attach(part)
+
+        with smtplib.SMTP(smtp_host, smtp_port) as server:
+            server.starttls()
+            server.login(smtp_user, smtp_password)
+            server.sendmail(from_email, [email_pacient], msg.as_string())
+
+        return {"message": "Извештајот е успешно испратен на е-поштата на пациентот.", "email": email_pacient}
+    except HTTPException:
+        raise
+    except smtplib.SMTPException as e:
+        raise HTTPException(status_code=502, detail=f"Грешка при испраќање е-пошта: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Грешка: {str(e)}")
     finally:
         if conn and conn.is_connected():
             conn.close()

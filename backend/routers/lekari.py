@@ -1,11 +1,27 @@
 from fastapi import APIRouter, HTTPException, Request
 from typing import Optional
 from datetime import datetime, date
-import hashlib
+import string
 from database import get_connection
 from routers.utils import debug_log, transliterate_mk_to_lat
+from password_utils import hash_password, verify_password
 
 router = APIRouter(prefix="/lekari", tags=["lekari"])
+
+# Привремена лозинка за сите лекари – мора да се смени само ако е оваа (инаку не се менува)
+DEFAULT_LOZINKA_LEKARI = "Test123.."
+
+# Валидација на лозинка за лекари: мин. 8 знаци, барем една голема буква, барем еден број, барем еден интерпункциски знак
+def _validna_lozinka_lekar(lozinka: str) -> tuple:
+    if not lozinka or len(lozinka) < 8:
+        return False, "Лозинката мора да има најмалку 8 карактери"
+    if not any(c.isupper() for c in lozinka):
+        return False, "Лозинката мора да содржи барем една голема буква"
+    if not any(c.isdigit() for c in lozinka):
+        return False, "Лозинката мора да содржи барем еден број"
+    if not any(c in string.punctuation for c in lozinka):
+        return False, "Лозинката мора да содржи барем еден интерпункциски знак"
+    return True, ""
 
 @router.get("")
 def get_lekari(specijalnost: Optional[str] = None):                                                     # ako se vnese string vraka lekari od vnesena specijalnost, ako ne vnese string gi dava site lekari 
@@ -70,10 +86,6 @@ async def login_lekar(request: Request):
         
         conn = get_connection()  # воспоставување конекција со базата на податоци
         db_cursor = conn.cursor(dictionary=True)  # cursor за извршување SQL наредби со резултат како речник
-        
-        # Хеширање на лозинката за споредба со хешираната лозинка во базата
-        # Според PDF: "сите осетливни податоци ќе се хешираат во базата на податоци"
-        password_hash = hashlib.sha256(password.encode()).hexdigest()
         
         # Проверка дали постои лекар со даденото корисничко име (име.презиме на латиница)
         # Корисничкото име е во формат "име.презиме" на латиница (напр. "ana.ivanovska")
@@ -140,16 +152,16 @@ async def login_lekar(request: Request):
         debug_log("main.py:261", "login_lekar: Doctor found", {"doctor_id": doctor.get("doctor_ID"), "has_stored_password": bool(doctor.get("password"))}, hypothesis_id="E")
         # #endregion
         
-        # Проверка на лозинката: споредуваме хешираната внесена лозинка со хешираната лозинка од базата
-        stored_password_hash = doctor.get("password") or ""
+        # Проверка на лозинката: секој лекар мора да има поставена лозинка во базата
+        stored_password_hash = (doctor.get("password") or "").strip()
         
-        # Ако во базата нема зачувана лозинка (NULL), дозволуваме најава само со корисничко име за постоечки лекари
-        # Ова е за поддршка на постоечки лекари кои сè уште немаат поставена лозинка
-        if stored_password_hash:
-            # Ако има зачувана лозинка, мора да се совпаѓа
-            if password_hash != stored_password_hash:
-                raise HTTPException(status_code=401, detail="Невалидно корисничко име или лозинка")
-        # Ако нема зачувана лозинка, дозволуваме најава (за назадна компатибилност)
+        if not stored_password_hash:
+            raise HTTPException(
+                status_code=403,
+                detail="Овој лекар сè уште не е регистриран. Користете ја опцијата „Регистрирај се“ за да креирате профил (име, презиме, специјалност, е-пошта, лозинка). По регистрација најавете се со корисничко име име.презиме и лозинката што ја поставивте."
+            )
+        if not verify_password(password, stored_password_hash):
+            raise HTTPException(status_code=401, detail="Невалидно корисничко име или лозинка")
         
         doctor_id = doctor["doctor_ID"]  # ID на лекарот за да ги земеме неговите термини
         
@@ -197,16 +209,20 @@ async def login_lekar(request: Request):
         debug_log("main.py:314", "login_lekar: Success", {"doctor_id": doctor["doctor_ID"], "termini_count": len(termini)}, hypothesis_id="E")
         # #endregion
         
+        # Дали лекар мора да ја смени лозинката: само ако тековната лозинка е привремената Test123..
+        must_change = verify_password(DEFAULT_LOZINKA_LEKARI, stored_password_hash)
+
         # Враќаме JSON објект со податоци за лекарот и неговите термини
         return {
             "doctor": {
-                "doctor_ID": doctor["doctor_ID"],  # ID на лекарот од базата
-                "name": doctor["name"],  # името на лекарот
-                "surname": doctor["surname"],  # презиме на лекар
-                "email": doctor.get("email") or "",  # маил на лекар
-                "specijalnost": (doctor.get("specijalnost") or "").strip(),  # враќа специјалност на лекарот
+                "doctor_ID": doctor["doctor_ID"],
+                "name": doctor["name"],
+                "surname": doctor["surname"],
+                "email": doctor.get("email") or "",
+                "specijalnost": (doctor.get("specijalnost") or "").strip(),
             },
-            "termini": termini,  # сите термини за лекарот
+            "termini": termini,
+            "must_change_password": must_change,  # при прва најава – задолжителна смена на лозинка
         }
     except HTTPException as e:  # форматирана грешка
         # #region agent log
@@ -219,6 +235,57 @@ async def login_lekar(request: Request):
         # #endregion
         raise HTTPException(status_code=500, detail=str(e))  # статусен код 500 и објаснување сместено во e
     finally:  # се проверува дали има конекција, ако има се затвора, се извршува без разлика дали има или нема грешка
+        if conn and conn.is_connected():
+            conn.close()
+
+
+@router.patch("/promeni-lozinka")
+async def promeni_lozinka_lekar(request: Request):
+    """
+    Смена на лозинка за најавен лекар. Потребна е тековната лозинка за верификација.
+    Само најавениот лекар може да ја смени својата лозинка (побезбедно од опција „поставете за прв пат“).
+    """
+    conn = None
+    try:
+        data = await request.json()
+        doctor_id = data.get("doctor_id")
+        trenutna = (data.get("trenutna_lozinka") or "").strip()
+        nova = (data.get("nova_lozinka") or "").strip()
+
+        if not doctor_id:
+            raise HTTPException(status_code=400, detail="Недостасува doctor_id")
+        if not trenutna:
+            raise HTTPException(status_code=400, detail="Внесете ја тековната лозинка")
+        ok, msg = _validna_lozinka_lekar(nova)
+        if not ok:
+            raise HTTPException(status_code=400, detail=msg)
+
+        conn = get_connection()
+        db_cursor = conn.cursor(dictionary=True)
+        db_cursor.execute("SELECT doctor_ID, password FROM Doctors WHERE doctor_ID = %s", (doctor_id,))
+        doctor = db_cursor.fetchone()
+        if not doctor:
+            raise HTTPException(status_code=404, detail="Лекар не е пронајден")
+
+        stored = (doctor.get("password") or "").strip()
+        if not stored:
+            raise HTTPException(status_code=403, detail="Немате поставено лозинка. Користете ја опцијата за прв пат поставување или контактирајте го администраторот.")
+
+        if not verify_password(trenutna, stored):
+            raise HTTPException(status_code=401, detail="Тековната лозинка не е точна")
+
+        nova_hash = hash_password(nova)
+        db_cursor.execute(
+            "UPDATE Doctors SET password = %s, must_change_password = 0 WHERE doctor_ID = %s",
+            (nova_hash, doctor_id)
+        )
+        conn.commit()
+        return {"message": "Лозинката е успешно променета."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
         if conn and conn.is_connected():
             conn.close()
 
@@ -811,8 +878,9 @@ async def register_lekar(request: Request):
         # Базична email валидација
         if '@' not in email or '.' not in email.split('@')[1]:
             raise HTTPException(status_code=400, detail="Внесете валидна е-пошта")
-        if not password or len(password) < 6:
-            raise HTTPException(status_code=400, detail="Лозинката мора да има најмалку 6 карактери")
+        ok, msg = _validna_lozinka_lekar(password)
+        if not ok:
+            raise HTTPException(status_code=400, detail=msg)
         
         conn = get_connection()
         db_cursor = conn.cursor(dictionary=True)
@@ -839,17 +907,17 @@ async def register_lekar(request: Request):
         if db_cursor.fetchone():
             raise HTTPException(status_code=400, detail="Лекар со оваа е-пошта веќе постои")
         
-        # Хеширање на лозинката
-        password_hash = hashlib.sha256(password.encode()).hexdigest()
+        # Хеширање на лозинката (bcrypt)
+        password_hash = hash_password(password)
         
         # #region agent log
         debug_log("main.py:929", "register_lekar: Attempting INSERT", {"ime": ime, "prezime": prezime, "specialty": specialty, "email": email, "username": username}, hypothesis_id="A")
         # #endregion
         
-        # Креирање на нов лекар
+        # Креирање на нов лекар (при само-регистрација лозинката е веќе избрана, не мора да се менува)
         db_cursor.execute("""
-            INSERT INTO Doctors (name, surname, specialty, email, password)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO Doctors (name, surname, specialty, email, password, must_change_password)
+            VALUES (%s, %s, %s, %s, %s, 0)
         """, (ime, prezime, specialty, email, password_hash))
         
         conn.commit()
