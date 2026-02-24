@@ -32,25 +32,20 @@ def get_lekari(specijalnost: Optional[str] = None):                             
     try:            
         conn = get_connection()                     # povrzuvanje so bazata na podatoci, vo conn se cuva konekcijata
         db_cursor = conn.cursor(dictionary=True)       # db_cursor objekt sto ovozmozuva da se vrsi sql naredba, argumento (dictionary=True) ni go dava izlezot kako recenica ne kako tuples
-                                                    # tuka so voa izlezot ke mi e [ {'id': 1, 'ime': 'Ana', 'vozrast': 22},{'id': 2, 'ime': 'Marko', 'vozrast': 21}]
+        # tuka so voa izlezot ke mi e [ {'id': 1, 'ime': 'Ana', 'vozrast': 22},{'id': 2, 'ime': 'Marko', 'vozrast': 21}]
 
-        if specijalnost and specijalnost.strip():   # se proveruva dali e izbrana specijalnost, so strip se otstranuva prazno mesto i se prikazuva, ako ne e izbrano site lekari 
-
-            # so db_cursor.execute se ispraka sql komanda do bazata, za da se zemat doctor_ID, name, surname, specijalност, email od tabelata Doctors, 
-            #  WHERE specialty = %s se zema vrednost izbrana i se smestuva vo %s (% placeholder, namesto da go vnesam preku kod se vnesuva so izbor), i se podreduva po ime i prezime lekarot
-            db_cursor.execute("""                  
-                SELECT doctor_ID, name, surname, specialty AS specijalnost, email 
-                FROM Doctors 
-                WHERE specialty = %s AND specialty IS NOT NULL AND specialty != ''
-                ORDER BY name, surname
-            """, (specijalnost.strip(),))   # kaj speciјalnost se trgat praznite mesta za pravilna rabota so bazata, 
-                                            # Tuple (zapirka ,) e potrebno: bezbednost da ne moze da se vnesuvat drugi podatoci + db_cursor.execute() bara tuple
-        else:
-            # ako ne e izbrana specijalnost se isprakaat istite parametri do bazata se zemaat lekarite po ime i prezime
+        if specijalnost and specijalnost.strip():   # se proveruva dali e izbrana specijalnost
             db_cursor.execute("""
-                SELECT doctor_ID, name, surname, specialty AS specijalnost, email 
-                FROM Doctors 
-                WHERE specialty IS NOT NULL AND specialty != ''
+                SELECT doctor_ID, name, surname, COALESCE(specialty, '') AS specijalnost, email
+                FROM Doctors
+                WHERE specialty = %s
+                ORDER BY name, surname
+            """, (specijalnost.strip(),))
+        else:
+            # сите лекари – вклучувајќи ги и оние без специјалност (ќе се прикаже Н/П на frontend)
+            db_cursor.execute("""
+                SELECT doctor_ID, name, surname, COALESCE(specialty, '') AS specijalnost, email
+                FROM Doctors
                 ORDER BY name, surname
             """)
         lekari = db_cursor.fetchall()  # fetchall() vraka lista na lekari vo vid na recinica i se zapisuvaat vo promenlivata lakari 
@@ -252,6 +247,11 @@ async def promeni_lozinka_lekar(request: Request):
     try:
         data = await request.json()
         doctor_id = data.get("doctor_id")
+        if doctor_id is not None and doctor_id != "":
+            try:
+                doctor_id = int(doctor_id)
+            except (TypeError, ValueError):
+                doctor_id = None
         trenutna = (data.get("trenutna_lozinka") or "").strip()
         nova = (data.get("nova_lozinka") or "").strip()
 
