@@ -12,9 +12,12 @@ router = APIRouter(prefix="/lekari", tags=["lekari"])
 DEFAULT_LOZINKA_LEKARI = "Test123.."
 
 # Валидација на лозинка за лекари: мин. 8 знаци, барем една голема буква, барем еден број, барем еден интерпункциски знак
+# Подразуеваната привремена лозинка не смее да се користи како нова – мора да се смени во нешто друго
 def _validna_lozinka_lekar(lozinka: str) -> tuple:
     if not lozinka or len(lozinka) < 8:
         return False, "Лозинката мора да има најмалку 8 карактери"
+    if lozinka.strip() == DEFAULT_LOZINKA_LEKARI:
+        return False, "Лозинката не смее да биде привремената/подразуеваната лозинка. Изберете друга лозинка според правилата (мин. 8 знаци, голема буква, број, интерпункциски знак)."
     if not any(c.isupper() for c in lozinka):
         return False, "Лозинката мора да содржи барем една голема буква"
     if not any(c.isdigit() for c in lozinka):

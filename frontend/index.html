@@ -19,7 +19,7 @@
         <a href="#lekari" class="nav-link">Лекари</a>
         <a href="#kontakt" class="nav-link">Контакт</a>
         <a href="#lekari" id="nav-zakazi-pregled" class="nav-link nav-zakazi-pregled" style="display: none;">Закажи преглед</a>
-        <button id="auto-login_btn" class="btn-lekar-login" onclick="openLekarLoginModal()">Најави се! </button>
+        <button id="auto-login_btn" class="btn-lekar-login" onclick="openLekarLoginModal()">Најави се!</button>
       </nav>
     </div>
   </header>
@@ -53,21 +53,20 @@
         <div class="feature-card">
           <div class="feature-icon">
             <div class="icon-circle">
-              <span class="icon-stethoscope">+</span>
+              <span class="icon-cross">+</span>
             </div>
           </div>
           <h3>Искуствени Тимови</h3>
-          <p>Искуство. Брзина. 
-            <p><i>Тимови што можат да реагираат веднаш.</i></p>
-          </p></div>
+          <p>Искуство. Брзина. <i>Тимови што можат да реагираат веднаш.</i></p>
+        </div>
         <div class="feature-card">
           <div class="feature-icon">
             <div class="icon-circle">
-              <span class="icon-shield">+</span>
+              <span class="icon-cross">+</span>
             </div>
           </div>
           <h3>Медицинска Опрема</h3>
-          <p>Технологија и грижа. <p><i>Комбинираме знаење и достапни технологии за вашата сигурност.</i></p></p>
+          <p>Технологија и грижа. <i>Комбинираме знаење и достапни технологии за вашата сигурност.</i></p>
         </div>
       </div>
     </div>
@@ -110,9 +109,9 @@
         <div class="loading">Вчитувам...</div>
       </div>
       
-      <div class="lekari-controls" style="text-align: center; margin-top: 2rem; display: none;">
+      <div class="lekari-controls" style="display: none;">
         <button id="show-more-btn" class="btn-show-more" onclick="showMoreDoctors()">Прикажи повеќе</button>
-        <button id="show-less-btn" class="btn-show-less" onclick="showLessDoctors()" style="display: none;">Прикажи помалку</button>
+        <button id="show-less-btn" class="btn-show-less" style="display: none;" onclick="showLessDoctors()">Прикажи помалку</button>
       </div>
     </div>
   </section>
@@ -140,16 +139,11 @@
   <section id="kariera" class="section career-section">
     <div class="container">
       <h2>Кариера</h2>
-      <br>
-      <p><i>Твоето знаење може да значи нечие утре.
-        Во Клиничка болница, веруваме дека медицината е повеќе од професија – таа е повик. 
-        Доколку си посветен, одговорен и подготвен да работиш во динамична средина, разгледај ги нашите отворени позиции.<i></p>
-          <br>
-          <br>
+      <p class="kariera-intro">Твоето знаење може да значи нечие утре. Во Клиничка болница, веруваме дека медицината е повеќе од професија – таа е повик. Доколку си посветен, одговорен и подготвен да работиш во динамична средина, разгледај ги нашите отворени позиции.</p>
       <div id="kariera-list" class="kariera-grid">Вчитувам позиции...</div>
 
-      <h3 style="text-align: center;">Аплицирај</h3>
-      <p id="selected-pozicija-info" style="display: none; padding: 10px; background: #e8f5e9; border-radius: 5px; margin-bottom: 15px; text-align: center; max-width: 600px; margin-left: auto; margin-right: auto;">
+      <h3 class="kariera-apply-title">Аплицирај</h3>
+      <p id="selected-pozicija-info" class="selected-pozicija-info" style="display: none;">
         <strong>Избрана позиција:</strong> <span id="selected-pozicija-text"></span>
       </p>
       <form id="kariera-forma" class="kariera-forma">
@@ -180,7 +174,6 @@
           src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d2934.0806!2d22.1955!3d41.7454!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zNDHCsDQ0JzQzLjQnTiAyMsKwMTEnNDQuMCJF!5e0!3m2!1smk!2s!4v202501111200"
           width="100%"
           height="200"
-          style="border:0;"
           allowfullscreen=""
           loading="lazy"
         ></iframe>
@@ -188,7 +181,7 @@
     </div>
     <div class="footer-bottom">
       <p>&copy;<span id="year"></span> Клиничка Болница Штип. Сите права задржани.</p>
-      <p><i><h5>{ Designed & Developed by: Даниел Ефтимов }</h5></i></p>
+      <p><i>{ Designed & Developed by: Даниел Ефтимов }</i></p>
     </div>
   </footer>
 
@@ -259,58 +252,44 @@
   </div>
 
   <!-- Unified Auth Modal - Единствен модал за најава и регистрација -->
-<div id="auth-modal" class="modal">
-  <div class="modal-content auth-modal-content">
-    <span class="close" onclick="closeAuthModal()">&times;</span>
-    
-    <!-- Лого и наслов -->
-    <div class="auth-header">
-      <div class="auth-logo">
-        <span class="red-cross">+</span>
+  <div id="auth-modal" class="modal" style="display: none;">
+    <div class="modal-content auth-modal-content">
+      <span class="close" onclick="closeAuthModal()">&times;</span>
+      
+      <div class="auth-header">
+        <div class="auth-logo">+</div>
+        <h2>Клиничка Болница</h2>
+        <p id="auth-subtitle">Најавете се на вашиот профил</p>
       </div>
-      <h2>Клиничка Болница</h2>
-      <p id="auth-subtitle">Најавете се на вашиот профил</p>
-    </div>
-    
-    <!-- Табови за избор на улога -->
-    <div class="role-tabs">
-      <button class="role-tab active" onclick="switchRole('pacient')" id="tab-pacient">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-          <circle cx="12" cy="7" r="4"></circle>
-        </svg>Пациент
-      </button>
-      <button class="role-tab" onclick="switchRole('lekar')" id="tab-lekar">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
-        </svg>Лекар
-      </button>
-    </div>
-    
-    <!-- Форма за најава – иста структура за Пациент и Лекар (лабела, поле, појаснување, белешка) -->
-    <div id="login-form-container" class="auth-form-container">
-      <form id="auth-login-form">
-        <div class="form-group">
-          <label for="login-identifier" id="login-identifier-label">Е-пошта</label>
-          <input type="text" id="login-identifier" placeholder="Овде внесете го вашиот mail" required autocomplete="email" />
-          <small class="form-hint" id="login-identifier-hint">Внесете ја е-поштата и лозинката од вашата регистрација. Немате профил? Регистрирајте се.</small>
-        </div>
-        <div class="form-group">
-          <label for="login-password">Лозинка</label>
-          <input type="password" id="login-password" placeholder="Внесете ја вашата лозинка" required autocomplete="current-password" />
-        </div>
-        <p class="auth-role-note" id="auth-pacient-note" style="font-size: 0.85rem; color: #666; margin-bottom: 1rem;">Најавете се со е-поштата и лозинката што ги поставивте при регистрација.</p>
-        <p class="auth-role-note" id="auth-doctor-note" style="display: none; font-size: 0.85rem; color: #666; margin-bottom: 1rem;">Нема пред-поставени кориснички имиња или лозинки за лекари. Регистрирајте го секој лекар, потоа најавете се со име.презиме и таа лозинка.</p>
-        <div id="login-error" class="auth-error" style="display: none;"></div>
-        <button type="submit" class="btn-auth-submit">
-          <span class="btn-text">Најави се</span>
-          <span class="btn-loading" style="display: none;">Вчитувам...</span>
-        </button>
-      </form>
-      <p class="auth-switch">
-        Немате профил? <a href="#" onclick="showRegister(); return false;">Регистрирајте се</a>
-      </p>
-    </div>
+      
+      <div class="role-tabs">
+        <button class="role-tab active" onclick="switchRole('pacient')" id="tab-pacient">Пациент</button>
+        <button class="role-tab" onclick="switchRole('lekar')" id="tab-lekar">Лекар</button>
+      </div>
+      
+      <div id="login-form-container" class="auth-form-container">
+        <form id="auth-login-form">
+          <div class="form-group">
+            <label for="login-identifier" id="login-identifier-label">Е-пошта</label>
+            <input type="text" id="login-identifier" placeholder="Овде внесете го вашиот mail" required autocomplete="email" />
+            <small class="form-hint" id="login-identifier-hint">Внесете ја е-поштата и лозинката од вашата регистрација. Немате профил? Регистрирајте се.</small>
+          </div>
+          <div class="form-group">
+            <label for="login-password">Лозинка</label>
+            <input type="password" id="login-password" placeholder="Внесете ја вашата лозинка" required autocomplete="current-password" />
+          </div>
+          <p class="auth-role-note" id="auth-pacient-note">Најавете се со е-поштата и лозинката што ги поставивте при регистрација.</p>
+          <p class="auth-role-note" id="auth-doctor-note" style="display: none;">Нема пред-поставени кориснички имиња или лозинки за лекари. Регистрирајте го секој лекар, потоа најавете се со име.презиме и таа лозинка.</p>
+          <div id="login-error" class="auth-error" style="display: none;"></div>
+          <button type="submit" class="btn-auth-submit">
+            <span class="btn-text">Најави се</span>
+            <span class="btn-loading" style="display: none;">Вчитувам...</span>
+          </button>
+        </form>
+        <p class="auth-switch">
+          Немате профил? <a href="#" onclick="showRegister(); return false;">Регистрирајте се</a>
+        </p>
+      </div>
     
     <!-- Форма за регистрација -->
     <div id="register-form-container" class="auth-form-container" style="display: none;">
@@ -362,16 +341,16 @@
   </div>
 </div>
 
-  <!-- Модал за закажување преглед кај лекар (иста логика како закажување термин на апарат) -->
-  <div id="appointment-modal" class="modal">
+  <!-- Модал за закажување преглед кај лекар -->
+  <div id="appointment-modal" class="modal" style="display: none;">
     <div class="modal-content appointment-modal-content">
       <span class="close" onclick="closeAppointmentModal()">&times;</span>
       <h2>Закажете преглед</h2>
       <div id="appointment-doctor-info" class="doctor-info-modal"></div>
       <div class="appointment-container">
-        <div class="form-group" style="width: 100%;">
+        <div class="form-group calendar-form-group">
           <label>Изберете датум и време:</label>
-          <div class="calendar-section aparati-calendar-section" style="margin-top: 1rem;">
+          <div class="calendar-section aparati-calendar-section">
             <div id="calendar"></div>
             <p class="calendar-hint">Изберете датум од календарот, потоа време од понудените слотови.</p>
             <div id="time-slots" class="time-slots"></div>
@@ -379,7 +358,7 @@
         </div>
         <div class="form-section">
           <h3>Ваши податоци</h3>
-          <div id="pacient-info-display" style="display: none; background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1rem;">
+          <div id="pacient-info-display" class="pacient-info-display" style="display: none;">
             <p><strong>Најавен како:</strong> <span id="pacient-name-display"></span></p>
             <p><strong>Е-пошта:</strong> <span id="pacient-email-display"></span></p>
           </div>
