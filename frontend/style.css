@@ -85,6 +85,13 @@ a.nav-zakazi-pregled:hover {
   color: #c0392b;
 }
 
+a.nav-maticni-lekari {
+  font-weight: 500;
+}
+a.nav-maticni-lekari:hover {
+  opacity: 0.8;
+}
+
 .btn-contact {
   background-color: #e74c3c;
   color: white;
@@ -2236,6 +2243,39 @@ html {
   color: #666;
 }
 
+/* Обвивка за полето за лозинка со копче за приказ/скривање (како на другите сајтови) */
+.password-wrapper {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+.password-wrapper input,
+.password-wrapper input[type="password"],
+.password-wrapper input[type="text"] {
+  padding-right: 2.75rem !important;
+  width: 100% !important;
+  box-sizing: border-box;
+}
+.btn-toggle-password {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  padding: 0.35rem;
+  cursor: pointer;
+  font-size: 1.1rem;
+  line-height: 1;
+  color: #666;
+  opacity: 0.9;
+  z-index: 5;
+}
+.btn-toggle-password:hover {
+  color: #e74c3c;
+  opacity: 1;
+}
+
 /* X за затворање на dashboard модалот – подобра видливост */
 /* X за затворање – исто како при најава: мало црвено круже како на MacBook, од лева страна */
 .lekar-dashboard-content .close {
@@ -2281,41 +2321,71 @@ html {
   transform: none;
 }
 
-/* При прва најава – overlay за задолжителна смена на лозинка */
+/* ========== При прва најава – overlay за задолжителна смена на лозинка ========== */
+
+/* вака е затоа што overlay-от треба да го покрие целиот modal и да биде над останатиот содржина */
 .lekar-first-login-overlay {
   position: absolute;
+  /* вака е затоа што треба да заземе цела површина од родителот */
   inset: 0;
+  /* вака е затоа што позадината да биде речиси непроѕирна за фокус на смена на лозинка */
   background: rgba(255, 255, 255, 0.97);
+  /* вака е затоа што overlay-от да биде над табовите и содржината */
   z-index: 500;
+  /* вака е затоа што содржината во него да биде центрирана вертикално и хоризонтално */
   display: flex;
   align-items: center;
   justify-content: center;
+  /* вака е затоа што аглите на overlay-от да бидат заоблени како модалот */
   border-radius: 20px;
 }
+
+/* вака е затоа што кутијата со текстот и формата да има доволно место за подолгиот известувачки текст */
 .lekar-first-login-box {
-  max-width: 420px;
+  max-width: 560px;
+  /* вака е затоа што да има воздух околу текстот и формата */
   padding: 2rem;
+  /* вака е затоа што насловот и известувањето да бидат центрирани */
   text-align: center;
 }
+
+/* вака е затоа што секој чекор (порака / форма) да е посебен блок и да се превключува со „Во ред“ */
+.lekar-first-login-step {
+  width: 100%;
+}
+
+/* вака е затоа што копчето „Во ред“ да биде одделено од текстот над него */
+#lekar-first-login-ok-btn {
+  margin-top: 1.25rem;
+}
+
+/* вака е затоа што насловот „Добредојде!“ да биде истакнат и читлив */
 .lekar-first-login-dobredojde {
   color: #1a1a2e;
   font-size: 1.5rem;
   font-weight: 700;
   margin-bottom: 1rem;
 }
+
+/* вака е затоа што известувањето за задолжителна смена на лозинка да биде во посебна кутија со предупредна боја */
 .lekar-first-login-obavesti {
   background: #fff3cd;
   border: 1px solid #e74c3c;
   color: #856404;
-  padding: 1rem 1.25rem;
+  /* вака е затоа што подолгиот текст да има простор и да не се набива до рабовите */
+  padding: 1.25rem 1.5rem;
   border-radius: 10px;
   margin-bottom: 1.25rem;
   font-size: 0.95rem;
   line-height: 1.5;
 }
+
+/* вака е затоа што насловот во известувањето (на пр. „Известување за задолжителна промена…“) да биде потемна црвеникава */
 .lekar-first-login-obavesti strong {
   color: #c0392b;
 }
+
+/* вака е затоа што инструкцијата под известувањето да биде неутрална сива и со одделеност од формата */
 .lekar-first-login-msg {
   color: #666;
   font-size: 0.95rem;

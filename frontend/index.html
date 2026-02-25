@@ -7,6 +7,14 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <script>
+    window.togglePasswordVisibility = function(inputId, btn) {
+      var input = document.getElementById(inputId);
+      if (!input) return;
+      if (input.type === 'password') { input.type = 'text'; if (btn) btn.setAttribute('title', 'Скриј лозинка'); }
+      else { input.type = 'password'; if (btn) btn.setAttribute('title', 'Прикажи лозинка'); }
+    };
+  </script>
   <header>
     <div class="container">
       <div class="logo">
@@ -17,6 +25,7 @@
         <a href="#home" class="nav-link">Почетна</a>
         <a href="#uslugi" class="nav-link">Услуги</a>
         <a href="#lekari" class="nav-link">Лекари</a>
+        <a href="#" id="nav-maticni-lekari" class="nav-link nav-maticni-lekari" target="_blank" rel="noopener noreferrer" title="Матични лекари – резервација на термини преку надворешна платформа">Матични лекари</a>
         <a href="#kontakt" class="nav-link">Контакт</a>
         <a href="#lekari" id="nav-zakazi-pregled" class="nav-link nav-zakazi-pregled" style="display: none;">Закажи преглед</a>
         <button id="auto-login_btn" class="btn-lekar-login" onclick="openLekarLoginModal()">Најави се!</button>
@@ -200,9 +209,9 @@
             <h1 class="welcome-title">Добредојде!</h1>
             <p class="welcome-description">Најави се за да закажеш преглед</p>
             <div class="welcome-features">
-              <div class="feature-item">✓ Закажување прегледи</div>
-              <div class="feature-item">✓ Преглед на историја</div>
-              <div class="feature-item">✓ Пристап до резултати</div>
+              <div class="feature-item">Закажување прегледи</div>
+              <div class="feature-item"> Преглед на историја</div>
+              <div class="feature-item"> Пристап до резултати</div>
             </div>
           </div>
         </div>
@@ -229,13 +238,16 @@
               <label for="pacient-password-input">
                 Лозинка
               </label>
-              <input 
-                type="password" 
-                id="pacient-password-input" 
-                placeholder="Поле наменето за вашата лозинка" 
-                required 
-                autocomplete="current-password"
-              />
+              <div class="password-wrapper">
+                <input 
+                  type="password" 
+                  id="pacient-password-input" 
+                  placeholder="Поле наменето за вашата лозинка" 
+                  required 
+                  autocomplete="current-password"
+                />
+                <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('pacient-password-input', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+              </div>
             </div>
             <div id="pacient-login-error-message" class="error-message" style="display: none;"></div>
             <button type="submit" class="btn-login-submit" id="pacient-login-submit-btn">
@@ -276,7 +288,10 @@
           </div>
           <div class="form-group">
             <label for="login-password">Лозинка</label>
-            <input type="password" id="login-password" placeholder="Внесете ја вашата лозинка" required autocomplete="current-password" />
+            <div class="password-wrapper">
+              <input type="password" id="login-password" placeholder="Внесете ја вашата лозинка" required autocomplete="current-password" />
+              <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('login-password', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+            </div>
           </div>
           <p class="auth-role-note" id="auth-pacient-note">Најавете се со е-поштата и лозинката што ги поставивте при регистрација.</p>
           <p class="auth-role-note" id="auth-doctor-note" style="display: none;">Нема пред-поставени кориснички имиња или лозинки за лекари. Регистрирајте го секој лекар, потоа најавете се со име.презиме и таа лозинка.</p>
@@ -322,11 +337,17 @@
         </div>
         <div class="form-group">
           <label for="register-password">Лозинка</label>
-          <input type="password" id="register-password" placeholder="Овде внесете ја вашата лозинка" required minlength="8" />
+          <div class="password-wrapper">
+            <input type="password" id="register-password" placeholder="Овде внесете ја вашата лозинка" required minlength="8" />
+            <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('register-password', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+          </div>
         </div>
         <div class="form-group">
           <label for="register-password-confirm">Потврди лозинка</label>
-          <input type="password" id="register-password-confirm" placeholder="Потврдете ја вашата лозинка" required />
+          <div class="password-wrapper">
+            <input type="password" id="register-password-confirm" placeholder="Потврдете ја вашата лозинка" required />
+            <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('register-password-confirm', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+          </div>
         </div>
         <div id="register-error" class="auth-error" style="display: none;"></div>
         <button type="submit" class="btn-auth-submit">
@@ -405,31 +426,49 @@
   <!-- Doctor Dashboard Modal - Главен интерфејс за лекари -->
   <div id="lekar-dashboard-modal" class="modal">
     <div class="modal-content lekar-dashboard-content">
-      <!-- При привремена лозинка – задолжителна смена веднаш, без пристап до податоци -->
+      <!-- При привремена лозинка – прво прозорец со порака, по „Во ред“ се појавува форма за смена -->
       <div id="lekar-first-login-overlay" class="lekar-first-login-overlay" style="display: none;">
         <div class="lekar-first-login-box">
-          <p id="lekar-first-login-dobredojde" class="lekar-first-login-dobredojde">Добредојде!</p>
-          <div class="lekar-first-login-obavesti">
-            <strong>Морате да ја смените лозинката веднаш.</strong><br>
-            За поголема безбедност на вашиот профил како и на прфилите на сите останати вработени, системот бара да поставите нова лозинка при првата најава.
+          <!-- Чекор 1: само порака и копче „Во ред“ -->
+          <div id="lekar-first-login-message-step" class="lekar-first-login-step">
+            <p id="lekar-first-login-dobredojde" class="lekar-first-login-dobredojde">Добредојде!</p>
+            <div class="lekar-first-login-obavesti">
+              <strong>Известување за задолжителна промена на лозинка.</strong><br>
+              Ве известуваме дека, согласно безбедносната политика на системот, задолжително е да ја промените привремената лозинка дадена од администраторот на веб- страницата.
+              Промената на лозинката е неопходна со цел обезбедување повисоко ниво на заштита на вашиот профил и на податоците во системот.
+              <p><i>Ви благодариме на разбирањето! Ваша КБ Штип</i></p>
+            </div>
+            <button type="button" id="lekar-first-login-ok-btn" class="btn-raspored-load" onclick="showLekarFirstLoginFormStep()">Во ред</button>
           </div>
-          <p class="lekar-first-login-msg">Внесете ја тековната (привремена) лозинка дадена од IT одделот.</p>
-          <form id="lekar-prva-najava-lozinka-form" class="postavki-form">
-            <div class="form-group">
-              <label for="prva-najava-tekovna">Тековна (привремена) лозинка</label>
-              <input type="password" id="prva-najava-tekovna" placeholder="Внесете ја привремената лозинка" required autocomplete="current-password" />
-            </div>
-            <div class="form-group">
-              <label for="prva-najava-nova">Нова лозинка</label>
-              <input type="password" id="prva-najava-nova" placeholder="Внесете нова лозинка." required minlength="8" autocomplete="new-password" />
-            </div>
-            <div class="form-group">
-              <label for="prva-najava-potvrdi">Потврди нова лозинка</label>
-              <input type="password" id="prva-najava-potvrdi" placeholder="Повторно внесете ја новата лозинка" required minlength="8" autocomplete="new-password" />
-            </div>
-            <div id="prva-najava-lozinka-poraka" class="auth-error" style="display: none;"></div>
-            <button type="submit" class="btn-raspored-load">Смени лозинка и продолжи</button>
-          </form>
+          <!-- Чекор 2: форма за промена на лозинка (се прикажува по притискање на „Во ред“) -->
+          <div id="lekar-first-login-form-step" class="lekar-first-login-step" style="display: none;">
+            <p class="lekar-first-login-msg">Внесете ја тековната (привремена) лозинка дадена од IT одделот.</p>
+            <form id="lekar-prva-najava-lozinka-form" class="postavki-form" onsubmit="event.preventDefault(); handlePrvaNajavaSubmit(event); return false;">
+              <div class="form-group">
+                <label for="prva-najava-tekovna">Тековна (привремена) лозинка</label>
+                <div class="password-wrapper">
+                  <input type="password" id="prva-najava-tekovna" placeholder="Внесете ја привремената лозинка" required autocomplete="current-password" />
+                  <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('prva-najava-tekovna', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="prva-najava-nova">Нова лозинка</label>
+                <div class="password-wrapper">
+                  <input type="password" id="prva-najava-nova" placeholder="Внесете нова лозинка." required minlength="8" autocomplete="new-password" />
+                  <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('prva-najava-nova', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label for="prva-najava-potvrdi">Потврди нова лозинка</label>
+                <div class="password-wrapper">
+                  <input type="password" id="prva-najava-potvrdi" placeholder="Повторно внесете ја новата лозинка" required minlength="8" autocomplete="new-password" />
+                  <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('prva-najava-potvrdi', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👀</button>
+                </div>
+              </div>
+              <div id="prva-najava-lozinka-poraka" class="auth-error" style="display: none;"></div>
+              <button type="button" class="btn-raspored-load" onclick="handlePrvaNajavaSubmit(event)">Смени лозинка и продолжи</button>
+            </form>
+          </div>
         </div>
       </div>
       
@@ -515,11 +554,17 @@
         <form id="lekar-promeni-lozinka-form" class="postavki-form">
           <div class="form-group">
             <label for="lozinka-tekovna">Тековна лозинка</label>
-            <input type="password" id="lozinka-tekovna" placeholder="Внесете ја тековната лозинка" required autocomplete="current-password" />
+            <div class="password-wrapper">
+              <input type="password" id="lozinka-tekovna" placeholder="Внесете ја тековната лозинка" required autocomplete="current-password" />
+              <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('lozinka-tekovna', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+            </div>
           </div>
           <div class="form-group">
             <label for="lozinka-nova">Нова лозинка</label>
-            <input type="password" id="lozinka-nova" placeholder="Внесете нова лозинка по ваш избор" required minlength="8" autocomplete="new-password" />
+            <div class="password-wrapper">
+              <input type="password" id="lozinka-nova" placeholder="Внесете нова лозинка по ваш избор" required minlength="8" autocomplete="new-password" />
+              <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('lozinka-nova', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+            </div>
             <small class="form-hint">Лозинката мора да содржи најмалку 8 карактери, од кои:
                     • најмалку една голема буква (A–Z)  
                     • најмалку една бројка (0–9)  
@@ -528,7 +573,10 @@
           </div>
           <div class="form-group">
             <label for="lozinka-nova-potvrdi">Потврди нова лозинка</label>
-            <input type="password" id="lozinka-nova-potvrdi" placeholder="Повторно внесете ја новата лозинка" required minlength="8" autocomplete="new-password" />
+            <div class="password-wrapper">
+              <input type="password" id="lozinka-nova-potvrdi" placeholder="Повторно внесете ја новата лозинка" required minlength="8" autocomplete="new-password" />
+              <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('lozinka-nova-potvrdi', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+            </div>
           </div>
           <div id="promeni-lozinka-poraka" class="auth-error" style="display: none;"></div>
           <button type="submit" class="btn-raspored-load">Смени лозинка</button>

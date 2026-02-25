@@ -1,5 +1,8 @@
 // Овие променливи се користат низ целиот код за чување на состојбата на апликацијата
 
+// URL на надворешната платформа за матични лекари (резервација на термини). Смени го кога ќе го имаш линкот.
+var MATICNI_LEKARI_URL = 'https://mojtermin.mk/health_workers';
+
 let allDoctors = [];  // Листа на сите лекари вчитани од API-то
 let filteredDoctors = [];  // Моментално филтрирана листа на лекари (според име и специјалност)
 let selectedDoctor = null;  // Лекарот кој е избран за закажување на преглед
@@ -970,7 +973,9 @@ function setupSmoothScroll() {
 // Според PDF: "Системот би бил со едноставен интерфејс за полесно управување"
 // Оваа функција ги повикува сите потребни функции за вчитување на податоци и поставување на event listeners
 function initialize() {
-  
+  var navMaticni = document.getElementById('nav-maticni-lekari');
+  if (navMaticni && typeof MATICNI_LEKARI_URL === 'string') navMaticni.href = MATICNI_LEKARI_URL;
+
   // Load services
   if (document.getElementById('uslugi-list')) {
     loadUslugi();
@@ -1082,50 +1087,108 @@ function closeLekarDashboardModal() {
 // Подразуеваната привремена лозинка – не смее да се користи како нова (исто како на backend)
 var DEFAULT_LOZINKA_LEKARI = 'Test123..';
 
-function setupLekarPasswordForms() {
-  // Форма за прва најава – смена на привремена лозинка
-  var prvaForm = document.getElementById('lekar-prva-najava-lozinka-form');
-  if (prvaForm) {
-    prvaForm.addEventListener('submit', async function(e) {
-      e.preventDefault();
-      var errEl = document.getElementById('prva-najava-lozinka-poraka');
-      var tekovna = document.getElementById('prva-najava-tekovna').value.trim();
-      var nova = document.getElementById('prva-najava-nova').value.trim();
-      var potvrdi = document.getElementById('prva-najava-potvrdi').value.trim();
-      if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
-      if (nova !== potvrdi) {
-        if (errEl) { errEl.textContent = 'Лозинките не се совпаѓаат.'; errEl.style.display = 'block'; }
-        return;
-      }
-      if (nova === DEFAULT_LOZINKA_LEKARI) {
-        if (errEl) { errEl.textContent = 'Лозинката не смее да биде привремената/подразуеваната лозинка. Изберете друга лозинка според правилата (мин. 8 знаци, голема буква, број, интерпункциски знак).'; errEl.style.display = 'block'; }
-        return;
-      }
-      if (!currentLekar || !currentLekar.doctor_ID) {
-        if (errEl) { errEl.textContent = 'Немате најавен лекар.'; errEl.style.display = 'block'; }
-        return;
-      }
-      try {
-        var res = await fetch('http://localhost:8000/lekari/promeni-lozinka', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ doctor_id: currentLekar.doctor_ID, trenutna_lozinka: tekovna, nova_lozinka: nova })
-        });
-        var data = await res.json().catch(function() { return {}; });
-        if (res.ok) {
-          var overlay = document.getElementById('lekar-first-login-overlay');
-          if (overlay) overlay.style.display = 'none';
-          prvaForm.reset();
-          if (errEl) { errEl.style.display = 'none'; }
-          alert('Лозинката е успешно променета. Сега можете да го користите системот.');
-        } else {
-          if (errEl) { errEl.textContent = (data.detail || data.message || 'Грешка при смена на лозинка.'); errEl.style.display = 'block'; }
-        }
-      } catch (err) {
-        if (errEl) { errEl.textContent = 'Серверот не е достапен. Обидете се повторно.'; errEl.style.display = 'block'; }
-      }
-    });
+// Прикажи/скриј лозинка додека се пишува (како на другите сајтови)
+function togglePasswordVisibility(inputId, btn) {
+  var input = document.getElementById(inputId);
+  if (!input) return;
+  if (input.type === 'password') {
+    input.type = 'text';
+    if (btn) btn.setAttribute('title', 'Скриј лозинка');
+  } else {
+    input.type = 'password';
+    if (btn) btn.setAttribute('title', 'Прикажи лозинка');
   }
+}
+window.togglePasswordVisibility = togglePasswordVisibility;
+
+// Глобална функција за копче „Во ред“ – скриј порака, прикажи форма за промена на лозинка (повикана и од onclick во HTML)
+function showLekarFirstLoginFormStep() {
+  var msgStep = document.getElementById('lekar-first-login-message-step');
+  var formStep = document.getElementById('lekar-first-login-form-step');
+  if (msgStep) msgStep.style.display = 'none';
+  if (formStep) formStep.style.display = 'block';
+}
+window.showLekarFirstLoginFormStep = showLekarFirstLoginFormStep;
+
+// Глобална обработка на прва најава – смена лозинка (повикана од onsubmit на формата за сигурно работење)
+async function handlePrvaNajavaSubmit(e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  var errEl = document.getElementById('prva-najava-lozinka-poraka');
+  var tekovnaEl = document.getElementById('prva-najava-tekovna');
+  var novaEl = document.getElementById('prva-najava-nova');
+  var potvrdiEl = document.getElementById('prva-najava-potvrdi');
+  var tekovna = tekovnaEl ? tekovnaEl.value.trim() : '';
+  var nova = novaEl ? novaEl.value.trim() : '';
+  var potvrdi = potvrdiEl ? potvrdiEl.value.trim() : '';
+  if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+  if (nova !== potvrdi) {
+    if (errEl) { errEl.textContent = 'Лозинките не се совпаѓаат.'; errEl.style.display = 'block'; } else { alert('Лозинките не се совпаѓаат.'); }
+    return false;
+  }
+  if (nova === DEFAULT_LOZINKA_LEKARI) {
+    var msg = 'Лозинката не смее да биде привремената/подразуеваната лозинка. Изберете друга лозинка според правилата (мин. 8 знаци, голема буква, број, интерпункциски знак).';
+    if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; } else { alert(msg); }
+    return false;
+  }
+  if (!currentLekar || !currentLekar.doctor_ID) {
+    if (errEl) { errEl.textContent = 'Немате најавен лекар.'; errEl.style.display = 'block'; } else { alert('Немате најавен лекар.'); }
+    return false;
+  }
+  try {
+    var res = await fetch('http://localhost:8000/lekari/promeni-lozinka', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        doctor_id: parseInt(currentLekar.doctor_ID, 10),
+        trenutna_lozinka: tekovna,
+        nova_lozinka: nova
+      })
+    });
+    var data = await res.json().catch(function() { return {}; });
+    var detail = data.detail;
+    if (Array.isArray(detail) && detail.length) detail = detail[0].msg || detail[0];
+    if (typeof detail !== 'string') detail = data.message || 'Грешка при смена на лозинка.';
+    if (res.ok) {
+      var overlay = document.getElementById('lekar-first-login-overlay');
+      if (overlay) overlay.style.display = 'none';
+      var prvaForm = document.getElementById('lekar-prva-najava-lozinka-form');
+      if (prvaForm) prvaForm.reset();
+      if (errEl) errEl.style.display = 'none';
+      var imePrezime = (currentLekar && (currentLekar.name || currentLekar.surname))
+        ? 'Добредојде, Др. ' + (currentLekar.name || '') + ' ' + (currentLekar.surname || '') + '!'
+        : 'Добредојде!';
+      alert(imePrezime + ' Лозинката е успешно променета. Сега можете да правите преглед на пациенти.');
+      document.querySelectorAll('.lekar-tab-content').forEach(function(t) { t.classList.remove('active'); });
+      document.querySelectorAll('.nav-tab').forEach(function(b) { b.classList.remove('active'); });
+      var tabPacienti = document.getElementById('tab-pacienti');
+      if (tabPacienti) tabPacienti.classList.add('active');
+      var navPacienti = document.querySelector('.lekar-nav-tabs .nav-tab');
+      if (navPacienti) navPacienti.classList.add('active');
+      var datumInput = document.getElementById('raspored-datum-select');
+      if (datumInput) {
+        var today = new Date();
+        datumInput.value = today.toISOString().split('T')[0];
+      }
+      if (typeof loadMojRaspored === 'function') loadMojRaspored();
+    } else {
+      if (errEl) { errEl.textContent = detail; errEl.style.display = 'block'; } else { alert(detail); }
+    }
+  } catch (err) {
+    var msg = 'Серверот не е достапен. Обидете се повторно.';
+    if (errEl) { errEl.textContent = msg; errEl.style.display = 'block'; } else { alert(msg); }
+  }
+  return false;
+}
+window.handlePrvaNajavaSubmit = handlePrvaNajavaSubmit;
+
+function setupLekarPasswordForms() {
+  // Дополнително прикачување на listener за „Во ред“ (ако onclick не се изврши)
+  var okBtn = document.getElementById('lekar-first-login-ok-btn');
+  if (okBtn && !okBtn.getAttribute('onclick')) {
+    okBtn.addEventListener('click', showLekarFirstLoginFormStep);
+  }
+
+  // Форма за прва најава се обработува со handlePrvaNajavaSubmit() преку onsubmit во HTML
 
   // Форма за смена на лозинка во Поставки
   var promeniForm = document.getElementById('lekar-promeni-lozinka-form');
@@ -1246,9 +1309,17 @@ function displayLekarDashboard(data) {
   const terminiList = document.getElementById('lekar-termini-list');
   const firstLoginOverlay = document.getElementById('lekar-first-login-overlay');
 
-  // При прва најава со привремена лозинка – прикажи overlay за задолжителна смена
+  // При прва најава со привремена лозинка – прикажи overlay за задолжителна смена (прво порака, по „Во ред“ форма)
   if (firstLoginOverlay) {
-    firstLoginOverlay.style.display = data.must_change_password ? 'flex' : 'none';
+    if (data.must_change_password) {
+      firstLoginOverlay.style.display = 'flex';
+      var msgStep = document.getElementById('lekar-first-login-message-step');
+      var formStep = document.getElementById('lekar-first-login-form-step');
+      if (msgStep) msgStep.style.display = 'block';
+      if (formStep) formStep.style.display = 'none';
+    } else {
+      firstLoginOverlay.style.display = 'none';
+    }
   }
 
   if (doctorInfo) {
@@ -3066,7 +3137,7 @@ async function handleLogin(e) {
 async function handleRegister(e) {
   e.preventDefault();
   
-  const imeInput = document.getElementById('register-ime').value.trim();
+  const ime = document.getElementById('register-ime').value.trim();
   const prezime = document.getElementById('register-prezime').value.trim();
   const email = document.getElementById('register-email').value.trim();
   const password = document.getElementById('register-password').value;
@@ -3086,8 +3157,8 @@ async function handleRegister(e) {
     return;
   }
   
-  if (password.length < 6) {
-    showAuthError('register-error', 'Лозинката мора да има најмалку 6 карактери');
+  if (password.length < 8) {
+    showAuthError('register-error', 'Лозинката мора да има најмалку 8 карактери');
     return;
   }
   // За лекари: подразуеваната привремена лозинка не смее да се користи
@@ -3141,8 +3212,11 @@ async function handleRegister(e) {
     });
     
     if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.detail || 'Грешка при регистрација');
+      const error = await res.json().catch(function() { return {}; });
+      var detail = error.detail;
+      if (Array.isArray(detail) && detail.length) detail = detail[0].msg || detail[0];
+      if (typeof detail !== 'string') detail = error.message || 'Грешка при регистрација';
+      throw new Error(detail);
     }
     
     alert('Успешно се регистриравте! Сега можете да се најавите.');
