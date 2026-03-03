@@ -8,7 +8,7 @@ import os
 def debug_log(location: str, message: str, data: dict = None, run_id: str = "run1", hypothesis_id: str = None):
     """Безбедно логирање кое не фрла exception ако фајлот не може да се отвори"""
     try:
-        log_path = '/Users/danieleftimov/Desktop/UGD/XML/Klinicka_Bolnica_Stip_XML/.cursor/debug.log'
+        log_path = os.path.join(os.getcwd(), 'debug.log')
         log_entry = {
             "location": location,
             "message": message,
