@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from typing import Optional
 from datetime import datetime, date
+import os
 import string
 from database import get_connection
 from routers.utils import debug_log, transliterate_mk_to_lat
@@ -48,7 +49,9 @@ def get_lekari(specijalnost: Optional[str] = None):                             
                 FROM Doctors
                 ORDER BY name, surname
             """)
-        lekari = db_cursor.fetchall()  # fetchall() vraka lista na lekari vo vid na recinica i se zapisuvaat vo promenlivata lakari 
+        lekari = db_cursor.fetchall()  # fetchall() vraka lista na lekari vo vid na recinica i se zapisuvaat vo promenlivata lakari
+        if os.getenv("DEBUG_DB", "").strip().lower() in ("1", "true", "yes"):
+            debug_log("lekari.get_lekari", "Broj na vrateni lekari", {"count": len(lekari), "specijalnost_filter": specijalnost or "(site)"})
         return lekari       # se vrakaat lekarite vo JSON format {"doctor_ID": 1, ...},{... }}
     except Exception as e:  # ako nastane greska, Exception, vo e e smenstena porakata za greska 
         raise HTTPException(status_code=500, detail=str(e))     # se dava 500 kako kod za greska  detail=str(e) poraka za prikaza na klient
