@@ -47,7 +47,7 @@ _engine = None
 
 def get_engine():
     global _engine
-    if _engine is not None:  # <-- ИСПРАВЕНО: беше `is None`, треба `is not None`
+    if _engine is not None: 
         return _engine
     
     host = os.getenv("DB_HOST", "localhost")
