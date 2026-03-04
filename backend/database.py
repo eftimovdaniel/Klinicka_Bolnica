@@ -29,7 +29,8 @@
       #  database=database,
     #)
 
-from unittest import result
+# Модул за управување со конекцијата до базата на податоци
+# Според PDF: "Базата на податоци би се изработувала во MySQL"
 
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -38,16 +39,16 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 
-_env_paht = Path(__file__).resolve().parent / ".env"
-load_dotenv(_env_paht)
+_env_path = Path(__file__).resolve().parent / ".env"
+load_dotenv(_env_path)
 
 Base = declarative_base()
 _engine = None
 
 def get_engine():
     global _engine
-    if _engine is None:
-      return _engine
+    if _engine is not None:  # <-- ИСПРАВЕНО: беше `is None`, треба `is not None`
+        return _engine
     
     host = os.getenv("DB_HOST", "localhost")
     user = os.getenv("DB_USER", "root")
@@ -59,28 +60,31 @@ def get_engine():
             "Недостасуваат податоци за базата. Во backend/.env постави: DB_HOST, DB_USER, DB_PASSWORD, DB_NAME. "
             "Погледни backend/.env.example за пример."
         )
+    
     database_url = f"mysql+pymysql://{user}:{password}@{host}/{database}"
     _engine = create_engine(
        database_url,
-       poolclass = QueuePool,
-       pool_size = 3
-       max_overflow = 5,
-       pool_timeout = 30,
-       pool_recycle = 240, 
-       pool_pre_ping = True
-       echo = False
+       poolclass=QueuePool,
+       pool_size=3, 
+       max_overflow=5,
+       pool_timeout=30,
+       pool_recycle=240, 
+       pool_pre_ping=True,  
+       echo=False
     )
     return _engine
 
 def get_connection():
-   engin = get_engine()
-   with engine.connect() as connection:
-      resilt = connection.execute(text("SELECT COUNT(*) as total FROM Doctors"))
-      count = result.fetchone()[0]
-      print(f"Воспоставена е конекција со базата на податоци. Вкупниот број на лекари во базата која ја користите е: {count}")
-      return count
-   except Exception as e:
-    print(f"Грешка при воспоставување конекција со базата на податоци: {e}")
-    raise
-if __name__ == "__main__":
-   test_connection()
+    try: 
+        engine = get_engine() 
+        with engine.connect() as connection:
+            result = connection.execute(text("SELECT COUNT(*) AS total FROM Doctors"))  
+            count = result.fetchone()[0]
+            print(f"Воспоставена е конекција со базата на податоци. Вкупниот број на пронајдени лекари е: {count}")
+            return count
+    except Exception as e:  
+        print(f"Грешка при воспоставување на конекција со базата на податоци: {e}")
+        raise
+
+if __name__ == "__main__":  
+    get_connection() 
