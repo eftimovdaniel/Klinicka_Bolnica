@@ -25,6 +25,19 @@ let displayedDoctorsCount = 8;  // Почетно прикажуваме 8 ле�
   } catch (e) {}
 })();
 
+// Врати го најавениот лекар (директор) од sessionStorage – да остане најавен по објава/превчитување
+(function restoreLekarSession() {
+  try {
+    var saved = sessionStorage.getItem('currentLekar');
+    if (saved) {
+      var parsed = JSON.parse(saved);
+      if (parsed && parsed.doctor_ID) {
+        currentLekar = parsed;
+      }
+    }
+  } catch (e) {}
+})();
+
 // Константа за автоматско менување на годината во footer-от
 const yearSpan = document.getElementById('year');
 if (yearSpan) {
@@ -2091,6 +2104,7 @@ async function loginLekar() {
     // Ако автентификацијата е успешна, ги земаме податоците за лекарот и неговите термини
     const data = await res.json();
     currentLekar = data.doctor;
+    try { sessionStorage.setItem('currentLekar', JSON.stringify(data.doctor)); } catch (e) {}
     
     // Прикажи персонализирана порака за најавениот лекар
     const lekarIme = `${data.doctor.name} ${data.doctor.surname}`;
@@ -3006,8 +3020,8 @@ async function loadNovostiAdmin() {
         '<strong>' + (n.naslov || '').replace(/</g, '&lt;') + '</strong> &ndash; ' + dateStr +
         '</div>' +
         '<div class="admin-list-item-actions">' +
-        '<button type="button" class="btn-secondary btn-sm" onclick="editNovost(' + n.id + ')">Уреди</button> ' +
-        '<button type="button" class="btn-secondary btn-sm" onclick="deleteNovost(' + n.id + ')">Избриши</button>' +
+        '<button type="button" class="btn-edit" onclick="editNovost(' + n.id + ')">Уреди</button> ' +
+        '<button type="button" class="btn-delete" onclick="deleteNovost(' + n.id + ')">Избриши</button>' +
         '</div>';
       listEl.appendChild(div);
     });
@@ -3484,6 +3498,7 @@ async function handleLogin(e) {
     
     if (currentRole === 'lekar') {
       currentLekar = data.doctor;
+      try { sessionStorage.setItem('currentLekar', JSON.stringify(data.doctor)); } catch (e) {}
       closeAuthModal();
       displayLekarDashboard(data);
       openLekarDashboardModal();

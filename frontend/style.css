@@ -1662,7 +1662,7 @@ html {
   font-weight: 400;
 }
 
-/* Doctor Login Modal - Подобрен изглед (за назад компатибилност) */
+/* Doctor Login Modal */
 .lekar-login-modal-content {
   max-width: 500px;
   padding: 3rem;
@@ -2651,10 +2651,12 @@ html {
   font-weight: 600;
   transition: background-color 0.3s;
   margin-top: 0.5rem;
+  box-shadow: none;
 }
 
 .btn-save-termin:hover {
   background-color: #229954;
+  box-shadow: none;
 }
 
 /* Show More/Less Doctors Buttons */
@@ -2744,6 +2746,34 @@ html {
   gap: 1rem;
 }
 
+/* Редови во листата на новости – исто како .admin-item */
+.admin-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  transition: box-shadow 0.3s;
+}
+
+.admin-list-item:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.admin-list-item-content {
+  flex: 1;
+}
+
+.admin-list-item-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-left: 1rem;
+  align-items: flex-end;
+}
+
 /* Поединечна административна ставка (дежурство или оглас) */
 .admin-item {
   display: flex;
@@ -2787,7 +2817,7 @@ html {
   align-items: flex-end;
 }
 
-/* Копчиња за уредување и бришење */
+/* Копчиња за уредување и бришење (без сјај) */
 .btn-edit,
 .btn-delete {
   padding: 0.35rem 0.7rem;
@@ -2798,6 +2828,7 @@ html {
   transition: all 0.2s;
   min-width: 60px;
   text-align: center;
+  box-shadow: none;
 }
 
 /* Копче за уредување (сина боја) */
@@ -2811,22 +2842,24 @@ html {
   background-color: #d4e8f1;
   border-color: #2980b9;
   color: #1f5f8b;
+  box-shadow: none;
 }
 
-/* Копче за бришење (црвена боја) */
+/* Копче за бришење (нежно црвено) */
 .btn-delete {
-  background-color: #fdeaea;
-  color: #c0392b;
-  border-color: #f5c6cb;
+  background-color: #f5e0e0;
+  color: #b85450;
+  border-color: #e8c4c4;
 }
 
 .btn-delete:hover {
-  background-color: #fbd5d5;
-  border-color: #c0392b;
-  color: #a93226;
+  background-color: #f0d0d0;
+  border-color: #c97b77;
+  color: #a04542;
+  box-shadow: none;
 }
 
-/* Секундарно копче (за откажување) */
+/* Секундарно копче (за откажување, без сјај) */
 .btn-secondary {
   background-color: #e8e8e8;
   color: #555;
@@ -2837,14 +2870,16 @@ html {
   font-size: 0.85rem;
   margin-left: 0.5rem;
   transition: all 0.2s;
+  box-shadow: none;
 }
 
 .btn-secondary:hover {
   background-color: #d8d8d8;
   border-color: #aaa;
+  box-shadow: none;
 }
 
-/* Копче за додавање нови записи во администрација (+ Додади ново дежурство / + Додади нов оглас) */
+/* Копче за додавање нови записи во администрација (без сјај) */
 .btn-admin-add {
   padding: 0.5rem 1rem !important;
   font-size: 0.85rem !important;
@@ -2852,12 +2887,14 @@ html {
   color: #2980b9 !important;
   border: 1px solid #b3d9e6 !important;
   margin-bottom: 1rem;
+  box-shadow: none !important;
 }
 
 .btn-admin-add:hover {
   background-color: #d4e8f1 !important;
   border-color: #2980b9 !important;
   color: #1f5f8b !important;
+  box-shadow: none !important;
 }
 
 /* Новости - јавна секција */
@@ -3073,25 +3110,28 @@ html {
   min-height: 80px;
 }
 
-/* Примарно копче во административните форми (Зачувај) */
+/* Примарно копче во административните форми (Зачувај – зеленкаво, без сјај) */
 #dezurstvo-form .btn-primary,
-#oglas-form .btn-primary {
+#oglas-form .btn-primary,
+#novost-form .btn-primary {
   padding: 0.5rem 1rem !important;
   font-size: 0.85rem !important;
-  background-color: #e8f4f8 !important;
-  color: #2980b9 !important;
-  border: 1px solid #b3d9e6 !important;
+  background-color: #e8f5e9 !important;
+  color: #2e7d32 !important;
+  border: 1px solid #a5d6a7 !important;
   box-shadow: none !important;
   text-transform: none !important;
   font-weight: 500 !important;
 }
 
 #dezurstvo-form .btn-primary:hover,
-#oglas-form .btn-primary:hover {
-  background-color: #d4e8f1 !important;
-  border-color: #2980b9 !important;
-  color: #1f5f8b !important;
+#oglas-form .btn-primary:hover,
+#novost-form .btn-primary:hover {
+  background-color: #c8e6c9 !important;
+  border-color: #66bb6a !important;
+  color: #1b5e20 !important;
   transform: none !important;
+  box-shadow: none !important;
 }
 
 /* Секундарно копче во административните форми (Откажи) */
@@ -3341,6 +3381,24 @@ html {
 .auth-form-container input::placeholder {
   color: #aaa;
   font-size: 0.95rem;
+}
+
+/* Помали полиња за регистрација (име, презиме, е-пошта) – за да се вклопат без прелив */
+#register-form-container form {
+  gap: 0.75rem;
+}
+
+#register-form-container .form-row {
+  gap: 0.75rem;
+}
+
+#register-form-container input {
+  padding: 0.65rem 0.85rem;
+  font-size: 0.92rem;
+}
+
+#register-form-container input::placeholder {
+  font-size: 0.9rem;
 }
 
 /* Ерор порака */
