@@ -2873,6 +2873,8 @@ html {
   overflow: hidden;
   box-shadow: 0 4px 14px rgba(0,0,0,0.08);
   transition: box-shadow 0.3s;
+  display: flex;
+  flex-direction: column;
 }
 .novosti-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
 .novosti-card-img {
@@ -2881,7 +2883,12 @@ html {
   object-fit: cover;
   display: block;
 }
-.novosti-card-body { padding: 1.25rem; }
+.novosti-card-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+}
 .novosti-card-title {
   font-size: 1.15rem;
   margin-bottom: 0.5rem;
@@ -2899,7 +2906,12 @@ html {
   margin-bottom: 1rem;
   line-height: 1.5;
 }
-.novosti-card .btn-sm { font-size: 0.9rem; padding: 0.4rem 0.8rem; }
+.novosti-card .btn-sm {
+  font-size: 0.9rem;
+  padding: 0.4rem 0.8rem;
+  margin-top: auto;
+  align-self: flex-start;
+}
 .modal-content-wide { max-width: 700px; }
 #novost-form-modal .modal-content { max-width: 640px; }
 .modal-content-novost .close { right: 1rem; top: 1rem; font-size: 1.8rem; }
@@ -2917,6 +2929,87 @@ html {
 .novost-current-image label { margin-left: 0.5rem; font-weight: normal; }
 .novosti-full-sodrzina { white-space: normal; line-height: 1.6; font-size: 1.02rem; }
 .novosti-full-sodrzina br { display: block; content: ''; margin-bottom: 0.25em; }
+
+.novost-main-img {
+  display: block;
+  margin: 0 auto 1rem auto;
+  max-width: 100%;
+  height: 260px;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 8px;
+}
+
+.novost-extra-gallery {
+  margin-top: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-start;
+}
+
+.novost-extra-thumb {
+  flex: 0 0 calc(50% - 0.75rem);
+  max-width: calc(50% - 0.75rem);
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12);
+  cursor: pointer;
+}
+
+#novost-gallery-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.novost-gallery-inner {
+  position: relative;
+  max-width: 900px;
+  width: 90%;
+}
+
+.novost-gallery-image {
+  width: 100%;
+  max-height: 80vh;
+  object-fit: contain;
+  border-radius: 8px;
+  background: #000;
+}
+
+.novost-gallery-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 2.2rem;
+  color: #fff;
+  cursor: pointer;
+  padding: 0.25rem 0.6rem;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 999px;
+  user-select: none;
+}
+
+.novost-gallery-arrow.left {
+  left: -2.5rem;
+}
+
+.novost-gallery-arrow.right {
+  right: -2.5rem;
+}
+
+.novost-gallery-close {
+  position: absolute;
+  top: -2.2rem;
+  right: -0.5rem;
+  font-size: 2rem;
+  color: #fff;
+  cursor: pointer;
+}
 
 /* Модални прозорци за административни форми */
 #dezurstvo-form-modal .modal-content,

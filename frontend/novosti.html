@@ -27,20 +27,30 @@
       font-weight: 500;
     }
     .novosti-page-header a:hover { text-decoration: underline; }
+    .novosti-subtitle {
+      text-align: center;
+      margin-bottom: 2rem;
+      color: #333;
+      font-size: 1.35rem;
+      font-weight: 600;
+    }
     #novosti-list { min-height: 200px; }
   </style>
 </head>
 <body>
   <header class="novosti-page-header">
     <div class="container">
-      <h1>Новости – ЈЗУ Клиничка Болница Штип</h1>
+      <div class="logo">
+        <span class="red-cross">+</span>
+        <h1>Новости – ЈЗУ Клиничка Болница Штип</h1>
+      </div>
       <a href="index.html">← Назад кон почетна</a>
     </div>
   </header>
 
   <main class="section novosti-section">
     <div class="container">
-      <p style="text-align: center; margin-bottom: 2rem; color: #666;">Најнови информации од болницата</p>
+      <p class="novosti-subtitle">Најнови информации од болницата</p>
       <div id="novosti-list" class="novosti-grid">
         <div class="loading">Вчитувам новости...</div>
       </div>
@@ -71,15 +81,19 @@
         if (!t) return '';
         return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
       }
-      function getVideoEmbedUrl(url) {
-        if (!url || typeof url !== 'string') return '';
+      function getVideoInfo(url) {
+        if (!url || typeof url !== 'string') return null;
         var u = url.trim();
+        if (!u) return null;
         var m = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-        if (m) return 'https://www.youtube.com/embed/' + m[1];
+        if (m) return { type: 'embed', url: 'https://www.youtube.com/embed/' + m[1] };
         m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
-        if (m) return 'https://player.vimeo.com/video/' + m[1];
-        if (u.indexOf('embed') !== -1 || u.indexOf('player.') !== -1) return u;
-        return u;
+        if (m) return { type: 'embed', url: 'https://player.vimeo.com/video/' + m[1] };
+        if (/\.(mp4|webm|ogg)$/i.test(u)) {
+          return { type: 'file', url: u };
+        }
+        if (u.indexOf('embed') !== -1 || u.indexOf('player.') !== -1) return { type: 'embed', url: u };
+        return { type: 'embed', url: u };
       }
       fetch(API_BASE + '/novosti/' + id)
         .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('Не е пронајдена')); })
@@ -87,20 +101,120 @@
           var imgUrl = n.slika_path ? API_BASE + '/' + n.slika_path : '';
           var author = [n.author_name, n.author_surname].filter(Boolean).join(' ') || 'Болница';
           var dateStr = n.created_at ? (n.created_at.split('T')[0] || n.created_at) : '';
-          var html = (imgUrl ? '<img src="' + imgUrl + '" alt="" style="max-width:100%; border-radius:8px; margin-bottom:1rem;" />' : '');
-          var embedUrl = getVideoEmbedUrl(n.video_url);
-          if (embedUrl) html += '<div class="novost-video-wrap" style="margin-bottom:1rem;"><iframe src="' + embedUrl.replace(/"/g, '&quot;') + '" allowfullscreen style="max-width:100%; width:560px; height:315px; border:0; border-radius:8px;"></iframe></div>';
+          var pos = parseInt(n.slika_position, 10);
+          if (!isFinite(pos)) pos = 50;
+          if (pos < 0) pos = 0;
+          if (pos > 100) pos = 100;
+          var posStyle = 'object-position: center ' + pos + '%;';
+          var topHtml = (imgUrl ? '<img src="' + imgUrl + '" alt="" class="novost-main-img" style="' + posStyle + '" />' : '');
           var extra = n.slike_extra && Array.isArray(n.slike_extra) ? n.slike_extra : [];
-          extra.forEach(function(p) {
-            var src = (p.indexOf('http') === 0 || p.indexOf('/') === 0) ? p : API_BASE + '/' + p;
-            html += '<img src="' + src.replace(/"/g, '&quot;') + '" alt="" style="max-width:100%; border-radius:8px; margin-bottom:0.5rem;" />';
-          });
-          html += '<h2>' + (n.naslov || '').replace(/</g, '&lt;') + '</h2>' +
+          var textHtml = '<h2>' + (n.naslov || '').replace(/</g, '&lt;') + '</h2>' +
             '<p style="color:#666; margin-bottom:1rem;">' + dateStr + ' &middot; ' + author + '</p>' +
             '<div class="novosti-full-sodrzina">' + formatSodrzina(n.sodrzina) + '</div>';
-          content.innerHTML = html;
+          var galleryHtml = '';
+          if (extra.length) {
+            galleryHtml = '<div class="novost-extra-gallery">';
+            extra.forEach(function(p) {
+              var src = (p.indexOf('http') === 0 || p.indexOf('/') === 0) ? p : API_BASE + '/' + p;
+              galleryHtml += '<img class="novost-extra-thumb" src="' + src.replace(/"/g, '&quot;') + '" alt="" />';
+            });
+            galleryHtml += '</div>';
+          }
+          var videoHtml = '';
+          var videoInfo = getVideoInfo(n.video_url);
+          if (videoInfo) {
+            if (videoInfo.type === 'file') {
+              var vSrc = videoInfo.url;
+              if (vSrc.indexOf('http') !== 0 && vSrc.charAt(0) !== '/') {
+                vSrc = API_BASE + '/' + vSrc;
+              }
+              vSrc = vSrc.replace(/"/g, '&quot;');
+              videoHtml =
+                '<div class="novost-video-wrap" style="margin-top:1.5rem; text-align:center;">' +
+                '<video controls style="max-width:100%; width:560px; max-height:360px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.25);">' +
+                '<source src="' + vSrc + '" type="video/mp4" />' +
+                '</video>' +
+                '</div>';
+            } else {
+              var eUrl = videoInfo.url.replace(/"/g, '&quot;');
+              videoHtml =
+                '<div class="novost-video-wrap" style="margin-top:1.5rem; text-align:center;">' +
+                '<iframe src="' + eUrl + '" allowfullscreen style="max-width:100%; width:560px; height:315px; border:0; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.25);"></iframe>' +
+                '</div>';
+            }
+          }
+          content.innerHTML = topHtml + textHtml + galleryHtml + videoHtml;
+          setupNovostGallery(content);
         })
         .catch(function() { content.innerHTML = '<p style="color:red;">Грешка при вчитување.</p>'; });
+    }
+
+    function setupNovostGallery(rootEl) {
+      var root = rootEl || document;
+      var thumbs = root.querySelectorAll('.novost-extra-thumb');
+      if (!thumbs.length) return;
+      var urls = Array.prototype.map.call(thumbs, function(img) { return img.getAttribute('src'); });
+      thumbs.forEach(function(img, index) {
+        img.addEventListener('click', function() {
+          openNovostGalleryLightbox(urls, index);
+        });
+      });
+    }
+
+    function openNovostGalleryLightbox(urls, startIndex) {
+      if (!urls || !urls.length) return;
+      var existing = document.getElementById('novost-gallery-lightbox');
+      if (existing) existing.remove();
+      var overlay = document.createElement('div');
+      overlay.id = 'novost-gallery-lightbox';
+      var inner = document.createElement('div');
+      inner.className = 'novost-gallery-inner';
+      var img = document.createElement('img');
+      img.className = 'novost-gallery-image';
+      inner.appendChild(img);
+      var close = document.createElement('div');
+      close.className = 'novost-gallery-close';
+      close.textContent = '×';
+      inner.appendChild(close);
+      var left = document.createElement('div');
+      left.className = 'novost-gallery-arrow left';
+      left.textContent = '‹';
+      var right = document.createElement('div');
+      right.className = 'novost-gallery-arrow right';
+      right.textContent = '›';
+      inner.appendChild(left);
+      inner.appendChild(right);
+      overlay.appendChild(inner);
+      document.body.appendChild(overlay);
+
+      var current = startIndex || 0;
+      function render() {
+        if (current < 0) current = urls.length - 1;
+        if (current >= urls.length) current = 0;
+        img.src = urls[current];
+      }
+      render();
+
+      function go(delta) {
+        current += delta;
+        render();
+      }
+
+      left.addEventListener('click', function(e) {
+        e.stopPropagation();
+        go(-1);
+      });
+      right.addEventListener('click', function(e) {
+        e.stopPropagation();
+        go(1);
+      });
+      close.addEventListener('click', function(e) {
+        e.stopPropagation();
+        overlay.remove();
+      });
+      overlay.addEventListener('click', function() {
+        overlay.remove();
+      });
     }
 
     function renderNovosti(items) {

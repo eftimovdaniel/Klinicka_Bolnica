@@ -2786,17 +2786,28 @@ function formatSodrzinaForDisplay(text) {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
 }
 
-function getVideoEmbedUrl(url) {
-  if (!url || typeof url !== 'string') return '';
+function getVideoInfo(url) {
+  if (!url || typeof url !== 'string') return null;
   var u = url.trim();
+  if (!u) return null;
+  // YouTube
   var m = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-  if (m) return 'https://www.youtube.com/embed/' + m[1];
+  if (m) return { type: 'embed', url: 'https://www.youtube.com/embed/' + m[1] };
   m = u.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]+)/);
-  if (m) return u;
+  if (m) return { type: 'embed', url: u };
+  // Vimeo
   m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
-  if (m) return 'https://player.vimeo.com/video/' + m[1];
-  if (u.indexOf('embed') !== -1 || u.indexOf('player.') !== -1) return u;
-  return u;
+  if (m) return { type: 'embed', url: 'https://player.vimeo.com/video/' + m[1] };
+  // Direct video files
+  if (/\.(mp4|webm|ogg)$/i.test(u)) {
+    return { type: 'file', url: u };
+  }
+  // Generic embed/player URLs
+  if (u.indexOf('embed') !== -1 || u.indexOf('player.') !== -1) {
+    return { type: 'embed', url: u };
+  }
+  // Fallback: treat as direct link opened in iframe
+  return { type: 'embed', url: u };
 }
 
 async function loadNovosti() {
@@ -2854,9 +2865,12 @@ function openNovostViewModal(id) {
       var imgUrl = n.slika_path ? API_BASE + '/' + n.slika_path : '';
       var author = [n.author_name, n.author_surname].filter(Boolean).join(' ') || 'Болница';
       var dateStr = n.created_at ? (n.created_at.split('T')[0] || n.created_at) : '';
-      var topHtml = (imgUrl ? '<img src="' + imgUrl + '" alt="" style="max-width:100%; border-radius:8px; margin-bottom:1rem;" />' : '');
-      var embedUrl = getVideoEmbedUrl(n.video_url);
-      if (embedUrl) topHtml += '<div class="novost-video-wrap" style="margin-bottom:1rem;"><iframe src="' + embedUrl.replace(/"/g, '&quot;') + '" allowfullscreen style="max-width:100%; width:560px; height:315px; border:0; border-radius:8px;"></iframe></div>';
+      var pos = parseInt(n.slika_position, 10);
+      if (!isFinite(pos)) pos = 50;
+      if (pos < 0) pos = 0;
+      if (pos > 100) pos = 100;
+      var posStyle = 'object-position: center ' + pos + '%;';
+      var topHtml = (imgUrl ? '<img src="' + imgUrl + '" alt="" class="novost-main-img" style="' + posStyle + '" />' : '');
       var extra = n.slike_extra && Array.isArray(n.slike_extra) ? n.slike_extra : [];
       var textHtml = '<h2>' + (n.naslov || '').replace(/</g, '&lt;') + '</h2>' +
         '<p style="color:#666; margin-bottom:1rem;">' + dateStr + ' &middot; ' + author + '</p>' +
@@ -2870,9 +2884,101 @@ function openNovostViewModal(id) {
         });
         galleryHtml += '</div>';
       }
-      content.innerHTML = topHtml + textHtml + galleryHtml;
+      var videoHtml = '';
+      var videoInfo = getVideoInfo(n.video_url);
+      if (videoInfo) {
+        if (videoInfo.type === 'file') {
+          var vSrc = videoInfo.url;
+          if (vSrc.indexOf('http') !== 0 && vSrc.charAt(0) !== '/') {
+            vSrc = API_BASE + '/' + vSrc;
+          }
+          vSrc = vSrc.replace(/"/g, '&quot;');
+          videoHtml =
+            '<div class="novost-video-wrap" style="margin-top:1.5rem; text-align:center;">' +
+            '<video controls style="max-width:100%; width:560px; max-height:360px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.25);">' +
+            '<source src="' + vSrc + '" type="video/mp4" />' +
+            '</video>' +
+            '</div>';
+        } else {
+          var eUrl = videoInfo.url.replace(/"/g, '&quot;');
+          videoHtml =
+            '<div class="novost-video-wrap" style="margin-top:1.5rem; text-align:center;">' +
+            '<iframe src="' + eUrl + '" allowfullscreen style="max-width:100%; width:560px; height:315px; border:0; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.25);"></iframe>' +
+            '</div>';
+        }
+      }
+      content.innerHTML = topHtml + textHtml + galleryHtml + videoHtml;
+      setupNovostGallery(content);
     })
     .catch(function() { content.innerHTML = '<p style="color:red;">Грешка при вчитување.</p>'; });
+}
+
+function setupNovostGallery(rootEl) {
+  var root = rootEl || document;
+  var thumbs = root.querySelectorAll('.novost-extra-thumb');
+  if (!thumbs.length) return;
+  var urls = Array.prototype.map.call(thumbs, function(img) { return img.getAttribute('src'); });
+  thumbs.forEach(function(img, index) {
+    img.addEventListener('click', function() {
+      openNovostGalleryLightbox(urls, index);
+    });
+  });
+}
+
+function openNovostGalleryLightbox(urls, startIndex) {
+  if (!urls || !urls.length) return;
+  var existing = document.getElementById('novost-gallery-lightbox');
+  if (existing) existing.remove();
+  var overlay = document.createElement('div');
+  overlay.id = 'novost-gallery-lightbox';
+  var inner = document.createElement('div');
+  inner.className = 'novost-gallery-inner';
+  var img = document.createElement('img');
+  img.className = 'novost-gallery-image';
+  inner.appendChild(img);
+  var close = document.createElement('div');
+  close.className = 'novost-gallery-close';
+  close.textContent = '×';
+  inner.appendChild(close);
+  var left = document.createElement('div');
+  left.className = 'novost-gallery-arrow left';
+  left.textContent = '‹';
+  var right = document.createElement('div');
+  right.className = 'novost-gallery-arrow right';
+  right.textContent = '›';
+  inner.appendChild(left);
+  inner.appendChild(right);
+  overlay.appendChild(inner);
+  document.body.appendChild(overlay);
+
+  var current = startIndex || 0;
+  function render() {
+    if (current < 0) current = urls.length - 1;
+    if (current >= urls.length) current = 0;
+    img.src = urls[current];
+  }
+  render();
+
+  function go(delta) {
+    current += delta;
+    render();
+  }
+
+  left.addEventListener('click', function(e) {
+    e.stopPropagation();
+    go(-1);
+  });
+  right.addEventListener('click', function(e) {
+    e.stopPropagation();
+    go(1);
+  });
+  close.addEventListener('click', function(e) {
+    e.stopPropagation();
+    overlay.remove();
+  });
+  overlay.addEventListener('click', function() {
+    overlay.remove();
+  });
 }
 
 function closeNovostViewModal() {
@@ -2922,6 +3028,8 @@ function openNovostForm(id) {
   if (videoEl) videoEl.value = '';
   var extraInput = document.getElementById('novost-sliki-extra');
   if (extraInput) extraInput.value = '';
+   var posInput = document.getElementById('novost-slika-pos');
+   if (posInput) posInput.value = '50';
   var wrap = document.getElementById('novost-current-image');
   var img = document.getElementById('novost-current-image-img');
   var removeCb = document.getElementById('novost-remove-slika');
@@ -2934,6 +3042,13 @@ function openNovostForm(id) {
         document.getElementById('novost-naslov').value = n.naslov || '';
         document.getElementById('novost-sodrzina').value = n.sodrzina || '';
         if (videoEl && n.video_url) videoEl.value = n.video_url;
+        if (posInput) {
+          var p = parseInt(n.slika_position, 10);
+          if (!isFinite(p)) p = 50;
+          if (p < 0) p = 0;
+          if (p > 100) p = 100;
+          posInput.value = String(p);
+        }
         if (n.slika_path) {
           img.src = API_BASE + '/' + n.slika_path;
           wrap.style.display = 'block';
@@ -3115,6 +3230,7 @@ document.addEventListener('DOMContentLoaded', () =>{
       var fileInput = document.getElementById('novost-slika');
       var videoUrlEl = document.getElementById('novost-video-url');
       var extraSlikiEl = document.getElementById('novost-sliki-extra');
+      var slikaPosEl = document.getElementById('novost-slika-pos');
       if (!naslov) { alert('Внесете наслов.'); return; }
       try {
         var formData = new FormData();
@@ -3122,6 +3238,7 @@ document.addEventListener('DOMContentLoaded', () =>{
         formData.append('sodrzina', sodrzina);
         formData.append('admin_doctor_id', currentLekar.doctor_ID);
         if (videoUrlEl) formData.append('video_url', (videoUrlEl.value || '').trim());
+        if (slikaPosEl) formData.append('slika_position', (slikaPosEl.value || '50'));
         if (fileInput.files.length) formData.append('slika', fileInput.files[0]);
         if (extraSlikiEl && extraSlikiEl.files.length) {
           for (var i = 0; i < extraSlikiEl.files.length; i++) formData.append('sliki_extra', extraSlikiEl.files[i]);

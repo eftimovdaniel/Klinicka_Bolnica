@@ -117,6 +117,7 @@ CREATE TABLE IF NOT EXISTS Novosti (
   naslov VARCHAR(500) NOT NULL,
   sodrzina TEXT NOT NULL,
   slika_path VARCHAR(500) DEFAULT NULL,
+  slika_position VARCHAR(20) DEFAULT NULL,
   video_url VARCHAR(500) DEFAULT NULL,
   slike_extra TEXT DEFAULT NULL,
   author_doctor_id INT DEFAULT NULL,
