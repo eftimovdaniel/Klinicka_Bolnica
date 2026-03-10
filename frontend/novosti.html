@@ -86,7 +86,9 @@
         var u = url.trim();
         if (!u) return null;
         var m = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
-        if (m) return { type: 'embed', url: 'https://www.youtube.com/embed/' + m[1] };
+        if (m) return { type: 'embed', url: 'https://www.youtube-nocookie.com/embed/' + m[1] };
+        m = u.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]+)/);
+        if (m) return { type: 'embed', url: 'https://www.youtube-nocookie.com/embed/' + m[1] };
         m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
         if (m) return { type: 'embed', url: 'https://player.vimeo.com/video/' + m[1] };
         if (/\.(mp4|webm|ogg)$/i.test(u)) {
@@ -101,12 +103,7 @@
           var imgUrl = n.slika_path ? API_BASE + '/' + n.slika_path : '';
           var author = [n.author_name, n.author_surname].filter(Boolean).join(' ') || 'Болница';
           var dateStr = n.created_at ? (n.created_at.split('T')[0] || n.created_at) : '';
-          var pos = parseInt(n.slika_position, 10);
-          if (!isFinite(pos)) pos = 50;
-          if (pos < 0) pos = 0;
-          if (pos > 100) pos = 100;
-          var posStyle = 'object-position: center ' + pos + '%;';
-          var topHtml = (imgUrl ? '<img src="' + imgUrl + '" alt="" class="novost-main-img" style="' + posStyle + '" />' : '');
+          var topHtml = (imgUrl ? '<img src="' + imgUrl + '" alt="" class="novost-main-img" />' : '');
           var extra = n.slike_extra && Array.isArray(n.slike_extra) ? n.slike_extra : [];
           var textHtml = '<h2>' + (n.naslov || '').replace(/</g, '&lt;') + '</h2>' +
             '<p style="color:#666; margin-bottom:1rem;">' + dateStr + ' &middot; ' + author + '</p>' +
@@ -139,7 +136,7 @@
               var eUrl = videoInfo.url.replace(/"/g, '&quot;');
               videoHtml =
                 '<div class="novost-video-wrap" style="margin-top:1.5rem; text-align:center;">' +
-                '<iframe src="' + eUrl + '" allowfullscreen style="max-width:100%; width:560px; height:315px; border:0; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.25);"></iframe>' +
+                '<iframe src="' + eUrl + '" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen style="max-width:100%; width:560px; height:315px; border:0; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.25);"></iframe>' +
                 '</div>';
             }
           }

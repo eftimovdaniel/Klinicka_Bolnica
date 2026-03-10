@@ -2940,6 +2940,24 @@ html {
   border-radius: 8px;
 }
 
+.novost-video-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  background: #e74c3c;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 500;
+  margin-top: 1.5rem;
+}
+
+.novost-video-link:hover {
+  background: #c0392b;
+  text-decoration: none;
+}
+
 .novost-extra-gallery {
   margin-top: 1rem;
   display: flex;

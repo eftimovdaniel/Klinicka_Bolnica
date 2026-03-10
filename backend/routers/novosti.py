@@ -41,6 +41,7 @@ def _normalize_novost_row(r: dict) -> None:
     if r.get("updated_at"):
         r["updated_at"] = r["updated_at"].isoformat() if hasattr(r["updated_at"], "isoformat") else str(r["updated_at"])
     r.setdefault("slika_position", None)
+    r.setdefault("slika_height", None)
     if isinstance(r.get("slike_extra"), str) and r["slike_extra"]:
         try:
             r["slike_extra"] = json.loads(r["slike_extra"])
@@ -58,7 +59,7 @@ def list_novosti():
         cur = conn.cursor(dictionary=True)
         try:
             cur.execute("""
-                SELECT n.id, n.naslov, n.sodrzina, n.slika_path, n.slika_position, n.video_url, n.slike_extra, n.created_at, n.updated_at,
+                SELECT n.id, n.naslov, n.sodrzina, n.slika_path, n.slika_position, n.slika_height, n.video_url, n.slike_extra, n.created_at, n.updated_at,
                        d.name AS author_name, d.surname AS author_surname
                 FROM Novosti n
                 LEFT JOIN Doctors d ON n.author_doctor_id = d.doctor_ID
@@ -98,7 +99,7 @@ def get_novost(novost_id: int):
         cur = conn.cursor(dictionary=True)
         try:
             cur.execute("""
-                SELECT n.id, n.naslov, n.sodrzina, n.slika_path, n.slika_position, n.video_url, n.slike_extra, n.created_at, n.updated_at,
+                SELECT n.id, n.naslov, n.sodrzina, n.slika_path, n.slika_position, n.slika_height, n.video_url, n.slike_extra, n.created_at, n.updated_at,
                        d.name AS author_name, d.surname AS author_surname
                 FROM Novosti n
                 LEFT JOIN Doctors d ON n.author_doctor_id = d.doctor_ID
@@ -138,6 +139,7 @@ def create_novost(
     admin_doctor_id: int = Form(...),
     video_url: Optional[str] = Form(None),
     slika_position: Optional[str] = Form(None),
+    slika_height: Optional[str] = Form(None),
     slika: Optional[UploadFile] = File(None),
     sliki_extra: List[UploadFile] = File(default=[]),
 ):
@@ -149,6 +151,7 @@ def create_novost(
         raise HTTPException(status_code=400, detail="Насловот е задолжителен.")
     video_url = (video_url or "").strip() or None
     slika_position = (slika_position or "").strip() or None
+    slika_height = (slika_height or "").strip() or None
     slika_path = _save_upload(slika) if slika else None
     extra_paths = []
     for f in sliki_extra:
@@ -162,8 +165,8 @@ def create_novost(
         cur = conn.cursor(dictionary=True)
         try:
             cur.execute(
-                "INSERT INTO Novosti (naslov, sodrzina, slika_path, slika_position, video_url, slike_extra, author_doctor_id) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                (naslov, sodrzina, slika_path, slika_position, video_url, slike_extra_json, admin_doctor_id),
+                "INSERT INTO Novosti (naslov, sodrzina, slika_path, slika_position, slika_height, video_url, slike_extra, author_doctor_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                (naslov, sodrzina, slika_path, slika_position, slika_height, video_url, slike_extra_json, admin_doctor_id),
             )
         except Exception as ins_err:
             if "Unknown column" in str(ins_err) or "unknown column" in str(ins_err).lower():
@@ -193,6 +196,7 @@ def update_novost(
     admin_doctor_id: int = Form(...),
     video_url: Optional[str] = Form(None),
     slika_position: Optional[str] = Form(None),
+    slika_height: Optional[str] = Form(None),
     slika: Optional[UploadFile] = File(None),
     remove_slika: Optional[str] = Form(None),
     sliki_extra: List[UploadFile] = File(default=[]),
@@ -204,7 +208,7 @@ def update_novost(
         conn = get_connection()
         cur = conn.cursor(dictionary=True)
         try:
-            cur.execute("SELECT id, slika_path, slika_position, video_url, slike_extra FROM Novosti WHERE id = %s", (novost_id,))
+            cur.execute("SELECT id, slika_path, slika_position, slika_height, video_url, slike_extra FROM Novosti WHERE id = %s", (novost_id,))
         except Exception as sel_err:
             if "Unknown column" in str(sel_err) or "unknown column" in str(sel_err).lower():
                 cur.execute("SELECT id, slika_path FROM Novosti WHERE id = %s", (novost_id,))
@@ -216,6 +220,7 @@ def update_novost(
         slika_path = row.get("slika_path")
         video_url_val = (video_url or "").strip() or None if video_url is not None else row.get("video_url")
         slika_position_val = (slika_position or "").strip() or None if slika_position is not None else row.get("slika_position")
+        slika_height_val = (slika_height or "").strip() or None if slika_height is not None else row.get("slika_height")
         slike_extra_current = row.get("slike_extra")
         if isinstance(slike_extra_current, str) and slike_extra_current:
             try:
@@ -256,8 +261,8 @@ def update_novost(
             raise HTTPException(status_code=400, detail="Насловот е задолжителен.")
         try:
             cur.execute(
-                "UPDATE Novosti SET naslov = %s, sodrzina = %s, slika_path = %s, slika_position = %s, video_url = %s, slike_extra = %s WHERE id = %s",
-                (new_naslov, new_sodrzina, slika_path, slika_position_val, video_url_val, slike_extra_json, novost_id),
+                "UPDATE Novosti SET naslov = %s, sodrzina = %s, slika_path = %s, slika_position = %s, slika_height = %s, video_url = %s, slike_extra = %s WHERE id = %s",
+                (new_naslov, new_sodrzina, slika_path, slika_position_val, slika_height_val, video_url_val, slike_extra_json, novost_id),
             )
         except Exception as upd_err:
             if "Unknown column" in str(upd_err) or "unknown column" in str(upd_err).lower():
