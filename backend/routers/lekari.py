@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, Request
 from typing import Optional
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import os
+import secrets
 import string
 from database import get_connection
 from routers.utils import debug_log, transliterate_mk_to_lat
@@ -287,6 +288,89 @@ async def promeni_lozinka_lekar(request: Request):
         )
         conn.commit()
         return {"message": "Лозинката е успешно променета."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
+
+
+@router.post("/forgot-password")
+async def forgot_password_lekar(request: Request):
+    """Барање за заборавена лозинка. Кодот се печати во терминалот на серверот (SMTP не е задолжителен)."""
+    data = await request.json()
+    email = (data.get("email") or "").strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Внесете валидна е-пошта")
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT doctor_ID, name, surname FROM Doctors WHERE LOWER(email) = %s", (email,))
+        doctor = cur.fetchone()
+        if not doctor:
+            return {"message": "Ако постои лекар со оваа е-пошта, ќе добиете код. За локална употреба погледнете го терминалот на серверот."}
+        cur.execute("DELETE FROM password_reset_tokens WHERE email = %s AND user_type = 'lekar'", (email,))
+        token = secrets.token_urlsafe(12)
+        expires = datetime.utcnow() + timedelta(hours=1)
+        cur.execute(
+            "INSERT INTO password_reset_tokens (email, token, user_type, expires_at) VALUES (%s, %s, 'lekar', %s)",
+            (email, token, expires),
+        )
+        conn.commit()
+        msg = (
+            f"\n{'='*60}\n"
+            f"  ЗАБОРАВЕНА ЛОЗИНКА – ЛЕКАР\n"
+            f"  Е-пошта: {email}\n"
+            f"  Код (внесете го во формата): {token}\n"
+            f"  Валиден до: {expires.isoformat()}\n"
+            f"{'='*60}\n"
+        )
+        print(msg)
+        return {"message": "Ако постои лекар со оваа е-пошта, кодот е испечатен во терминалот каде што работи backend-от. Внесете го кодот и новата лозинка."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
+
+
+@router.post("/reset-password")
+async def reset_password_lekar(request: Request):
+    """Промена на лозинка со код од заборавена лозинка (без најава)."""
+    data = await request.json()
+    email = (data.get("email") or "").strip().lower()
+    token = (data.get("token") or "").strip().replace(" ", "").replace("\n", "").replace("\r", "")
+    nova = (data.get("nova_lozinka") or "").strip()
+    if not email or not token:
+        raise HTTPException(status_code=400, detail="Внесете е-пошта и код")
+    ok, msg = _validna_lozinka_lekar(nova)
+    if not ok:
+        raise HTTPException(status_code=400, detail=msg)
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            "SELECT id, email FROM password_reset_tokens WHERE token = %s AND user_type = 'lekar' AND expires_at > UTC_TIMESTAMP()",
+            (token,),
+        )
+        row = cur.fetchone()
+        if not row or (row.get("email") or "").strip().lower() != email:
+            raise HTTPException(status_code=400, detail="Неважечки или истечен код. Побарајте нов код.")
+        cur.execute("SELECT doctor_ID FROM Doctors WHERE LOWER(email) = %s", (email,))
+        doctor = cur.fetchone()
+        if not doctor:
+            raise HTTPException(status_code=404, detail="Лекар не е пронајден")
+        nova_hash = hash_password(nova)
+        cur.execute("UPDATE Doctors SET password = %s, must_change_password = 0 WHERE doctor_ID = %s", (nova_hash, doctor["doctor_ID"]))
+        cur.execute("DELETE FROM password_reset_tokens WHERE token = %s", (token,))
+        conn.commit()
+        return {"message": "Лозинката е успешно променета. Можете да се најавите."}
     except HTTPException:
         raise
     except Exception as e:

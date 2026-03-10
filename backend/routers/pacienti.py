@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Request
-from datetime import datetime
+from datetime import datetime, timedelta
+import secrets
 from database import get_connection
 from routers.utils import debug_log
 from password_utils import hash_password, verify_password
@@ -59,6 +60,89 @@ async def login_pacienti(request: Request):
     finally:
          if conn and conn.is_connected():
             conn.close()
+
+
+@router.post("/forgot-password")
+async def forgot_password_pacient(request: Request):
+    """Барање за заборавена лозинка. Кодот се печати во терминалот на серверот."""
+    data = await request.json()
+    email = (data.get("email") or "").strip().lower()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Внесете валидна е-пошта")
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT patient_ID, name_patient, surname_patient FROM patient WHERE LOWER(email) = %s", (email,))
+        patient = cur.fetchone()
+        if not patient:
+            return {"message": "Ако постои пациент со оваа е-пошта, ќе добиете код. За локална употреба погледнете го терминалот на серверот."}
+        cur.execute("DELETE FROM password_reset_tokens WHERE email = %s AND user_type = 'pacient'", (email,))
+        token = secrets.token_urlsafe(12)
+        expires = datetime.utcnow() + timedelta(hours=1)
+        cur.execute(
+            "INSERT INTO password_reset_tokens (email, token, user_type, expires_at) VALUES (%s, %s, 'pacient', %s)",
+            (email, token, expires),
+        )
+        conn.commit()
+        msg = (
+            f"\n{'='*60}\n"
+            f"  ЗАБОРАВЕНА ЛОЗИНКА – ПАЦИЕНТ\n"
+            f"  Е-пошта: {email}\n"
+            f"  Код (внесете го во формата): {token}\n"
+            f"  Валиден до: {expires.isoformat()}\n"
+            f"{'='*60}\n"
+        )
+        print(msg)
+        return {"message": "Ако постои пациент со оваа е-пошта, кодот е испечатен во терминалот каде што работи backend-от. Внесете го кодот и новата лозинка."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
+
+
+@router.post("/reset-password")
+async def reset_password_pacient(request: Request):
+    """Промена на лозинка со код од заборавена лозинка (без најава)."""
+    data = await request.json()
+    email = (data.get("email") or "").strip().lower()
+    token = (data.get("token") or "").strip().replace(" ", "").replace("\n", "").replace("\r", "")
+    nova = (data.get("nova_lozinka") or "").strip()
+    if not email or not token:
+        raise HTTPException(status_code=400, detail="Внесете е-пошта и код")
+    if not nova or len(nova) < 8:
+        raise HTTPException(status_code=400, detail="Лозинката мора да има најмалку 8 карактери")
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            "SELECT id, email FROM password_reset_tokens WHERE token = %s AND user_type = 'pacient' AND expires_at > UTC_TIMESTAMP()",
+            (token,),
+        )
+        row = cur.fetchone()
+        if not row or (row.get("email") or "").strip().lower() != email:
+            raise HTTPException(status_code=400, detail="Неважечки или истечен код. Побарајте нов код.")
+        cur.execute("SELECT patient_ID FROM patient WHERE LOWER(email) = %s", (email,))
+        patient = cur.fetchone()
+        if not patient:
+            raise HTTPException(status_code=404, detail="Пациент не е пронајден")
+        nova_hash = hash_password(nova)
+        cur.execute("UPDATE patient SET password = %s WHERE patient_ID = %s", (nova_hash, patient["patient_ID"]))
+        cur.execute("DELETE FROM password_reset_tokens WHERE token = %s", (token,))
+        conn.commit()
+        return {"message": "Лозинката е успешно променета. Можете да се најавите."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
+
 
 @router.post("/register")
 async def register_pacienti(request: Request):

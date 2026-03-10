@@ -2415,6 +2415,8 @@ function showAdminSubTab(subTabName) {
     loadAdminDezurstva();
   } else if (subTabName === 'oglasi-admin') {
     loadAdminOglasi();
+  } else if (subTabName === 'novosti-admin') {
+    loadNovostiAdmin();
   }
 }
 
@@ -2775,6 +2777,200 @@ async function deleteOglas(oglasId) {
 }
 
 // ============================================================================
+// НОВОСТИ (јавна листа + администрација за директорот)
+// ============================================================================
+var API_BASE = 'http://localhost:8000';
+
+function formatSodrzinaForDisplay(text) {
+  if (!text) return '';
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
+}
+
+function getVideoEmbedUrl(url) {
+  if (!url || typeof url !== 'string') return '';
+  var u = url.trim();
+  var m = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+  if (m) return 'https://www.youtube.com/embed/' + m[1];
+  m = u.match(/youtube\.com\/embed\/([a-zA-Z0-9_-]+)/);
+  if (m) return u;
+  m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (m) return 'https://player.vimeo.com/video/' + m[1];
+  if (u.indexOf('embed') !== -1 || u.indexOf('player.') !== -1) return u;
+  return u;
+}
+
+async function loadNovosti() {
+  var listEl = document.getElementById('novosti-list');
+  if (!listEl) return;
+  try {
+    listEl.innerHTML = '<div class="loading">Вчитувам новости...</div>';
+    var res = await fetch(API_BASE + '/novosti');
+    if (!res.ok) throw new Error('Грешка при вчитување');
+    var data = await res.json();
+    renderNovosti(data);
+  } catch (err) {
+    listEl.innerHTML = '<div class="loading" style="color:red;">' + (err.message || 'Грешка при вчитување на новости.') + '</div>';
+  }
+}
+
+function renderNovosti(items) {
+  var listEl = document.getElementById('novosti-list');
+  if (!listEl) return;
+  if (!items || items.length === 0) {
+    listEl.innerHTML = '<p class="loading">Нема објавени новости.</p>';
+    return;
+  }
+  listEl.innerHTML = '';
+  items.forEach(function(n) {
+    var raw = n.sodrzina || '';
+    var excerpt = raw.substring(0, 150).replace(/\n/g, ' ');
+    if (raw.length > 150) excerpt += '...';
+    var dateStr = n.created_at ? (n.created_at.split('T')[0] || n.created_at) : '';
+    var author = [n.author_name, n.author_surname].filter(Boolean).join(' ') || 'Болница';
+    var imgUrl = n.slika_path ? API_BASE + '/' + n.slika_path : '';
+    var card = document.createElement('div');
+    card.className = 'novosti-card';
+    card.innerHTML =
+      (imgUrl ? '<img src="' + imgUrl + '" alt="" class="novosti-card-img" />' : '') +
+      '<div class="novosti-card-body">' +
+      '<h3 class="novosti-card-title">' + (n.naslov || '').replace(/</g, '&lt;') + '</h3>' +
+      '<p class="novosti-card-meta">' + dateStr + ' &middot; ' + author + '</p>' +
+      '<p class="novosti-card-excerpt">' + (excerpt || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>' +
+      '<button type="button" class="btn-primary btn-sm" onclick="openNovostViewModal(' + n.id + ')">Прочитај повеќе</button>' +
+      '</div>';
+    listEl.appendChild(card);
+  });
+}
+
+function openNovostViewModal(id) {
+  var modal = document.getElementById('novost-view-modal');
+  var content = document.getElementById('novost-view-content');
+  if (!modal || !content) return;
+  content.innerHTML = '<div class="loading">Вчитувам...</div>';
+  if (modal) modal.style.display = 'block';
+  fetch(API_BASE + '/novosti/' + id)
+    .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('Не е пронајдена')); })
+    .then(function(n) {
+      var imgUrl = n.slika_path ? API_BASE + '/' + n.slika_path : '';
+      var author = [n.author_name, n.author_surname].filter(Boolean).join(' ') || 'Болница';
+      var dateStr = n.created_at ? (n.created_at.split('T')[0] || n.created_at) : '';
+      var topHtml = (imgUrl ? '<img src="' + imgUrl + '" alt="" style="max-width:100%; border-radius:8px; margin-bottom:1rem;" />' : '');
+      var embedUrl = getVideoEmbedUrl(n.video_url);
+      if (embedUrl) topHtml += '<div class="novost-video-wrap" style="margin-bottom:1rem;"><iframe src="' + embedUrl.replace(/"/g, '&quot;') + '" allowfullscreen style="max-width:100%; width:560px; height:315px; border:0; border-radius:8px;"></iframe></div>';
+      var extra = n.slike_extra && Array.isArray(n.slike_extra) ? n.slike_extra : [];
+      var textHtml = '<h2>' + (n.naslov || '').replace(/</g, '&lt;') + '</h2>' +
+        '<p style="color:#666; margin-bottom:1rem;">' + dateStr + ' &middot; ' + author + '</p>' +
+        '<div class="novosti-full-sodrzina">' + formatSodrzinaForDisplay(n.sodrzina) + '</div>';
+      var galleryHtml = '';
+      if (extra.length) {
+        galleryHtml = '<div class="novost-extra-gallery">';
+        extra.forEach(function(p) {
+          var src = (p.indexOf('http') === 0 || p.indexOf('/') === 0) ? p : API_BASE + '/' + p;
+          galleryHtml += '<img class="novost-extra-thumb" src="' + src.replace(/"/g, '&quot;') + '" alt="" />';
+        });
+        galleryHtml += '</div>';
+      }
+      content.innerHTML = topHtml + textHtml + galleryHtml;
+    })
+    .catch(function() { content.innerHTML = '<p style="color:red;">Грешка при вчитување.</p>'; });
+}
+
+function closeNovostViewModal() {
+  var modal = document.getElementById('novost-view-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+async function loadNovostiAdmin() {
+  var listEl = document.getElementById('novosti-admin-list');
+  if (!listEl || !currentLekar) return;
+  try {
+    listEl.innerHTML = '<div class="loading">Вчитувам новости...</div>';
+    var res = await fetch(API_BASE + '/novosti');
+    if (!res.ok) throw new Error('Грешка при вчитување');
+    var data = await res.json();
+    listEl.innerHTML = '';
+    if (!data.length) {
+      listEl.innerHTML = '<p>Нема новости. Додадете прва новост.</p>';
+      return;
+    }
+    data.forEach(function(n) {
+      var dateStr = n.created_at ? (n.created_at.split('T')[0] || n.created_at) : '';
+      var div = document.createElement('div');
+      div.className = 'admin-list-item';
+      div.innerHTML =
+        '<div class="admin-list-item-content">' +
+        '<strong>' + (n.naslov || '').replace(/</g, '&lt;') + '</strong> &ndash; ' + dateStr +
+        '</div>' +
+        '<div class="admin-list-item-actions">' +
+        '<button type="button" class="btn-secondary btn-sm" onclick="editNovost(' + n.id + ')">Уреди</button> ' +
+        '<button type="button" class="btn-secondary btn-sm" onclick="deleteNovost(' + n.id + ')">Избриши</button>' +
+        '</div>';
+      listEl.appendChild(div);
+    });
+  } catch (err) {
+    listEl.innerHTML = '<p style="color:red;">' + (err.message || 'Грешка') + '</p>';
+  }
+}
+
+function openNovostForm(id) {
+  document.getElementById('novost-form-title').textContent = id ? 'Уреди новост' : 'Додади новост';
+  document.getElementById('novost-id').value = id || '';
+  document.getElementById('novost-naslov').value = '';
+  document.getElementById('novost-sodrzina').value = '';
+  document.getElementById('novost-slika').value = '';
+  var videoEl = document.getElementById('novost-video-url');
+  if (videoEl) videoEl.value = '';
+  var extraInput = document.getElementById('novost-sliki-extra');
+  if (extraInput) extraInput.value = '';
+  var wrap = document.getElementById('novost-current-image');
+  var img = document.getElementById('novost-current-image-img');
+  var removeCb = document.getElementById('novost-remove-slika');
+  if (wrap) { wrap.style.display = 'none'; img.src = ''; }
+  if (removeCb) removeCb.checked = false;
+  if (id) {
+    fetch(API_BASE + '/novosti/' + id)
+      .then(function(r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function(n) {
+        document.getElementById('novost-naslov').value = n.naslov || '';
+        document.getElementById('novost-sodrzina').value = n.sodrzina || '';
+        if (videoEl && n.video_url) videoEl.value = n.video_url;
+        if (n.slika_path) {
+          img.src = API_BASE + '/' + n.slika_path;
+          wrap.style.display = 'block';
+        }
+      })
+      .catch(function() {});
+  }
+  var m = document.getElementById('novost-form-modal');
+  if (m) m.style.display = 'block';
+}
+
+function closeNovostForm() {
+  var m = document.getElementById('novost-form-modal');
+  if (m) m.style.display = 'none';
+}
+
+function editNovost(id) {
+  openNovostForm(id);
+}
+
+async function deleteNovost(id) {
+  if (!currentLekar || !confirm('Дали сте сигурни дека сакате да ја избришете оваа новост?')) return;
+  try {
+    var res = await fetch(API_BASE + '/admin/novosti/' + id + '?admin_doctor_id=' + currentLekar.doctor_ID, { method: 'DELETE' });
+    if (!res.ok) {
+      var d = await res.json();
+      throw new Error(d.detail || 'Грешка при бришење');
+    }
+    alert('Новоста е избришана.');
+    loadNovostiAdmin();
+    loadNovosti();
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+// ============================================================================
 // EVENT LISTENERS ЗА АДМИНИСТРАТИВНИ ФОРМИ
 // ============================================================================
 
@@ -2906,6 +3102,70 @@ document.addEventListener('DOMContentLoaded', () =>{
       }
     });
   }
+
+  var novostForm = document.getElementById('novost-form');
+  if (novostForm) {
+    novostForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      if (!currentLekar) { alert('Не сте најавени'); return; }
+      var id = document.getElementById('novost-id').value;
+      var naslov = document.getElementById('novost-naslov').value.trim();
+      var sodrzina = document.getElementById('novost-sodrzina').value.trim();
+      var removeSlika = document.getElementById('novost-remove-slika').checked;
+      var fileInput = document.getElementById('novost-slika');
+      var videoUrlEl = document.getElementById('novost-video-url');
+      var extraSlikiEl = document.getElementById('novost-sliki-extra');
+      if (!naslov) { alert('Внесете наслов.'); return; }
+      try {
+        var formData = new FormData();
+        formData.append('naslov', naslov);
+        formData.append('sodrzina', sodrzina);
+        formData.append('admin_doctor_id', currentLekar.doctor_ID);
+        if (videoUrlEl) formData.append('video_url', (videoUrlEl.value || '').trim());
+        if (fileInput.files.length) formData.append('slika', fileInput.files[0]);
+        if (extraSlikiEl && extraSlikiEl.files.length) {
+          for (var i = 0; i < extraSlikiEl.files.length; i++) formData.append('sliki_extra', extraSlikiEl.files[i]);
+        }
+        if (id) {
+          formData.append('remove_slika', removeSlika ? '1' : '0');
+          var res = await fetch(API_BASE + '/admin/novosti/' + id, { method: 'PUT', body: formData });
+          if (!res.ok) {
+            var d = await res.json().catch(function() { return {}; });
+            var msg = d.detail;
+            if (Array.isArray(msg)) {
+              msg = msg.map(function(x) {
+                var loc = Array.isArray(x.loc) ? x.loc.join('.') : '';
+                var text = x.msg || '';
+                return (loc ? loc + ': ' : '') + text;
+              }).join('; ');
+            }
+            throw new Error(msg || 'Грешка при ажурирање');
+          }
+          alert('Новоста е ажурирана.');
+        } else {
+          var res = await fetch(API_BASE + '/admin/novosti', { method: 'POST', body: formData });
+          if (!res.ok) {
+            var d = await res.json().catch(function() { return {}; });
+            var msg = d.detail;
+            if (Array.isArray(msg)) {
+              msg = msg.map(function(x) {
+                var loc = Array.isArray(x.loc) ? x.loc.join('.') : '';
+                var text = x.msg || '';
+                return (loc ? loc + ': ' : '') + text;
+              }).join('; ');
+            }
+            throw new Error(msg || 'Грешка при додавање');
+          }
+          alert('Новоста е додадена.');
+        }
+        closeNovostForm();
+        loadNovostiAdmin();
+        if (typeof loadNovosti === 'function') loadNovosti();
+      } catch (err) {
+        alert(err.message || 'Грешка при зачувување.');
+      }
+    });
+  }
   
   // Затворање на модални прозорци при клик на X копчето
   const dezurstvoModal = document.getElementById('dezurstvo-form-modal');
@@ -2964,6 +3224,8 @@ function showLogin() {
   document.getElementById('auth-subtitle').textContent = 'Најавете се на вашиот профил';
   document.getElementById('login-form-container').style.display = 'block';
   document.getElementById('register-form-container').style.display = 'none';
+  var forgotContainer = document.getElementById('forgot-password-container');
+  if (forgotContainer) forgotContainer.style.display = 'none';
   resetAuthForms();
 }
 
@@ -2973,8 +3235,25 @@ function showRegister() {
   document.getElementById('auth-subtitle').textContent = 'Креирајте нов профил';
   document.getElementById('login-form-container').style.display = 'none';
   document.getElementById('register-form-container').style.display = 'block';
+  var forgotContainer = document.getElementById('forgot-password-container');
+  if (forgotContainer) forgotContainer.style.display = 'none';
   updateRegisterFields();
   resetAuthForms();
+}
+
+// Заборавена лозинка – прикажи форма (код се печати во терминалот на backend)
+function showForgotPassword() {
+  document.getElementById('login-form-container').style.display = 'none';
+  document.getElementById('register-form-container').style.display = 'none';
+  var forgotContainer = document.getElementById('forgot-password-container');
+  if (forgotContainer) forgotContainer.style.display = 'block';
+  document.getElementById('forgot-reset-block').style.display = 'none';
+  document.getElementById('forgot-password-form').reset();
+  document.getElementById('reset-password-form').reset();
+  document.getElementById('reset-email').value = '';
+  document.getElementById('reset-error').style.display = 'none';
+  var title = document.getElementById('forgot-title');
+  if (title) title.textContent = currentRole === 'lekar' ? 'Заборавена лозинка (лекар)' : 'Заборавена лозинка (пациент)';
 }
 
 // Менаѓање на улога (Пациент/Лекар)
@@ -3022,6 +3301,12 @@ function resetAuthForms() {
   document.getElementById('auth-register-form')?.reset();
   document.getElementById('login-error').style.display = 'none';
   document.getElementById('register-error').style.display = 'none';
+  var forgotReset = document.getElementById('forgot-reset-block');
+  if (forgotReset) forgotReset.style.display = 'none';
+  document.getElementById('forgot-password-form')?.reset();
+  document.getElementById('reset-password-form')?.reset();
+  var resetErr = document.getElementById('reset-error');
+  if (resetErr) resetErr.style.display = 'none';
 }
 
 // Прикажување на грешка
@@ -3236,16 +3521,86 @@ async function handleRegister(e) {
 // ============================================================================
 
 function setupAuth() {
-  // Event listeners за формите
   document.getElementById('auth-login-form')?.addEventListener('submit', handleLogin);
   document.getElementById('auth-register-form')?.addEventListener('submit', handleRegister);
+
+  var forgotForm = document.getElementById('forgot-password-form');
+  if (forgotForm) {
+    forgotForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      var email = (document.getElementById('forgot-email').value || '').trim().toLowerCase();
+      if (!email) { showAuthError('login-error', 'Внесете е-пошта'); return; }
+      var btn = document.getElementById('forgot-send-btn');
+      var btnText = btn && btn.querySelector('.btn-text');
+      var btnLoad = btn && btn.querySelector('.btn-loading');
+      if (btnText) btnText.style.display = 'none';
+      if (btnLoad) btnLoad.style.display = 'inline-block';
+      var base = (typeof API_BASE !== 'undefined') ? API_BASE : 'http://localhost:8000';
+      var url = currentRole === 'lekar' ? base + '/lekari/forgot-password' : base + '/pacienti/forgot-password';
+      try {
+        var res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email }) });
+        var data = await res.json().catch(function() { return {}; });
+        if (btnText) btnText.style.display = 'inline-block';
+        if (btnLoad) btnLoad.style.display = 'none';
+        document.getElementById('reset-email').value = email;
+        document.getElementById('forgot-code-msg').textContent = data.message || 'Погледнете го терминалот на серверот за кодот. Внесете го подолу.';
+        document.getElementById('forgot-reset-block').style.display = 'block';
+      } catch (err) {
+        if (btnText) btnText.style.display = 'inline-block';
+        if (btnLoad) btnLoad.style.display = 'none';
+        showAuthError('login-error', 'Грешка при испраќање. Проверете дали backend-от работи.');
+      }
+    });
+  }
+
+  var resetForm = document.getElementById('reset-password-form');
+  if (resetForm) {
+    resetForm.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      var email = (document.getElementById('reset-email').value || '').trim().toLowerCase();
+      var token = (document.getElementById('reset-token').value || '').trim();
+      var nova = (document.getElementById('reset-nova').value || '').trim();
+      var confirm = (document.getElementById('reset-nova-confirm').value || '').trim();
+      var errEl = document.getElementById('reset-error');
+      if (!email || !token) { errEl.textContent = 'Внесете е-пошта и код.'; errEl.style.display = 'block'; return; }
+      if (nova.length < 8) { errEl.textContent = 'Лозинката мора да има најмалку 8 карактери.'; errEl.style.display = 'block'; return; }
+      if (nova !== confirm) { errEl.textContent = 'Лозинките не се совпаѓаат.'; errEl.style.display = 'block'; return; }
+      errEl.style.display = 'none';
+      var submitBtn = e.target && e.target.querySelector('.btn-auth-submit');
+      var btnText = submitBtn && submitBtn.querySelector('.btn-text');
+      var btnLoad = submitBtn && submitBtn.querySelector('.btn-loading');
+      if (btnText) btnText.style.display = 'none';
+      if (btnLoad) btnLoad.style.display = 'inline-block';
+      var base = (typeof API_BASE !== 'undefined') ? API_BASE : 'http://localhost:8000';
+      var url = currentRole === 'lekar' ? base + '/lekari/reset-password' : base + '/pacienti/reset-password';
+      try {
+        var res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, token: token, nova_lozinka: nova })
+        });
+        var data = await res.json().catch(function() { return {}; });
+        if (btnText) btnText.style.display = 'inline-block';
+        if (btnLoad) btnLoad.style.display = 'none';
+        if (!res.ok) {
+          errEl.textContent = data.detail || 'Грешка при промена на лозинка.';
+          errEl.style.display = 'block';
+          return;
+        }
+        alert(data.message || 'Лозинката е променета. Најавете се.');
+        showLogin();
+      } catch (err) {
+        if (btnText) btnText.style.display = 'inline-block';
+        if (btnLoad) btnLoad.style.display = 'none';
+        errEl.textContent = 'Грешка при поврзување. Проверете дали backend-от работи.';
+        errEl.style.display = 'block';
+      }
+    });
+  }
   
-  // Затворање при клик надвор
   window.addEventListener('click', (e) => {
     const modal = document.getElementById('auth-modal');
-    if (e.target === modal) {
-      closeAuthModal();
-    }
+    if (e.target === modal) closeAuthModal();
   });
 }
 
@@ -3295,6 +3650,7 @@ window.closeAuthModal = closeAuthModal;
 window.switchRole = switchRole;
 window.showLogin = showLogin;
 window.showRegister = showRegister;
+window.showForgotPassword = showForgotPassword;
 window.openLekarLoginModal = openLekarLoginModal;
 window.closeLekarLoginModal = closeLekarLoginModal;
 window.openPacientLoginModal = openPacientLoginModal;
@@ -3319,6 +3675,13 @@ window.openOglasForm = openOglasForm;
 window.closeOglasForm = closeOglasForm;
 window.editOglas = editOglas;
 window.deleteOglas = deleteOglas;
+window.loadNovosti = loadNovosti;
+window.openNovostViewModal = openNovostViewModal;
+window.closeNovostViewModal = closeNovostViewModal;
+window.openNovostForm = openNovostForm;
+window.closeNovostForm = closeNovostForm;
+window.editNovost = editNovost;
+window.deleteNovost = deleteNovost;
 
 window.showLessDoctors = showLessDoctors;
 window.showPacientLogin = showPacientLogin;

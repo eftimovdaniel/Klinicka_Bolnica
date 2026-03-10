@@ -1101,6 +1101,9 @@ footer {
   backdrop-filter: blur(8px);
   animation: fadeIn 0.3s ease-out;
 }
+.modal.active {
+  display: block;
+}
 
 @keyframes fadeIn {
   from {
@@ -2261,18 +2264,20 @@ html {
   right: 0.5rem;
   top: 50%;
   transform: translateY(-50%);
-  background: transparent;
+  background: url("assets/show-password.png") center center no-repeat;
+  background-size: contain;
   border: none;
   padding: 0.35rem;
   cursor: pointer;
-  font-size: 1.1rem;
-  line-height: 1;
-  color: #666;
+  width: 24px;
+  height: 24px;
+  font-size: 0;
+  line-height: 0;
+  color: transparent;
   opacity: 0.9;
   z-index: 5;
 }
 .btn-toggle-password:hover {
-  color: #e74c3c;
   opacity: 1;
 }
 
@@ -2855,6 +2860,64 @@ html {
   color: #1f5f8b !important;
 }
 
+/* Новости - јавна секција */
+.novosti-section { padding: 3rem 0; }
+.novosti-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+.novosti-card {
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.08);
+  transition: box-shadow 0.3s;
+}
+.novosti-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.12); }
+.novosti-card-img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  display: block;
+}
+.novosti-card-body { padding: 1.25rem; }
+.novosti-card-title {
+  font-size: 1.15rem;
+  margin-bottom: 0.5rem;
+  color: #1a1a2e;
+  line-height: 1.3;
+}
+.novosti-card-meta {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 0.75rem;
+}
+.novosti-card-excerpt {
+  font-size: 0.95rem;
+  color: #555;
+  margin-bottom: 1rem;
+  line-height: 1.5;
+}
+.novosti-card .btn-sm { font-size: 0.9rem; padding: 0.4rem 0.8rem; }
+.modal-content-wide { max-width: 700px; }
+#novost-form-modal .modal-content { max-width: 640px; }
+.modal-content-novost .close { right: 1rem; top: 1rem; font-size: 1.8rem; }
+#novost-form .form-group { margin-bottom: 1rem; }
+#novost-form label { display: block; margin-bottom: 0.5rem; font-weight: bold; }
+#novost-form input[type="text"],
+#novost-form input[type="url"],
+#novost-form textarea { width: 100%; padding: 0.6rem; border: 1px solid #ddd; border-radius: 4px; }
+#novost-sodrzina {
+  font-size: 1.05rem;
+  line-height: 1.5;
+  min-height: 320px;
+  resize: vertical;
+}
+.novost-current-image label { margin-left: 0.5rem; font-weight: normal; }
+.novosti-full-sodrzina { white-space: normal; line-height: 1.6; font-size: 1.02rem; }
+.novosti-full-sodrzina br { display: block; content: ''; margin-bottom: 0.25em; }
+
 /* Модални прозорци за административни форми */
 #dezurstvo-form-modal .modal-content,
 #oglas-form-modal .modal-content {
@@ -3236,6 +3299,25 @@ html {
 
 .auth-switch a:hover {
   text-decoration: underline;
+}
+
+.auth-forgot {
+  margin-top: 0.75rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+.auth-forgot a {
+  color: #2980b9;
+  text-decoration: none;
+}
+.auth-forgot a:hover { text-decoration: underline; }
+.auth-success-msg {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
 }
 
 /* Responsive */

@@ -26,6 +26,7 @@
         <a href="#uslugi" class="nav-link">Услуги</a>
         <a href="#lekari" class="nav-link">Лекари</a>
         <a href="#" id="nav-maticni-lekari" class="nav-link nav-maticni-lekari" target="_blank" rel="noopener noreferrer" title="Матични лекари – резервација на термини преку надворешна платформа">Матични лекари</a>
+        <a href="novosti.html" class="nav-link" target="_blank" rel="noopener noreferrer" title="Новости – отвора во нов прозорец">Новости</a>
         <a href="#kontakt" class="nav-link">Контакт</a>
         <a href="#lekari" id="nav-zakazi-pregled" class="nav-link nav-zakazi-pregled" style="display: none;">Закажи преглед</a>
         <button id="auto-login_btn" class="btn-lekar-login" onclick="openLekarLoginModal()">Најави се!</button>
@@ -246,7 +247,7 @@
                   required 
                   autocomplete="current-password"
                 />
-                <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('pacient-password-input', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+                <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('pacient-password-input', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка"></button>
               </div>
             </div>
             <div id="pacient-login-error-message" class="error-message" style="display: none;"></div>
@@ -290,7 +291,7 @@
             <label for="login-password">Лозинка</label>
             <div class="password-wrapper">
               <input type="password" id="login-password" placeholder="Внесете ја вашата лозинка" required autocomplete="current-password" />
-              <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('login-password', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+              <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('login-password', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка"></button>
             </div>
           </div>
           <p class="auth-role-note" id="auth-pacient-note">Најавете се со е-поштата и лозинката што ги поставивте при регистрација.</p>
@@ -300,9 +301,59 @@
             <span class="btn-text">Најави се</span>
             <span class="btn-loading" style="display: none;">Вчитувам...</span>
           </button>
+          <p class="auth-forgot">
+            <a href="#" onclick="showForgotPassword(); return false;">Заборавена лозинка?</a>
+          </p>
         </form>
         <p class="auth-switch">
           Немате профил? <a href="#" onclick="showRegister(); return false;">Регистрирајте се</a>
+        </p>
+      </div>
+
+      <div id="forgot-password-container" class="auth-form-container" style="display: none;">
+        <h3 id="forgot-title">Заборавена лозинка</h3>
+        <p class="form-hint">Внесете ја е-поштата на вашиот профил. Кодот за промена на лозинка ќе се испечати во <strong>терминалот каде што работи backend-от</strong> (не се праќа по е-пошта).</p>
+        <form id="forgot-password-form">
+          <div class="form-group">
+            <label for="forgot-email">Е-пошта</label>
+            <input type="email" id="forgot-email" placeholder="vashata@eposhta.mk" required />
+          </div>
+          <button type="submit" class="btn-auth-submit" id="forgot-send-btn">
+            <span class="btn-text">Испрати код</span>
+            <span class="btn-loading" style="display: none;">Испраќам...</span>
+          </button>
+        </form>
+        <div id="forgot-reset-block" style="display: none;">
+          <p class="auth-success-msg" id="forgot-code-msg"></p>
+          <form id="reset-password-form">
+            <input type="hidden" id="reset-email" />
+            <div class="form-group">
+              <label for="reset-token">Код (од терминалот на серверот)</label>
+              <input type="text" id="reset-token" placeholder="Внесете го кодот" required />
+            </div>
+            <div class="form-group">
+              <label for="reset-nova">Нова лозинка</label>
+              <div class="password-wrapper">
+                <input type="password" id="reset-nova" placeholder="Минимум 8 карактери" required minlength="8" />
+                <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('reset-nova', this)" title="Прикажи/скриј" aria-label="Прикажи лозинка"></button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="reset-nova-confirm">Потврди нова лозинка</label>
+              <div class="password-wrapper">
+                <input type="password" id="reset-nova-confirm" placeholder="Повторете ја лозинката" required />
+                <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('reset-nova-confirm', this)" title="Прикажи/скриј" aria-label="Прикажи лозинка"></button>
+              </div>
+            </div>
+            <div id="reset-error" class="auth-error" style="display: none;"></div>
+            <button type="submit" class="btn-auth-submit">
+              <span class="btn-text">Промени лозинка</span>
+              <span class="btn-loading" style="display: none;">Зачувувам...</span>
+            </button>
+          </form>
+        </div>
+        <p class="auth-switch" style="margin-top: 1rem;">
+          <a href="#" onclick="showLogin(); return false;">← Назад кон најава</a>
         </p>
       </div>
     
@@ -339,14 +390,14 @@
           <label for="register-password">Лозинка</label>
           <div class="password-wrapper">
             <input type="password" id="register-password" placeholder="Овде внесете ја вашата лозинка" required minlength="8" />
-            <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('register-password', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+            <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('register-password', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка"></button>
           </div>
         </div>
         <div class="form-group">
           <label for="register-password-confirm">Потврди лозинка</label>
           <div class="password-wrapper">
             <input type="password" id="register-password-confirm" placeholder="Потврдете ја вашата лозинка" required />
-            <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('register-password-confirm', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+            <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('register-password-confirm', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка"></button>
           </div>
         </div>
         <div id="register-error" class="auth-error" style="display: none;"></div>
@@ -448,21 +499,21 @@
                 <label for="prva-najava-tekovna">Тековна (привремена) лозинка</label>
                 <div class="password-wrapper">
                   <input type="password" id="prva-najava-tekovna" placeholder="Внесете ја привремената лозинка" required autocomplete="current-password" />
-                  <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('prva-najava-tekovna', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+                  <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('prva-najava-tekovna', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка"></button>
                 </div>
               </div>
               <div class="form-group">
                 <label for="prva-najava-nova">Нова лозинка</label>
                 <div class="password-wrapper">
                   <input type="password" id="prva-najava-nova" placeholder="Внесете нова лозинка." required minlength="8" autocomplete="new-password" />
-                  <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('prva-najava-nova', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+                  <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('prva-najava-nova', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка"></button>
                 </div>
               </div>
               <div class="form-group">
                 <label for="prva-najava-potvrdi">Потврди нова лозинка</label>
                 <div class="password-wrapper">
                   <input type="password" id="prva-najava-potvrdi" placeholder="Повторно внесете ја новата лозинка" required minlength="8" autocomplete="new-password" />
-                  <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('prva-najava-potvrdi', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👀</button>
+                  <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('prva-najava-potvrdi', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка"></button>
                 </div>
               </div>
               <div id="prva-najava-lozinka-poraka" class="auth-error" style="display: none;"></div>
@@ -556,14 +607,14 @@
             <label for="lozinka-tekovna">Тековна лозинка</label>
             <div class="password-wrapper">
               <input type="password" id="lozinka-tekovna" placeholder="Внесете ја тековната лозинка" required autocomplete="current-password" />
-              <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('lozinka-tekovna', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+              <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('lozinka-tekovna', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка"></button>
             </div>
           </div>
           <div class="form-group">
             <label for="lozinka-nova">Нова лозинка</label>
             <div class="password-wrapper">
               <input type="password" id="lozinka-nova" placeholder="Внесете нова лозинка по ваш избор" required minlength="8" autocomplete="new-password" />
-              <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('lozinka-nova', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+              <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('lozinka-nova', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка"></button>
             </div>
             <small class="form-hint">Лозинката мора да содржи најмалку 8 карактери, од кои:
                     • најмалку една голема буква (A–Z)  
@@ -575,7 +626,7 @@
             <label for="lozinka-nova-potvrdi">Потврди нова лозинка</label>
             <div class="password-wrapper">
               <input type="password" id="lozinka-nova-potvrdi" placeholder="Повторно внесете ја новата лозинка" required minlength="8" autocomplete="new-password" />
-              <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('lozinka-nova-potvrdi', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка">👁</button>
+              <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('lozinka-nova-potvrdi', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка"></button>
             </div>
           </div>
           <div id="promeni-lozinka-poraka" class="auth-error" style="display: none;"></div>
@@ -591,6 +642,7 @@
         <div class="admin-sub-tabs">
           <button class="admin-sub-tab active" onclick="showAdminSubTab('dezurstva-admin')">Управување со дежурства</button>
           <button class="admin-sub-tab" onclick="showAdminSubTab('oglasi-admin')">Управување со огласи</button>
+          <button class="admin-sub-tab" onclick="showAdminSubTab('novosti-admin')">Новости</button>
         </div>
         
         <!-- Под-таб за дежурства -->
@@ -608,6 +660,14 @@
           <button class="btn-primary btn-admin-add" onclick="openOglasForm()" style="margin-bottom: 1rem;">+ Додади нов оглас</button>
           <div id="oglasi-admin-list" class="admin-list">
             <div class="loading">Вчитувам огласи...</div>
+          </div>
+        </div>
+        <!-- Под-таб за новости -->
+        <div id="novosti-admin" class="admin-sub-tab-content">
+          <h4>Новости</h4>
+          <button class="btn-primary btn-admin-add" onclick="openNovostForm()" style="margin-bottom: 1rem;">+ Додади новост</button>
+          <div id="novosti-admin-list" class="admin-list">
+            <div class="loading">Вчитувам новости...</div>
           </div>
         </div>
       </div>
@@ -687,6 +747,51 @@
         <button type="submit" class="btn-primary">Зачувај</button>
         <button type="button" class="btn-secondary" onclick="closeOglasForm()">Откажи</button>
       </form>
+    </div>
+  </div>
+
+  <!-- Модален прозорец за новост (додади/уреди) -->
+  <div id="novost-form-modal" class="modal">
+    <div class="modal-content modal-content-wide modal-content-novost">
+      <span class="close" onclick="closeNovostForm()" title="Затвори">&times;</span>
+      <h2 id="novost-form-title">Додади новост</h2>
+      <form id="novost-form">
+        <input type="hidden" id="novost-id" />
+        <div class="form-group">
+          <label for="novost-naslov">Наслов:</label>
+          <input type="text" id="novost-naslov" placeholder="Наслов на новоста" required />
+        </div>
+        <div class="form-group">
+          <label for="novost-sodrzina">Содржина:</label>
+          <textarea id="novost-sodrzina" rows="14" placeholder="Текст на новоста... (новиот ред ќе се прикаже како нов ред)" required></textarea>
+        </div>
+        <div class="form-group">
+          <label for="novost-video-url">Видео URL (опционално):</label>
+          <input type="url" id="novost-video-url" placeholder="https://www.youtube.com/embed/..." />
+        </div>
+        <div class="form-group">
+          <label for="novost-slika">Главна слика (опционално):</label>
+          <input type="file" id="novost-slika" accept=".jpg,.jpeg,.png,.gif,.webp" />
+          <div id="novost-current-image" class="novost-current-image" style="display: none; margin-top: 0.5rem;">
+            <img id="novost-current-image-img" src="" alt="" style="max-width: 200px; max-height: 150px; border-radius: 8px;" />
+            <label><input type="checkbox" id="novost-remove-slika" /> Отстрани слика</label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="novost-sliki-extra">Дополнителни слики (опционално):</label>
+          <input type="file" id="novost-sliki-extra" accept=".jpg,.jpeg,.png,.gif,.webp" multiple />
+        </div>
+        <button type="submit" class="btn-primary">Зачувај</button>
+        <button type="button" class="btn-secondary" onclick="closeNovostForm()">Откажи</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Модал за приказ на цела новост (јавно) -->
+  <div id="novost-view-modal" class="modal">
+    <div class="modal-content modal-content-wide modal-content-novost">
+      <span class="close" onclick="closeNovostViewModal()" title="Затвори">&times;</span>
+      <div id="novost-view-content"></div>
     </div>
   </div>
 

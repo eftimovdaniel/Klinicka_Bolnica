@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="mk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Новости – Клиничка Болница Штип</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body { padding-bottom: 2rem; }
+    .novosti-page-header {
+      background: #fff;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+      padding: 1rem 0;
+      margin-bottom: 2rem;
+    }
+    .novosti-page-header .container {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .novosti-page-header h1 { font-size: 1.4rem; margin: 0; color: #1a1a2e; }
+    .novosti-page-header a {
+      color: #2980b9;
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .novosti-page-header a:hover { text-decoration: underline; }
+    #novosti-list { min-height: 200px; }
+  </style>
+</head>
+<body>
+  <header class="novosti-page-header">
+    <div class="container">
+      <h1>Новости – ЈЗУ Клиничка Болница Штип</h1>
+      <a href="index.html">← Назад кон почетна</a>
+    </div>
+  </header>
+
+  <main class="section novosti-section">
+    <div class="container">
+      <p style="text-align: center; margin-bottom: 2rem; color: #666;">Најнови информации од болницата</p>
+      <div id="novosti-list" class="novosti-grid">
+        <div class="loading">Вчитувам новости...</div>
+      </div>
+    </div>
+  </main>
+
+  <div id="novost-view-modal" class="modal">
+    <div class="modal-content modal-content-wide">
+      <span class="close" onclick="closeNovostViewModal()">&times;</span>
+      <div id="novost-view-content"></div>
+    </div>
+  </div>
+
+  <script>
+    var API_BASE = 'http://localhost:8000';
+
+    function closeNovostViewModal() {
+      var m = document.getElementById('novost-view-modal');
+      if (m) m.style.display = 'none';
+    }
+
+    function openNovostViewModal(id) {
+      var modal = document.getElementById('novost-view-modal');
+      var content = document.getElementById('novost-view-content');
+      content.innerHTML = '<div class="loading">Вчитувам...</div>';
+      modal.style.display = 'block';
+      function formatSodrzina(t) {
+        if (!t) return '';
+        return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
+      }
+      function getVideoEmbedUrl(url) {
+        if (!url || typeof url !== 'string') return '';
+        var u = url.trim();
+        var m = u.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/);
+        if (m) return 'https://www.youtube.com/embed/' + m[1];
+        m = u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+        if (m) return 'https://player.vimeo.com/video/' + m[1];
+        if (u.indexOf('embed') !== -1 || u.indexOf('player.') !== -1) return u;
+        return u;
+      }
+      fetch(API_BASE + '/novosti/' + id)
+        .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('Не е пронајдена')); })
+        .then(function(n) {
+          var imgUrl = n.slika_path ? API_BASE + '/' + n.slika_path : '';
+          var author = [n.author_name, n.author_surname].filter(Boolean).join(' ') || 'Болница';
+          var dateStr = n.created_at ? (n.created_at.split('T')[0] || n.created_at) : '';
+          var html = (imgUrl ? '<img src="' + imgUrl + '" alt="" style="max-width:100%; border-radius:8px; margin-bottom:1rem;" />' : '');
+          var embedUrl = getVideoEmbedUrl(n.video_url);
+          if (embedUrl) html += '<div class="novost-video-wrap" style="margin-bottom:1rem;"><iframe src="' + embedUrl.replace(/"/g, '&quot;') + '" allowfullscreen style="max-width:100%; width:560px; height:315px; border:0; border-radius:8px;"></iframe></div>';
+          var extra = n.slike_extra && Array.isArray(n.slike_extra) ? n.slike_extra : [];
+          extra.forEach(function(p) {
+            var src = (p.indexOf('http') === 0 || p.indexOf('/') === 0) ? p : API_BASE + '/' + p;
+            html += '<img src="' + src.replace(/"/g, '&quot;') + '" alt="" style="max-width:100%; border-radius:8px; margin-bottom:0.5rem;" />';
+          });
+          html += '<h2>' + (n.naslov || '').replace(/</g, '&lt;') + '</h2>' +
+            '<p style="color:#666; margin-bottom:1rem;">' + dateStr + ' &middot; ' + author + '</p>' +
+            '<div class="novosti-full-sodrzina">' + formatSodrzina(n.sodrzina) + '</div>';
+          content.innerHTML = html;
+        })
+        .catch(function() { content.innerHTML = '<p style="color:red;">Грешка при вчитување.</p>'; });
+    }
+
+    function renderNovosti(items) {
+      var listEl = document.getElementById('novosti-list');
+      if (!items || items.length === 0) {
+        listEl.innerHTML = '<p class="loading">Нема објавени новости.</p>';
+        return;
+      }
+      listEl.innerHTML = '';
+      items.forEach(function(n) {
+        var raw = n.sodrzina || '';
+        var excerpt = raw.substring(0, 150).replace(/\n/g, ' ');
+        if (raw.length > 150) excerpt += '...';
+        var dateStr = n.created_at ? (n.created_at.split('T')[0] || n.created_at) : '';
+        var author = [n.author_name, n.author_surname].filter(Boolean).join(' ') || 'Болница';
+        var imgUrl = n.slika_path ? API_BASE + '/' + n.slika_path : '';
+        var card = document.createElement('div');
+        card.className = 'novosti-card';
+        card.innerHTML =
+          (imgUrl ? '<img src="' + imgUrl + '" alt="" class="novosti-card-img" />' : '') +
+          '<div class="novosti-card-body">' +
+          '<h3 class="novosti-card-title">' + (n.naslov || '').replace(/</g, '&lt;') + '</h3>' +
+          '<p class="novosti-card-meta">' + dateStr + ' &middot; ' + author + '</p>' +
+          '<p class="novosti-card-excerpt">' + (excerpt || '').replace(/</g, '&lt;') + '</p>' +
+          '<button type="button" class="btn-primary btn-sm" onclick="openNovostViewModal(' + n.id + ')">Прочитај повеќе</button>' +
+          '</div>';
+        listEl.appendChild(card);
+      });
+    }
+
+    fetch(API_BASE + '/novosti')
+      .then(function(r) {
+        if (!r.ok) throw new Error('Грешка при вчитување');
+        return r.json();
+      })
+      .then(renderNovosti)
+      .catch(function(err) {
+        document.getElementById('novosti-list').innerHTML =
+          '<div class="loading" style="color:red;">' + (err.message || 'Грешка при вчитување на новости.') + '</div>';
+      });
+  </script>
+</body>
+</html>

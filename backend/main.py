@@ -1,10 +1,14 @@
+import os
+from pathlib import Path
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import lekari, pacienti, termini, aparati, uslugi, kariera, admin
+from fastapi.staticfiles import StaticFiles
+
+from routers import lekari, pacienti, termini, aparati, uslugi, kariera, admin, novosti
 
 app = FastAPI(title="Клиничка Болница Штип API")
 
-# CORS middleware за дозвола на повици од frontend
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -13,15 +17,19 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Регистрација на router-ите
+static_dir = Path(__file__).resolve().parent / "static" / "uploads"
+static_dir.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(static_dir)), name="uploads")
+
 app.include_router(lekari.router)
 app.include_router(pacienti.router)
 app.include_router(termini.router)
 app.include_router(aparati.router)
 app.include_router(uslugi.router)
 app.include_router(kariera.router)
-app.include_router(kariera.app_router)  # /aplikacija endpoint без prefix
-app.include_router(admin.router)  # Административни endpoints
+app.include_router(kariera.app_router)
+app.include_router(admin.router)
+app.include_router(novosti.router)
 
 if __name__ == "__main__":          # proverka dali e startuvam fajlot direktno
     import uvicorn              # se importira uvicorn 
