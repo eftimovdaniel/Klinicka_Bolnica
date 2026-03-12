@@ -25,7 +25,7 @@ def _validna_lozinka_lekar(lozinka: str) -> tuple:
     if not any(c.isdigit() for c in lozinka):
         return False, "Лозинката мора да содржи барем еден број"
     if not any(c in string.punctuation for c in lozinka):
-        return False, "Лозинката мора да содржи барем еден интерпункциски знак"
+        return False, "Внесете еден интерпукциски знак"
     return True, ""
 
 @router.get("")
