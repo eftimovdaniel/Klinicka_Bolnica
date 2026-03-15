@@ -20,6 +20,9 @@ from io import BytesIO
 router = APIRouter(prefix="/termini", tags=["termini"])
 
 
+# funkcija koja praka mail na korisnikot koga ke se najave i ke napraev uspesno realizacija na termin
+# ke mu stigne na mail vreme lekar i datum za toa kaj koj lekar e napraveno termin so soodveten datum i vreme 
+# kako potvrda da bide na nekoj nacin deka so sigurnost e zakazan pregledot 
 def _poslati_potvrda_na_email(to_email: str, ime_pacient: str, ime_lekar: str, datum: str, vreme: str):
     """Испрати потврда на е-пошта до пациентот по закажан термин. Ако SMTP не е поставен, се печати во конзола."""
     if not to_email or "@" not in to_email:

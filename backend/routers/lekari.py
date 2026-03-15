@@ -111,12 +111,14 @@ async def login_lekar(request: Request):
             # Алтернативна проверка: ако корисникот внесува без "h" за "sh" (напр. "usinov" наместо "ushinov")
             # Ова е за поддршка на различни транслитерации
             # Проверка 1: Доколку корисникот внесува "usinov" а во базата е "ushinov"
+            # мора да го имам бидејки сите го пишуват различно ако кај мене во базата е sh а корисникот лекарот внесе s да може да се најаве без да има проб во сиситемот
             doc_username_no_sh = doc_username.replace("sh", "s").replace("zh", "z").replace("ch", "c")
             if doc_username_no_sh == username:
                 doctor = doc
                 break
             
             # Проверка 2: Доколку корисникот внесува "ushinov" а во базата е "usinov" (обратно)
+            # воа не ми треба ама нека стое како резерва, направи промена во базата
             username_with_sh = username.replace("s", "sh").replace("z", "zh").replace("c", "ch")
             if doc_username == username_with_sh:
                 doctor = doc

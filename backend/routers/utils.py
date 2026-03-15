@@ -6,7 +6,6 @@ import json
 import os
 
 def debug_log(location: str, message: str, data: dict = None, run_id: str = "run1", hypothesis_id: str = None):
-    """Безбедно логирање кое не фрла exception ако фајлот не може да се отвори"""
     try:
         log_path = os.path.join(os.getcwd(), 'debug.log')
         log_entry = {
@@ -32,6 +31,8 @@ def transliterate_mk_to_lat(text):
     """Конвертира македонски текст од кирилица во латиница"""
     if not text:
         return ""
+    
+    # mora da go imam bidejki nekoj iminja ne moze da se poznaat poradi toa so mora da se najavaeme na laticica
     
     translit_map = {
         'Ѓ': 'gj', 'ѓ': 'gj', 'Ѕ': 'dz', 'ѕ': 'dz', 'Љ': 'lj', 'љ': 'lj',

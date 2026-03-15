@@ -9,10 +9,14 @@ router = APIRouter(
     prefix="/pacienti",
     tags=["pacienti"]) 
 
+
+# end point za logiranje
+
 @router.post("/login")
 async def login_pacienti(request: Request):
     conn = None
     try:
+        # debug_log mi treba na mene da vidam dali e se vo red preku terminal kofa ja pravam lokalno na moj komp, imase nekoj prob i zatoa sta uste
         debug_log("main.py:817",  "login_pacient: Request received", {"timestamp": datetime.now().isoformat()}, hypothesis_id="F")
         data = await request.json()
         email = (data.get("email") or "").strip().lower()

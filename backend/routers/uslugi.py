@@ -18,8 +18,8 @@ def get_specialnosti():         # funkcija so ime get_specialnosti(): bez nikakv
             WHERE specialty IS NOT NULL AND specialty != ''
             ORDER BY specialty
         """)
-        specialnosti = db_cursor.fetchall()        # se zemaat site karakteri od bazata i se zapisuvaat vo promenliva specijalnost
-        return specialnosti         # vrakanje na site specijalnosti 
+        specialnosti = db_cursor.fetchall()        # se zemaat site karakteri od bazata i se zapisuvaat vo specijalnosta 
+        return specialnosti         # dava gi site specijalnosti so koj raspolagame, koi se vneseni vo database 
     # ako nastane greska se frla Exception so statusen kod 500 i objasnuvanje smensteno vo e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))    
