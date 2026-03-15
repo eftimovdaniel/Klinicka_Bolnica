@@ -617,20 +617,18 @@
               <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('lozinka-nova', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка"></button>
             </div>
             <small class="form-hint">Лозинката мора да содржи најмалку 8 карактери, од кои:
-                    • најмалку една голема буква (A–Z)  
-                    • најмалку една бројка (0–9)  
-                    • најмалку еден специјален знак (. , ! ? -), или некој друг по ваш избор.
+                    • Минимално една голема буква, една бројка, еден специјален знак
                     <i>Доколку лозинката не ги исполнува овие услови, нема да можете да го користите системот.<i></small>
           </div>
           <div class="form-group">
-            <label for="lozinka-nova-potvrdi">Потврди нова лозинка</label>
+            <label for="lozinka-nova-potvrdi">Потврди ја нова лозинка</label>
             <div class="password-wrapper">
-              <input type="password" id="lozinka-nova-potvrdi" placeholder="Повторно внесете ја новата лозинка" required minlength="8" autocomplete="new-password" />
+              <input type="password" id="lozinka-nova-potvrdi" placeholder="Внесете ја новата лозинка" required minlength="8" autocomplete="new-password" />
               <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('lozinka-nova-potvrdi', this)" title="Прикажи/скриј лозинка" aria-label="Прикажи лозинка"></button>
             </div>
           </div>
           <div id="promeni-lozinka-poraka" class="auth-error" style="display: none;"></div>
-          <button type="submit" class="btn-raspored-load">Смени лозинка</button>
+          <button type="submit" class="btn-raspored-load">Промени лозинка</button>
         </form>
       </div>
       
@@ -650,7 +648,7 @@
           <h4>Дежурства</h4>
           <button class="btn-primary btn-admin-add" onclick="openDezurstvoForm()" style="margin-bottom: 1rem;">+ Додади ново дежурство</button>
           <div id="dezurstva-admin-list" class="admin-list">
-            <div class="loading">Вчитувам дежурства...</div>
+            <div class="loading">Се вчитуваат дежуства...</div>
           </div>
         </div>
         

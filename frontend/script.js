@@ -3808,5 +3808,3 @@ window.showPacientRegister = showPacientRegister;
 window.showLekarRegister = showLekarRegister;
 window.showLekarLogin = showLekarLogin;
 window.closeLekarRegisterModal = closeLekarRegisterModal;
-
-
