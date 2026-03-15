@@ -3515,3 +3515,352 @@ html {
     font-size: 2rem;
   }
 }
+
+/* ========== МОБИЛНА ПРИЛАГОДЛИВОСТ (responsive) ========== */
+
+/* Хамбургер мени – скриено на десктоп */
+.nav-toggle {
+  display: none;
+}
+
+.nav-hamburger {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  width: 44px;
+  height: 44px;
+  cursor: pointer;
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  transition: background 0.2s;
+}
+
+.nav-hamburger span {
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: #333;
+  border-radius: 1px;
+  transition: transform 0.3s, opacity 0.3s;
+}
+
+.nav-toggle:checked + .nav-hamburger span:nth-child(1) {
+  transform: translateY(7px) rotate(45deg);
+}
+
+.nav-toggle:checked + .nav-hamburger span:nth-child(2) {
+  opacity: 0;
+}
+
+.nav-toggle:checked + .nav-hamburger span:nth-child(3) {
+  transform: translateY(-7px) rotate(-45deg);
+}
+
+.nav-hamburger:hover {
+  background: #eee;
+}
+
+/* Мобилен breakpoint – 768px */
+@media (max-width: 768px) {
+  .container {
+    width: 95%;
+    max-width: none;
+    padding: 0 1rem;
+  }
+
+  /* Header – хамбургер + навигација */
+  .header-container {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    padding: 0.75rem 0;
+  }
+
+  .nav-toggle:checked ~ .main-nav {
+    display: flex;
+  }
+
+  .nav-hamburger {
+    display: flex;
+    order: 2;
+    margin-left: auto;
+  }
+
+  .main-nav {
+    display: none;
+    order: 3;
+    flex-basis: 100%;
+    flex-direction: column;
+    gap: 0;
+    padding-top: 0.5rem;
+    border-top: 1px solid #eee;
+  }
+
+  .main-nav a,
+  .main-nav button {
+    padding: 0.85rem 1rem;
+    font-size: 1rem;
+    border-bottom: 1px solid #f0f0f0;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+  }
+
+  .main-nav .btn-lekar-login {
+    margin: 0.5rem 0 0;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .logo h1 {
+    font-size: 1rem;
+    line-height: 1.3;
+    white-space: normal;
+  }
+
+  .red-cross {
+    font-size: 1.4rem;
+  }
+
+  /* Hero – помала висина на мобилен */
+  .hero {
+    height: 420px;
+    min-height: 50vh;
+  }
+
+  .hero-content h1 {
+    font-size: 1.5rem;
+    line-height: 1.25;
+  }
+
+  .hero-content p {
+    font-size: 1rem;
+  }
+
+  .btn-primary {
+    padding: 0.85rem 1.5rem;
+    font-size: 1rem;
+    min-height: 44px;
+  }
+
+  /* Секции – помал padding */
+  .section,
+  .features-section,
+  .services-section {
+    padding: 2rem 1rem;
+  }
+
+  .section h2 {
+    font-size: 1.6rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .features-grid {
+    gap: 1.25rem;
+  }
+
+  .feature-card {
+    padding: 1.5rem 1.25rem;
+  }
+
+  .feature-card h3 {
+    font-size: 1.25rem;
+  }
+
+  .feature-card p {
+    font-size: 0.95rem;
+  }
+
+  .icon-circle {
+    width: 60px;
+    height: 60px;
+  }
+
+  .icon-cross {
+    font-size: 1.8rem;
+  }
+
+  /* Услуги – грани */
+  .granki-columns {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .usluga-card {
+    padding: 1.5rem 1rem;
+  }
+
+  /* Лекари */
+  .lekari-grid {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .lekar-card {
+    max-width: 100%;
+  }
+
+  .lekar-card h3 {
+    font-size: 1.25rem;
+  }
+
+  /* Календар за термини */
+  .appointment-container {
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+  }
+
+  .calendar-month {
+    gap: 0.35rem;
+  }
+
+  .calendar-day,
+  .calendar-header {
+    padding: 0.4rem 0.25rem;
+    font-size: 0.85rem;
+  }
+
+  .time-slot {
+    padding: 0.6rem 0.4rem;
+    font-size: 0.9rem;
+    min-height: 44px;
+  }
+
+  /* Модали – полна ширина */
+  .modal-content {
+    width: 95%;
+    max-width: none;
+    margin: 2% auto;
+    padding: 1.25rem;
+    max-height: 90vh;
+  }
+
+  .login-split-modal {
+    max-width: 95%;
+  }
+
+  .lekar-login-modal-content {
+    max-width: 95%;
+    padding: 1.5rem;
+  }
+
+  .auth-modal-content {
+    max-width: 95%;
+    padding: 1.5rem;
+  }
+
+  .lekar-dashboard-content {
+    max-width: 95%;
+    padding: 1rem;
+  }
+
+  .lekar-nav-tabs {
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .nav-tab {
+    padding: 0.6rem 1rem;
+    font-size: 0.9rem;
+    min-height: 44px;
+  }
+
+  /* Табели – хоризонтален скрол */
+  .dezurstva-list table,
+  .admin-list-item,
+  .pozicija-card {
+    min-width: 280px;
+  }
+
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Форми */
+  .appointment-form-fields input,
+  .appointment-form-fields textarea,
+  .form-group input {
+    font-size: 16px; /* спречува zoom на iOS при фокус */
+    min-height: 44px;
+  }
+
+  .postavki-form {
+    max-width: 100%;
+  }
+
+  .aparati-form {
+    max-width: 100%;
+  }
+
+  /* Копчиња – touch-friendly */
+  button,
+  .btn-primary,
+  .btn-edit,
+  .btn-delete,
+  .btn-secondary,
+  .btn-admin-add {
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0.6rem 1rem;
+  }
+
+  .btn-edit,
+  .btn-delete {
+    min-width: auto;
+  }
+
+  /* Footer */
+  footer .container {
+    flex-direction: column;
+    text-align: center;
+    gap: 1rem;
+  }
+
+  /* Новости */
+  .novosti-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .novosti-card-body {
+    padding: 1rem;
+  }
+
+  .novost-extra-thumb {
+    flex: 0 0 100%;
+    max-width: 100%;
+  }
+}
+
+/* Уште помали екрани – 480px */
+@media (max-width: 480px) {
+  .hero {
+    height: 360px;
+    min-height: 45vh;
+  }
+
+  .hero-content h1 {
+    font-size: 1.25rem;
+  }
+
+  .section h2 {
+    font-size: 1.4rem;
+  }
+
+  .modal-content {
+    width: 98%;
+    padding: 1rem;
+  }
+
+  .admin-sub-tabs {
+    flex-direction: column;
+  }
+
+  .admin-sub-tab {
+    width: 100%;
+    min-height: 44px;
+  }
+}

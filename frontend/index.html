@@ -2,7 +2,7 @@
 <html lang="mk">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes"/>
   <title>Клиничка Болница Штип</title>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -16,12 +16,16 @@
     };
   </script>
   <header>
-    <div class="container">
+    <div class="container header-container">
       <div class="logo">
         <span class="red-cross">+</span>
         <h1>ЈЗУ Клиничка Болница - Штип</h1>
       </div>
-      <nav>
+      <input type="checkbox" id="nav-toggle" class="nav-toggle" aria-label="Отвори мени" />
+      <label for="nav-toggle" class="nav-hamburger" aria-label="Мени">
+        <span></span><span></span><span></span>
+      </label>
+      <nav class="main-nav">
         <a href="#home" class="nav-link">Почетна</a>
         <a href="#uslugi" class="nav-link">Услуги</a>
         <a href="#lekari" class="nav-link">Лекари</a>
@@ -794,5 +798,16 @@
   </div>
 
   <script src="script.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var toggle = document.getElementById('nav-toggle');
+      var nav = document.querySelector('.main-nav');
+      if (toggle && nav) {
+        nav.querySelectorAll('a').forEach(function(a) {
+          a.addEventListener('click', function() { toggle.checked = false; });
+        });
+      }
+    });
+  </script>
 </body>
 </html>
