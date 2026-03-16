@@ -795,14 +795,19 @@ let selectedOglas = null;
 // Ги вчитува сите активни огласи и ги прикажува во секцијата за кариера
 // Автоматски ги филтрира истечените огласи (повеќе од 5 дена од истекот)
 async function loadKariera() {
+  const container = document.getElementById('kariera-list');
+  if (!container) return;
   try {
+    container.classList.add('kariera-loading');
+    container.innerHTML = '<span class="loading">Вчитувам позиции...</span>';
     const res = await fetch('http://localhost:8000/kariera');
     const pozicii = await res.json();
-    const container = document.getElementById('kariera-list');
+    container.classList.remove('kariera-loading');
     container.innerHTML = '';
 
     if (pozicii.length === 0) {
-      container.innerHTML = '<div class="loading">Нема достапни позиции.</div>';
+      container.innerHTML = '<span class="loading">Нема достапни позиции.</span>';
+      container.classList.add('kariera-loading');
       return;
     }
 
@@ -908,8 +913,11 @@ async function loadKariera() {
       container.appendChild(div);
     });
   } catch (err) {
-    document.getElementById('kariera-list').innerHTML =
-      '<div class="loading">Грешка при вчитување на позициите.</div>';
+    const c = document.getElementById('kariera-list');
+    if (c) {
+      c.classList.add('kariera-loading');
+      c.innerHTML = '<span class="loading">Грешка при вчитување на позициите.</span>';
+    }
   }
 }
 
@@ -3477,6 +3485,7 @@ async function handleLogin(e) {
         throw new Error('За да продолжите со најава, ве молиме внесете го вашето корисничко име во форма име.презиме(на латиница).');
       }
       body = { username: username, password: password };
+      console.log('[DEBUG lekar login] username:', username, '| password length:', password ? password.length : 0, '| endpoint:', endpoint);
     } else {
       // За пациенти: користи email
       endpoint = 'http://localhost:8000/pacienti/login';
@@ -3490,8 +3499,15 @@ async function handleLogin(e) {
     });
     
     if (!res.ok) {
-      const error = await res.json();
-      throw new Error(error.detail || 'Настана грешка при најава');
+      let errorDetail = 'Настана грешка при најава';
+      try {
+        const errJson = await res.json();
+        errorDetail = errJson.detail || errorDetail;
+      } catch (e) {
+        console.error('[DEBUG] res.json() failed, status:', res.status, 'statusText:', res.statusText);
+      }
+      console.error('[DEBUG login error] status:', res.status, 'detail:', errorDetail);
+      throw new Error(errorDetail);
     }
     
     const data = await res.json();
@@ -3526,7 +3542,12 @@ async function handleLogin(e) {
     }
     
   } catch (err) {
-    showAuthError('login-error', err.message);
+    console.error('[DEBUG login catch]', err.message, err);
+    var msg = err.message;
+    if (msg === 'Failed to fetch' || err.name === 'TypeError') {
+      msg = 'Серверот не е достапен. Проверете дали backend работи (uvicorn main:app --port 8000) и дали сте на http://localhost.';
+    }
+    showAuthError('login-error', msg);
   } finally {
     //submitBtn.disabled = false;
     if(submitBtn) submitBtn.disabled = false;
@@ -3771,7 +3792,24 @@ window.showLogin = showLogin;
 window.showRegister = showRegister;
 window.showForgotPassword = showForgotPassword;
 window.openLekarLoginModal = openLekarLoginModal;
+window.openLekarLoginModal = openLekarLoginModal;
 window.closeLekarLoginModal = closeLekarLoginModal;
+
+// DEBUG: Тестирај дали backend е достапен – отвори конзола (F12) и напиши: debugLekarConnection()
+window.debugLekarConnection = async function() {
+  try {
+    var r = await fetch('http://localhost:8000/lekari');
+    console.log('[DEBUG] GET /lekari status:', r.status, r.ok ? 'OK' : 'FAIL');
+    if (r.ok) {
+      var lekari = await r.json();
+      console.log('[DEBUG] Број на лекари:', lekari.length);
+      console.log('[DEBUG] Први 5 лекари (име, презиме – за најава користи име.презиме на латиница):', lekari.slice(0, 5).map(function(l) { return (l.name || '') + ' ' + (l.surname || ''); }));
+    }
+  } catch (e) {
+    console.error('[DEBUG] Грешка:', e.message, '| Дали backend работи? cd backend && uvicorn main:app --port 8000');
+  }
+};
+
 window.openPacientLoginModal = openPacientLoginModal;
 window.closePacientLoginModal = closePacientLoginModal;
 window.showPacientRegister = showPacientRegister;

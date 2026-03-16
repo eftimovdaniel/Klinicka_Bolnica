@@ -150,6 +150,7 @@ async def login_lekar(request: Request):
                                 break
         
         if not doctor:
+            print(f"[DEBUG login] Невалидно корисничко име: '{username}' | Проверени: {checked_usernames[:5]}...")
             raise HTTPException(status_code=401, detail="Невалидно корисничко име или лозинка")
         
         # #region agent log
@@ -165,6 +166,7 @@ async def login_lekar(request: Request):
                 detail="Овој лекар сè уште не е регистриран. Користете ја опцијата „Регистрирај се“ за да креирате профил (име, презиме, специјалност, е-пошта, лозинка). По регистрација најавете се со корисничко име име.презиме и лозинката што ја поставивте."
             )
         if not verify_password(password, stored_password_hash):
+            print(f"[DEBUG login] Невалидна лозинка за лекар: {doctor.get('name')} {doctor.get('surname')} (username: {username})")
             raise HTTPException(status_code=401, detail="Невалидно корисничко име или лозинка")
         
         doctor_id = doctor["doctor_ID"]  # ID на лекарот за да ги земеме неговите термини
@@ -212,6 +214,7 @@ async def login_lekar(request: Request):
         # #region agent log
         debug_log("main.py:314", "login_lekar: Success", {"doctor_id": doctor["doctor_ID"], "termini_count": len(termini)}, hypothesis_id="E")
         # #endregion
+        print(f"[DEBUG login] Успешна најава: {doctor.get('name')} {doctor.get('surname')} (ID: {doctor_id})")
         
         # Дали лекар мора да ја смени лозинката: само ако тековната лозинка е привремената Test123..
         must_change = verify_password(DEFAULT_LOZINKA_LEKARI, stored_password_hash)
