@@ -149,6 +149,7 @@ def create_novost(
     slika_height: Optional[str] = Form(None),
     slika_url: Optional[str] = Form(None),
     slika: Optional[UploadFile] = File(None),
+    slike_extra_urls: Optional[str] = Form(None),
     sliki_extra: List[UploadFile] = File(default=[]),
 ):
     if not check_admin_access(admin_doctor_id):
@@ -167,6 +168,13 @@ def create_novost(
     elif slika:
         slika_path = _save_upload(slika)
     extra_paths = []
+    if slike_extra_urls and isinstance(slike_extra_urls, str):
+        for line in slike_extra_urls.strip().splitlines():
+            u = line.strip()
+            if u and _is_full_url(u):
+                extra_paths.append(u)
+            elif u and u.startswith("uploads/"):
+                extra_paths.append(u)
     for f in sliki_extra:
         p = _save_upload(f)
         if p:
@@ -213,6 +221,7 @@ def update_novost(
     slika_url: Optional[str] = Form(None),
     slika: Optional[UploadFile] = File(None),
     remove_slika: Optional[str] = Form(None),
+    slike_extra_urls: Optional[str] = Form(None),
     sliki_extra: List[UploadFile] = File(default=[]),
 ):
     if not check_admin_access(admin_doctor_id):
@@ -264,7 +273,16 @@ def update_novost(
                     except Exception:
                         pass
             slika_path = _save_upload(slika)
-        extra_paths = list(slike_extra_current) if slike_extra_current else []
+        extra_paths = []
+        if slike_extra_urls and isinstance(slike_extra_urls, str):
+            for line in slike_extra_urls.strip().splitlines():
+                u = line.strip()
+                if u and _is_full_url(u):
+                    extra_paths.append(u)
+                elif u and u.startswith("uploads/"):
+                    extra_paths.append(u)
+        elif slike_extra_current:
+            extra_paths = list(slike_extra_current)
         for f in sliki_extra:
             p = _save_upload(f)
             if p:

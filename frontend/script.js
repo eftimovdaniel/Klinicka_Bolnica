@@ -3058,6 +3058,8 @@ function openNovostForm(id) {
   if (videoEl) videoEl.value = '';
   var extraInput = document.getElementById('novost-sliki-extra');
   if (extraInput) extraInput.value = '';
+  var extraUrlsEl = document.getElementById('novost-slike-extra-urls');
+  if (extraUrlsEl) extraUrlsEl.value = '';
   var urlEl = document.getElementById('novost-slika-url');
   if (urlEl) urlEl.value = '';
   var wrap = document.getElementById('novost-current-image');
@@ -3078,6 +3080,8 @@ function openNovostForm(id) {
         }
         var urlEl = document.getElementById('novost-slika-url');
         if (urlEl) urlEl.value = (n.slika_path && (n.slika_path.indexOf('http') === 0)) ? n.slika_path : '';
+        var extra = n.slike_extra && Array.isArray(n.slike_extra) ? n.slike_extra : [];
+        if (extraUrlsEl && extra.length) extraUrlsEl.value = extra.join('\n');
       })
       .catch(function() {});
   }
@@ -3265,6 +3269,8 @@ document.addEventListener('DOMContentLoaded', () =>{
         var slikaUrlEl = document.getElementById('novost-slika-url');
         if (slikaUrlEl && (slikaUrlEl.value || '').trim()) formData.append('slika_url', (slikaUrlEl.value || '').trim());
         if (fileInput.files.length) formData.append('slika', fileInput.files[0]);
+        var extraUrlsEl = document.getElementById('novost-slike-extra-urls');
+        if (extraUrlsEl) formData.append('slike_extra_urls', (extraUrlsEl.value || '').trim());
         if (extraSlikiEl && extraSlikiEl.files.length) {
           for (var i = 0; i < extraSlikiEl.files.length; i++) formData.append('sliki_extra', extraSlikiEl.files[i]);
         }
