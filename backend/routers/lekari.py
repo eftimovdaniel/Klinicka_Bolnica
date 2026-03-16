@@ -1,3 +1,4 @@
+import traceback
 from fastapi import APIRouter, HTTPException, Request
 from typing import Optional
 from datetime import datetime, date, timedelta
@@ -55,6 +56,7 @@ def get_lekari(specijalnost: Optional[str] = None):                             
             debug_log("lekari.get_lekari", "Broj na vrateni lekari", {"count": len(lekari), "specijalnost_filter": specijalnost or "(site)"})
         return lekari       # se vrakaat lekarite vo JSON format {"doctor_ID": 1, ...},{... }}
     except Exception as e:  # ako nastane greska, Exception, vo e e smenstena porakata za greska 
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))     # se dava 500 kako kod za greska  detail=str(e) poraka za prikaza na klient
     finally:                                # se vrsi ovoj blok bez razlika dali ima ili nema nastanato greska 
         if conn and conn.is_connected():    # dokolku postoi konekcija i taa e aktivna

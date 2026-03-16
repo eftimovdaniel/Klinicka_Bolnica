@@ -47,6 +47,33 @@ def root():
     return {"message": "Клиничка Болница Штип – API", "docs": "/docs"}
 
 
+@app.get("/debug-db")
+def debug_db():
+    """Проверка на конекција и табели – прикажува точна грешка при проблем."""
+    from database import get_connection
+    results = {}
+    try:
+        conn = get_connection()
+        results["connection"] = "OK"
+        cur = conn.cursor()
+        # Тест на табели
+        for name, sql in [
+            ("Doctors", "SELECT COUNT(*) FROM Doctors"),
+            ("Oddeli", "SELECT COUNT(*) FROM Oddeli"),
+            ("Vrabotuvanje", "SELECT COUNT(*) FROM Vrabotuvanje"),
+        ]:
+            try:
+                cur.execute(sql)
+                results[name] = {"ok": True, "count": cur.fetchone()[0]}
+            except Exception as e:
+                results[name] = {"ok": False, "error": str(e)}
+        cur.close()
+        conn.close()
+    except Exception as e:
+        results["connection"] = f"ГРЕШКА: {e}"
+    return results
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

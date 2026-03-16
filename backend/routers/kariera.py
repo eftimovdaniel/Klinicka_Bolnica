@@ -1,3 +1,4 @@
+import traceback
 from fastapi import APIRouter, HTTPException, Request
 from datetime import datetime
 from database import get_connection
@@ -47,6 +48,7 @@ def get_kariera():          # funkcija koja e nameneta za kariera
     except HTTPException:
         raise
     except Exception as e:                      # pojava na greska so soodveten kod i poraka do lekar ili korisnik 
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     finally:                                        # krein blok kade se zatvra sekoja otvorena konekcija
         if conn and conn.is_connected():
