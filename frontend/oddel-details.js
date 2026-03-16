@@ -1,3 +1,8 @@
+// API базен URL – автоматски се прилагодува
+var API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:8000'
+  : (window.location.protocol + '//' + window.location.hostname + ':8000');
+
 // Функција за добивање на параметри од URL
 function getURLParameter(name) {
   const urlParams = new URLSearchParams(window.location.search);
@@ -77,7 +82,7 @@ async function loadLekariForOddel(oddelNaziv) {
     console.log(`[DEBUG] Вчитување лекари за оддел: ${oddelNaziv}`);
     
     // Прво пробај со точно име на одделот
-    let res = await fetch(`http://localhost:8000/lekari?specijalnost=${encodeURIComponent(oddelNaziv)}`);
+    let res = await fetch(`${API_BASE}/lekari?specijalnost=${encodeURIComponent(oddelNaziv)}`);
     
     if (!res.ok) {
       throw new Error(`HTTP грешка! Статус: ${res.status}`);
@@ -93,7 +98,7 @@ async function loadLekariForOddel(oddelNaziv) {
       console.log(`[DEBUG] Мапирани специјалности:`, specialties);
       
       // Вчитај ги сите лекари и филтрирај локално
-      const allRes = await fetch('http://localhost:8000/lekari');
+      const allRes = await fetch(API_BASE + '/lekari');
       if (allRes.ok) {
         const allLekari = await allRes.json();
         console.log(`[DEBUG] Вкупно лекари во базата:`, allLekari.length);

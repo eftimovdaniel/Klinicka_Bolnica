@@ -55,16 +55,20 @@ def debug_db():
     try:
         conn = get_connection()
         results["connection"] = "OK"
-        cur = conn.cursor()
-        # Тест на табели
-        for name, sql in [
-            ("Doctors", "SELECT COUNT(*) FROM Doctors"),
-            ("Oddeli", "SELECT COUNT(*) FROM Oddeli"),
-            ("Vrabotuvanje", "SELECT COUNT(*) FROM Vrabotuvanje"),
-        ]:
+        cur = conn.cursor(dictionary=True)
+        # Тест на табели (истите query-и како endpoints)
+        tests = [
+            ("Doctors", "SELECT COUNT(*) as c FROM Doctors"),
+            ("Oddeli", "SELECT ime_na_oddel FROM Oddeli LIMIT 1"),
+            ("Vrabotuvanje", "SELECT id_oglas, pozicija, oddel, datum_na_prijavuvanje FROM Vrabotuvanje LIMIT 1"),
+            ("Novosti", "SELECT id, naslov FROM Novosti LIMIT 1"),
+        ]
+        for name, sql in tests:
             try:
                 cur.execute(sql)
-                results[name] = {"ok": True, "count": cur.fetchone()[0]}
+                rows = cur.fetchall()
+                cnt = rows[0].get("c", len(rows)) if rows else 0
+                results[name] = {"ok": True, "count": cnt}
             except Exception as e:
                 results[name] = {"ok": False, "error": str(e)}
         cur.close()

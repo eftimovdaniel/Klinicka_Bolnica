@@ -1,5 +1,10 @@
 // Овие променливи се користат низ целиот код за чување на состојбата на апликацијата
 
+// API базен URL – автоматски се прилагодува (localhost vs production)
+var API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:8000'
+  : (window.location.protocol + '//' + window.location.hostname + ':8000');
+
 // URL на надворешната платформа за матични лекари (резервација на термини). Смени го кога ќе го имаш линкот.
 var MATICNI_LEKARI_URL = 'https://mojtermin.mk/health_workers';
 
@@ -60,7 +65,7 @@ async function loadLekari() {
 
     container.innerHTML = '<div class="loading">Вчитувам лекари...</div>';
 
-    const res = await fetch('http://localhost:8000/lekari');
+    const res = await fetch(API_BASE + '/lekari');
 
     if (!res.ok) {
       throw new Error(`HTTP грешка! Статус: ${res.status}`);
@@ -251,7 +256,7 @@ async function openAppointmentModalInternal(doctorId) {
     selectedDoctor = allDoctors.find(function (d) { return Number(d.doctor_ID) === doctorIdNum; });
     if (!selectedDoctor) {
       try {
-        const res = await fetch('http://localhost:8000/lekari');
+        const res = await fetch(API_BASE + '/lekari');
         if (res.ok) {
           const lekari = await res.json();
           selectedDoctor = lekari.find(function (d) { return Number(d.doctor_ID) === doctorIdNum; });
@@ -489,7 +494,7 @@ async function renderTimeSlots() {
 
   try {
     const datumStr = selectedDate.toISOString().split('T')[0];
-    const res = await fetch(`http://localhost:8000/termini/dostapni?lekar_id=${selectedDoctor.doctor_ID}&datum=${datumStr}`);
+    const res = await fetch(`${API_BASE}/termini/dostapni?lekar_id=${selectedDoctor.doctor_ID}&datum=${datumStr}`);
     
     if (!res.ok) {
       throw new Error(`HTTP грешка! Статус: ${res.status}`);
@@ -577,7 +582,7 @@ function setupAppointmentForm() {
         napomena: document.getElementById('patient-napomena').value.trim()
       };
       try {
-        const response = await fetch('http://localhost:8000/termini', {
+        const response = await fetch(API_BASE + '/termini', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(appointmentData)
@@ -603,7 +608,7 @@ function setupAppointmentForm() {
           alert('Грешка при закажување: ' + (result.detail || result.message || 'Обидете се повторно.'));
         }
       } catch (err) {
-        alert('Серверот не е достапен. Проверете дали backend работи на http://localhost:8000');
+        alert('Серверот не е достапен. Проверете дали backend работи на ' + API_BASE);
       }
     });
   }
@@ -623,7 +628,7 @@ async function loadUslugi() {
 
     container.innerHTML = '<div class="loading">Вчитувам услуги...</div>';
 
-    const res = await fetch('http://localhost:8000/uslugi');
+    const res = await fetch(API_BASE + '/uslugi');
 
     if (!res.ok) {
       throw new Error(`HTTP грешка! Статус: ${res.status}`);
@@ -800,7 +805,7 @@ async function loadKariera() {
   try {
     container.classList.add('kariera-loading');
     container.innerHTML = '<span class="loading">Вчитувам позиции...</span>';
-    const res = await fetch('http://localhost:8000/kariera');
+    const res = await fetch(API_BASE + '/kariera');
     const pozicii = await res.json();
     container.classList.remove('kariera-loading');
     container.innerHTML = '';
@@ -947,7 +952,7 @@ function attachForms() {
       const formData = new FormData(e.target);
 
       try {
-        const res = await fetch('http://localhost:8000/aplikacija', {
+        const res = await fetch(API_BASE + '/aplikacija', {
           method: 'POST',
           body: formData
         });
@@ -1156,7 +1161,7 @@ async function handlePrvaNajavaSubmit(e) {
     return false;
   }
   try {
-    var res = await fetch('http://localhost:8000/lekari/promeni-lozinka', {
+    var res = await fetch(API_BASE + '/lekari/promeni-lozinka', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -1234,7 +1239,7 @@ function setupLekarPasswordForms() {
         return;
       }
       try {
-        var res = await fetch('http://localhost:8000/lekari/promeni-lozinka', {
+        var res = await fetch(API_BASE + '/lekari/promeni-lozinka', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ doctor_id: currentLekar.doctor_ID, trenutna_lozinka: tekovna, nova_lozinka: nova })
@@ -1391,7 +1396,7 @@ async function loadDezurstva() {
   try {
     // Ова ќе биде имплементирано во backend
     // За сега прикажуваме пример
-    const res = await fetch(`http://localhost:8000/lekari/${currentLekar.doctor_ID}/dezurstva`);
+    const res = await fetch(`${API_BASE}/lekari/${currentLekar.doctor_ID}/dezurstva`);
     
     if (res.ok) {
       const dezurstva = await res.json();
@@ -1511,7 +1516,7 @@ async function loadLekariForAparati() {
   if (!lekarSelect) return;
   
   try {
-    const res = await fetch('http://localhost:8000/lekari');
+    const res = await fetch(API_BASE + '/lekari');
     if (res.ok) {
       allLekariForAparati = await res.json();
       // Не ги пополнуваме директно, ќе се пополнат кога се избере апарат
@@ -1614,7 +1619,7 @@ async function loadAparati() {
   if (!aparatSelect) return;
   
   try {
-    const res = await fetch('http://localhost:8000/aparati');
+    const res = await fetch(API_BASE + '/aparati');
     if (res.ok) {
       const aparati = await res.json();
       
@@ -1795,7 +1800,7 @@ async function renderAparatiTimeSlots() {
   try {
     const datumStr = aparatiSelectedDate.toISOString().split('T')[0];
     const lekarId = lekarSelect.value;
-    const res = await fetch(`http://localhost:8000/termini/dostapni?lekar_id=${lekarId}&datum=${datumStr}`);
+    const res = await fetch(`${API_BASE}/termini/dostapni?lekar_id=${lekarId}&datum=${datumStr}`);
     
     if (!res.ok) {
       throw new Error(`HTTP грешка! Статус: ${res.status}`);
@@ -1886,7 +1891,7 @@ function setupAparatiForm() {
       const aparatIme = aparatSelect.options[aparatSelect.selectedIndex]?.textContent || aparatKod;
       
       // Користи го кодот на апаратот за проверка на достапност
-      let url = `http://localhost:8000/aparati/termini/dostapnost?aparat=${encodeURIComponent(aparatKod)}&datum=${datum}&vreme=${vreme}`;
+      let url = `${API_BASE}/aparati/termini/dostapnost?aparat=${encodeURIComponent(aparatKod)}&datum=${datum}&vreme=${vreme}`;
       
       if (lekarId) {
         url += `&lekar_id=${lekarId}`;
@@ -1978,7 +1983,7 @@ function setupAparatiForm() {
       const aparatKod = aparatSelect.value; // Кодот на апаратот
       const aparatIme = aparatSelect.options[aparatSelect.selectedIndex]?.textContent || aparatKod;
       
-      let checkUrl = `http://localhost:8000/aparati/termini/dostapnost?aparat=${encodeURIComponent(aparatKod)}&datum=${datum}&vreme=${vreme}`;
+      let checkUrl = `${API_BASE}/aparati/termini/dostapnost?aparat=${encodeURIComponent(aparatKod)}&datum=${datum}&vreme=${vreme}`;
       checkUrl += `&lekar_id=${lekarId}`;
       checkUrl += `&pacient_ime=${encodeURIComponent(pacientIme)}&pacient_prezime=${encodeURIComponent(pacientPrezime)}`;
       
@@ -2000,7 +2005,7 @@ function setupAparatiForm() {
       const aparatKod = aparatSelect.value;
       const aparatIme = aparatSelect.options[aparatSelect.selectedIndex]?.textContent || aparatKod;
       
-      const res = await fetch('http://localhost:8000/aparati/termini', {
+      const res = await fetch(API_BASE + '/aparati/termini', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2088,7 +2093,7 @@ async function loginLekar() {
   try {
     // Испраќаме POST барање со корисничко име и лозинка за автентификација
     // Backend-от ќе провери дали комбинацијата е валидна
-    const res = await fetch('http://localhost:8000/lekari/login', {
+    const res = await fetch(API_BASE + '/lekari/login', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -2178,7 +2183,7 @@ window.loadMojRaspored = async function loadMojRaspored() {
   terminiList.innerHTML = '<div class="loading">Вчитувам распоред...</div>';
 
   try {
-    const url = `http://localhost:8000/lekari/moj-raspored/${currentLekar.doctor_ID}${datum ? `?datum=${datum}` : ''}`;
+    const url = `${API_BASE}/lekari/moj-raspored/${currentLekar.doctor_ID}${datum ? `?datum=${datum}` : ''}`;
     const res = await fetch(url);
 
     if (!res.ok) {
@@ -2308,7 +2313,7 @@ async function saveTerminChanges(terminId) {
   const terapija = terapijaInput.value.trim();
 
   try {
-    const res = await fetch(`http://localhost:8000/termini/${terminId}`, {
+    const res = await fetch(`${API_BASE}/termini/${terminId}`, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -2452,7 +2457,7 @@ async function loadAdminDezurstva() {
   try {
     container.innerHTML = '<div class="loading">Вчитувам дежурства...</div>';
     
-    const res = await fetch(`http://localhost:8000/admin/dezurstva?admin_doctor_id=${currentLekar.doctor_ID}`);
+    const res = await fetch(`${API_BASE}/admin/dezurstva?admin_doctor_id=${currentLekar.doctor_ID}`);
     if (!res.ok) {
       const error = await res.json();
       throw new Error(error.detail || `HTTP грешка! Статус: ${res.status}`);
@@ -2498,7 +2503,7 @@ async function loadAdminOglasi() {
   try {
     container.innerHTML = '<div class="loading">Вчитувам огласи...</div>';
     
-    const res = await fetch(`http://localhost:8000/admin/oglasi?admin_doctor_id=${currentLekar.doctor_ID}`);
+    const res = await fetch(`${API_BASE}/admin/oglasi?admin_doctor_id=${currentLekar.doctor_ID}`);
     if (!res.ok) {
       const error = await res.json();
       throw new Error(error.detail || `HTTP грешка! Статус: ${res.status}`);
@@ -2541,7 +2546,7 @@ async function loadDoctorsForAdmin() {
   if (!select) return;
   
   try {
-    const res = await fetch('http://localhost:8000/lekari');
+    const res = await fetch(API_BASE + '/lekari');
     if (res.ok) {
       const lekari = await res.json();
       select.innerHTML = '<option value="">Изберете лекар...</option>';
@@ -2618,7 +2623,7 @@ async function loadDezurstvoForEdit(dezurstvoId) {
   
   try {
     // Вчитај ги сите дежурства и најди го тоа со соодветниот ID
-    const res = await fetch(`http://localhost:8000/admin/dezurstva?admin_doctor_id=${currentLekar.doctor_ID}`);
+    const res = await fetch(`${API_BASE}/admin/dezurstva?admin_doctor_id=${currentLekar.doctor_ID}`);
     if (!res.ok) throw new Error('Грешка при вчитување');
     
     const dezurstva = await res.json();
@@ -2659,7 +2664,7 @@ async function deleteDezurstvo(dezurstvoId) {
   }
   
   try {
-    const res = await fetch(`http://localhost:8000/admin/dezurstva/${dezurstvoId}?admin_doctor_id=${currentLekar.doctor_ID}`, {
+    const res = await fetch(`${API_BASE}/admin/dezurstva/${dezurstvoId}?admin_doctor_id=${currentLekar.doctor_ID}`, {
       method: 'DELETE'
     });
     
@@ -2742,7 +2747,7 @@ async function loadOglasForEdit(oglasId) {
   }
   
   try {
-    const res = await fetch(`http://localhost:8000/admin/oglasi?admin_doctor_id=${currentLekar.doctor_ID}`);
+    const res = await fetch(`${API_BASE}/admin/oglasi?admin_doctor_id=${currentLekar.doctor_ID}`);
     if (!res.ok) throw new Error('Грешка при вчитување');
     
     const oglasi = await res.json();
@@ -2782,7 +2787,7 @@ async function deleteOglas(oglasId) {
   }
   
   try {
-    const res = await fetch(`http://localhost:8000/admin/oglasi/${oglasId}?admin_doctor_id=${currentLekar.doctor_ID}`, {
+    const res = await fetch(`${API_BASE}/admin/oglasi/${oglasId}?admin_doctor_id=${currentLekar.doctor_ID}`, {
       method: 'DELETE'
     });
     
@@ -2801,8 +2806,6 @@ async function deleteOglas(oglasId) {
 // ============================================================================
 // НОВОСТИ (јавна листа + администрација за директорот)
 // ============================================================================
-var API_BASE = 'http://localhost:8000';
-
 function resolveNovostSlikaUrl(p) {
   if (!p || typeof p !== 'string') return '';
   var s = p.trim();
@@ -3135,8 +3138,8 @@ document.addEventListener('DOMContentLoaded', () =>{
         }
         
         const url = dezurstvoId 
-          ? `http://localhost:8000/admin/dezurstva/${dezurstvoId}`
-          : 'http://localhost:8000/admin/dezurstva';
+          ? `${API_BASE}/admin/dezurstva/${dezurstvoId}`
+          : API_BASE + '/admin/dezurstva';
         
         const method = dezurstvoId ? 'PUT' : 'POST';
         
@@ -3190,7 +3193,7 @@ document.addEventListener('DOMContentLoaded', () =>{
         
         if (oglasId) {
           // Ажурирање
-          const res = await fetch(`http://localhost:8000/admin/oglasi/${oglasId}`, {
+          const res = await fetch(`${API_BASE}/admin/oglasi/${oglasId}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -3211,7 +3214,7 @@ document.addEventListener('DOMContentLoaded', () =>{
           alert('Огласот е успешно ажуриран');
         } else {
           // Креирање (користи административен endpoint за да нема валидација на позицијата)
-          const res = await fetch('http://localhost:8000/admin/oglasi', {
+          const res = await fetch(API_BASE + '/admin/oglasi', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -3488,7 +3491,7 @@ async function handleLogin(e) {
     
     if (currentRole === 'lekar') {
       // За лекари: користи username (email без @...)
-      endpoint = 'http://localhost:8000/lekari/login';
+      endpoint = API_BASE + '/lekari/login';
       let username = identifier.toLowerCase().trim();
       // ako e vnesen email se dele kaj @ i se zema delot pred nego
       if (username.includes('@')) {
@@ -3501,7 +3504,7 @@ async function handleLogin(e) {
       console.log('[DEBUG lekar login] username:', username, '| password length:', password ? password.length : 0, '| endpoint:', endpoint);
     } else {
       // За пациенти: користи email
-      endpoint = 'http://localhost:8000/pacienti/login';
+      endpoint = API_BASE + '/pacienti/login';
       body = { email: identifier, password: password };
     }
     
@@ -3620,7 +3623,7 @@ async function handleRegister(e) {
         throw new Error('Внесете специјалност');
       }
       
-      endpoint = 'http://localhost:8000/lekari/register';
+      endpoint = API_BASE + '/lekari/register';
       body = {
         ime,
         prezime,
@@ -3632,7 +3635,7 @@ async function handleRegister(e) {
       const telefon = document.getElementById('register-telefon').value.trim();
       const embg = document.getElementById('register-embg').value.trim();
       
-      endpoint = 'http://localhost:8000/pacienti/register';
+      endpoint = API_BASE + '/pacienti/register';
       body = {
         ime,
         prezime,
@@ -3811,7 +3814,7 @@ window.closeLekarLoginModal = closeLekarLoginModal;
 // DEBUG: Тестирај дали backend е достапен – отвори конзола (F12) и напиши: debugLekarConnection()
 window.debugLekarConnection = async function() {
   try {
-    var r = await fetch('http://localhost:8000/lekari');
+    var r = await fetch(API_BASE + '/lekari');
     console.log('[DEBUG] GET /lekari status:', r.status, r.ok ? 'OK' : 'FAIL');
     if (r.ok) {
       var lekari = await r.json();
