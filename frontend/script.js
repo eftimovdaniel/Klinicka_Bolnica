@@ -2803,6 +2803,13 @@ async function deleteOglas(oglasId) {
 // ============================================================================
 var API_BASE = 'http://localhost:8000';
 
+function resolveNovostSlikaUrl(p) {
+  if (!p || typeof p !== 'string') return '';
+  var s = p.trim();
+  if (s.indexOf('http://') === 0 || s.indexOf('https://') === 0) return s;
+  return API_BASE + '/' + s;
+}
+
 function formatSodrzinaForDisplay(text) {
   if (!text) return '';
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
@@ -2862,7 +2869,7 @@ function renderNovosti(items) {
     if (raw.length > 150) excerpt += '...';
     var dateStr = n.created_at ? (n.created_at.split('T')[0] || n.created_at) : '';
     var author = [n.author_name, n.author_surname].filter(Boolean).join(' ') || 'Болница';
-    var imgUrl = n.slika_path ? API_BASE + '/' + n.slika_path : '';
+    var imgUrl = resolveNovostSlikaUrl(n.slika_path);
     var card = document.createElement('div');
     card.className = 'novosti-card';
     card.innerHTML =
@@ -2886,7 +2893,7 @@ function openNovostViewModal(id) {
   fetch(API_BASE + '/novosti/' + id)
     .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('Не е пронајдена')); })
     .then(function(n) {
-      var imgUrl = n.slika_path ? API_BASE + '/' + n.slika_path : '';
+      var imgUrl = resolveNovostSlikaUrl(n.slika_path);
       var author = [n.author_name, n.author_surname].filter(Boolean).join(' ') || 'Болница';
       var dateStr = n.created_at ? (n.created_at.split('T')[0] || n.created_at) : '';
       var topHtml = (imgUrl ? '<img src="' + imgUrl + '" alt="" class="novost-main-img" />' : '');
@@ -3048,7 +3055,9 @@ function openNovostForm(id) {
   if (videoEl) videoEl.value = '';
   var extraInput = document.getElementById('novost-sliki-extra');
   if (extraInput) extraInput.value = '';
-   var wrap = document.getElementById('novost-current-image');
+  var urlEl = document.getElementById('novost-slika-url');
+  if (urlEl) urlEl.value = '';
+  var wrap = document.getElementById('novost-current-image');
   var img = document.getElementById('novost-current-image-img');
   var removeCb = document.getElementById('novost-remove-slika');
   if (wrap) { wrap.style.display = 'none'; img.src = ''; }
@@ -3061,9 +3070,11 @@ function openNovostForm(id) {
         document.getElementById('novost-sodrzina').value = n.sodrzina || '';
         if (videoEl && n.video_url) videoEl.value = n.video_url;
         if (n.slika_path) {
-          img.src = API_BASE + '/' + n.slika_path;
+          img.src = resolveNovostSlikaUrl(n.slika_path);
           wrap.style.display = 'block';
         }
+        var urlEl = document.getElementById('novost-slika-url');
+        if (urlEl) urlEl.value = (n.slika_path && (n.slika_path.indexOf('http') === 0)) ? n.slika_path : '';
       })
       .catch(function() {});
   }
@@ -3248,6 +3259,8 @@ document.addEventListener('DOMContentLoaded', () =>{
         formData.append('sodrzina', sodrzina);
         formData.append('admin_doctor_id', currentLekar.doctor_ID);
         if (videoUrlEl) formData.append('video_url', (videoUrlEl.value || '').trim());
+        var slikaUrlEl = document.getElementById('novost-slika-url');
+        if (slikaUrlEl && (slikaUrlEl.value || '').trim()) formData.append('slika_url', (slikaUrlEl.value || '').trim());
         if (fileInput.files.length) formData.append('slika', fileInput.files[0]);
         if (extraSlikiEl && extraSlikiEl.files.length) {
           for (var i = 0; i < extraSlikiEl.files.length; i++) formData.append('sliki_extra', extraSlikiEl.files[i]);

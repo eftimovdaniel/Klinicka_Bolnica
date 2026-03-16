@@ -41,7 +41,7 @@
   <section id="home" class="hero">
     <div class="hero-overlay"></div>
     <div class="hero-background">
-      <img src="frontend 3.jpg" alt="Амбуланта" class="hero-bg-image" />
+      <img src="https://kbstipstorage.blob.core.windows.net/kbstiptcontaine/frontend%203.jpg" alt="Амбуланта" class="hero-bg-image" />
     </div>
     <div class="container">
       <div class="hero-content">
@@ -772,7 +772,11 @@
           <input type="url" id="novost-video-url" placeholder="https://www.youtube.com/embed/..." />
         </div>
         <div class="form-group">
-          <label for="novost-slika">Главна слика (опционално):</label>
+          <label for="novost-slika-url">URL на слика (Azure Blob или друг URL):</label>
+          <input type="url" id="novost-slika-url" placeholder="https://...blob.core.windows.net/..." />
+        </div>
+        <div class="form-group">
+          <label for="novost-slika">Главна слика – прикачи фајл (опционално):</label>
           <input type="file" id="novost-slika" accept=".jpg,.jpeg,.png,.gif,.webp" />
           <div id="novost-current-image" class="novost-current-image" style="display: none; margin-top: 0.5rem;">
             <img id="novost-current-image-img" src="" alt="" style="max-width: 200px; max-height: 150px; border-radius: 8px;" />

@@ -67,6 +67,13 @@
   <script>
     var API_BASE = 'http://localhost:8000';
 
+    function resolveNovostSlikaUrl(p) {
+      if (!p || typeof p !== 'string') return '';
+      var s = p.trim();
+      if (s.indexOf('http://') === 0 || s.indexOf('https://') === 0) return s;
+      return API_BASE + '/' + s;
+    }
+
     function closeNovostViewModal() {
       var m = document.getElementById('novost-view-modal');
       if (m) m.style.display = 'none';
@@ -100,7 +107,7 @@
       fetch(API_BASE + '/novosti/' + id)
         .then(function(r) { return r.ok ? r.json() : Promise.reject(new Error('Не е пронајдена')); })
         .then(function(n) {
-          var imgUrl = n.slika_path ? API_BASE + '/' + n.slika_path : '';
+          var imgUrl = resolveNovostSlikaUrl(n.slika_path);
           var author = [n.author_name, n.author_surname].filter(Boolean).join(' ') || 'Болница';
           var dateStr = n.created_at ? (n.created_at.split('T')[0] || n.created_at) : '';
           var topHtml = (imgUrl ? '<img src="' + imgUrl + '" alt="" class="novost-main-img" />' : '');
@@ -227,7 +234,7 @@
         if (raw.length > 150) excerpt += '...';
         var dateStr = n.created_at ? (n.created_at.split('T')[0] || n.created_at) : '';
         var author = [n.author_name, n.author_surname].filter(Boolean).join(' ') || 'Болница';
-        var imgUrl = n.slika_path ? API_BASE + '/' + n.slika_path : '';
+        var imgUrl = resolveNovostSlikaUrl(n.slika_path);
         var card = document.createElement('div');
         card.className = 'novosti-card';
         card.innerHTML =

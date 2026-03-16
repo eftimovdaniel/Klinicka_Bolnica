@@ -132,6 +132,13 @@ def get_novost(novost_id: int):
             conn.close()
 
 
+def _is_full_url(s: Optional[str]) -> bool:
+    if not s or not isinstance(s, str):
+        return False
+    s = s.strip()
+    return s.startswith("http://") or s.startswith("https://")
+
+
 @router.post("/admin/novosti")
 def create_novost(
     naslov: str = Form(...),
@@ -140,6 +147,7 @@ def create_novost(
     video_url: Optional[str] = Form(None),
     slika_position: Optional[str] = Form(None),
     slika_height: Optional[str] = Form(None),
+    slika_url: Optional[str] = Form(None),
     slika: Optional[UploadFile] = File(None),
     sliki_extra: List[UploadFile] = File(default=[]),
 ):
@@ -152,7 +160,12 @@ def create_novost(
     video_url = (video_url or "").strip() or None
     slika_position = (slika_position or "").strip() or None
     slika_height = (slika_height or "").strip() or None
-    slika_path = _save_upload(slika) if slika else None
+    slika_path = None
+    slika_url_val = (slika_url or "").strip() or None
+    if slika_url_val and _is_full_url(slika_url_val):
+        slika_path = slika_url_val
+    elif slika:
+        slika_path = _save_upload(slika)
     extra_paths = []
     for f in sliki_extra:
         p = _save_upload(f)
@@ -197,6 +210,7 @@ def update_novost(
     video_url: Optional[str] = Form(None),
     slika_position: Optional[str] = Form(None),
     slika_height: Optional[str] = Form(None),
+    slika_url: Optional[str] = Form(None),
     slika: Optional[UploadFile] = File(None),
     remove_slika: Optional[str] = Form(None),
     sliki_extra: List[UploadFile] = File(default=[]),
@@ -230,7 +244,7 @@ def update_novost(
         else:
             slike_extra_current = [] if slike_extra_current is None else slike_extra_current
         if remove_slika and str(remove_slika).strip().lower() in ("1", "true", "yes"):
-            if slika_path:
+            if slika_path and not _is_full_url(slika_path):
                 full = Path(__file__).resolve().parent.parent / "static" / slika_path
                 if full.exists():
                     try:
@@ -238,8 +252,11 @@ def update_novost(
                     except Exception:
                         pass
             slika_path = None
-        if slika:
-            if slika_path:
+        slika_url_val = (slika_url or "").strip() or None
+        if slika_url_val and _is_full_url(slika_url_val):
+            slika_path = slika_url_val
+        elif slika:
+            if slika_path and not _is_full_url(slika_path):
                 full = Path(__file__).resolve().parent.parent / "static" / slika_path
                 if full.exists():
                     try:
