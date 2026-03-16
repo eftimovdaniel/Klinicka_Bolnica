@@ -47,6 +47,22 @@ def root():
     return {"message": "Клиничка Болница Штип – API", "docs": "/docs"}
 
 
+@app.get("/debug-novosti")
+def debug_novosti():
+    """Приказ на slika_path и slike_extra за сите новости – за проверка што е во базата."""
+    from database import get_connection
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SELECT id, naslov, slika_path, slike_extra FROM Novosti ORDER BY id")
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+        return {"novosti": rows}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.get("/debug-db")
 def debug_db():
     """Проверка на конекција и табели – прикажува точна грешка при проблем."""

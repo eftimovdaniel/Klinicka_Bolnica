@@ -2810,7 +2810,7 @@ function resolveNovostSlikaUrl(p) {
   if (!p || typeof p !== 'string') return '';
   var s = p.trim();
   if (s.indexOf('http://') === 0 || s.indexOf('https://') === 0) return s;
-  return API_BASE + '/' + s;
+  return API_BASE + '/static/' + s;
 }
 
 function formatSodrzinaForDisplay(text) {
@@ -2908,7 +2908,7 @@ function openNovostViewModal(id) {
       if (extra.length) {
         galleryHtml = '<div class="novost-extra-gallery">';
         extra.forEach(function(p) {
-          var src = (p.indexOf('http') === 0 || p.indexOf('/') === 0) ? p : API_BASE + '/' + p;
+          var src = (p.indexOf('http') === 0 || p.indexOf('/') === 0) ? p : API_BASE + '/static/' + p;
           galleryHtml += '<img class="novost-extra-thumb" src="' + src.replace(/"/g, '&quot;') + '" alt="" />';
         });
         galleryHtml += '</div>';
@@ -2919,7 +2919,7 @@ function openNovostViewModal(id) {
         if (videoInfo.type === 'file') {
           var vSrc = videoInfo.url;
           if (vSrc.indexOf('http') !== 0 && vSrc.charAt(0) !== '/') {
-            vSrc = API_BASE + '/' + vSrc;
+            vSrc = API_BASE + '/static/' + vSrc;
           }
           vSrc = vSrc.replace(/"/g, '&quot;');
           videoHtml =
