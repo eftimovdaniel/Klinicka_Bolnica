@@ -608,6 +608,7 @@ function setupAppointmentForm() {
           selectedDoctor = null;
           var successEl = document.getElementById('appointment-success-overlay');
           if (successEl) successEl.style.display = 'flex';
+          alert('Терминот е успешно закажан! Ќе добиете потврда на е-пошта.');
         } else {
           alert('Грешка при закажување: ' + (result.detail || result.message || 'Обидете се повторно.'));
         }

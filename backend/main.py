@@ -63,6 +63,31 @@ def debug_novosti():
         return {"error": str(e)}
 
 
+@app.get("/debug-kariera")
+def debug_kariera():
+    """Приказ на огласи од Vrabotuvanje – за проверка зошто кариера не се прикажува."""
+    from database import get_connection
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        cur.execute("""
+            SELECT id_oglas, pozicija, oddel, datum_na_prijavuvanje, status_oglas
+            FROM Vrabotuvanje
+            ORDER BY datum_na_prijavuvanje ASC
+        """)
+        rows = cur.fetchall()
+        out = []
+        for r in rows:
+            d = r.get("datum_na_prijavuvanje")
+            rok = d.strftime("%d.%m.%Y") if d and hasattr(d, "strftime") else (str(d)[:10] if d else "")
+            out.append({**r, "rok_str": rok})
+        cur.close()
+        conn.close()
+        return {"count": len(out), "oglasi": out}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 @app.get("/debug-db")
 def debug_db():
     """Проверка на конекција и табели – прикажува точна грешка при проблем."""

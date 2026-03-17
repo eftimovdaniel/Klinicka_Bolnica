@@ -27,7 +27,7 @@ def get_kariera():          # funkcija koja e nameneta za kariera
             SELECT id_oglas, pozicija AS naslov, oddel AS opis,
                    datum_na_prijavuvanje AS rok_datum
             FROM Vrabotuvanje
-            WHERE status_oglas IS NULL OR status_oglas != 'завршен'
+            WHERE (status_oglas IS NULL OR status_oglas = '' OR status_oglas != 'завршен')
             ORDER BY datum_na_prijavuvanje ASC
         """)
         rows = db_cursor.fetchall()            # se zemaat site oglasi koi se podneseni
