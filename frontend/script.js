@@ -1,9 +1,12 @@
 // Овие променливи се користат низ целиот код за чување на состојбата на апликацијата
 
 // API базен URL – автоматски се прилагодува (localhost vs production)
-var API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? 'http://localhost:8000'
-  : (window.location.protocol + '//' + window.location.hostname + ':8000');
+var API_BASE = (function() {
+  var h = window.location.hostname;
+  if (!h || h === 'localhost' || h === '127.0.0.1') return 'http://localhost:8000';
+  var p = window.location.protocol;
+  return (p === 'https:' ? 'https:' : 'http:') + '//' + h + ':8000';
+})();
 
 // URL на надворешната платформа за матични лекари (резервација на термини). Смени го кога ќе го имаш линкот.
 var MATICNI_LEKARI_URL = 'https://mojtermin.mk/health_workers';
@@ -90,8 +93,9 @@ async function loadLekari() {
   } catch (err) {
     const container = document.getElementById('lekari-list');
     if (container) {
-      container.innerHTML =
-        `<div class="loading" style="color: red;">Грешка при вчитување на лекарите: ${err.message}</div>`;
+      var msg = err.message || 'Непозната грешка';
+      if (msg === 'Failed to fetch' || err.name === 'TypeError') msg = 'Серверот не одговара. Проверете дали backend работи на ' + API_BASE;
+      container.innerHTML = '<div class="loading" style="color: red;">Грешка при вчитување на лекарите: ' + msg + '</div>';
     }
   }
 }
@@ -783,8 +787,9 @@ async function loadUslugi() {
   } catch (err) {
     const container = document.getElementById('uslugi-list');
     if (container) {
-      container.innerHTML =
-        `<div class="loading" style="color: red;">Грешка при вчитување на услуги: ${err.message}</div>`;
+      var msg = err.message || 'Непозната грешка';
+      if (msg === 'Failed to fetch' || err.name === 'TypeError') msg = 'Серверот не одговара. Проверете дали backend работи на ' + API_BASE;
+      container.innerHTML = '<div class="loading" style="color: red;">Грешка при вчитување на услуги: ' + msg + '</div>';
     }
   }
 }
@@ -920,8 +925,10 @@ async function loadKariera() {
   } catch (err) {
     const c = document.getElementById('kariera-list');
     if (c) {
+      var msg = err.message || 'Непозната грешка';
+      if (msg === 'Failed to fetch' || err.name === 'TypeError') msg = 'Серверот не одговара. Проверете дали backend работи на ' + API_BASE;
       c.classList.add('kariera-loading');
-      c.innerHTML = '<span class="loading">Грешка при вчитување на позициите.</span>';
+      c.innerHTML = '<span class="loading" style="color:red;">Грешка при вчитување на позициите: ' + msg + '</span>';
     }
   }
 }
@@ -1206,6 +1213,10 @@ async function handlePrvaNajavaSubmit(e) {
   return false;
 }
 window.handlePrvaNajavaSubmit = handlePrvaNajavaSubmit;
+
+function setupLekarLogin() {
+  /* Auth за лекари се обработува преку setupAuth (auth-modal). openLekarLoginModal веќе користи auth-modal. */
+}
 
 function setupLekarPasswordForms() {
   // Дополнително прикачување на listener за „Во ред“ (ако onclick не се изврши)
@@ -2854,7 +2865,9 @@ async function loadNovosti() {
     var data = await res.json();
     renderNovosti(data);
   } catch (err) {
-    listEl.innerHTML = '<div class="loading" style="color:red;">' + (err.message || 'Грешка при вчитување на новости.') + '</div>';
+    var msg = err.message || 'Грешка при вчитување на новости.';
+    if (msg === 'Failed to fetch' || err.name === 'TypeError') msg = 'Серверот не одговара. Проверете дали backend работи на ' + API_BASE;
+    listEl.innerHTML = '<div class="loading" style="color:red;">' + msg + '</div>';
   }
 }
 
@@ -3044,7 +3057,9 @@ async function loadNovostiAdmin() {
       listEl.appendChild(div);
     });
   } catch (err) {
-    listEl.innerHTML = '<p style="color:red;">' + (err.message || 'Грешка') + '</p>';
+    var msg = err.message || 'Грешка';
+    if (msg === 'Failed to fetch' || err.name === 'TypeError') msg = 'Серверот не одговара. Проверете дали backend работи на ' + API_BASE;
+    listEl.innerHTML = '<p style="color:red;">' + msg + '</p>';
   }
 }
 
