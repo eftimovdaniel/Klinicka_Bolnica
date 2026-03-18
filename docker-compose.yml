@@ -1,0 +1,66 @@
+# Docker Compose за Клиничка Болница Штип
+# Користи: docker-compose up -d
+#
+# ВАЖНО: Постави backend/.env со DB_HOST, DB_USER, DB_PASSWORD, DB_NAME
+# Ако MySQL е во Docker: DB_HOST=mysql
+# Ако MySQL е надвор (host/Azure): DB_HOST=host.docker.internal или Azure hostname
+
+version: "3.8"
+
+services:
+  # MySQL – само ако користиш локална база во Docker (раскоментирај depends_on во backend)
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-rootpass}
+      MYSQL_DATABASE: ${DB_NAME:-Klinicka_Bolnica_Stip}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - with-db
+
+  # Backend (FastAPI) – сервира и API и статички frontend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    environment:
+      DB_HOST: ${DB_HOST:-mysql}
+      DB_USER: ${DB_USER:-root}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-Klinicka_Bolnica_Stip}
+      DB_PORT: ${DB_PORT:-3306}
+    volumes:
+      - ./backend/static:/app/static
+    # depends_on:  # раскоментирај ако користиш mysql сервис
+    #   mysql:
+    #     condition: service_healthy
+
+  # Frontend (nginx) на порт 80 – опционално
+  frontend:
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:
