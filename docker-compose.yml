@@ -10,17 +10,17 @@ version: "3.8"
 services:
   # MySQL – само ако користиш локална база во Docker (раскоментирај depends_on во backend)
   mysql:
-    image: mysql:8.0
-    restart: unless-stopped
+    image: mysql:8.0      
+    restart: unless-stopped   # pri pad na azure serverot vedna po podiganje ke se vkluce database
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-rootpass}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-rootpass}  # lozinka, ako nema se zema rootpass
       MYSQL_DATABASE: ${DB_NAME:-Klinicka_Bolnica_Stip}
     ports:
-      - "3306:3306"
+      - "3306:3306"     # porta na slusanje edna za ured, eden za docker
     volumes:
-      - mysql_data:/var/lib/mysql
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-    healthcheck:
+      - mysql_data:/var/lib/mysql   # povrzuvanje na podatocite od bazata so azure diskovite
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci   #utf-8 bidejki oddeli lekari i se drugo vo database mi e na makedonski 
+    healthcheck:    # proverka dali bazata raboti na sekoj 5 sekundi 
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
       timeout: 5s
@@ -36,7 +36,7 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    env_file:
+    env_file:     # kade e smesteno imeto na bazata i lozinkata
       - ./backend/.env
     environment:
       DB_HOST: ${DB_HOST:-mysql}
@@ -57,10 +57,10 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./frontend:/usr/share/nginx/html:ro
-      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend:/usr/share/nginx/html:ro   # se dava patekata do frontnd fajlovi 
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro    # ja vcituva konfiguracijata, kako se odvivaat baranjata
     depends_on:
-      - backend
+      - backend       # frontend ne se aktivira dodeka ne se startuva backend
 
 volumes:
   mysql_data:

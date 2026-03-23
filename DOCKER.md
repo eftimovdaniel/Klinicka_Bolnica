@@ -81,3 +81,77 @@ docker-compose logs -f backend
 ```
 
 Ќе ги видиш грешките од базата (на пр. „Не може да се поврзе со базата“).
+
+---
+
+## VM со постоечки MySQL контејнер (klinicka_bolnica_db_1)
+
+Ако веќе имаш MySQL контејнер со податоци и добиваш:
+- `Can't connect to MySQL server on 'localhost:3306'`
+- `Bind for 0.0.0.0:3306 failed: port is already allocated`
+
+### Решение
+
+1. **НЕ користи** `--profile with-db` – не стартувај нов MySQL (порт 3306 е зафатен).
+
+2. **Креирај `backend/.env`** со:
+   ```env
+   DB_HOST=klinicka_bolnica_db_1
+   DB_USER=root
+   DB_PASSWORD=rootpassword
+   DB_NAME=Klinicka_Bolnica_Stip
+   ```
+
+3. **Стартувај само backend и frontend:**
+   ```bash
+   docker-compose up -d --build
+   ```
+   (без `--profile with-db`)
+
+4. Backend ќе се поврзе со постоечкиот db контејнер преку името `klinicka_bolnica_db_1`.
+
+### Adminer – пристап до базата преку прелистувач
+
+Ако Workbench не работи (SSH грешки), користи **Adminer** – веб-интерфејс за MySQL.
+
+1. На VM, во папката на проектот:
+   ```bash
+   # Најди ја мрежата на db контејнерот:
+   docker inspect klinicka_bolnica_db_1 --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}{{end}}'
+
+   # Стартувај Adminer (замени NETWORK_NAME со резултатот од горната команда):
+   docker run -d --name adminer --network NETWORK_NAME -p 8080:8080 adminer
+   ```
+   Пример: ако мрежата е `klinicka_bolnica_default`:
+   ```bash
+   docker run -d --name adminer --network klinicka_bolnica_default -p 8080:8080 adminer
+   ```
+
+2. Отвори во прелистувач: **http://20.199.137.96:8080**
+
+3. Најава:
+   - **System:** MySQL
+   - **Server:** `klinicka_bolnica_db_1`
+   - **Username:** `root`
+   - **Password:** `rootpassword`
+   - **Database:** `Klinicka_Bolnica_Stip`
+
+4. Кликни **Login** – ќе видиш табели и можеш да внесуваш/уредуваш податоци.
+
+**Azure VM:** Отвори порт 8080 во Network Security Group (NSG):
+- Azure Portal → VM → Networking → Add inbound port rule
+- Port: 8080, Protocol: TCP, Source: Any (или твоја IP за безбедност)
+
+---
+
+### Ако порт 3306 е сè уште зафатен
+
+Стопирај го стариот db контејнер пред да стартуваш нов compose:
+```bash
+docker stop klinicka_bolnica_db_1
+docker-compose up -d
+```
+Потоа повторно стартувај го db (ако е потребен):
+```bash
+docker start klinicka_bolnica_db_1
+```
