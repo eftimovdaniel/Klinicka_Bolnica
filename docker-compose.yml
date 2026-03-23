@@ -1,9 +1,3 @@
-# Docker Compose за Клиничка Болница Штип
-# Користи: docker-compose up -d
-#
-# ВАЖНО: Постави backend/.env со DB_HOST, DB_USER, DB_PASSWORD, DB_NAME
-# Ако MySQL е во Docker: DB_HOST=mysql
-# Ако MySQL е надвор (host/Azure): DB_HOST=host.docker.internal или Azure hostname
 
 version: "3.8"
 
