@@ -16,7 +16,7 @@ app = FastAPI(
     version="1.0",
 )
 
-# CORS – дозволи повици од frontend (localhost или друг домен)
+#dozvola za povik na api od frontend delot 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
