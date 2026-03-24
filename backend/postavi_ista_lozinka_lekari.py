@@ -30,7 +30,6 @@ def main():
     try:
         conn = get_connection()
         cur = conn.cursor()
-        # Постави иста лозинка и must_change_password = 1 за сите
         cur.execute("UPDATE Doctors SET password = %s, must_change_password = 1 WHERE doctor_ID IS NOT NULL", (pw_hash,))
         n = cur.rowcount
         conn.commit()
