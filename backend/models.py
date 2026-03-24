@@ -1,8 +1,6 @@
-# Модели за валидација на податоци користејќи Pydantic
-# Pydantic овозможува автоматска валидација на податоци и конверзија на типови
 from pydantic import BaseModel
-from typing import Optional  # Optional овозможува вредности кои можат да бидат None или од даден тип
-from datetime import date, time  # datetime типови за работа со датуми и времиња
+from typing import Optional  
+from datetime import date, time  
 
 # Модел за лекар - дефинира структурата на податоците за лекар во системот
 # Според PDF: "За секој лекар се чуваат информации како име, презиме, специјалност, е-пошта и лозинка"

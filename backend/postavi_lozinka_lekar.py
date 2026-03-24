@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 """
 Поставување лозинка за постоечки лекар во базата (за тест).
 Користение: python postavi_lozinka_lekar.py
