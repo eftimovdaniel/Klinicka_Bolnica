@@ -132,13 +132,13 @@ async function loadLekariForOddel(oddelNaziv) {
     }
     
     if (!Array.isArray(lekari)) {
-      throw new Error('API-то не врати листа од лекари');
+      throw new Error('API-то не може да врати лекари сместени во базата на податоци');
     }
     
     container.innerHTML = '';
     
     if (lekari.length === 0) {
-      container.innerHTML = '<div class="loading">Нема лекари за овој оддел во моментов.</div>';
+      container.innerHTML = '<div class="loading">Во моментот не се пронајдени лекари за избраниот оддел</div>';
       return;
     }
     
