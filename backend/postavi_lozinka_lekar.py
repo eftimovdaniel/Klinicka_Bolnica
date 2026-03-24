@@ -18,9 +18,9 @@ def main():
     if not email:
         print("Внесете email.")
         return
-    password = input("Нова лозинка (мин. 6 знаци): ").strip()
+    password = input("Нова лозинка (мин. 8 карактери): ").strip()
     if len(password) < 6:
-        print("Лозинката мора да има најмалку 6 знаци.")
+        print("Лозинката мора да има најмалку 8 карактери.")
         return
     if not hash_password:
         print("Грешка: password_utils не е достапно. Трчајте од backend/.")
