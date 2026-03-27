@@ -100,9 +100,6 @@ async function loadLekari() {
   }
 }
 
-// Функција за прикажување на лекари во grid формат
-// Креира HTML картички за секој лекар со неговите основни информации
-// Според PDF: "Системот би бил со едноставен интерфејс за полесно управување"
 function renderDoctors(doctors) {
   const container = document.getElementById('lekari-list');
   const controlsDiv = document.querySelector('.lekari-controls');
@@ -113,8 +110,6 @@ function renderDoctors(doctors) {
     if (controlsDiv) controlsDiv.style.display = 'none';
     return;
   }
-
-  // Прикажи само првите displayedDoctorsCount лекари
   const doctorsToShow = doctors.slice(0, displayedDoctorsCount);
   
   doctorsToShow.forEach(doctor => {
