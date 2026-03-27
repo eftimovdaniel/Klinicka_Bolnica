@@ -44,7 +44,7 @@ services:
     #   mysql:
     #     condition: service_healthy
 
-  # Frontend (nginx) на порт 80 – опционално
+  # Frontend se postavuva na porta 80
   frontend:
     image: nginx:alpine
     restart: unless-stopped
