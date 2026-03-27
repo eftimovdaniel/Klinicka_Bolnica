@@ -153,7 +153,7 @@ def create_novost(
     sliki_extra: List[UploadFile] = File(default=[]),
 ):
     if not check_admin_access(admin_doctor_id):
-        raise HTTPException(status_code=403, detail="Немате пристап. Само директорот може да додава новости.")
+        raise HTTPException(status_code=403, detail="За зал немате пристап, новости се додаваат само од овластени лица во установата. Би благодариме на разбиранјето.")
     naslov = (naslov or "").strip()
     sodrzina = (sodrzina or "").strip()
     if not naslov:
