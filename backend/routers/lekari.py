@@ -177,7 +177,7 @@ async def login_lekar(request: Request):
         # ВАЖНО: Според базата, колоните се: Ime_pacient, Ime_lekar (со голема буква I)
         # COALESCE: ако дијагноза/терапија е NULL во базата, врати празен string '' наместо NULL
         db_cursor.execute("""
-            SELECT termin_ID, Ime_pacient, datum_pregled, vreme_pregled, email_pacient, telefon_pacient,
+            SELECT termin_ID, ime_pacient AS Ime_pacient, datum_pregled, vreme_pregled, email_pacient, telefon_pacient,
                    COALESCE(dijagnoza, '') AS dijagnoza, COALESCE(terapija, '') AS terapija
             FROM Termin_pregled
             WHERE doctor_ID = %s AND (status_pregled IS NULL OR status_pregled = 'закажан')
@@ -408,7 +408,7 @@ def get_lekari_termini(email: str):             # funkcija za vrakanje na termin
         # COALESCE: ako dijagnoza/terapija e NULL vo bazata, vrati prazen string '' namesto NULL
         # ВАЖНО: Според базата, колоните се: Ime_pacient, Ime_lekar (со голема буква I)
         db_cursor.execute("""
-            SELECT termin_ID, Ime_pacient, datum_pregled, vreme_pregled, email_pacient, telefon_pacient,
+            SELECT termin_ID, ime_pacient AS Ime_pacient, datum_pregled, vreme_pregled, email_pacient, telefon_pacient,
                    COALESCE(dijagnoza, '') AS dijagnoza, COALESCE(terapija, '') AS terapija
             FROM Termin_pregled
             WHERE doctor_ID = %s AND (status_pregled IS NULL OR status_pregled = 'закажан')
@@ -498,7 +498,7 @@ def get_moj_raspored(lekar_id: int, datum: Optional[str] = None):
                 tp.datum_pregled,
                 TIME(tp.vreme_pregled) as vreme_pregled,
                 tp.status_pregled,
-                tp.Ime_pacient,
+                tp.ime_pacient AS Ime_pacient,
                 tp.email_pacient,
                 COALESCE(p.name_patient, '') AS ime_pacient,
                 COALESCE(p.surname_patient, '') AS prezime_pacient
