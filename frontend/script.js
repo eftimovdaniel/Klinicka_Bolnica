@@ -1,11 +1,10 @@
 // Овие променливи се користат низ целиот код за чување на состојбата на апликацијата
 
-// API базен URL – автоматски се прилагодува (localhost vs production)
+// API базен URL: локално → директно :8000; на сервер → ист хост/порт како страницата (nginx проксира кон backend)
 var API_BASE = (function() {
   var h = window.location.hostname;
   if (!h || h === 'localhost' || h === '127.0.0.1') return 'http://localhost:8000';
-  var p = window.location.protocol;
-  return (p === 'https:' ? 'https:' : 'http:') + '//' + h + ':8000';
+  return window.location.protocol + '//' + window.location.host;
 })();
 
 // URL на надворешната платформа за матични лекари (резервација на термини). Смени го кога ќе го имаш линкот.
