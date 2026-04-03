@@ -6,13 +6,12 @@ services:
   mysql:
     image: mysql:8.0      
     restart: unless-stopped   # pri pad na azure serverot vedna po podiganje ke se vkluce database
-    # Лозинка за root: од backend/.env (MYSQL_ROOT_PASSWORD — исто како DB_PASSWORD). Не користи ${DB_PASSWORD}
-    # од compose освен преку корен .env; env_file го вчитува цел backend/.env во контејнерот.
+    # Root лозинка: само од backend/.env (MYSQL_ROOT_PASSWORD — исто како DB_PASSWORD).
+    # НЕ користи MYSQL_ROOT_PASSWORD: ${DB_PASSWORD} тука: ако коренот нема .env, Compose ја
+    # заменува со празно и го презапишува env_file → 1045 при логирање.
     env_file:
       - ./backend/.env
     environment:
-      # Експлицитно: Compose мора да ја пренесе root лозинката при init (исто како DB_PASSWORD).
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME:-Klinicka_Bolnica_Stip}
     ports:
       - "3306:3306"     # porta na slusanje edna za ured, eden za docker
