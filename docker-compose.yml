@@ -40,10 +40,8 @@ services:
       - ./backend/.env
     volumes:
       - ./backend/static:/app/static
-    # Ако backend се поврзува на контејнер mysql, раскоментирај:
-    # depends_on:
-    #   mysql:
-    #     condition: service_healthy
+    # Нема depends_on mysql: backend може да користи само Azure MySQL (DB_HOST во backend/.env).
+    # Локален MySQL: прво `docker compose up -d mysql`, почекај healthy, па `docker compose up -d backend frontend`.
 
   # Frontend se postavuva na porta 80
   frontend:
