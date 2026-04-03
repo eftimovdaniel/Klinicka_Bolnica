@@ -6,8 +6,13 @@ services:
   mysql:
     image: mysql:8.0      
     restart: unless-stopped   # pri pad na azure serverot vedna po podiganje ke se vkluce database
+    # Лозинка за root: од backend/.env (MYSQL_ROOT_PASSWORD — исто како DB_PASSWORD). Не користи ${DB_PASSWORD}
+    # од compose освен преку корен .env; env_file го вчитува цел backend/.env во контејнерот.
+    env_file:
+      - ./backend/.env
     environment:
-      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-rootpass}  # lozinka, ako nema se zema rootpass
+      # Експлицитно: Compose мора да ја пренесе root лозинката при init (исто како DB_PASSWORD).
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME:-Klinicka_Bolnica_Stip}
     ports:
       - "3306:3306"     # porta na slusanje edna za ured, eden za docker
@@ -19,8 +24,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-    profiles:
-      - with-db
+    # (без profiles: постари Docker/Compose на VM не поддржуваат --profile; MySQL се стартува со `docker compose up -d`)
+    # Ако користиш само Azure MySQL: не пуштај го mysql сервисот — на пр. `docker compose up -d backend frontend` или скриј го mysql со override.
 
   # Backend (FastAPI) – сервира и API и статички frontend
   backend:
@@ -40,7 +45,8 @@ services:
       DB_PORT: ${DB_PORT:-3306}
     volumes:
       - ./backend/static:/app/static
-    # depends_on:  # раскоментирај ако користиш mysql сервис
+    # Ако backend се поврзува на контејнер mysql, раскоментирај:
+    # depends_on:
     #   mysql:
     #     condition: service_healthy
 
