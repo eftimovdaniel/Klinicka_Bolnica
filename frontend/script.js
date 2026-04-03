@@ -17,7 +17,8 @@ let selectedDate = null;  // Избраниот датум за преглед (
 let selectedTime = null;  // Избраното време за преглед (string формат "HH:MM")
 let currentLekar = null;  // Податоци за моментално најавениот лекар (за приказ на неговите термини)
 let currentPacient = null;  // Податоци за моментално најавениот пациент (за закажување на прегледи)
-let displayedDoctorsCount = 8;  // Почетно прикажуваме 8 лекари (2 реда x 4 колони), може да се зголеми со "Прикажи повеќе"
+// Колку лекари да се исцртаат; се ажурира на бројот на вчитани/филтрирани за да се видат сите
+let displayedDoctorsCount = 8;
 
 // Врати го најавениот пациент од sessionStorage (за да може да закаже по враќање од oddel-details)
 (function restorePacientSession() {
@@ -81,6 +82,7 @@ async function loadLekari() {
 
     allDoctors = data;
     filteredDoctors = data; // Иницијално, филтрираната листа е иста како сите лекари
+    displayedDoctorsCount = data.length;
 
     if (data.length === 0) {
       container.innerHTML = '<div class="loading">Нема достапни лекари.</div>';
@@ -170,8 +172,7 @@ function filterDoctors() {
     return matchesName && matchesSpecialty;
   });
 
-  // Ресетирај бројот на прикажани лекари кога се менува филтерот
-  displayedDoctorsCount = 8;
+  displayedDoctorsCount = filteredDoctors.length;
   renderDoctors(filteredDoctors);
 }
 
@@ -1059,43 +1060,7 @@ if (document.readyState === 'loading') {
   // DOM is already loaded
   initialize();
 }
-// ФУНКЦИИ ЗА НАЈАВА НА ЛЕКАРИ
-// Функција за отворање на модален прозорец за најава на лекари
-// Според PDF: "За прикачување на мрежата секој вработен ќе треба да го внесе својот ID идентификатор и соодветна лозинка"
-function openLekarLoginModal() {
-  const modal = document.getElementById('lekar-login-modal');
-  if (modal) {
-    modal.style.display = 'block';
-  }
-}
-
-function closeLekarLoginModal() {
-  const modal = document.getElementById('lekar-login-modal');
-  if (modal) {
-    modal.style.display = 'none';
-    const form = document.getElementById('lekar-login-form');
-    const errorMessage = document.getElementById('login-error-message');
-    const submitBtn = document.getElementById('login-submit-btn');
-    const btnText = submitBtn?.querySelector('.btn-text');
-    const btnLoading = submitBtn?.querySelector('.btn-loading');
-    
-    if (form) {
-      form.reset();
-    }
-    
-    // Ресетирај error message и loading state
-    if (errorMessage) {
-      errorMessage.style.display = 'none';
-      errorMessage.textContent = '';
-    }
-    
-    if (submitBtn && btnText && btnLoading) {
-      submitBtn.disabled = false;
-      btnText.style.display = 'inline-block';
-      btnLoading.style.display = 'none';
-    }
-  }
-}
+// Најава на лекар: openLekarLoginModal / closeLekarLoginModal се дефинирани подолу (auth-modal).
 
 // Функции за управување со главниот интерфејс за лекари (dashboard)
 function openLekarDashboardModal() {
@@ -3823,7 +3788,6 @@ window.switchRole = switchRole;
 window.showLogin = showLogin;
 window.showRegister = showRegister;
 window.showForgotPassword = showForgotPassword;
-window.openLekarLoginModal = openLekarLoginModal;
 window.openLekarLoginModal = openLekarLoginModal;
 window.closeLekarLoginModal = closeLekarLoginModal;
 
