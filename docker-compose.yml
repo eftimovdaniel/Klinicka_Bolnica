@@ -34,14 +34,10 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    env_file:     # kade e smesteno imeto na bazata i lozinkata
+    # Само backend/.env — НЕ додавај DB_* во environment со ${...}: празниот корен .env
+    # ги презапишува лозинката/хостот и backend добива 500 при конекција кон MySQL.
+    env_file:
       - ./backend/.env
-    environment:
-      DB_HOST: ${DB_HOST:-mysql}
-      DB_USER: ${DB_USER:-root}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME:-Klinicka_Bolnica_Stip}
-      DB_PORT: ${DB_PORT:-3306}
     volumes:
       - ./backend/static:/app/static
     # Ако backend се поврзува на контејнер mysql, раскоментирај:

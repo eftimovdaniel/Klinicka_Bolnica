@@ -47,11 +47,26 @@ def get_connection():
     }
 
     ssl_ca = os.getenv("DB_SSL_CA", "").strip()
+    want_ssl = os.getenv("DB_SSL", "").strip().lower() in ("1", "true", "yes")
+    ssl_mode = os.getenv("DB_SSL_MODE", "").strip().lower()
+
     if ssl_ca:
-        kwargs["ssl_ca"] = ssl_ca
-        kwargs["ssl_verify_cert"] = True
-    elif os.getenv("DB_SSL", "").strip().lower() in ("1", "true", "yes"):
         kwargs["ssl_disabled"] = False
+        kwargs["ssl_ca"] = ssl_ca
+        kwargs["ssl_verify_cert"] = os.getenv("DB_SSL_VERIFY", "true").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+    elif want_ssl or ssl_mode in ("required", "require"):
+        # Azure Database for MySQL: SSL е задолжителен; без локален CA фајл често треба verify off
+        kwargs["ssl_disabled"] = False
+        kwargs["ssl_verify_cert"] = os.getenv("DB_SSL_VERIFY", "false").strip().lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        kwargs["ssl_verify_identity"] = kwargs["ssl_verify_cert"]
 
     try:
         conn = mysql.connector.connect(**kwargs)
