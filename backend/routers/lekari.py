@@ -978,10 +978,6 @@ async def register_lekar(request: Request):
         # Хеширање на лозинката (bcrypt)
         password_hash = hash_password(password)
         
-        # #region agent log
-        debug_log("main.py:929", "register_lekar: Attempting INSERT", {"ime": ime, "prezime": prezime, "specialty": specialty, "email": email, "username": username}, hypothesis_id="A")
-        # #endregion
-        
         # Креирање на нов лекар (при само-регистрација лозинката е веќе избрана, не мора да се менува)
         db_cursor.execute("""
             INSERT INTO Doctors (name, surname, specialty, email, password, must_change_password)
@@ -991,24 +987,14 @@ async def register_lekar(request: Request):
         conn.commit()
         doctor_id = db_cursor.lastrowid
         
-        # #region agent log
-        debug_log("main.py:937", "register_lekar: Success", {"doctor_id": doctor_id, "username": username}, hypothesis_id="A")
-        # #endregion
-        
         return {
             "message": "Успешно се регистриравте!",
             "doctor_ID": doctor_id,
             "username": username
         }
     except HTTPException as e:
-        # #region agent log
-        debug_log("main.py:942", "register_lekar: HTTPException", {"status_code": e.status_code, "detail": e.detail}, hypothesis_id="A")
-        # #endregion
         raise
     except Exception as e:
-        # #region agent log
-        debug_log("main.py:945", "register_lekar: Exception", {"error_type": type(e).__name__, "error_message": str(e)}, hypothesis_id="A")
-        # #endregion
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         if conn and conn.is_connected():
