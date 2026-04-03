@@ -4,7 +4,7 @@ version: "3.8"
 services:
   # MySQL – само ако користиш локална база во Docker (раскоментирај depends_on во backend)
   mysql:
-    image: mysql:8.0      
+    image: mysql:8.0
     restart: unless-stopped   # pri pad na azure serverot vedna po podiganje ke se vkluce database
     # Root лозинка: само од backend/.env (MYSQL_ROOT_PASSWORD — исто како DB_PASSWORD).
     # НЕ користи MYSQL_ROOT_PASSWORD: ${DB_PASSWORD} тука: ако коренот нема .env, Compose ја
@@ -17,8 +17,8 @@ services:
       - "3306:3306"     # porta na slusanje edna za ured, eden za docker
     volumes:
       - mysql_data:/var/lib/mysql   # povrzuvanje na podatocite od bazata so azure diskovite
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci   #utf-8 bidejki oddeli lekari i se drugo vo database mi e na makedonski 
-    healthcheck:    # proverka dali bazata raboti na sekoj 5 sekundi 
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci # utf-8 oddeli lekari i makedonski tekst
+    healthcheck: # mysqladmin ping
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 5s
       timeout: 5s
@@ -56,7 +56,7 @@ services:
     ports:
       - "80:80"
     volumes:
-      - ./frontend:/usr/share/nginx/html:ro   # se dava tocna lokacija do frontend fajlovite 
+      - ./frontend:/usr/share/nginx/html:ro # static frontend
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro    # ja vcituva konfiguracijata, kako se odvivaat baranjata
     depends_on:
       - backend       # frontend ne se aktivira dodeka ne se startuva backend, se ceka start na backend pa potoa na frontend
