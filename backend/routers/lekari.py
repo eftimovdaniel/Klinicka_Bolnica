@@ -6,7 +6,7 @@ import os
 import secrets
 import string
 from database import get_connection
-from routers.utils import debug_log, transliterate_mk_to_lat
+from routers.utils import transliterate_mk_to_lat
 from password_utils import hash_password, verify_password
 
 router = APIRouter(prefix="/lekari", tags=["lekari"])
@@ -52,8 +52,6 @@ def get_lekari(specijalnost: Optional[str] = None):                             
                 ORDER BY name, surname
             """)
         lekari = db_cursor.fetchall()  # fetchall() vraka lista na lekari vo vid na recinica i se zapisuvaat vo promenlivata lakari
-        if os.getenv("DEBUG_DB", "").strip().lower() in ("1", "true", "yes"):
-            debug_log("lekari.get_lekari", "Broj na vrateni lekari", {"count": len(lekari), "specijalnost_filter": specijalnost or "(site)"})
         return lekari       # se vrakaat lekarite vo JSON format {"doctor_ID": 1, ...},{... }}
     except Exception as e:  # ako nastane greska, Exception, vo e e smenstena porakata za greska 
         traceback.print_exc()
@@ -71,17 +69,10 @@ async def login_lekar(request: Request):
     """
     conn = None
     try:
-        # #region agent log
-        debug_log("main.py:226", "login_lekar: Request received", {"timestamp": datetime.now().isoformat()}, hypothesis_id="E")
-        # #endregion
         data = await request.json()  # ги земаме податоците од frontend (JSON формат)
         username = (data.get("username") or "").strip().lower()  # корисничко име на лекарот (име.презиме)
         password = data.get("password") or ""  # лозинка на лекарот
-        
-        # #region agent log
-        debug_log("main.py:229", "login_lekar: Data parsed", {"username": username, "has_password": bool(password)}, hypothesis_id="E")
-        # #endregion
-        
+
         # Валидација: проверуваме дали се внесени и корисничко име и лозинка
         if not username:
             raise HTTPException(status_code=400, detail="Внесете корисничко име")
@@ -154,11 +145,7 @@ async def login_lekar(request: Request):
         if not doctor:
             print(f"[DEBUG login] Невалидно корисничко име: '{username}' | Проверени: {checked_usernames[:5]}...")
             raise HTTPException(status_code=401, detail="Невалидно корисничко име или лозинка")
-        
-        # #region agent log
-        debug_log("main.py:261", "login_lekar: Doctor found", {"doctor_id": doctor.get("doctor_ID"), "has_stored_password": bool(doctor.get("password"))}, hypothesis_id="E")
-        # #endregion
-        
+
         # Проверка на лозинката: секој лекар мора да има поставена лозинка во базата
         stored_password_hash = (doctor.get("password") or "").strip()
         
@@ -212,10 +199,7 @@ async def login_lekar(request: Request):
                 "dijagnoza": (r.get("dijagnoza") or "").strip(),  # се зема дијагнозата
                 "terapija": (r.get("terapija") or "").strip(),  # се зема терапијата
             })
-        
-        # #region agent log
-        debug_log("main.py:314", "login_lekar: Success", {"doctor_id": doctor["doctor_ID"], "termini_count": len(termini)}, hypothesis_id="E")
-        # #endregion
+
         print(f"[DEBUG login] Успешна најава: {doctor.get('name')} {doctor.get('surname')} (ID: {doctor_id})")
         
         # Дали лекар мора да ја смени лозинката: само ако тековната лозинка е привремената Test123..
@@ -234,14 +218,8 @@ async def login_lekar(request: Request):
             "must_change_password": must_change,  # при прва најава – задолжителна смена на лозинка
         }
     except HTTPException as e:  # форматирана грешка
-        # #region agent log
-        debug_log("main.py:325", "login_lekar: HTTPException", {"status_code": e.status_code, "detail": e.detail}, hypothesis_id="E")
-        # #endregion
         raise  # се продолжува
     except Exception as e:  # доколку се јави било која друга грешка
-        # #region agent log
-        debug_log("main.py:327", "login_lekar: Exception", {"error_type": type(e).__name__, "error_message": str(e)}, hypothesis_id="E")
-        # #endregion
         raise HTTPException(status_code=500, detail=str(e))  # статусен код 500 и објаснување сместено во e
     finally:  # се проверува дали има конекција, ако има се затвора, се извршува без разлика дали има или нема грешка
         if conn and conn.is_connected():
@@ -950,15 +928,8 @@ async def register_lekar(request: Request):
     """
     conn = None
     try:
-        # #region agent log
-        debug_log("main.py:882", "register_lekar: Request received", {"timestamp": datetime.now().isoformat()}, hypothesis_id="A")
-        # #endregion
         data = await request.json()
-        
-        # #region agent log
-        debug_log("main.py:886", "register_lekar: Data parsed", {"ime": data.get("ime"), "prezime": data.get("prezime"), "specialty": data.get("specialty"), "email": data.get("email"), "has_password": bool(data.get("password"))}, hypothesis_id="A")
-        # #endregion
-        
+
         ime = (data.get("ime") or "").strip()
         prezime = (data.get("prezime") or "").strip()
         specialty = (data.get("specialty") or "").strip()
