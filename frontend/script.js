@@ -240,42 +240,36 @@ function updateNavForPacient() {
   }
 }
 
+/** Само ако постојат navbar табови (на пр. стара верзија) */
 function setNavAuthRoleTab(role) {
   var p = document.getElementById('nav-tab-pacient');
   var l = document.getElementById('nav-tab-lekar');
-  if (p) p.classList.toggle('active', role === 'pacient');
-  if (l) l.classList.toggle('active', role === 'lekar');
+  if (!p || !l) return;
+  p.classList.toggle('active', role === 'pacient');
+  l.classList.toggle('active', role === 'lekar');
 }
 
-function closeMobileNavIfOpen() {
-  var t = document.getElementById('nav-toggle');
-  if (t) t.checked = false;
+function openNavLoginChoice() {
+  var el = document.getElementById('nav-login-choice-overlay');
+  if (el) el.style.display = 'flex';
 }
 
-function openNavPacientLogin() {
-  closeMobileNavIfOpen();
-  setNavAuthRoleTab('pacient');
-  openPacientLoginModal();
+function closeNavLoginChoice() {
+  var el = document.getElementById('nav-login-choice-overlay');
+  if (el) el.style.display = 'none';
 }
 
-function openNavLekarLogin() {
-  closeMobileNavIfOpen();
-  setNavAuthRoleTab('lekar');
-  openLekarLoginModal();
-}
-
-/** Назад компат.: најавен лекар → панел; инаку најава како пациент */
+/** Назад компат.: гостин → прозорче за избор; најавен лекар → панел */
 function handleMainNavAuthClick() {
   if (currentLekar && currentLekar.doctor_ID) {
     openLekarDashboardModal();
   } else {
-    openNavPacientLogin();
+    openNavLoginChoice();
   }
 }
 
-window.openNavPacientLogin = openNavPacientLogin;
-window.openNavLekarLogin = openNavLekarLogin;
-window.setNavAuthRoleTab = setNavAuthRoleTab;
+window.openNavLoginChoice = openNavLoginChoice;
+window.closeNavLoginChoice = closeNavLoginChoice;
 
 /** Ажурирај го хедерот: гостинско „Најави се!“ или „Лекарски панел“ кога лекарот е најавен */
 function updateAuthHeader() {
@@ -290,7 +284,7 @@ function updateAuthHeader() {
       navBtn.textContent = 'Лекарски панел';
     }
   } else {
-    if (guest) guest.style.display = 'inline-flex';
+    if (guest) guest.style.display = 'inline-block';
     if (navBtn) navBtn.style.display = 'none';
   }
   if (loP) loP.style.display = currentPacient ? 'inline-block' : 'none';
@@ -3535,6 +3529,7 @@ function switchRole(role) {
   if (typeof setNavAuthRoleTab === 'function') {
     setNavAuthRoleTab(role);
   }
+  
   // Ажурирај полиња за регистрација
   if (currentAuthMode === 'register') {
     updateRegisterFields();
