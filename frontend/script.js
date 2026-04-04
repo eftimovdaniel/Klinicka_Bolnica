@@ -240,7 +240,7 @@ function updateNavForPacient() {
   }
 }
 
-/** Назад компатибилност ако некаде се повикува старото единствено копче за најава */
+/** Едно копче „Најави се!“: отвора auth-модал; избор Пациент/Лекар е на табовите во модалот (не паѓачко мени) */
 function handleMainNavAuthClick() {
   if (currentLekar && currentLekar.doctor_ID) {
     openLekarDashboardModal();
@@ -249,7 +249,7 @@ function handleMainNavAuthClick() {
   }
 }
 
-/** Ажурирај го хедерот: двојно копче Пациент/Лекар или „Лекарски панел“ кога лекарот е најавен */
+/** Ажурирај го хедерот: гостинско „Најави се!“ или „Лекарски панел“ кога лекарот е најавен */
 function updateAuthHeader() {
   var navBtn = document.getElementById('auto-login_btn');
   var guest = document.getElementById('nav-auth-guest');
@@ -262,7 +262,7 @@ function updateAuthHeader() {
       navBtn.textContent = 'Лекарски панел';
     }
   } else {
-    if (guest) guest.style.display = 'inline-flex';
+    if (guest) guest.style.display = 'inline-block';
     if (navBtn) navBtn.style.display = 'none';
   }
   if (loP) loP.style.display = currentPacient ? 'inline-block' : 'none';
