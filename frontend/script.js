@@ -240,12 +240,15 @@ function updateNavForPacient() {
   }
 }
 
-/** Копче во хедер: панел ако има currentLekar, инаку форма за најава */
+/** Копче во хедер: панел ако има currentLekar, иначе auth-модал (Пациент/Лекар — избор, не форсиран лекар) */
 function handleMainNavAuthClick() {
   if (currentLekar && currentLekar.doctor_ID) {
     openLekarDashboardModal();
   } else {
-    openLekarLoginModal();
+    // #region agent log
+    fetch('http://127.0.0.1:7456/ingest/f43d60d3-8207-4f3e-9f76-4120f9e162e0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'673ecb'},body:JSON.stringify({sessionId:'673ecb',location:'script.js:handleMainNavAuthClick',message:'header auth: open unified login',data:{path:'openPacientLoginModal'},timestamp:Date.now(),hypothesisId:'H1',runId:'post-fix'})}).catch(function(){});
+    // #endregion
+    openPacientLoginModal();
   }
 }
 
@@ -3858,12 +3861,18 @@ function setupAuth() {
 
 // Овие функции ги користат старите копчиња во header
 function openLekarLoginModal() {
+  // #region agent log
+  fetch('http://127.0.0.1:7456/ingest/f43d60d3-8207-4f3e-9f76-4120f9e162e0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'673ecb'},body:JSON.stringify({sessionId:'673ecb',location:'script.js:openLekarLoginModal',message:'force lekar tab',data:{forcedRole:'lekar'},timestamp:Date.now(),hypothesisId:'H1',runId:'post-fix'})}).catch(function(){});
+  // #endregion
   currentRole = 'lekar';
   switchRole('lekar');
   openLoginModal();
 }
 
 function openPacientLoginModal() {
+  // #region agent log
+  fetch('http://127.0.0.1:7456/ingest/f43d60d3-8207-4f3e-9f76-4120f9e162e0',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'673ecb'},body:JSON.stringify({sessionId:'673ecb',location:'script.js:openPacientLoginModal',message:'pacient tab default',data:{role:'pacient'},timestamp:Date.now(),hypothesisId:'H1',runId:'post-fix'})}).catch(function(){});
+  // #endregion
   currentRole = 'pacient';
   switchRole('pacient');
   openLoginModal();
