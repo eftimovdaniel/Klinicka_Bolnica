@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes"/>
   <title>Клиничка Болница Штип</title>
-  <link rel="stylesheet" href="style.css?v=20260404-10" />
+  <link rel="stylesheet" href="style.css?v=20260404-11" />
 </head>
 <body>
   <script>
@@ -33,7 +33,8 @@
         <a href="novosti.html" class="nav-link" target="_blank" rel="noopener noreferrer" title="Новости – отвора во нов прозорец">Новости</a>
         <a href="#kontakt" class="nav-link">Контакт</a>
         <a href="#lekari" id="nav-zakazi-pregled" class="nav-link nav-zakazi-pregled" style="display: none;">Закажи преглед</a>
-        <div id="nav-auth-guest" class="nav-auth-guest-wrap" aria-label="Најава">
+        <div id="nav-auth-guest" class="nav-auth-guest-wrap nav-auth-unified" aria-label="Најава">
+          <span class="nav-auth-unified-title">Најави се!</span>
           <div class="role-tabs nav-auth-role-tabs" role="tablist">
             <button type="button" role="tab" class="role-tab active" id="nav-tab-pacient" onclick="openNavPacientLogin()">Пациент</button>
             <button type="button" role="tab" class="role-tab" id="nav-tab-lekar" onclick="openNavLekarLogin()">Лекар</button>
@@ -819,7 +820,7 @@
     </div>
   </div>
 
-  <script src="script.js?v=20260404-10"></script>
+  <script src="script.js?v=20260404-11"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       var toggle = document.getElementById('nav-toggle');
