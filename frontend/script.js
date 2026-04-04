@@ -247,28 +247,74 @@ function setNavAuthRoleTab(role) {
   if (l) l.classList.toggle('active', role === 'lekar');
 }
 
+function closeNavAuthExpand() {
+  var panel = document.getElementById('nav-auth-choices');
+  var btn = document.getElementById('nav-auth-toggle');
+  if (panel) panel.setAttribute('hidden', '');
+  if (btn) btn.setAttribute('aria-expanded', 'false');
+}
+
+function toggleNavAuthExpand(ev) {
+  if (ev) ev.stopPropagation();
+  var panel = document.getElementById('nav-auth-choices');
+  var btn = document.getElementById('nav-auth-toggle');
+  if (!panel || !btn) return;
+  var open = !panel.hasAttribute('hidden');
+  if (open) {
+    closeNavAuthExpand();
+  } else {
+    panel.removeAttribute('hidden');
+    btn.setAttribute('aria-expanded', 'true');
+  }
+}
+
+function closeMobileNavIfOpen() {
+  var t = document.getElementById('nav-toggle');
+  if (t) t.checked = false;
+}
+
 function openNavPacientLogin() {
+  closeNavAuthExpand();
+  closeMobileNavIfOpen();
   setNavAuthRoleTab('pacient');
   openPacientLoginModal();
 }
 
 function openNavLekarLogin() {
+  closeNavAuthExpand();
+  closeMobileNavIfOpen();
   setNavAuthRoleTab('lekar');
   openLekarLoginModal();
 }
 
-/** Назад компат.: најавен лекар → панел; инаку најава како пациент */
+/** Назад компат.: најавен лекар → панел; инаку отвори/затвори избор под „Најави се!“ */
 function handleMainNavAuthClick() {
   if (currentLekar && currentLekar.doctor_ID) {
     openLekarDashboardModal();
   } else {
-    openNavPacientLogin();
+    toggleNavAuthExpand();
+  }
+}
+
+function setupNavAuthOutsideClose() {
+  if (setupNavAuthOutsideClose._done) return;
+  setupNavAuthOutsideClose._done = true;
+  document.addEventListener('click', function () {
+    closeNavAuthExpand();
+  });
+  var guest = document.getElementById('nav-auth-guest');
+  if (guest) {
+    guest.addEventListener('click', function (ev) {
+      ev.stopPropagation();
+    });
   }
 }
 
 window.openNavPacientLogin = openNavPacientLogin;
 window.openNavLekarLogin = openNavLekarLogin;
 window.setNavAuthRoleTab = setNavAuthRoleTab;
+window.toggleNavAuthExpand = toggleNavAuthExpand;
+window.closeNavAuthExpand = closeNavAuthExpand;
 
 /** Ажурирај го хедерот: гостинско „Најави се!“ или „Лекарски панел“ кога лекарот е најавен */
 function updateAuthHeader() {
@@ -283,7 +329,10 @@ function updateAuthHeader() {
       navBtn.textContent = 'Лекарски панел';
     }
   } else {
-    if (guest) guest.style.display = 'inline-flex';
+    if (guest) {
+      guest.style.display = 'inline-block';
+      closeNavAuthExpand();
+    }
     if (navBtn) navBtn.style.display = 'none';
   }
   if (loP) loP.style.display = currentPacient ? 'inline-block' : 'none';
@@ -1164,6 +1213,7 @@ function initialize() {
   setupLekarPasswordForms();
   setupPacientAuth();
   if (typeof setupAuth === 'function') setupAuth();
+  setupNavAuthOutsideClose();
   updateAuthHeader();
 
   var pendingId = sessionStorage.getItem('pending_appointment_doctor_id');

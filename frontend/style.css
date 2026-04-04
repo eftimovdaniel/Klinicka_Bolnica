@@ -1575,32 +1575,32 @@ html {
   border-color: #999;
 }
 
-/* Хедер: една целина „Најави се!“ + Пациент/Лекар (двата избори секогаш видливи) */
+/* Хедер: само „Најави се!“; по клик се појавува Пациент / Лекар */
 .main-nav .nav-auth-guest-wrap {
-  display: inline-flex;
+  display: inline-block;
   flex-shrink: 0;
   align-self: center;
-  align-items: center;
+  vertical-align: middle;
 }
 
-.main-nav .nav-auth-unified {
-  gap: 0.5rem;
-  padding: 0.3rem 0.4rem 0.3rem 0.85rem;
-  background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+.main-nav .nav-auth-collapsible {
+  position: relative;
+}
+
+.main-nav .nav-auth-choices {
+  position: absolute;
+  top: calc(100% + 0.4rem);
+  right: 0;
+  z-index: 2500;
+  min-width: 240px;
+  padding: 0.4rem;
+  background: #fff;
   border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(231, 76, 60, 0.35);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.18);
+  border: 1px solid rgba(0, 0, 0, 0.06);
 }
 
-.main-nav .nav-auth-unified-title {
-  color: #fff;
-  font-weight: 700;
-  font-size: 0.9rem;
-  white-space: nowrap;
-  user-select: none;
-  padding-right: 0.15rem;
-}
-
-.main-nav .nav-auth-role-tabs.role-tabs {
+.main-nav .nav-auth-choices .nav-auth-role-tabs.role-tabs {
   margin-bottom: 0;
   padding: 0.35rem;
   gap: 0.4rem;
@@ -3745,16 +3745,20 @@ html {
     box-sizing: border-box;
   }
 
-  .main-nav .nav-auth-unified {
-    flex-direction: column;
-    align-items: stretch;
-    padding: 0.55rem 0.5rem;
-    gap: 0.45rem;
+  .main-nav #nav-auth-toggle {
+    border-bottom: none;
   }
 
-  .main-nav .nav-auth-unified-title {
-    text-align: center;
-    padding-right: 0;
+  .main-nav .nav-auth-choices {
+    position: static;
+    right: auto;
+    top: auto;
+    min-width: 0;
+    width: 100%;
+    margin-top: 0.5rem;
+    box-shadow: none;
+    border: 1px solid #eee;
+    padding: 0.35rem;
   }
 
   .main-nav .nav-auth-role-tabs.role-tabs {
