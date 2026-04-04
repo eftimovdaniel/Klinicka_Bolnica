@@ -542,10 +542,14 @@
       <!-- Таб за преглед на пациенти -->
       <div id="tab-pacienti" class="lekar-tab-content active">
         <h3>Преглед на пациенти</h3>
+        <p class="lekar-termini-hint" style="margin-bottom: 1rem; color: #555; font-size: 0.95rem;">
+          По најава се прикажуваат <strong>сите</strong> ваши закажани термини (иста база како на серверот). За листа само за еден ден, изберете датум и кликнете „За избран датум“.
+        </p>
         <div style="margin-bottom: 1.5rem;">
-          <label for="raspored-datum-select" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Изберете датум:</label>
+          <label for="raspored-datum-select" style="display: block; margin-bottom: 0.5rem; font-weight: 600;">Филтер по датум (опционално):</label>
           <input type="date" id="raspored-datum-select" style="padding: 0.7rem; border: 2px solid #e0e0e0; border-radius: 8px; font-size: 1rem; width: 250px;" />
-          <button onclick="loadMojRaspored()" class="btn-raspored-load" style="margin-left: 1rem;">Преглед на пациенти</button>
+          <button type="button" onclick="loadMojRaspored()" class="btn-raspored-load" style="margin-left: 0.5rem;">За избран датум</button>
+          <button type="button" onclick="refreshLekarTerminiAll()" class="btn-raspored-load" style="margin-left: 0.5rem;">Сите термини</button>
         </div>
         <div id="lekar-termini-list" class="termini-list"></div>
       </div>
