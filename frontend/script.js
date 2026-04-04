@@ -240,16 +240,42 @@ function updateNavForPacient() {
   }
 }
 
-/** Гостин: еден клик → auth-модал; Пациент/Лекар се бираат горе во формата. Лекар најавен → панел. */
+function setNavAuthRoleTab(role) {
+  var p = document.getElementById('nav-tab-pacient');
+  var l = document.getElementById('nav-tab-lekar');
+  if (p) p.classList.toggle('active', role === 'pacient');
+  if (l) l.classList.toggle('active', role === 'lekar');
+}
+
+function closeMobileNavIfOpen() {
+  var t = document.getElementById('nav-toggle');
+  if (t) t.checked = false;
+}
+
+function openNavPacientLogin() {
+  closeMobileNavIfOpen();
+  setNavAuthRoleTab('pacient');
+  openPacientLoginModal();
+}
+
+function openNavLekarLogin() {
+  closeMobileNavIfOpen();
+  setNavAuthRoleTab('lekar');
+  openLekarLoginModal();
+}
+
+/** Назад компат.: најавен лекар → панел; инаку најава како пациент */
 function handleMainNavAuthClick() {
   if (currentLekar && currentLekar.doctor_ID) {
     openLekarDashboardModal();
   } else {
-    var t = document.getElementById('nav-toggle');
-    if (t) t.checked = false;
-    openPacientLoginModal();
+    openNavPacientLogin();
   }
 }
+
+window.openNavPacientLogin = openNavPacientLogin;
+window.openNavLekarLogin = openNavLekarLogin;
+window.setNavAuthRoleTab = setNavAuthRoleTab;
 
 /** Ажурирај го хедерот: гостинско „Најави се!“ или „Лекарски панел“ кога лекарот е најавен */
 function updateAuthHeader() {
@@ -264,7 +290,7 @@ function updateAuthHeader() {
       navBtn.textContent = 'Лекарски панел';
     }
   } else {
-    if (guest) guest.style.display = 'inline-block';
+    if (guest) guest.style.display = 'inline-flex';
     if (navBtn) navBtn.style.display = 'none';
   }
   if (loP) loP.style.display = currentPacient ? 'inline-block' : 'none';
@@ -3505,6 +3531,9 @@ function switchRole(role) {
     if (modalTab && authModal.contains(modalTab)) {
       modalTab.classList.add('active');
     }
+  }
+  if (typeof setNavAuthRoleTab === 'function') {
+    setNavAuthRoleTab(role);
   }
   // Ажурирај полиња за регистрација
   if (currentAuthMode === 'register') {
