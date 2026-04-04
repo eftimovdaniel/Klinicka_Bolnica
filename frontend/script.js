@@ -279,6 +279,22 @@ function logoutLekar() {
   updateAuthHeader();
 }
 
+/** Порака во лекарскиот панел без alert() – alert го ресетира скролот на почеток на многу прелистувачи */
+function showLekarToast(message, isError) {
+  var el = document.getElementById('lekar-toast');
+  if (!el) {
+    if (message) window.alert(message);
+    return;
+  }
+  el.textContent = message || '';
+  el.className = 'lekar-toast' + (isError ? ' lekar-toast--error' : '');
+  el.style.display = 'block';
+  if (showLekarToast._t) clearTimeout(showLekarToast._t);
+  showLekarToast._t = setTimeout(function() {
+    el.style.display = 'none';
+  }, 4500);
+}
+
 function dismissLekariCallout() {
   sessionStorage.setItem('lekari_callout_dismissed', '1');
   var callout = document.getElementById('lekari-pacient-callout');
@@ -1233,12 +1249,12 @@ async function handlePrvaNajavaSubmit(e) {
       var imePrezime = (currentLekar && (currentLekar.name || currentLekar.surname))
         ? 'Добредојде, Др. ' + (currentLekar.name || '') + ' ' + (currentLekar.surname || '') + '!'
         : 'Добредојде!';
-      alert(imePrezime + ' Лозинката е успешно променета. Сега можете да правите преглед на пациенти.');
+      showLekarToast(imePrezime + ' Лозинката е успешно променета. Сега можете да правите преглед на пациенти.', false);
       document.querySelectorAll('.lekar-tab-content').forEach(function(t) { t.classList.remove('active'); });
-      document.querySelectorAll('.nav-tab').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('.lekar-nav-tabs .nav-tab').forEach(function(b) { b.classList.remove('active'); });
       var tabPacienti = document.getElementById('tab-pacienti');
       if (tabPacienti) tabPacienti.classList.add('active');
-      var navPacienti = document.querySelector('.lekar-nav-tabs .nav-tab');
+      var navPacienti = document.querySelector('.lekar-nav-tabs .nav-tab[data-lekar-tab="pacienti"]');
       if (navPacienti) navPacienti.classList.add('active');
       var datumInput = document.getElementById('raspored-datum-select');
       if (datumInput) {
@@ -1302,7 +1318,7 @@ function setupLekarPasswordForms() {
         if (res.ok) {
           promeniForm.reset();
           if (errEl) { errEl.style.display = 'none'; }
-          alert('Лозинката е успешно променета.');
+          showLekarToast('Лозинката е успешно променета.', false);
         } else {
           if (errEl) { errEl.textContent = (data.detail || data.message || 'Грешка при смена на лозинка.'); errEl.style.display = 'block'; }
         }
@@ -1334,9 +1350,9 @@ function showLekarTab(tabName) {
     selectedTab.classList.add('active');
   }
   
-  // Додади active класа на избраното копче
-  event.target.classList.add('active');
-  
+  var tabBtn = document.querySelector('.lekar-nav-tabs .nav-tab[data-lekar-tab="' + tabName + '"]');
+  if (tabBtn) tabBtn.classList.add('active');
+
   // Таб „Преглед на пациенти“: не вчитувај автоматски само денешен датум (термините веќе се прикажани по најава)
   
   // Ако е табот за дежурства, вчитај ги податоците за дежурства
@@ -2184,8 +2200,8 @@ async function loginLekar() {
     updateAuthHeader();
 
     // Прикажи персонализирана порака
-    setTimeout(() => {
-      alert(`Добредојде, Др. ${lekarIme}${lekarSpecijalnost ? ` (${lekarSpecijalnost})` : ''}! Успешно се најавивте.`);
+    setTimeout(function() {
+      showLekarToast('Добредојде, Др. ' + lekarIme + (lekarSpecijalnost ? ' (' + lekarSpecijalnost + ')' : '') + '! Успешно се најавивте.', false);
     }, 300);
   } catch (err) {
     showLoginError('Грешка при најава. Проверете дали серверот работи.');
@@ -2345,7 +2361,7 @@ function displayLekarTermini(data) {
             <label>Терапија:</label>
             <textarea class="terapija-input" data-termin-id="${termin.termin_ID}" placeholder="Внесете терапија...">${termin.terapija || ''}</textarea>
           </div>
-          <button class="btn-save-termin" onclick="saveTerminChanges(${termin.termin_ID})">Зачувај промени</button>
+          <button type="button" class="btn-save-termin" onclick="saveTerminChanges(${termin.termin_ID})">Зачувај промени</button>
         </div>
       `;
       terminiList.appendChild(terminDiv);
@@ -2361,7 +2377,7 @@ async function saveTerminChanges(terminId) {
   const terapijaInput = document.querySelector(`.terapija-input[data-termin-id="${terminId}"]`);
 
   if (!dijagnozaInput || !terapijaInput) {
-    alert('Грешка при наоѓање на полињата');
+    showLekarToast('Грешка при наоѓање на полињата', true);
     return;
   }
 
@@ -2379,14 +2395,14 @@ async function saveTerminChanges(terminId) {
 
     if (!res.ok) {
       const error = await res.json();
-      alert(error.detail || 'Грешка при зачувување');
+      showLekarToast(error.detail || 'Грешка при зачувување', true);
       return;
     }
 
     const result = await res.json();
-    alert(result.message || 'Промените се зачувани успешно!');
+    showLekarToast(result.message || 'Промените се зачувани успешно!', false);
   } catch (err) {
-    alert('Грешка при зачувување. Проверете дали серверот работи.');
+    showLekarToast('Грешка при зачувување. Проверете дали серверот работи.', true);
   }
 }
 // ФУНКЦИИ ЗА ПРИКАЗУВАЊЕ НА ПОВЕЌЕ/ПОМАЛКУ ЛЕКАРИ
@@ -2467,6 +2483,7 @@ window.handleMainNavAuthClick = handleMainNavAuthClick;
 window.logoutPacient = logoutPacient;
 window.logoutLekar = logoutLekar;
 window.updateAuthHeader = updateAuthHeader;
+window.showLekarToast = showLekarToast;
 window.showLekarTab = showLekarTab;
 window.saveTerminChanges = saveTerminChanges;
 window.showMoreDoctors = showMoreDoctors;
@@ -2494,9 +2511,9 @@ function showAdminSubTab(subTabName) {
     selectedTab.classList.add('active');
   }
   
-  // Додади active класа на избраното копче
-  event.target.classList.add('active');
-  
+  var subBtn = document.querySelector('.admin-sub-tab[data-admin-subtab="' + subTabName + '"]');
+  if (subBtn) subBtn.classList.add('active');
+
   // Вчитај ги податоците според под-табот
   if (subTabName === 'dezurstva-admin') {
     loadAdminDezurstva();
@@ -3170,11 +3187,11 @@ async function deleteNovost(id) {
       var d = await res.json();
       throw new Error(d.detail || 'Грешка при бришење');
     }
-    alert('Новоста е избришана.');
+    showLekarToast('Новоста е избришана.', false);
     loadNovostiAdmin();
     loadNovosti();
   } catch (err) {
-    alert(err.message);
+    showLekarToast(err.message, true);
   }
 }
 
@@ -3201,7 +3218,7 @@ document.addEventListener('DOMContentLoaded', () =>{
       
       try {
         if (!currentLekar) {
-          alert('Не сте најавени');
+          showLekarToast('Не сте најавени', true);
           return;
         }
         
@@ -3230,11 +3247,11 @@ document.addEventListener('DOMContentLoaded', () =>{
           throw new Error(data.detail || 'Грешка при зачувување');
         }
         
-        alert(dezurstvoId ? 'Дежурството е успешно ажурирано' : 'Дежурството е успешно креирано');
+        showLekarToast(dezurstvoId ? 'Дежурството е успешно ажурирано' : 'Дежурството е успешно креирано', false);
         closeDezurstvoForm();
         loadAdminDezurstva();
       } catch (err) {
-        alert('Грешка: ' + err.message);
+        showLekarToast('Грешка: ' + err.message, true);
       }
     });
     setupAuth();
@@ -3255,7 +3272,7 @@ document.addEventListener('DOMContentLoaded', () =>{
       
       try {
         if (!currentLekar) {
-          alert('Не сте најавени');
+          showLekarToast('Не сте најавени', true);
           return;
         }
         
@@ -3279,7 +3296,7 @@ document.addEventListener('DOMContentLoaded', () =>{
             throw new Error(data.detail || 'Грешка при ажурирање');
           }
           
-          alert('Огласот е успешно ажуриран');
+          showLekarToast('Огласот е успешно ажуриран', false);
         } else {
           // Креирање (користи административен endpoint за да нема валидација на позицијата)
           const res = await fetch(API_BASE + '/admin/oglasi', {
@@ -3300,13 +3317,13 @@ document.addEventListener('DOMContentLoaded', () =>{
             throw new Error(data.detail || 'Грешка при креирање');
           }
           
-          alert('Огласот е успешно креиран');
+          showLekarToast('Огласот е успешно креиран', false);
         }
         
         closeOglasForm();
         loadAdminOglasi();
       } catch (err) {
-        alert('Грешка: ' + err.message);
+        showLekarToast('Грешка: ' + err.message, true);
       }
     });
   }
@@ -3315,7 +3332,7 @@ document.addEventListener('DOMContentLoaded', () =>{
   if (novostForm) {
     novostForm.addEventListener('submit', async function(e) {
       e.preventDefault();
-      if (!currentLekar) { alert('Не сте најавени'); return; }
+      if (!currentLekar) { showLekarToast('Не сте најавени', true); return; }
       var id = document.getElementById('novost-id').value;
       var naslov = document.getElementById('novost-naslov').value.trim();
       var sodrzina = document.getElementById('novost-sodrzina').value.trim();
@@ -3323,7 +3340,7 @@ document.addEventListener('DOMContentLoaded', () =>{
       var fileInput = document.getElementById('novost-slika');
       var videoUrlEl = document.getElementById('novost-video-url');
       var extraSlikiEl = document.getElementById('novost-sliki-extra');
-      if (!naslov) { alert('Внесете наслов.'); return; }
+      if (!naslov) { showLekarToast('Внесете наслов.', true); return; }
       try {
         var formData = new FormData();
         formData.append('naslov', naslov);
@@ -3353,7 +3370,7 @@ document.addEventListener('DOMContentLoaded', () =>{
             }
             throw new Error(msg || 'Грешка при ажурирање');
           }
-          alert('Новоста е ажурирана.');
+          showLekarToast('Новоста е ажурирана.', false);
         } else {
           var res = await fetch(API_BASE + '/admin/novosti', { method: 'POST', body: formData });
           if (!res.ok) {
@@ -3368,13 +3385,13 @@ document.addEventListener('DOMContentLoaded', () =>{
             }
             throw new Error(msg || 'Грешка при додавање');
           }
-          alert('Новоста е додадена.');
+          showLekarToast('Новоста е додадена.', false);
         }
         closeNovostForm();
         loadNovostiAdmin();
         if (typeof loadNovosti === 'function') loadNovosti();
       } catch (err) {
-        alert(err.message || 'Грешка при зачувување.');
+        showLekarToast(err.message || 'Грешка при зачувување.', true);
       }
     });
   }
@@ -3605,8 +3622,8 @@ async function handleLogin(e) {
       displayLekarDashboard(data);
       openLekarDashboardModal();
       updateAuthHeader();
-      setTimeout(() => {
-        alert(`Добредојде, Др. ${data.doctor.name} ${data.doctor.surname}!`);
+      setTimeout(function() {
+        showLekarToast('Добредојде, Др. ' + data.doctor.name + ' ' + data.doctor.surname + '!', false);
       }, 300);
     } else {
       currentPacient = data.pacient;

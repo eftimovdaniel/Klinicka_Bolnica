@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes"/>
   <title>Клиничка Болница Штип</title>
-  <link rel="stylesheet" href="style.css?v=20260404-1" />
+  <link rel="stylesheet" href="style.css?v=20260404-2" />
 </head>
 <body>
   <script>
@@ -483,6 +483,7 @@
   <!-- Doctor Dashboard Modal - Главен интерфејс за лекари -->
   <div id="lekar-dashboard-modal" class="modal">
     <div class="modal-content lekar-dashboard-content">
+      <div id="lekar-toast" class="lekar-toast" role="status" aria-live="polite" style="display: none;"></div>
       <!-- При привремена лозинка – прво прозорец со порака, по „Во ред“ се појавува форма за смена -->
       <div id="lekar-first-login-overlay" class="lekar-first-login-overlay" style="display: none;">
         <div class="lekar-first-login-box">
@@ -534,11 +535,11 @@
       
       <!-- Навигација во интерфејсот за лекари -->
       <div class="lekar-nav-tabs">
-        <button class="nav-tab active" onclick="showLekarTab('pacienti')">Преглед на пациенти</button>
-        <button class="nav-tab" onclick="showLekarTab('dezurstva')">Распоред на дежурства</button>
-        <button class="nav-tab" onclick="showLekarTab('aparati')">Закажи термин на апарат</button>
-        <button class="nav-tab" onclick="showLekarTab('postavki')">Поставки</button>
-        <button id="admin-tab-btn" class="nav-tab" onclick="showLekarTab('admin')" style="display: none;">Администрација</button>
+        <button type="button" class="nav-tab active" data-lekar-tab="pacienti" onclick="showLekarTab('pacienti')">Преглед на пациенти</button>
+        <button type="button" class="nav-tab" data-lekar-tab="dezurstva" onclick="showLekarTab('dezurstva')">Распоред на дежурства</button>
+        <button type="button" class="nav-tab" data-lekar-tab="aparati" onclick="showLekarTab('aparati')">Закажи термин на апарат</button>
+        <button type="button" class="nav-tab" data-lekar-tab="postavki" onclick="showLekarTab('postavki')">Поставки</button>
+        <button type="button" id="admin-tab-btn" class="nav-tab" data-lekar-tab="admin" onclick="showLekarTab('admin')" style="display: none;">Администрација</button>
       </div>
       
       <!-- Таб за преглед на пациенти -->
@@ -649,15 +650,15 @@
         
         <!-- Под-табови за администрација -->
         <div class="admin-sub-tabs">
-          <button class="admin-sub-tab active" onclick="showAdminSubTab('dezurstva-admin')">Управување со дежурства</button>
-          <button class="admin-sub-tab" onclick="showAdminSubTab('oglasi-admin')">Управување со огласи</button>
-          <button class="admin-sub-tab" onclick="showAdminSubTab('novosti-admin')">Новости</button>
+          <button type="button" class="admin-sub-tab active" data-admin-subtab="dezurstva-admin" onclick="showAdminSubTab('dezurstva-admin')">Управување со дежурства</button>
+          <button type="button" class="admin-sub-tab" data-admin-subtab="oglasi-admin" onclick="showAdminSubTab('oglasi-admin')">Управување со огласи</button>
+          <button type="button" class="admin-sub-tab" data-admin-subtab="novosti-admin" onclick="showAdminSubTab('novosti-admin')">Новости</button>
         </div>
         
         <!-- Под-таб за дежурства -->
         <div id="dezurstva-admin" class="admin-sub-tab-content active">
           <h4>Дежурства</h4>
-          <button class="btn-primary btn-admin-add" onclick="openDezurstvoForm()" style="margin-bottom: 1rem;">+ Додади ново дежурство</button>
+          <button type="button" class="btn-primary btn-admin-add" onclick="openDezurstvoForm()" style="margin-bottom: 1rem;">+ Додади ново дежурство</button>
           <div id="dezurstva-admin-list" class="admin-list">
             <div class="loading">Се вчитуваат дежуства...</div>
           </div>
@@ -666,7 +667,7 @@
         <!-- Под-таб за огласи -->
         <div id="oglasi-admin" class="admin-sub-tab-content">
           <h4>Огласи за работа</h4>
-          <button class="btn-primary btn-admin-add" onclick="openOglasForm()" style="margin-bottom: 1rem;">+ Додади нов оглас</button>
+          <button type="button" class="btn-primary btn-admin-add" onclick="openOglasForm()" style="margin-bottom: 1rem;">+ Додади нов оглас</button>
           <div id="oglasi-admin-list" class="admin-list">
             <div class="loading">Вчитувам огласи...</div>
           </div>
@@ -674,7 +675,7 @@
         <!-- Под-таб за новости -->
         <div id="novosti-admin" class="admin-sub-tab-content">
           <h4>Новости</h4>
-          <button class="btn-primary btn-admin-add" onclick="openNovostForm()" style="margin-bottom: 1rem;">+ Додади новост</button>
+          <button type="button" class="btn-primary btn-admin-add" onclick="openNovostForm()" style="margin-bottom: 1rem;">+ Додади новост</button>
           <div id="novosti-admin-list" class="admin-list">
             <div class="loading">Вчитувам новости...</div>
           </div>
@@ -812,7 +813,7 @@
     </div>
   </div>
 
-  <script src="script.js?v=20260404-1"></script>
+  <script src="script.js?v=20260404-2"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       var toggle = document.getElementById('nav-toggle');

@@ -2203,6 +2203,25 @@ html {
   position: relative;
 }
 
+.lekar-dashboard-content .lekar-toast {
+  position: sticky;
+  top: 0;
+  z-index: 25;
+  padding: 0.65rem 1rem;
+  margin: 0 0 0.75rem 0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  color: #155724;
+}
+.lekar-dashboard-content .lekar-toast.lekar-toast--error {
+  background: #f8d7da;
+  border-color: #f5c6cb;
+  color: #721c24;
+}
+
 /* Навигација со табови */
 .lekar-nav-tabs {
   display: flex;
