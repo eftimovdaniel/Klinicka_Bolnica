@@ -1575,6 +1575,19 @@ html {
   border-color: #999;
 }
 
+/* Хедер: избор Пациент / Лекар (ист стил како табовите во auth-модалот) */
+.main-nav .nav-auth-guest.role-tabs {
+  margin-bottom: 0;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.main-nav .nav-auth-guest .role-tab {
+  padding: 0.45rem 0.9rem;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
 /* Split Login Modal - Два панели (лево: добредојде, десно: форма) */
 .login-split-modal {
   max-width: 700px;
@@ -3698,6 +3711,18 @@ html {
     margin: 0.5rem 0 0;
     width: 100%;
     justify-content: center;
+  }
+
+  .main-nav .nav-auth-guest.role-tabs {
+    width: 100%;
+    margin-top: 0.5rem;
+    box-sizing: border-box;
+  }
+
+  .main-nav .nav-auth-guest .role-tab {
+    flex: 1;
+    justify-content: center;
+    padding: 0.75rem 0.5rem;
   }
 
   .logo h1 {
