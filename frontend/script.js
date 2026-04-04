@@ -20,27 +20,64 @@ let currentPacient = null;  // Податоци за моментално нај
 // Колку лекари да се исцртаат; се ажурира на бројот на вчитани/филтрирани за да се видат сите
 let displayedDoctorsCount = 8;
 
-// Врати го најавениот пациент од sessionStorage (за да може да закаже по враќање од oddel-details)
+var KB_KEY_PACIENT = 'currentPacient';
+var KB_KEY_LEKAR = 'currentLekar';
+
+function persistPacientToStorage() {
+  if (!currentPacient) return;
+  try {
+    var s = JSON.stringify(currentPacient);
+    sessionStorage.setItem(KB_KEY_PACIENT, s);
+    localStorage.setItem(KB_KEY_PACIENT, s);
+  } catch (e) {}
+}
+
+function persistLekarToStorage() {
+  if (!currentLekar || !currentLekar.doctor_ID) return;
+  try {
+    var s = JSON.stringify(currentLekar);
+    sessionStorage.setItem(KB_KEY_LEKAR, s);
+    localStorage.setItem(KB_KEY_LEKAR, s);
+  } catch (e) {}
+}
+
+function clearPacientFromStorage() {
+  try {
+    sessionStorage.removeItem(KB_KEY_PACIENT);
+    localStorage.removeItem(KB_KEY_PACIENT);
+  } catch (e) {}
+}
+
+function clearLekarFromStorage() {
+  try {
+    sessionStorage.removeItem(KB_KEY_LEKAR);
+    localStorage.removeItem(KB_KEY_LEKAR);
+  } catch (e) {}
+}
+
+// Врати го најавениот пациент од sessionStorage или localStorage (дупло складирање)
 (function restorePacientSession() {
   try {
-    var saved = sessionStorage.getItem('currentPacient');
+    var saved = sessionStorage.getItem(KB_KEY_PACIENT) || localStorage.getItem(KB_KEY_PACIENT);
     if (saved) {
       var parsed = JSON.parse(saved);
       if (parsed && (parsed.pacient_ID || parsed.email)) {
         currentPacient = parsed;
+        persistPacientToStorage();
       }
     }
   } catch (e) {}
 })();
 
-// Врати го најавениот лекар (директор) од sessionStorage – да остане најавен по објава/превчитување
+// Врати го најавениот лекар од sessionStorage или localStorage
 (function restoreLekarSession() {
   try {
-    var saved = sessionStorage.getItem('currentLekar');
+    var saved = sessionStorage.getItem(KB_KEY_LEKAR) || localStorage.getItem(KB_KEY_LEKAR);
     if (saved) {
       var parsed = JSON.parse(saved);
       if (parsed && parsed.doctor_ID) {
         currentLekar = parsed;
+        persistLekarToStorage();
       }
     }
   } catch (e) {}
@@ -231,13 +268,13 @@ function updateAuthHeader() {
 
 function logoutPacient() {
   currentPacient = null;
-  try { sessionStorage.removeItem('currentPacient'); } catch (e) {}
+  clearPacientFromStorage();
   updateAuthHeader();
 }
 
 function logoutLekar() {
   currentLekar = null;
-  try { sessionStorage.removeItem('currentLekar'); } catch (e) {}
+  clearLekarFromStorage();
   closeLekarDashboardModal();
   updateAuthHeader();
 }
@@ -251,7 +288,14 @@ function dismissLekariCallout() {
 function closeAppointmentSuccess() {
   var el = document.getElementById('appointment-success-overlay');
   if (el) el.style.display = 'none';
-  // НЕ бриши currentPacient – корисникот останува најавен додека сам не се одјави (види копче во менито).
+  try {
+    if (!currentPacient) {
+      var saved = sessionStorage.getItem(KB_KEY_PACIENT) || localStorage.getItem(KB_KEY_PACIENT);
+      if (saved) currentPacient = JSON.parse(saved);
+    }
+    if (currentPacient) persistPacientToStorage();
+  } catch (e) {}
+  if (typeof updateAuthHeader === 'function') updateAuthHeader();
 }
 
 // Функција за отворање на модален прозорец за закажување на преглед
@@ -640,7 +684,8 @@ function setupAppointmentForm() {
           selectedDoctor = null;
           var successEl = document.getElementById('appointment-success-overlay');
           if (successEl) successEl.style.display = 'flex';
-          alert('Терминот е успешно закажан! Ќе добиете потврда на е-пошта.');
+          persistPacientToStorage();
+          if (typeof updateAuthHeader === 'function') updateAuthHeader();
         } else {
           alert('Грешка при закажување: ' + (result.detail || result.message || 'Обидете се повторно.'));
         }
@@ -2126,8 +2171,8 @@ async function loginLekar() {
     // Ако автентификацијата е успешна, ги земаме податоците за лекарот и неговите термини
     const data = await res.json();
     currentLekar = data.doctor;
-    try { sessionStorage.setItem('currentLekar', JSON.stringify(data.doctor)); } catch (e) {}
-    
+    persistLekarToStorage();
+
     // Прикажи персонализирана порака за најавениот лекар
     const lekarIme = `${data.doctor.name} ${data.doctor.surname}`;
     const lekarSpecijalnost = data.doctor.specijalnost || '';
@@ -3555,7 +3600,7 @@ async function handleLogin(e) {
     
     if (currentRole === 'lekar') {
       currentLekar = data.doctor;
-      try { sessionStorage.setItem('currentLekar', JSON.stringify(data.doctor)); } catch (e) {}
+      persistLekarToStorage();
       closeAuthModal();
       displayLekarDashboard(data);
       openLekarDashboardModal();
@@ -3565,7 +3610,7 @@ async function handleLogin(e) {
       }, 300);
     } else {
       currentPacient = data.pacient;
-      try { sessionStorage.setItem('currentPacient', JSON.stringify(data.pacient)); } catch (e) {}
+      persistPacientToStorage();
       closeAuthModal();
       updateAuthHeader();
 
