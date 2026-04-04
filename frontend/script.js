@@ -203,6 +203,45 @@ function updateNavForPacient() {
   }
 }
 
+/** Копче во хедер: панел ако има currentLekar, инаку форма за најава */
+function handleMainNavAuthClick() {
+  if (currentLekar && currentLekar.doctor_ID) {
+    openLekarDashboardModal();
+  } else {
+    openLekarLoginModal();
+  }
+}
+
+/** Ажурирај го текстот на копчето и копчињата за одјавување (не се одјавува автоматски по закажување) */
+function updateAuthHeader() {
+  var navBtn = document.getElementById('auto-login_btn');
+  var loP = document.getElementById('nav-logout-pacient');
+  var loL = document.getElementById('nav-logout-lekar');
+  if (navBtn) {
+    if (currentLekar && currentLekar.doctor_ID) {
+      navBtn.textContent = 'Лекарски панел';
+    } else {
+      navBtn.textContent = 'Најави се!';
+    }
+  }
+  if (loP) loP.style.display = currentPacient ? 'inline-block' : 'none';
+  if (loL) loL.style.display = currentLekar && currentLekar.doctor_ID ? 'inline-block' : 'none';
+  updateNavForPacient();
+}
+
+function logoutPacient() {
+  currentPacient = null;
+  try { sessionStorage.removeItem('currentPacient'); } catch (e) {}
+  updateAuthHeader();
+}
+
+function logoutLekar() {
+  currentLekar = null;
+  try { sessionStorage.removeItem('currentLekar'); } catch (e) {}
+  closeLekarDashboardModal();
+  updateAuthHeader();
+}
+
 function dismissLekariCallout() {
   sessionStorage.setItem('lekari_callout_dismissed', '1');
   var callout = document.getElementById('lekari-pacient-callout');
@@ -212,9 +251,7 @@ function dismissLekariCallout() {
 function closeAppointmentSuccess() {
   var el = document.getElementById('appointment-success-overlay');
   if (el) el.style.display = 'none';
-  currentPacient = null;
-  try { sessionStorage.removeItem('currentPacient'); } catch (e) {}
-  updateNavForPacient();
+  // НЕ бриши currentPacient – корисникот останува најавен додека сам не се одјави (види копче во менито).
 }
 
 // Функција за отворање на модален прозорец за закажување на преглед
@@ -1035,12 +1072,13 @@ function initialize() {
   attachForms();
   setupModal();
   setupAppointmentForm();
+  setupAparatiForm();
   setupSmoothScroll();
   setupLekarLogin();
   setupLekarPasswordForms();
   setupPacientAuth();
   if (typeof setupAuth === 'function') setupAuth();
-  updateNavForPacient();
+  updateAuthHeader();
 
   var pendingId = sessionStorage.getItem('pending_appointment_doctor_id');
   if (pendingId) {
@@ -1810,7 +1848,9 @@ function aparatiSelectTime(time, element) {
 function setupAparatiForm() {
   const form = document.getElementById('aparati-booking-form');
   if (!form) return;
-  
+  if (form.dataset.aparatiSetup === '1') return;
+  form.dataset.aparatiSetup = '1';
+
   const aparatSelect = document.getElementById('aparati-aparat-select');
   const dostapnostMessage = document.createElement('div');
   dostapnostMessage.id = 'aparati-dostapnost-message';
@@ -1906,7 +1946,13 @@ function setupAparatiForm() {
   
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
-    
+    var prevFb = document.getElementById('aparati-booking-feedback');
+    if (prevFb) {
+      prevFb.style.display = 'none';
+      prevFb.textContent = '';
+      prevFb.className = 'aparati-booking-feedback';
+    }
+
     const lekarId = document.getElementById('aparati-lekar-select').value;
     const pacientInput = document.getElementById('aparati-pacient-input');
     const pacientFullName = pacientInput?.value.trim() || '';
@@ -1981,9 +2027,13 @@ function setupAparatiForm() {
       });
       
       if (res.ok) {
-        alert('Терминот за апарат е успешно закажан!');
+        var feedbackEl = document.getElementById('aparati-booking-feedback');
+        if (feedbackEl) {
+          feedbackEl.style.display = 'block';
+          feedbackEl.className = 'aparati-booking-feedback aparati-booking-feedback--success';
+          feedbackEl.textContent = 'Терминот за апарат е успешно закажан. Панелот останува отворен — можете да закажете друг термин или да отидете на „Преглед на пациенти“ за распоред.';
+        }
         form.reset();
-        // Ресетирај го select-от за лекари
         filterLekariByAparat('');
         aparatiSelectedDate = null;
         aparatiSelectedTime = null;
@@ -1995,6 +2045,7 @@ function setupAparatiForm() {
           day.classList.remove('selected');
         });
         dostapnostMessage.style.display = 'none';
+        if (typeof renderAparatiCalendar === 'function') renderAparatiCalendar();
       } else {
         const error = await res.json();
         alert(error.detail || 'Грешка при закажување на термин.');
@@ -2085,7 +2136,8 @@ async function loginLekar() {
     closeLekarLoginModal();
     displayLekarDashboard(data);
     openLekarDashboardModal();
-    
+    updateAuthHeader();
+
     // Прикажи персонализирана порака
     setTimeout(() => {
       alert(`Добредојде, Др. ${lekarIme}${lekarSpecijalnost ? ` (${lekarSpecijalnost})` : ''}! Успешно се најавивте.`);
@@ -2366,6 +2418,10 @@ function closePacientRegisterModal() {
 window.openLekarLoginModal = openLekarLoginModal;
 window.closeLekarLoginModal = closeLekarLoginModal;
 window.closeLekarDashboardModal = closeLekarDashboardModal;
+window.handleMainNavAuthClick = handleMainNavAuthClick;
+window.logoutPacient = logoutPacient;
+window.logoutLekar = logoutLekar;
+window.updateAuthHeader = updateAuthHeader;
 window.showLekarTab = showLekarTab;
 window.saveTerminChanges = saveTerminChanges;
 window.showMoreDoctors = showMoreDoctors;
@@ -3503,6 +3559,7 @@ async function handleLogin(e) {
       closeAuthModal();
       displayLekarDashboard(data);
       openLekarDashboardModal();
+      updateAuthHeader();
       setTimeout(() => {
         alert(`Добредојде, Др. ${data.doctor.name} ${data.doctor.surname}!`);
       }, 300);
@@ -3510,7 +3567,7 @@ async function handleLogin(e) {
       currentPacient = data.pacient;
       try { sessionStorage.setItem('currentPacient', JSON.stringify(data.pacient)); } catch (e) {}
       closeAuthModal();
-      updateNavForPacient();
+      updateAuthHeader();
 
       const pendingDoctorId = sessionStorage.getItem('pending_appointment_doctor_id');
       if (pendingDoctorId) {

@@ -33,7 +33,9 @@
         <a href="novosti.html" class="nav-link" target="_blank" rel="noopener noreferrer" title="Новости – отвора во нов прозорец">Новости</a>
         <a href="#kontakt" class="nav-link">Контакт</a>
         <a href="#lekari" id="nav-zakazi-pregled" class="nav-link nav-zakazi-pregled" style="display: none;">Закажи преглед</a>
-        <button id="auto-login_btn" class="btn-lekar-login" onclick="openLekarLoginModal()">Најави се!</button>
+        <button type="button" id="auto-login_btn" class="btn-lekar-login" onclick="handleMainNavAuthClick()">Најави се!</button>
+        <button type="button" id="nav-logout-pacient" class="btn-nav-logout" style="display: none;" onclick="logoutPacient()" title="Одјавување од профилот на пациент">Одјави се (пациент)</button>
+        <button type="button" id="nav-logout-lekar" class="btn-nav-logout" style="display: none;" onclick="logoutLekar()" title="Одјавување од профилот на лекар">Одјави се (лекар)</button>
       </nav>
     </div>
   </header>
@@ -565,6 +567,7 @@
       <!-- Таб за закажување термини на апарати -->
       <div id="tab-aparati" class="lekar-tab-content">
         <h3>Закажи термин на медицински апарат</h3>
+        <div id="aparati-booking-feedback" class="aparati-booking-feedback" role="status" aria-live="polite" style="display: none;"></div>
         <form id="aparati-booking-form" class="aparati-form">
           <div class="form-group">
             <label for="aparati-aparat-select">Апарат:</label>

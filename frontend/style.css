@@ -1558,6 +1558,23 @@ html {
   box-shadow: 0 2px 6px rgba(231, 76, 60, 0.3);
 }
 
+.btn-nav-logout {
+  background: transparent;
+  color: #555;
+  border: 1px solid #ccc;
+  padding: 0.45rem 0.65rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 500;
+  margin-left: 0.35rem;
+  white-space: nowrap;
+}
+.btn-nav-logout:hover {
+  background: #f5f5f5;
+  border-color: #999;
+}
+
 /* Split Login Modal - Два панели (лево: добредојде, десно: форма) */
 .login-split-modal {
   max-width: 700px;
@@ -2419,6 +2436,22 @@ html {
   font-size: 0.95rem;
   margin-bottom: 1.5rem;
   line-height: 1.5;
+}
+
+/* Порака по успешно закажување на апарат (без превчитување на страницата) */
+.aparati-booking-feedback {
+  max-width: 600px;
+  margin: 0 auto 1rem auto;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+.aparati-booking-feedback--success {
+  display: block !important;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  color: #155724;
 }
 
 /* Форма за закажување на апарати */
