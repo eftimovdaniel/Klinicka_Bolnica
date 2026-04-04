@@ -240,14 +240,27 @@ function updateNavForPacient() {
   }
 }
 
-/** Едно копче „Најави се!“: отвора auth-модал; избор Пациент/Лекар е на табовите во модалот (не паѓачко мени) */
+function openNavLoginChoice() {
+  var el = document.getElementById('nav-login-choice-overlay');
+  if (el) el.style.display = 'flex';
+}
+
+function closeNavLoginChoice() {
+  var el = document.getElementById('nav-login-choice-overlay');
+  if (el) el.style.display = 'none';
+}
+
+/** Едно копче „Најави се!“: гостин → прозорче за избор Пациент/Лекар; најавен лекар → панел */
 function handleMainNavAuthClick() {
   if (currentLekar && currentLekar.doctor_ID) {
     openLekarDashboardModal();
   } else {
-    openPacientLoginModal();
+    openNavLoginChoice();
   }
 }
+
+window.openNavLoginChoice = openNavLoginChoice;
+window.closeNavLoginChoice = closeNavLoginChoice;
 
 /** Ажурирај го хедерот: гостинско „Најави се!“ или „Лекарски панел“ кога лекарот е најавен */
 function updateAuthHeader() {

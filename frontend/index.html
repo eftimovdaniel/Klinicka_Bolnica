@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes"/>
   <title>Клиничка Болница Штип</title>
-  <link rel="stylesheet" href="style.css?v=20260404-7" />
+  <link rel="stylesheet" href="style.css?v=20260404-9" />
 </head>
 <body>
   <script>
@@ -816,7 +816,20 @@
     </div>
   </div>
 
-  <script src="script.js?v=20260404-7"></script>
+  <!-- Избор Пациент / Лекар по клик на „Најави се!“ (едно копче во хедер) -->
+  <div id="nav-login-choice-overlay" class="nav-login-choice-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="nav-login-choice-title" onclick="closeNavLoginChoice()">
+    <div class="nav-login-choice-box" onclick="event.stopPropagation()">
+      <h3 id="nav-login-choice-title">Најавете се</h3>
+      <p class="nav-login-choice-hint">Изберете како сакате да се најавите:</p>
+      <div class="nav-login-choice-btns">
+        <button type="button" class="btn-primary nav-login-choice-btn" onclick="closeNavLoginChoice(); openPacientLoginModal();">Пациент</button>
+        <button type="button" class="btn-primary nav-login-choice-btn" onclick="closeNavLoginChoice(); openLekarLoginModal();">Лекар</button>
+      </div>
+      <button type="button" class="btn-secondary nav-login-choice-cancel" onclick="closeNavLoginChoice()">Откажи</button>
+    </div>
+  </div>
+
+  <script src="script.js?v=20260404-9"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       var toggle = document.getElementById('nav-toggle');
