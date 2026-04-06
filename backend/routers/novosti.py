@@ -11,6 +11,13 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from database import get_connection
 from routers.admin import check_admin_access
 
+from azure.storage.blob import BlobServiceClient
+AZURE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME")
+
+blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
+
+
 router = APIRouter(tags=["novosti"])
 
 UPLOAD_DIR = Path(__file__).resolve().parent.parent / "static" / "uploads" / "novosti"
@@ -20,20 +27,23 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 def _ensure_upload_dir():
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-
 def _save_upload(file: UploadFile) -> Optional[str]:
     if not file or not file.filename:
         return None
     ext = Path(file.filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
         return None
-    _ensure_upload_dir()
-    name = f"{uuid.uuid4().hex}{ext}"
-    path = UPLOAD_DIR / name
-    with path.open("wb") as f:
-        shutil.copyfileobj(file.file, f)
-    return f"uploads/novosti/{name}"
+    
+    name = f"novosti/{uuid.uuid4().hex}{ext}"
 
+    try:
+        blob_client = blob_service_client.get_blob_client(ontainer=CONTAINER_NAME, blob=name)
+        contents = file.file.read()
+        blob_client.upload_blob(contents, overwrite=True)
+        return blob_client.url
+    except Exception as e:
+        print (f"Грешка при Azure Upload:{е}")
+        return None
 
 def _normalize_novost_row(r: dict) -> None:
     if r.get("created_at"):
