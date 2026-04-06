@@ -34,15 +34,15 @@ def _save_upload(file: UploadFile) -> Optional[str]:
     if ext not in ALLOWED_EXTENSIONS:
         return None
     
-    name = f"novosti/{uuid.uuid4().hex}{ext}"
+    name = f"{uuid.uuid4().hex}{ext}"
 
     try:
-        blob_client = blob_service_client.get_blob_client(ontainer=CONTAINER_NAME, blob=name)
+        blob_client = blob_service_client.get_blob_client(container=CONTAINER_NAME, blob=name)
         contents = file.file.read()
         blob_client.upload_blob(contents, overwrite=True)
         return blob_client.url
     except Exception as e:
-        print (f"Грешка при Azure Upload:{е}")
+        print (f"Грешка при Azure Upload:{e}")
         return None
 
 def _normalize_novost_row(r: dict) -> None:
