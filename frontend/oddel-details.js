@@ -117,7 +117,7 @@ async function loadLekariForOddel(oddelNaziv) {
                    specLower.includes(lekarSpecialty);
           });
           
-          // Ако не се совпаѓа со мапираните, пробај директно со името на одделот
+          
           if (!matches) {
             return lekarSpecialty === oddelLower ||
                    lekarSpecialty.includes(oddelLower) ||
