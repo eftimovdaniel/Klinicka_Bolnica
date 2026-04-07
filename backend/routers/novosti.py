@@ -11,9 +11,9 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from database import get_connection
 from routers.admin import check_admin_access
 
-from azure.storage.blob import BlobServiceClient
-AZURE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
-CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME")
+from azure.storage.blob import BlobServiceClient    # povrzuvanje na python so azure    
+AZURE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")      # 
+CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME")      # vcituvanje na imeto na papkata kade ke se zapisuvaat slikite
 
 blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
 
@@ -27,121 +27,24 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 def _ensure_upload_dir():
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
-def _save_upload(file: UploadFile) -> Optional[str]:
-    if not file or not file.filename:
+def _save_upload(file: UploadFile) -> Optional[str]:        # prima objekti od tip UploadFile fastapi standard za fajlovi i vraka link ili none
+    if not file or not file.filename:       # proverka dali e isptaten fajl ili ne
         return None
-    ext = Path(file.filename).suffix.lower()
-    if ext not in ALLOWED_EXTENSIONS:
+    ext = Path(file.filename).suffix.lower()        # ja vlece ekstenzijata, tipot na prikaceniot fajl.
+    if ext not in ALLOWED_EXTENSIONS:       # proverka dali e vo dozvoleni ekstenzii ili ne
         return None
     
-    name = f"{uuid.uuid4().hex}{ext}"
+    name = f"{uuid.uuid4().hex}{ext}"       # generiranje na novo, unikatno ime za fajlot. Korisni e koga dvajca korisnici ke prikacat slika so isto ime
 
     try:
-        blob_client = blob_service_client.get_blob_client(container=CONTAINER_NAME, blob=name)
-        contents = file.file.read()
-        blob_client.upload_blob(contents, overwrite=True)
+        blob_client = blob_service_client.get_blob_client(container=CONTAINER_NAME, blob=name)      # povrzuvanje so cloud provajderot i se koriste za save na fajlovi vo kontenjeri so unikatno ime
+        contents = file.file.read()     # go cita fajlot od memorijata na serverot, go pretvara vo binarna forma 
+        blob_client.upload_blob(contents, overwrite=True)   # gi praka podatocite na cloud
         return blob_client.url
     except Exception as e:
         print (f"Грешка при Azure Upload:{e}")
         return None
-
-def _normalize_novost_row(r: dict) -> None:
-    if r.get("created_at"):
-        r["created_at"] = r["created_at"].isoformat() if hasattr(r["created_at"], "isoformat") else str(r["created_at"])
-    if r.get("updated_at"):
-        r["updated_at"] = r["updated_at"].isoformat() if hasattr(r["updated_at"], "isoformat") else str(r["updated_at"])
-    r.setdefault("slika_position", None)
-    r.setdefault("slika_height", None)
-    if isinstance(r.get("slike_extra"), str) and r["slike_extra"]:
-        try:
-            r["slike_extra"] = json.loads(r["slike_extra"])
-        except Exception:
-            r["slike_extra"] = []
-    elif r.get("slike_extra") is None:
-        r["slike_extra"] = []
-
-
-@router.get("/novosti", response_model=List[dict])
-def list_novosti():
-    conn = None
-    try:
-        conn = get_connection()
-        cur = conn.cursor(dictionary=True)
-        try:
-            cur.execute("""
-                SELECT n.id, n.naslov, n.sodrzina, n.slika_path, n.slika_position, n.slika_height, n.video_url, n.slike_extra, n.created_at, n.updated_at,
-                       d.name AS author_name, d.surname AS author_surname
-                FROM Novosti n
-                LEFT JOIN Doctors d ON n.author_doctor_id = d.doctor_ID
-                ORDER BY n.created_at DESC
-            """)
-        except Exception as col_err:
-            if "Unknown column" in str(col_err) or "unknown column" in str(col_err).lower():
-                cur.execute("""
-                    SELECT n.id, n.naslov, n.sodrzina, n.slika_path, n.created_at, n.updated_at,
-                           d.name AS author_name, d.surname AS author_surname
-                    FROM Novosti n
-                    LEFT JOIN Doctors d ON n.author_doctor_id = d.doctor_ID
-                    ORDER BY n.created_at DESC
-                """)
-            else:
-                raise
-        rows = cur.fetchall()
-        for r in rows:
-            r.setdefault("video_url", None)
-            r.setdefault("slike_extra", [])
-            _normalize_novost_row(r)
-        return rows
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn and conn.is_connected():
-            conn.close()
-
-
-@router.get("/novosti/{novost_id}", response_model=dict)
-def get_novost(novost_id: int):
-    conn = None
-    try:
-        conn = get_connection()
-        cur = conn.cursor(dictionary=True)
-        try:
-            cur.execute("""
-                SELECT n.id, n.naslov, n.sodrzina, n.slika_path, n.slika_position, n.slika_height, n.video_url, n.slike_extra, n.created_at, n.updated_at,
-                       d.name AS author_name, d.surname AS author_surname
-                FROM Novosti n
-                LEFT JOIN Doctors d ON n.author_doctor_id = d.doctor_ID
-                WHERE n.id = %s
-            """, (novost_id,))
-        except Exception as col_err:
-            if "Unknown column" in str(col_err) or "unknown column" in str(col_err).lower():
-                cur.execute("""
-                    SELECT n.id, n.naslov, n.sodrzina, n.slika_path, n.created_at, n.updated_at,
-                           d.name AS author_name, d.surname AS author_surname
-                    FROM Novosti n
-                    LEFT JOIN Doctors d ON n.author_doctor_id = d.doctor_ID
-                    WHERE n.id = %s
-                """, (novost_id,))
-            else:
-                raise
-        row = cur.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Новостта не е пронајдена")
-        row.setdefault("video_url", None)
-        row.setdefault("slike_extra", [])
-        _normalize_novost_row(row)
-        return row
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn and conn.is_connected():
-            conn.close()
-
-
+    
 def _is_full_url(s: Optional[str]) -> bool:
     if not s or not isinstance(s, str):
         return False
@@ -326,6 +229,105 @@ def update_novost(
     finally:
         if conn and conn.is_connected():
             conn.close()
+
+
+
+def _normalize_novost_row(r: dict) -> None:
+    if r.get("created_at"):
+        r["created_at"] = r["created_at"].isoformat() if hasattr(r["created_at"], "isoformat") else str(r["created_at"])
+    if r.get("updated_at"):
+        r["updated_at"] = r["updated_at"].isoformat() if hasattr(r["updated_at"], "isoformat") else str(r["updated_at"])
+    r.setdefault("slika_position", None)
+    r.setdefault("slika_height", None)
+    if isinstance(r.get("slike_extra"), str) and r["slike_extra"]:
+        try:
+            r["slike_extra"] = json.loads(r["slike_extra"])
+        except Exception:
+            r["slike_extra"] = []
+    elif r.get("slike_extra") is None:
+        r["slike_extra"] = []
+
+
+@router.get("/novosti", response_model=List[dict])
+def list_novosti():
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        try:
+            cur.execute("""
+                SELECT n.id, n.naslov, n.sodrzina, n.slika_path, n.slika_position, n.slika_height, n.video_url, n.slike_extra, n.created_at, n.updated_at,
+                       d.name AS author_name, d.surname AS author_surname
+                FROM Novosti n
+                LEFT JOIN Doctors d ON n.author_doctor_id = d.doctor_ID
+                ORDER BY n.created_at DESC
+            """)
+        except Exception as col_err:
+            if "Unknown column" in str(col_err) or "unknown column" in str(col_err).lower():
+                cur.execute("""
+                    SELECT n.id, n.naslov, n.sodrzina, n.slika_path, n.created_at, n.updated_at,
+                           d.name AS author_name, d.surname AS author_surname
+                    FROM Novosti n
+                    LEFT JOIN Doctors d ON n.author_doctor_id = d.doctor_ID
+                    ORDER BY n.created_at DESC
+                """)
+            else:
+                raise
+        rows = cur.fetchall()
+        for r in rows:
+            r.setdefault("video_url", None)
+            r.setdefault("slike_extra", [])
+            _normalize_novost_row(r)
+        return rows
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
+
+
+@router.get("/novosti/{novost_id}", response_model=dict)
+def get_novost(novost_id: int):
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        try:
+            cur.execute("""
+                SELECT n.id, n.naslov, n.sodrzina, n.slika_path, n.slika_position, n.slika_height, n.video_url, n.slike_extra, n.created_at, n.updated_at,
+                       d.name AS author_name, d.surname AS author_surname
+                FROM Novosti n
+                LEFT JOIN Doctors d ON n.author_doctor_id = d.doctor_ID
+                WHERE n.id = %s
+            """, (novost_id,))
+        except Exception as col_err:
+            if "Unknown column" in str(col_err) or "unknown column" in str(col_err).lower():
+                cur.execute("""
+                    SELECT n.id, n.naslov, n.sodrzina, n.slika_path, n.created_at, n.updated_at,
+                           d.name AS author_name, d.surname AS author_surname
+                    FROM Novosti n
+                    LEFT JOIN Doctors d ON n.author_doctor_id = d.doctor_ID
+                    WHERE n.id = %s
+                """, (novost_id,))
+            else:
+                raise
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Новостта не е пронајдена")
+        row.setdefault("video_url", None)
+        row.setdefault("slike_extra", [])
+        _normalize_novost_row(row)
+        return row
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
+
 
 
 @router.delete("/admin/novosti/{novost_id}")
