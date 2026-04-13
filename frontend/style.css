@@ -4232,3 +4232,36 @@ html {
     align-items: flex-start;
   }
 }
+
+/* Админ: просечна оцена – избор на лекар */
+.statistika-ocena-intro {
+  margin-bottom: 1rem;
+  color: #555;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.statistika-ocena-lekar-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-bottom: 1rem;
+}
+
+.statistika-ocena-lekar-label {
+  font-weight: 600;
+  color: #444;
+  font-size: 0.95rem;
+}
+
+.statistika-ocena-lekar-select {
+  min-width: 14rem;
+  max-width: min(100%, 32rem);
+  flex: 1 1 16rem;
+  padding: 0.5rem 0.65rem;
+  font-size: 0.95rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  background: #fff;
+}

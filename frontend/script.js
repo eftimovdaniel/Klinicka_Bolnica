@@ -2875,22 +2875,59 @@ async function loadAdminStatistikaOptovaruvanje() {
   }
 }
 
-// Статистика: просечна оцена по лекар (само директор; JOIN feedback + термини + лекари)
+/** Полни го паѓачкото мени со сите лекари (еднаш по отворање на табот). */
+async function fillStatistikaProsekOcenaLekarSelect() {
+  var sel = document.getElementById('statistika-ocena-lekar-select');
+  if (!sel || sel.getAttribute('data-filled') === '1') return;
+  try {
+    const res = await fetch(API_BASE + '/lekari');
+    if (!res.ok) return;
+    const lekari = await res.json();
+    if (!Array.isArray(lekari)) return;
+    var first = sel.querySelector('option[value=""]');
+    sel.innerHTML = '';
+    if (first) sel.appendChild(first);
+    else {
+      var o0 = document.createElement('option');
+      o0.value = '';
+      o0.textContent = '— Изберете лекар —';
+      sel.appendChild(o0);
+    }
+    lekari.forEach(function (L) {
+      var opt = document.createElement('option');
+      opt.value = String(L.doctor_ID);
+      var sp = (L.specijalnost || '').trim();
+      opt.textContent = (L.name || '') + ' ' + (L.surname || '') + (sp ? ' — ' + sp : '');
+      sel.appendChild(opt);
+    });
+    sel.setAttribute('data-filled', '1');
+  } catch (e) {}
+}
+
+// Статистика: просечна оцена за избран лекар (директор)
 async function loadAdminStatistikaProsekOcena() {
   const container = document.getElementById('statistika-prosek-ocena-list');
   if (!container || !currentLekar) return;
 
-  var odEl = document.getElementById('statistika-ocena-datum-od');
-  var doEl = document.getElementById('statistika-ocena-datum-do');
-  var datumOd = odEl && odEl.value ? odEl.value : '';
-  var datumDo = doEl && doEl.value ? doEl.value : '';
+  await fillStatistikaProsekOcenaLekarSelect();
+
+  var sel = document.getElementById('statistika-ocena-lekar-select');
+  var doctorId = sel && sel.value ? parseInt(sel.value, 10) : NaN;
+
+  if (!sel || !sel.value || isNaN(doctorId)) {
+    container.innerHTML =
+      '<div class="loading">Изберете лекар од паѓачкото мени за да се прикаже просечната оцена и бројот на оцени.</div>';
+    return;
+  }
 
   try {
-    container.innerHTML = '<div class="loading">Вчитувам просечни оцени...</div>';
+    container.innerHTML = '<div class="loading">Вчитувам...</div>';
 
-    var q = 'admin_doctor_id=' + encodeURIComponent(currentLekar.doctor_ID);
-    if (datumOd) q += '&datum_od=' + encodeURIComponent(datumOd);
-    if (datumDo) q += '&datum_do=' + encodeURIComponent(datumDo);
+    var q =
+      'admin_doctor_id=' +
+      encodeURIComponent(currentLekar.doctor_ID) +
+      '&doctor_id=' +
+      encodeURIComponent(String(doctorId));
 
     const res = await fetch(API_BASE + '/admin/statistika/prosek-ocena-lekari?' + q);
     if (!res.ok) {
@@ -2900,51 +2937,54 @@ async function loadAdminStatistikaProsekOcena() {
 
     const data = await res.json();
     var lekari = data.lekari || [];
-
     if (lekari.length === 0) {
-      container.innerHTML =
-        '<div class="loading">Нема оцени за избраните филтри (или уште нема записи во Pregled_feedback).</div>';
+      container.innerHTML = '<div class="loading">Нема податоци за овој лекар.</div>';
       return;
     }
 
+    var L = lekari[0];
+    var ime = ((L.ime || '') + ' ' + (L.prezime || '')).trim() || '—';
+    var pr =
+      L.broj_oceni > 0 && L.prosek_ocena != null
+        ? Number(L.prosek_ocena).toFixed(2)
+        : '—';
+    var n = L.broj_oceni != null ? L.broj_oceni : 0;
+    var nemaOceni = n === 0;
+
     var table =
-      '<table class="statistika-oddeli-table" style="width:100%; border-collapse:collapse;">' +
+      '<table class="statistika-oddeli-table statistika-prosek-jeden-lekar" style="width:100%; max-width:40rem; border-collapse:collapse;">' +
       '<thead><tr>' +
-      '<th style="text-align:left; padding:0.5rem; border-bottom:2px solid #ddd;">#</th>' +
       '<th style="text-align:left; padding:0.5rem; border-bottom:2px solid #ddd;">Лекар</th>' +
       '<th style="text-align:left; padding:0.5rem; border-bottom:2px solid #ddd;">Специјалност</th>' +
       '<th style="text-align:right; padding:0.5rem; border-bottom:2px solid #ddd;">Просек</th>' +
       '<th style="text-align:right; padding:0.5rem; border-bottom:2px solid #ddd;">Број оцени</th>' +
-      '</tr></thead><tbody>';
-    lekari.forEach(function (L, idx) {
-      var ime = ((L.ime || '') + ' ' + (L.prezime || '')).trim() || '—';
-      var pr = L.prosek_ocena != null ? Number(L.prosek_ocena).toFixed(2) : '—';
-      var n = L.broj_oceni != null ? L.broj_oceni : 0;
+      '</tr></thead><tbody>' +
+      '<tr>' +
+      '<td style="padding:0.45rem 0.5rem; border-bottom:1px solid #eee;">' +
+      ime +
+      '</td>' +
+      '<td style="padding:0.45rem 0.5rem; border-bottom:1px solid #eee;">' +
+      (L.specijalnost || '—') +
+      '</td>' +
+      '<td style="text-align:right; padding:0.45rem 0.5rem; border-bottom:1px solid #eee;">' +
+      pr +
+      '</td>' +
+      '<td style="text-align:right; padding:0.45rem 0.5rem; border-bottom:1px solid #eee;">' +
+      n +
+      '</td>' +
+      '</tr></tbody></table>';
+
+    if (nemaOceni) {
       table +=
-        '<tr>' +
-        '<td style="padding:0.45rem 0.5rem; border-bottom:1px solid #eee; color:#888;">' +
-        (idx + 1) +
-        '</td>' +
-        '<td style="padding:0.45rem 0.5rem; border-bottom:1px solid #eee;">' +
-        ime +
-        '</td>' +
-        '<td style="padding:0.45rem 0.5rem; border-bottom:1px solid #eee;">' +
-        (L.specijalnost || '—') +
-        '</td>' +
-        '<td style="text-align:right; padding:0.45rem 0.5rem; border-bottom:1px solid #eee;">' +
-        pr +
-        '</td>' +
-        '<td style="text-align:right; padding:0.45rem 0.5rem; border-bottom:1px solid #eee;">' +
-        n +
-        '</td>' +
-        '</tr>';
-    });
-    table += '</tbody></table>';
+        '<p class="statistika-ocena-nema" style="margin-top:0.75rem; color:#666; font-size:0.92rem;">За овој лекар сè уште нема доставено оцени од пациенти.</p>';
+    }
     container.innerHTML = table;
   } catch (err) {
     container.innerHTML = '<div class="loading" style="color: red;">Грешка: ' + err.message + '</div>';
   }
 }
+
+window.fillStatistikaProsekOcenaLekarSelect = fillStatistikaProsekOcenaLekarSelect;
 
 async function loadAdminOglasi() {
   const container = document.getElementById('oglasi-admin-list');

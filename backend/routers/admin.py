@@ -637,14 +637,16 @@ def get_statistika_optovaruvanje_oddeli(
 @router.get("/statistika/prosek-ocena-lekari")
 def get_statistika_prosek_ocena_lekari(
     admin_doctor_id: Optional[int] = None,
+    doctor_id: Optional[int] = None,
     datum_od: Optional[str] = None,
     datum_do: Optional[str] = None,
 ):
     """
     Просечна оцена AVG(pf.ocena) и број на гласови COUNT по лекар.
     JOIN: Pregled_feedback → Termin_pregled → Doctors; GROUP BY doctor_ID.
-    Подредување по просек од највисок кон најнизок.
-    Опционален опсег на датум на прегледот (datum_pregled на терминот).
+    Ако е поставен doctor_id: еден избран лекар (и со 0 оцени).
+    Инаку: сите лекари со барем една оцена, подредени по просек опаѓачки.
+    Опционален опсег на датум на прегледот (datum_pregled).
     """
     if admin_doctor_id is None:
         raise HTTPException(status_code=403, detail="Недостасува ID на администратор")
@@ -655,6 +657,66 @@ def get_statistika_prosek_ocena_lekari(
     try:
         conn = get_connection()
         db_cursor = conn.cursor(dictionary=True)
+
+        if doctor_id is not None:
+            db_cursor.execute(
+                "SELECT doctor_ID, name, surname, specialty FROM Doctors WHERE doctor_ID = %s",
+                (doctor_id,),
+            )
+            doc = db_cursor.fetchone()
+            if not doc:
+                raise HTTPException(status_code=404, detail="Лекарот не е пронајден")
+
+            sub_where = "WHERE tp.doctor_ID = %s"
+            sub_params: list = [doctor_id]
+            if datum_od and str(datum_od).strip():
+                if "T" in str(datum_od):
+                    datum_od = str(datum_od).split("T")[0]
+                sub_where += " AND DATE(tp.datum_pregled) >= %s"
+                sub_params.append(datum_od.strip())
+            if datum_do and str(datum_do).strip():
+                if "T" in str(datum_do):
+                    datum_do = str(datum_do).split("T")[0]
+                sub_where += " AND DATE(tp.datum_pregled) <= %s"
+                sub_params.append(datum_do.strip())
+
+            db_cursor.execute(
+                f"""
+                SELECT
+                    ROUND(AVG(pf.ocena), 2) AS prosek_ocena,
+                    COUNT(pf.feedback_ID) AS broj_oceni
+                FROM Termin_pregled tp
+                INNER JOIN Pregled_feedback pf ON pf.termin_ID = tp.termin_ID
+                {sub_where}
+                """,
+                tuple(sub_params),
+            )
+            agg = db_cursor.fetchone()
+            broj = int(agg["broj_oceni"] or 0) if agg else 0
+            prosek = agg.get("prosek_ocena") if agg else None
+            if prosek is not None:
+                prosek = float(prosek)
+
+            spec = (doc.get("specialty") or "").strip()
+            if not spec:
+                spec = "Непознато"
+
+            lekari = [
+                {
+                    "doctor_ID": doc["doctor_ID"],
+                    "ime": (doc.get("name") or "").strip(),
+                    "prezime": (doc.get("surname") or "").strip(),
+                    "specijalnost": spec,
+                    "prosek_ocena": prosek,
+                    "broj_oceni": broj,
+                }
+            ]
+            return {
+                "lekari": lekari,
+                "doctor_id": doctor_id,
+                "datum_od": datum_od.strip() if datum_od and str(datum_od).strip() else None,
+                "datum_do": datum_do.strip() if datum_do and str(datum_do).strip() else None,
+            }
 
         query = """
             SELECT
