@@ -4047,3 +4047,143 @@ html {
     min-height: 44px;
   }
 }
+
+/* Пациент: оцени завршени прегледи */
+.pacient-ocenki-section {
+  background: #f8fafb;
+  border-top: 1px solid #e8ecef;
+}
+
+.pacient-ocenki-intro {
+  text-align: center;
+  color: #555;
+  max-width: 42rem;
+  margin: 0 auto 1.75rem;
+  line-height: 1.5;
+}
+
+.pacient-ocenki-list {
+  max-width: 40rem;
+  margin: 0 auto;
+}
+
+.pacient-ocenki-placeholder,
+.pacient-ocenki-empty,
+.pacient-ocenki-error {
+  text-align: center;
+  color: #666;
+  padding: 1rem;
+}
+
+.pacient-ocenki-error {
+  color: #c0392b;
+}
+
+.pacient-ocenka-card {
+  background: #fff;
+  border: 1px solid #e0e4e8;
+  border-radius: 10px;
+  padding: 1.1rem 1.25rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.pacient-ocenka-card--rated {
+  border-color: #cfe8d4;
+  background: #fafdfb;
+}
+
+.pacient-ocenka-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.88rem;
+  color: #2d6a4f;
+  line-height: 1.4;
+}
+
+.pacient-ocenka-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+  font-size: 0.95rem;
+}
+
+.pacient-ocenka-when {
+  color: #333;
+  font-weight: 600;
+}
+
+.pacient-ocenka-doc {
+  color: #555;
+}
+
+.pacient-ocena-scale {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: center;
+  margin: 0.35rem 0 0.85rem;
+}
+
+.pacient-ocena-num {
+  flex: 1 1 auto;
+  min-width: 2.75rem;
+  max-width: 4.5rem;
+  height: 3.5rem;
+  padding: 0 0.35rem;
+  font-size: 1.85rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #333;
+  background: #fff;
+  border: 2px solid #cfd4d8;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.pacient-ocena-num:hover {
+  border-color: #e74c3c;
+  background: #fff8f7;
+}
+
+.pacient-ocena-num--active {
+  border-color: #e74c3c;
+  background: #fff0ee;
+  color: #c0392b;
+  box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.2);
+}
+
+.pacient-ocenka-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pacient-ocenka-label {
+  font-size: 0.85rem;
+  color: #555;
+  font-weight: 600;
+}
+
+.pacient-ocena-kom {
+  width: 100%;
+  padding: 0.5rem 0.65rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.pacient-ocena-btn {
+  align-self: flex-start;
+  margin-top: 0.25rem;
+}
+
+@media (max-width: 600px) {
+  .pacient-ocenka-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

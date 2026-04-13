@@ -1,6 +1,2 @@
-{"sessionId": "ee0fe2", "hypothesisId": "H2", "location": "lekari.py:login_lekar", "message": "termini za login odgovor", "data": {"termini_count": 0, "doctor_id": 46, "must_change_password": false}, "timestamp": 1776108947423}
-{"sessionId":"ee0fe2","hypothesisId":"H1-H2-H3-H5","location":"script.js:displayLekarDashboard","message":"lekar dashboard","data":{"terminiLen":0,"must_change_password":false,"hasTerminiListEl":true,"hasRetrospektivaSection":false},"timestamp":1776108947464}
-{"sessionId":"ee0fe2","hypothesisId":"H2","location":"script.js:displayLekarTermini","message":"render karticki","data":{"terminiCount":0,"hasDoctor":true},"timestamp":1776108947467}
-{"sessionId": "ee0fe2", "hypothesisId": "H2", "location": "lekari.py:login_lekar", "message": "termini za login odgovor", "data": {"termini_count": 0, "doctor_id": 46, "must_change_password": false}, "timestamp": 1776109002468}
-{"sessionId":"ee0fe2","hypothesisId":"H1-H2-H3-H5","location":"script.js:displayLekarDashboard","message":"lekar dashboard","data":{"terminiLen":0,"must_change_password":false,"hasTerminiListEl":true,"hasRetrospektivaSection":false},"timestamp":1776109002511}
-{"sessionId":"ee0fe2","hypothesisId":"H2","location":"script.js:displayLekarTermini","message":"render karticki","data":{"terminiCount":0,"hasDoctor":true},"timestamp":1776109002512}
+{"sessionId": "ee0fe2", "timestamp": 1776111926175, "location": "pacienti.py:oceni_pregled:entry", "message": "oceni_pregled called", "data": {"termin_id": 24, "pacient_id": 6, "ocena": 4, "has_komentar": true}, "hypothesisId": "H1"}
+{"sessionId": "ee0fe2", "timestamp": 1776111927067, "location": "pacienti.py:oceni_pregled:ok", "message": "feedback saved", "data": {"termin_id": 24, "feedback_id": 1}, "hypothesisId": "H5"}

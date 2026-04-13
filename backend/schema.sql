@@ -18,6 +18,7 @@ SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS password_reset_tokens;
 DROP TABLE IF EXISTS Aparati_termini;
+DROP TABLE IF EXISTS Pregled_feedback;
 DROP TABLE IF EXISTS Termin_pregled;
 DROP TABLE IF EXISTS prijaveni_lekari;
 DROP TABLE IF EXISTS Dezurstva;
@@ -104,6 +105,22 @@ CREATE TABLE Termin_pregled (
   KEY idx_tp_status (status_pregled),
   CONSTRAINT fk_tp_doctor FOREIGN KEY (doctor_ID) REFERENCES Doctors (doctor_ID)
     ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- Pregled_feedback – оцена за завршен термин (една по termin_ID)
+-- ---------------------------------------------------------------------------
+CREATE TABLE Pregled_feedback (
+  feedback_ID INT NOT NULL AUTO_INCREMENT,
+  termin_ID INT NOT NULL,
+  ocena TINYINT NOT NULL,
+  komentar TEXT,
+  datum_na_ocena DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (feedback_ID),
+  UNIQUE KEY uq_pf_termin (termin_ID),
+  CONSTRAINT fk_pf_termin FOREIGN KEY (termin_ID) REFERENCES Termin_pregled (termin_ID)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT chk_pf_ocena CHECK (ocena >= 1 AND ocena <= 5)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------

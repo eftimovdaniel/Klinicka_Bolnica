@@ -79,6 +79,20 @@ CREATE TABLE Termin_pregled (
     ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Pregled_feedback – оцена за завршен термин (една по termin_ID)
+CREATE TABLE Pregled_feedback (
+  feedback_ID INT NOT NULL AUTO_INCREMENT,
+  termin_ID INT NOT NULL,
+  ocena TINYINT NOT NULL,
+  komentar TEXT,
+  datum_na_ocena DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (feedback_ID),
+  UNIQUE KEY uq_pf_termin (termin_ID),
+  CONSTRAINT fk_pf_termin FOREIGN KEY (termin_ID) REFERENCES Termin_pregled (termin_ID)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT chk_pf_ocena CHECK (ocena >= 1 AND ocena <= 5)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- Novosti
 CREATE TABLE Novosti (
   id INT NOT NULL AUTO_INCREMENT,

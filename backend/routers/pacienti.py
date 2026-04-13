@@ -1,8 +1,35 @@
-from fastapi import APIRouter, HTTPException, Request
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException, Query, Request
 from datetime import datetime, timedelta
+import json
 import secrets
+import time
+
+import mysql.connector
+
 from database import get_connection
 from password_utils import hash_password, verify_password
+
+_DEBUG_LOG_PATH = Path(__file__).resolve().parent.parent.parent / ".cursor" / "debug-ee0fe2.log"
+
+
+def _agent_dbg(location: str, message: str, data: dict, hypothesis_id: str = "H1") -> None:
+    # #region agent log
+    try:
+        payload = {
+            "sessionId": "ee0fe2",
+            "timestamp": int(time.time() * 1000),
+            "location": location,
+            "message": message,
+            "data": data,
+            "hypothesisId": hypothesis_id,
+        }
+        with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as _f:
+            _f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+    # #endregion
 
 router = APIRouter(
     prefix="/pacienti",
@@ -192,3 +219,213 @@ async def register_pacienti(request: Request):
      finally:
         if conn and conn.is_connected():
             conn.close( )
+
+
+@router.get("/zavrseni-za-ocenka")
+async def zavrseni_za_ocenka(pacient_ID: int = Query(..., description="ID на најавениот пациент")):
+    """Завршени прегледи за е-поштата на пациентот (за приказ и оцена)."""
+    conn = None
+    try:
+        conn = get_connection()
+        posrednik = conn.cursor(dictionary=True)
+        posrednik.execute(
+            "SELECT email FROM patient WHERE patient_ID = %s",
+            (pacient_ID,),
+        )
+        pac_row = posrednik.fetchone()
+        if not pac_row:
+            raise HTTPException(status_code=404, detail="Пациентот не е пронајден.")
+        email_pac = (pac_row.get("email") or "").strip().lower()
+        if not email_pac:
+            return {"pregledi": []}
+
+        posrednik.execute(
+            """
+            SELECT tp.termin_ID, tp.datum_pregled, tp.vreme_pregled, tp.ime_lekar,
+                   (pf.feedback_ID IS NOT NULL) AS veke_ocenat, pf.ocena AS dadena_ocena, pf.komentar AS komentar
+            FROM Termin_pregled tp
+            LEFT JOIN Pregled_feedback pf ON pf.termin_ID = tp.termin_ID
+            WHERE LOWER(TRIM(COALESCE(tp.email_pacient, ''))) = %s
+              AND tp.status_pregled = 'завршен'
+            ORDER BY tp.datum_pregled DESC, tp.vreme_pregled DESC
+            """,
+            (email_pac,),
+        )
+        rows = posrednik.fetchall() or []
+        pregledi = []
+        for r in rows:
+            dp = r.get("datum_pregled")
+            vp = r.get("vreme_pregled")
+            pregledi.append(
+                {
+                    "termin_ID": r.get("termin_ID"),
+                    "datum_pregled": dp.isoformat() if dp else None,
+                    "vreme_pregled": str(vp)[:8] if vp else None,
+                    "ime_lekar": (r.get("ime_lekar") or "").strip() or None,
+                    "veke_ocenat": bool(r.get("veke_ocenat")),
+                    "dadena_ocena": int(r["dadena_ocena"]) if r.get("dadena_ocena") is not None else None,
+                    "komentar": (r.get("komentar") or "").strip() or None,
+                }
+            )
+        return {"pregledi": pregledi}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Грешка при вчитување на прегледите.") from e
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
+
+
+@router.post("/oceni-pregled")
+async def oceni_pregled(request: Request):
+    """Внесува или ажурира оцена за завршен преглед. Еден термин = еден ред (termin_ID уникатен)."""
+    conn = None
+    try:
+        data = await request.json()
+        termin_id = data.get("termin_id")
+        pacient_id = data.get("pacient_ID") or data.get("pacient_id")
+        ocena_raw = data.get("ocena")
+        komentar = (data.get("komentar") or "").strip() or None
+
+        # #region agent log
+        _agent_dbg(
+            "pacienti.py:oceni_pregled:entry",
+            "oceni_pregled called",
+            {"termin_id": termin_id, "pacient_id": pacient_id, "ocena": ocena_raw, "has_komentar": bool(komentar)},
+            "H1",
+        )
+        # #endregion
+
+        if termin_id is None or pacient_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Потребни се termin_id и pacient_ID (идентификатор на најавениот пациент).",
+            )
+        try:
+            termin_id = int(termin_id)
+            pacient_id = int(pacient_id)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="termin_id и pacient_ID мора да бидат цели броеви.")
+
+        try:
+            ocena = int(ocena_raw)
+        except (TypeError, ValueError):
+            raise HTTPException(status_code=400, detail="Оцената мора да биде цел број од 1 до 5.")
+        if ocena < 1 or ocena > 5:
+            raise HTTPException(status_code=400, detail="Оцената мора да биде од 1 до 5.")
+
+        conn = get_connection()
+        posrednik = conn.cursor(dictionary=True)
+
+        posrednik.execute(
+            "SELECT email FROM patient WHERE patient_ID = %s",
+            (pacient_id,),
+        )
+        pac_row = posrednik.fetchone()
+        if not pac_row:
+            # #region agent log
+            _agent_dbg(
+                "pacienti.py:oceni_pregled:no_patient",
+                "patient not found",
+                {"pacient_id": pacient_id},
+                "H2",
+            )
+            # #endregion
+            raise HTTPException(status_code=404, detail="Пациентот не е пронајден.")
+
+        email_pac = (pac_row.get("email") or "").strip().lower()
+
+        posrednik.execute(
+            """
+            SELECT termin_ID, status_pregled, email_pacient
+            FROM Termin_pregled
+            WHERE termin_ID = %s
+            """,
+            (termin_id,),
+        )
+        tp = posrednik.fetchone()
+        if not tp:
+            # #region agent log
+            _agent_dbg("pacienti.py:oceni_pregled:no_termin", "termin not found", {"termin_id": termin_id}, "H2")
+            # #endregion
+            raise HTTPException(status_code=404, detail="Терминот не е пронајден.")
+
+        em_termin = (tp.get("email_pacient") or "").strip().lower()
+        if not em_termin or em_termin != email_pac:
+            # #region agent log
+            _agent_dbg(
+                "pacienti.py:oceni_pregled:email_mismatch",
+                "termin not owned by patient email",
+                {"termin_id": termin_id, "match": False},
+                "H3",
+            )
+            # #endregion
+            raise HTTPException(
+                status_code=403,
+                detail="Не можете да оцените овој термин (не одговара на вашиот профил).",
+            )
+
+        status = (tp.get("status_pregled") or "").strip()
+        if status != "завршен":
+            # #region agent log
+            _agent_dbg(
+                "pacienti.py:oceni_pregled:not_finished",
+                "termin not завршен",
+                {"termin_id": termin_id, "status_pregled": status},
+                "H4",
+            )
+            # #endregion
+            raise HTTPException(
+                status_code=400,
+                detail="Оцена може да се остави само за преглед со статус „завршен“.",
+            )
+
+        posrednik.execute(
+            """
+            INSERT INTO Pregled_feedback (termin_ID, ocena, komentar)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+              ocena = VALUES(ocena),
+              komentar = VALUES(komentar),
+              datum_na_ocena = CURRENT_TIMESTAMP
+            """,
+            (termin_id, ocena, komentar),
+        )
+        conn.commit()
+
+        posrednik.execute(
+            "SELECT feedback_ID, termin_ID, ocena, komentar, datum_na_ocena FROM Pregled_feedback WHERE termin_ID = %s",
+            (termin_id,),
+        )
+        out = posrednik.fetchone()
+
+        # #region agent log
+        _agent_dbg(
+            "pacienti.py:oceni_pregled:ok",
+            "feedback saved",
+            {"termin_id": termin_id, "feedback_id": out.get("feedback_ID") if out else None},
+            "H5",
+        )
+        # #endregion
+
+        return {
+            "message": "Оцената е зачувана.",
+            "ocenka": {
+                "feedback_ID": out.get("feedback_ID") if out else None,
+                "termin_ID": termin_id,
+                "ocena": ocena,
+                "komentar": komentar,
+                "datum_na_ocena": out.get("datum_na_ocena").isoformat() if out and out.get("datum_na_ocena") else None,
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        # #region agent log
+        _agent_dbg("pacienti.py:oceni_pregled:error", "exception", {"err_type": type(e).__name__}, "H5")
+        # #endregion
+        raise HTTPException(status_code=500, detail="Грешка при зачувување на оцената.") from e
+    finally:
+        if conn and conn.is_connected():
+            conn.close()

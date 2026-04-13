@@ -233,12 +233,214 @@ function setupFilters() {
 function updateNavForPacient() {
   var navLink = document.getElementById('nav-zakazi-pregled');
   if (navLink) navLink.style.display = currentPacient ? 'inline-block' : 'none';
+  var navOceni = document.getElementById('nav-oceni-pregled');
+  if (navOceni) navOceni.style.display = currentPacient ? 'inline-block' : 'none';
   var callout = document.getElementById('lekari-pacient-callout');
   if (callout) {
     var dismissed = sessionStorage.getItem('lekari_callout_dismissed');
     callout.style.display = (currentPacient && !dismissed) ? 'block' : 'none';
   }
+  loadPacientZavrseniZaOcenka();
 }
+
+/** Големи копчиња 1–5 за оцена; `selected` 1–5 или null. */
+function pacientOcenaScaleHtml(terminId, selected) {
+  var parts =
+    '<div class="pacient-ocena-scale" id="pacient-ocena-scale-' +
+    terminId +
+    '" role="group" aria-label="Оцена од 1 до 5">';
+  for (var s = 1; s <= 5; s++) {
+    var active = selected === s;
+    parts +=
+      '<button type="button" class="pacient-ocena-num' +
+      (active ? ' pacient-ocena-num--active' : '') +
+      '" data-ocena="' +
+      s +
+      '" aria-pressed="' +
+      (active ? 'true' : 'false') +
+      '" onclick="selectPacientOcena(' +
+      terminId +
+      ',' +
+      s +
+      ')">' +
+      s +
+      '</button>';
+  }
+  parts += '</div>';
+  parts +=
+    '<input type="hidden" id="pacient-ocena-val-' + terminId + '" value="' + (selected != null ? selected : '') + '" />';
+  return parts;
+}
+
+/** Избери број на скалата (и при прв избор и при менување). */
+function selectPacientOcena(terminId, n) {
+  var hid = document.getElementById('pacient-ocena-val-' + terminId);
+  if (hid) hid.value = String(n);
+  var wrap = document.getElementById('pacient-ocena-scale-' + terminId);
+  if (!wrap) return;
+  var btns = wrap.querySelectorAll('.pacient-ocena-num');
+  for (var i = 0; i < btns.length; i++) {
+    var v = parseInt(btns[i].getAttribute('data-ocena'), 10);
+    var on = v === n;
+    btns[i].classList.toggle('pacient-ocena-num--active', on);
+    btns[i].setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+}
+
+window.selectPacientOcena = selectPacientOcena;
+
+/**
+ * Вчитај завршени прегледи за најавениот пациент и прикажи форма за оцена (секција #pacient-ocenki-section).
+ */
+async function loadPacientZavrseniZaOcenka() {
+  var section = document.getElementById('pacient-ocenki-section');
+  var listEl = document.getElementById('pacient-ocenki-list');
+  if (!section || !listEl) return;
+
+  if (!currentPacient || !currentPacient.pacient_ID) {
+    section.style.display = 'none';
+    listEl.innerHTML = '<p class="pacient-ocenki-placeholder">Најавете се како пациент за да ги видите прегледите.</p>';
+    return;
+  }
+
+  section.style.display = 'block';
+  listEl.innerHTML = '<div class="loading">Вчитувам прегледи...</div>';
+
+  try {
+    var res = await fetch(
+      API_BASE + '/pacienti/zavrseni-za-ocenka?pacient_ID=' + encodeURIComponent(String(currentPacient.pacient_ID))
+    );
+    if (!res.ok) {
+      var errText = 'Грешка при вчитување';
+      try {
+        var ej = await res.json();
+        errText = ej.detail || errText;
+      } catch (e2) {}
+      listEl.innerHTML = '<p class="pacient-ocenki-error">' + errText + '</p>';
+      return;
+    }
+    var data = await res.json();
+    var items = data.pregledi || [];
+
+    if (items.length === 0) {
+      listEl.innerHTML =
+        '<p class="pacient-ocenki-empty">Нема завршени прегледи за оцена. Кога лекарот ќе го означи прегледот како <strong>завршен</strong>, ќе се појави тука.</p>';
+      return;
+    }
+
+    var html = items
+      .map(function (p) {
+        var tid = p.termin_ID;
+        var datum = p.datum_pregled || '';
+        var vr = p.vreme_pregled || '';
+        var lek = p.ime_lekar || '—';
+        var initialOcena =
+          p.dadena_ocena != null && p.dadena_ocena >= 1 && p.dadena_ocena <= 5 ? p.dadena_ocena : null;
+        var hint = p.veke_ocenat
+          ? '<p class="pacient-ocenka-hint">Можете да ја промените оцената или коментарот и повторно да зачувате.</p>'
+          : '';
+        return (
+          '<div class="pacient-ocenka-card' +
+          (p.veke_ocenat ? ' pacient-ocenka-card--rated' : '') +
+          '" id="pacient-ocenka-card-' +
+          tid +
+          '">' +
+          '<div class="pacient-ocenka-head"><span class="pacient-ocenka-when">' +
+          datum +
+          (vr ? ' · ' + vr : '') +
+          '</span><span class="pacient-ocenka-doc">' +
+          lek +
+          '</span></div>' +
+          hint +
+          '<div class="pacient-ocenka-form">' +
+          '<span class="pacient-ocenka-label">Оцена</span>' +
+          pacientOcenaScaleHtml(tid, initialOcena) +
+          '<label class="pacient-ocenka-label" for="pacient-ocena-kom-' +
+          tid +
+          '">Коментар (опционално)</label>' +
+          '<textarea id="pacient-ocena-kom-' +
+          tid +
+          '" class="pacient-ocena-kom" rows="2" placeholder="Краток коментар..."></textarea>' +
+          '<button type="button" id="pacient-ocena-submit-' +
+          tid +
+          '" class="btn-primary pacient-ocena-btn" onclick="submitPacientOcena(' +
+          tid +
+          ')">Зачувај оцена</button>' +
+          '</div></div>'
+        );
+      })
+      .join('');
+    listEl.innerHTML = html;
+    items.forEach(function (p) {
+      var ta = document.getElementById('pacient-ocena-kom-' + p.termin_ID);
+      if (ta && p.komentar) ta.value = p.komentar;
+    });
+  } catch (err) {
+    listEl.innerHTML =
+      '<p class="pacient-ocenki-error">' +
+      (err && err.message ? err.message : 'Не можев да се поврзам со серверот.') +
+      '</p>';
+  }
+}
+
+/**
+ * Прати оцена за termin_ID (повикано од копче во картичката).
+ */
+async function submitPacientOcena(terminId) {
+  if (!currentPacient || !currentPacient.pacient_ID) {
+    alert('Најавете се како пациент.');
+    return;
+  }
+  var hid = document.getElementById('pacient-ocena-val-' + terminId);
+  var komEl = document.getElementById('pacient-ocena-kom-' + terminId);
+  var ocena = hid && hid.value !== '' ? parseInt(hid.value, 10) : NaN;
+  var komentar = komEl ? komEl.value.trim() : '';
+  if (!ocena || ocena < 1 || ocena > 5) {
+    alert('Притиснете еден од броевите 1 до 5 погоре.');
+    return;
+  }
+  var btn = document.getElementById('pacient-ocena-submit-' + terminId);
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Зачувувам...';
+  }
+  try {
+    var res = await fetch(API_BASE + '/pacienti/oceni-pregled', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        termin_id: terminId,
+        pacient_ID: currentPacient.pacient_ID,
+        ocena: ocena,
+        komentar: komentar || undefined
+      })
+    });
+    var payload = null;
+    try {
+      payload = await res.json();
+    } catch (e) {}
+    if (!res.ok) {
+      var msg = (payload && payload.detail) || 'Грешка при испраќање на оцената.';
+      alert(msg);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = 'Зачувај оцена';
+      }
+      return;
+    }
+    await loadPacientZavrseniZaOcenka();
+    alert(payload && payload.message ? payload.message : 'Оцената е зачувана.');
+  } catch (err) {
+    alert(err && err.message ? err.message : 'Грешка при поврзување.');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Зачувај оцена';
+    }
+  }
+}
+
+window.loadPacientZavrseniZaOcenka = loadPacientZavrseniZaOcenka;
+window.submitPacientOcena = submitPacientOcena;
 
 /** Само ако постојат navbar табови (на пр. стара верзија) */
 function setNavAuthRoleTab(role) {

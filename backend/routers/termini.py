@@ -361,10 +361,23 @@ async def update_termin_dijagnoza_terapija(termin_id: int, request: Request):   
         )
         if not db_cursor.fetchone():
             raise HTTPException(status_code=404, detail="Термин не е пронајден")
-        db_cursor.execute(
-            "UPDATE Termin_pregled SET dijagnoza = %s, terapija = %s WHERE termin_ID = %s",
-            ((dijagnoza or "").strip() or None, (terapija or "").strip() or None, termin_id)
-        )
+        dij_n = (dijagnoza or "").strip() or None
+        ter_n = (terapija or "").strip() or None
+        # Кога лекарот ги зачува дијагноза/терапија, прегледот се смета за завршен (пациентот може да оцени).
+        if dij_n or ter_n:
+            db_cursor.execute(
+                """
+                UPDATE Termin_pregled
+                SET dijagnoza = %s, terapija = %s, status_pregled = 'завршен'
+                WHERE termin_ID = %s
+                """,
+                (dij_n, ter_n, termin_id),
+            )
+        else:
+            db_cursor.execute(
+                "UPDATE Termin_pregled SET dijagnoza = %s, terapija = %s WHERE termin_ID = %s",
+                (dij_n, ter_n, termin_id),
+            )
         conn.commit()       # se pravi promena vo bazata, se zacuvuva
         return {"message": "Дијагноза и терапија се ажурирани."}
     except HTTPException:               # formatirana greska

@@ -33,6 +33,7 @@
         <a href="novosti.html" class="nav-link" target="_blank" rel="noopener noreferrer" title="Новости – отвора во нов прозорец">Новости</a>
         <a href="#kontakt" class="nav-link">Контакт</a>
         <a href="#lekari" id="nav-zakazi-pregled" class="nav-link nav-zakazi-pregled" style="display: none;">Закажи преглед</a>
+        <a href="#pacient-ocenki-section" id="nav-oceni-pregled" class="nav-link nav-oceni-pregled" style="display: none;">Оцени преглед</a>
         <div id="nav-auth-guest" class="nav-auth-guest-wrap" aria-label="Најава">
           <button type="button" class="btn-lekar-login" onclick="openNavLoginChoice()">Најави се!</button>
         </div>
@@ -130,6 +131,18 @@
       <div class="lekari-controls" style="display: none;">
         <button id="show-more-btn" class="btn-show-more" onclick="showMoreDoctors()">Прикажи повеќе</button>
         <button id="show-less-btn" class="btn-show-less" style="display: none;" onclick="showLessDoctors()">Прикажи помалку</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="pacient-ocenki-section" class="section pacient-ocenki-section" style="display: none;" aria-label="Оцени завршени прегледи">
+    <div class="container">
+      <h2>Оцени ги завршените прегледи</h2>
+      <p class="pacient-ocenki-intro">
+        Одберете <strong>1–5</strong> за секој завршен преглед на вашата е-пошта; можете и подоцна да ја <strong>промените</strong> оцената или коментарот и повторно да зачувате.
+      </p>
+      <div id="pacient-ocenki-list" class="pacient-ocenki-list">
+        <p class="pacient-ocenki-placeholder">Најавете се како пациент за да ги видите прегледите.</p>
       </div>
     </div>
   </section>
