@@ -289,14 +289,6 @@ async def oceni_pregled(request: Request):
         )
         pac_row = posrednik.fetchone()
         if not pac_row:
-            # #region agent log
-            _agent_dbg(
-                "pacienti.py:oceni_pregled:no_patient",
-                "patient not found",
-                {"pacient_id": pacient_id},
-                "H2",
-            )
-            # #endregion
             raise HTTPException(status_code=404, detail="Пациентот не е пронајден.")
 
         email_pac = (pac_row.get("email") or "").strip().lower()
@@ -311,21 +303,10 @@ async def oceni_pregled(request: Request):
         )
         tp = posrednik.fetchone()
         if not tp:
-            # #region agent log
-            _agent_dbg("pacienti.py:oceni_pregled:no_termin", "termin not found", {"termin_id": termin_id}, "H2")
-            # #endregion
             raise HTTPException(status_code=404, detail="Терминот не е пронајден.")
 
         em_termin = (tp.get("email_pacient") or "").strip().lower()
         if not em_termin or em_termin != email_pac:
-            # #region agent log
-            _agent_dbg(
-                "pacienti.py:oceni_pregled:email_mismatch",
-                "termin not owned by patient email",
-                {"termin_id": termin_id, "match": False},
-                "H3",
-            )
-            # #endregion
             raise HTTPException(
                 status_code=403,
                 detail="Не можете да оцените овој термин (не одговара на вашиот профил).",
@@ -333,14 +314,6 @@ async def oceni_pregled(request: Request):
 
         status = (tp.get("status_pregled") or "").strip()
         if status != "завршен":
-            # #region agent log
-            _agent_dbg(
-                "pacienti.py:oceni_pregled:not_finished",
-                "termin not завршен",
-                {"termin_id": termin_id, "status_pregled": status},
-                "H4",
-            )
-            # #endregion
             raise HTTPException(
                 status_code=400,
                 detail="Оцена може да се остави само за преглед со статус „завршен“.",
@@ -365,15 +338,6 @@ async def oceni_pregled(request: Request):
         )
         out = posrednik.fetchone()
 
-        # #region agent log
-        _agent_dbg(
-            "pacienti.py:oceni_pregled:ok",
-            "feedback saved",
-            {"termin_id": termin_id, "feedback_id": out.get("feedback_ID") if out else None},
-            "H5",
-        )
-        # #endregion
-
         return {
             "message": "Оцената е зачувана.",
             "ocenka": {
@@ -387,9 +351,6 @@ async def oceni_pregled(request: Request):
     except HTTPException:
         raise
     except Exception as e:
-        # #region agent log
-        _agent_dbg("pacienti.py:oceni_pregled:error", "exception", {"err_type": type(e).__name__}, "H5")
-        # #endregion
         raise HTTPException(status_code=500, detail="Грешка при зачувување на оцената.") from e
     finally:
         if conn and conn.is_connected():

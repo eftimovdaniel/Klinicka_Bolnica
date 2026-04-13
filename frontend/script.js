@@ -23,6 +23,38 @@ let displayedDoctorsCount = 8;
 var KB_KEY_PACIENT = 'currentPacient';
 var KB_KEY_LEKAR = 'currentLekar';
 
+/** Име и презиме на директорот – исто како check_admin_access на backend */
+var ADMIN_DIRECTOR_NAMES = [
+  'Владко Захариев',
+  'Влатко Захариев',
+  'Владко Захаријев',
+  'Влатко Захаријев'
+];
+
+function normalizeMkPersonName(s) {
+  return String(s || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isLekarHospitalDirector(lekar) {
+  if (!lekar) return false;
+  var full = normalizeMkPersonName((lekar.name || '') + ' ' + (lekar.surname || ''));
+  return ADMIN_DIRECTOR_NAMES.indexOf(full) >= 0;
+}
+
+/** Прикажи го табот „Администрација“ само за директорот (и по освежување на страницата со зачувана сесија). */
+function updateLekarAdminTabVisibility() {
+  var btn = document.getElementById('admin-tab-btn');
+  if (!btn) return;
+  if (!currentLekar || !currentLekar.doctor_ID) {
+    btn.style.display = 'none';
+    return;
+  }
+  btn.style.display = isLekarHospitalDirector(currentLekar) ? 'inline-block' : 'none';
+}
+
 function persistPacientToStorage() {
   if (!currentPacient) return;
   try {
@@ -529,6 +561,7 @@ function updateAuthHeader() {
   if (loP) loP.style.display = currentPacient ? 'inline-block' : 'none';
   if (loL) loL.style.display = loggedLekar ? 'inline-block' : 'none';
   updateNavForPacient();
+  updateLekarAdminTabVisibility();
 }
 
 function logoutPacient() {
@@ -1680,23 +1713,7 @@ function displayLekarDashboard(data) {
     `;
   }
 
-  // Проверка дали најавениот лекар е директорот (Владко Захариев)
-  // Точниот формат во базата е "Владко Захариев"
-  // Само директорот може да види административниот таб
-  const doctorName = `${data.doctor.name} ${data.doctor.surname}`.trim();
-  const adminNames = [
-    "Владко Захариев",  // Точниот формат во базата
-    "Влатко Захариев",  // Варијација со "Влатко"
-    "Владко Захаријев", // Варијација со "Захаријев"
-    "Влатко Захаријев"  // Комбинација на двете варијации
-  ];
-  const isAdmin = adminNames.includes(doctorName);
-  
-  // Прикажи/скриј административниот таб според дали е директор
-  const adminTabBtn = document.getElementById('admin-tab-btn');
-  if (adminTabBtn) {
-    adminTabBtn.style.display = isAdmin ? 'inline-block' : 'none';
-  }
+  updateLekarAdminTabVisibility();
 
   // Прикажи ги термините на лекарот (сите закажани од базата – иста логика како Azure Flexible Server)
   displayLekarTermini(data);
@@ -2749,6 +2766,8 @@ function showAdminSubTab(subTabName) {
     loadNovostiAdmin();
   } else if (subTabName === 'statistika-optovaruvanje-admin') {
     loadAdminStatistikaOptovaruvanje();
+  } else if (subTabName === 'statistika-prosek-ocena-admin') {
+    loadAdminStatistikaProsekOcena();
   }
 }
 
@@ -2856,6 +2875,77 @@ async function loadAdminStatistikaOptovaruvanje() {
   }
 }
 
+// Статистика: просечна оцена по лекар (само директор; JOIN feedback + термини + лекари)
+async function loadAdminStatistikaProsekOcena() {
+  const container = document.getElementById('statistika-prosek-ocena-list');
+  if (!container || !currentLekar) return;
+
+  var odEl = document.getElementById('statistika-ocena-datum-od');
+  var doEl = document.getElementById('statistika-ocena-datum-do');
+  var datumOd = odEl && odEl.value ? odEl.value : '';
+  var datumDo = doEl && doEl.value ? doEl.value : '';
+
+  try {
+    container.innerHTML = '<div class="loading">Вчитувам просечни оцени...</div>';
+
+    var q = 'admin_doctor_id=' + encodeURIComponent(currentLekar.doctor_ID);
+    if (datumOd) q += '&datum_od=' + encodeURIComponent(datumOd);
+    if (datumDo) q += '&datum_do=' + encodeURIComponent(datumDo);
+
+    const res = await fetch(API_BASE + '/admin/statistika/prosek-ocena-lekari?' + q);
+    if (!res.ok) {
+      const error = await res.json().catch(function () { return {}; });
+      throw new Error(error.detail || 'Грешка при вчитување');
+    }
+
+    const data = await res.json();
+    var lekari = data.lekari || [];
+
+    if (lekari.length === 0) {
+      container.innerHTML =
+        '<div class="loading">Нема оцени за избраните филтри (или уште нема записи во Pregled_feedback).</div>';
+      return;
+    }
+
+    var table =
+      '<table class="statistika-oddeli-table" style="width:100%; border-collapse:collapse;">' +
+      '<thead><tr>' +
+      '<th style="text-align:left; padding:0.5rem; border-bottom:2px solid #ddd;">#</th>' +
+      '<th style="text-align:left; padding:0.5rem; border-bottom:2px solid #ddd;">Лекар</th>' +
+      '<th style="text-align:left; padding:0.5rem; border-bottom:2px solid #ddd;">Специјалност</th>' +
+      '<th style="text-align:right; padding:0.5rem; border-bottom:2px solid #ddd;">Просек</th>' +
+      '<th style="text-align:right; padding:0.5rem; border-bottom:2px solid #ddd;">Број оцени</th>' +
+      '</tr></thead><tbody>';
+    lekari.forEach(function (L, idx) {
+      var ime = ((L.ime || '') + ' ' + (L.prezime || '')).trim() || '—';
+      var pr = L.prosek_ocena != null ? Number(L.prosek_ocena).toFixed(2) : '—';
+      var n = L.broj_oceni != null ? L.broj_oceni : 0;
+      table +=
+        '<tr>' +
+        '<td style="padding:0.45rem 0.5rem; border-bottom:1px solid #eee; color:#888;">' +
+        (idx + 1) +
+        '</td>' +
+        '<td style="padding:0.45rem 0.5rem; border-bottom:1px solid #eee;">' +
+        ime +
+        '</td>' +
+        '<td style="padding:0.45rem 0.5rem; border-bottom:1px solid #eee;">' +
+        (L.specijalnost || '—') +
+        '</td>' +
+        '<td style="text-align:right; padding:0.45rem 0.5rem; border-bottom:1px solid #eee;">' +
+        pr +
+        '</td>' +
+        '<td style="text-align:right; padding:0.45rem 0.5rem; border-bottom:1px solid #eee;">' +
+        n +
+        '</td>' +
+        '</tr>';
+    });
+    table += '</tbody></table>';
+    container.innerHTML = table;
+  } catch (err) {
+    container.innerHTML = '<div class="loading" style="color: red;">Грешка: ' + err.message + '</div>';
+  }
+}
+
 async function loadAdminOglasi() {
   const container = document.getElementById('oglasi-admin-list');
   if (!container || !currentLekar) return;
@@ -2929,10 +3019,7 @@ function openDezurstvoForm(dezurstvoId = null) {
     return;
   }
   
-  // Проверка дали најавениот лекар е директорот
-  const doctorName = `${currentLekar.name} ${currentLekar.surname}`.trim();
-  const adminNames = ["Владко Захариев", "Влатко Захариев", "Владко Захаријев", "Влатко Захаријев"];
-  if (!adminNames.includes(doctorName)) {
+  if (!isLekarHospitalDirector(currentLekar)) {
     alert('Немате пристап до административниот панел');
     return;
   }
@@ -3049,16 +3136,7 @@ function openOglasForm(oglasId = null) {
     return;
   }
   
-  // Проверка дали најавениот лекар е директорот (Владко Захариев)
-  // Точниот формат во базата е "Владко Захариев"
-  const doctorName = `${currentLekar.name} ${currentLekar.surname}`.trim();
-  const adminNames = [
-    "Владко Захариев",  // Точниот формат во базата
-    "Влатко Захариев",  // Варијација со "Влатко"
-    "Владко Захаријев", // Варијација со "Захаријев"
-    "Влатко Захаријев"  // Комбинација на двете варијации
-  ];
-  if (!adminNames.includes(doctorName)) {
+  if (!isLekarHospitalDirector(currentLekar)) {
     alert('Немате пристап до административниот панел');
     return;
   }

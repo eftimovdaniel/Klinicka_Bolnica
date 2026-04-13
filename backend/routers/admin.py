@@ -628,3 +628,95 @@ def get_statistika_optovaruvanje_oddeli(
     finally:
         if conn and conn.is_connected():
             conn.close()
+
+
+# ============================================================================
+# СТАТИСТИКА – просечна оцена по лекар (ренген за директор)
+# ============================================================================
+
+@router.get("/statistika/prosek-ocena-lekari")
+def get_statistika_prosek_ocena_lekari(
+    admin_doctor_id: Optional[int] = None,
+    datum_od: Optional[str] = None,
+    datum_do: Optional[str] = None,
+):
+    """
+    Просечна оцена AVG(pf.ocena) и број на гласови COUNT по лекар.
+    JOIN: Pregled_feedback → Termin_pregled → Doctors; GROUP BY doctor_ID.
+    Подредување по просек од највисок кон најнизок.
+    Опционален опсег на датум на прегледот (datum_pregled на терминот).
+    """
+    if admin_doctor_id is None:
+        raise HTTPException(status_code=403, detail="Недостасува ID на администратор")
+    if not check_admin_access(admin_doctor_id):
+        raise HTTPException(status_code=403, detail="Немате пристап до административниот панел")
+
+    conn = None
+    try:
+        conn = get_connection()
+        db_cursor = conn.cursor(dictionary=True)
+
+        query = """
+            SELECT
+                d.doctor_ID,
+                d.name,
+                d.surname,
+                COALESCE(NULLIF(TRIM(d.specialty), ''), 'Непознато') AS specijalnost,
+                ROUND(AVG(pf.ocena), 2) AS prosek_ocena,
+                COUNT(pf.feedback_ID) AS broj_oceni
+            FROM Pregled_feedback pf
+            INNER JOIN Termin_pregled tp ON pf.termin_ID = tp.termin_ID
+            INNER JOIN Doctors d ON tp.doctor_ID = d.doctor_ID
+            WHERE 1=1
+        """
+        params = []
+
+        if datum_od and str(datum_od).strip():
+            if "T" in str(datum_od):
+                datum_od = str(datum_od).split("T")[0]
+            query += " AND DATE(tp.datum_pregled) >= %s"
+            params.append(datum_od.strip())
+
+        if datum_do and str(datum_do).strip():
+            if "T" in str(datum_do):
+                datum_do = str(datum_do).split("T")[0]
+            query += " AND DATE(tp.datum_pregled) <= %s"
+            params.append(datum_do.strip())
+
+        query += """
+            GROUP BY d.doctor_ID, d.name, d.surname, d.specialty
+            HAVING COUNT(pf.feedback_ID) > 0
+            ORDER BY prosek_ocena DESC, broj_oceni DESC, d.surname ASC, d.name ASC
+        """
+
+        db_cursor.execute(query, params)
+        rows = db_cursor.fetchall()
+
+        lekari = []
+        for row in rows:
+            prosek = row.get("prosek_ocena")
+            if prosek is not None:
+                prosek = float(prosek)
+            lekari.append(
+                {
+                    "doctor_ID": row["doctor_ID"],
+                    "ime": (row.get("name") or "").strip(),
+                    "prezime": (row.get("surname") or "").strip(),
+                    "specijalnost": row.get("specijalnost") or "Непознато",
+                    "prosek_ocena": prosek,
+                    "broj_oceni": int(row["broj_oceni"] or 0),
+                }
+            )
+
+        return {
+            "lekari": lekari,
+            "datum_od": datum_od.strip() if datum_od and str(datum_od).strip() else None,
+            "datum_do": datum_do.strip() if datum_do and str(datum_do).strip() else None,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
