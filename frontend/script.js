@@ -353,14 +353,16 @@ async function loadPacientZavrseniZaOcenka() {
           '</span></div>' +
           hint +
           '<div class="pacient-ocenka-form">' +
-          '<span class="pacient-ocenka-label">Оцена</span>' +
+          '<div class="pacient-ocena-block">' +
+          '<span class="pacient-ocenka-label pacient-ocenka-label--ocena">Оцена</span>' +
           pacientOcenaScaleHtml(tid, initialOcena) +
+          '</div>' +
           '<label class="pacient-ocenka-label" for="pacient-ocena-kom-' +
           tid +
           '">Коментар (опционално)</label>' +
           '<textarea id="pacient-ocena-kom-' +
           tid +
-          '" class="pacient-ocena-kom" rows="2" placeholder="Краток коментар..."></textarea>' +
+          '" class="pacient-ocena-kom" rows="4" placeholder="Коментар (опционално)..."></textarea>' +
           '<button type="button" id="pacient-ocena-submit-' +
           tid +
           '" class="btn-primary pacient-ocena-btn" onclick="submitPacientOcena(' +
