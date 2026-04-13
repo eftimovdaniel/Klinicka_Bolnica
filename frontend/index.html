@@ -724,13 +724,21 @@
         <div id="statistika-prosek-ocena-admin" class="admin-sub-tab-content">
           <h4>Просечна оцена по лекар</h4>
           <p class="lekar-termini-hint statistika-ocena-intro">
-            Одберете лекар за приказ на <strong>просечна оцена</strong> и <strong>број на оцени</strong> (пациентски повратни информации по термини).
+            Прво изберете <strong>оддел</strong>, потоа <strong>лекар</strong> од тој оддел — приказ на <strong>просечна оцена</strong> и <strong>број на оцени</strong>.
           </p>
           <div class="statistika-ocena-lekar-toolbar">
-            <label for="statistika-ocena-lekar-select" class="statistika-ocena-lekar-label">Лекар</label>
-            <select id="statistika-ocena-lekar-select" class="statistika-ocena-lekar-select" onchange="loadAdminStatistikaProsekOcena()">
-              <option value="">— Изберете лекар —</option>
-            </select>
+            <div class="statistika-ocena-field">
+              <label for="statistika-ocena-oddel-select" class="statistika-ocena-lekar-label">Оддел</label>
+              <select id="statistika-ocena-oddel-select" class="statistika-ocena-lekar-select" onchange="onProsekOcenaOdelChange()">
+                <option value="">— Изберете оддел —</option>
+              </select>
+            </div>
+            <div class="statistika-ocena-field">
+              <label for="statistika-ocena-lekar-select" class="statistika-ocena-lekar-label">Лекар</label>
+              <select id="statistika-ocena-lekar-select" class="statistika-ocena-lekar-select" disabled onchange="loadAdminStatistikaProsekOcena()">
+                <option value="">— Прво оддел —</option>
+              </select>
+            </div>
           </div>
           <div id="statistika-prosek-ocena-list" class="admin-list">
             <div class="loading">Изберете лекар од менито погоре.</div>

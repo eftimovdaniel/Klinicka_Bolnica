@@ -2875,33 +2875,120 @@ async function loadAdminStatistikaOptovaruvanje() {
   }
 }
 
-/** Полни го паѓачкото мени со сите лекари (еднаш по отворање на табот). */
-async function fillStatistikaProsekOcenaLekarSelect() {
-  var sel = document.getElementById('statistika-ocena-lekar-select');
-  if (!sel || sel.getAttribute('data-filled') === '1') return;
+/** Полни го паѓачкото мени за оддели: само оддели каде што постои барем еден лекар со иста специјалност како името на одделот. */
+async function fillStatistikaProsekOcenaOdelSelect() {
+  var odelSel = document.getElementById('statistika-ocena-oddel-select');
+  if (!odelSel || odelSel.getAttribute('data-filled') === '1') return;
   try {
-    const res = await fetch(API_BASE + '/lekari');
-    if (!res.ok) return;
-    const lekari = await res.json();
-    if (!Array.isArray(lekari)) return;
-    var first = sel.querySelector('option[value=""]');
-    sel.innerHTML = '';
-    if (first) sel.appendChild(first);
-    else {
-      var o0 = document.createElement('option');
-      o0.value = '';
-      o0.textContent = '— Изберете лекар —';
-      sel.appendChild(o0);
+    const [uRes, lRes] = await Promise.all([
+      fetch(API_BASE + '/uslugi'),
+      fetch(API_BASE + '/lekari')
+    ]);
+    if (!uRes.ok || !lRes.ok) return;
+    const uslugi = await uRes.json();
+    const lekari = await lRes.json();
+    var specSet = new Set();
+    if (Array.isArray(lekari)) {
+      lekari.forEach(function (L) {
+        var s = (L.specijalnost || '').trim();
+        if (s) specSet.add(s);
+      });
     }
-    lekari.forEach(function (L) {
-      var opt = document.createElement('option');
-      opt.value = String(L.doctor_ID);
-      var sp = (L.specijalnost || '').trim();
-      opt.textContent = (L.name || '') + ' ' + (L.surname || '') + (sp ? ' — ' + sp : '');
-      sel.appendChild(opt);
+    var odeliZaPrikaz = [];
+    if (Array.isArray(uslugi)) {
+      uslugi.forEach(function (u) {
+        var n = (u.naziv || '').trim();
+        if (n && specSet.has(n)) odeliZaPrikaz.push(n);
+      });
+    }
+    odeliZaPrikaz.sort(function (a, b) {
+      return a.localeCompare(b, 'mk');
     });
-    sel.setAttribute('data-filled', '1');
+    odelSel.innerHTML = '';
+    var o0 = document.createElement('option');
+    o0.value = '';
+    o0.textContent = '— Изберете оддел —';
+    odelSel.appendChild(o0);
+    odeliZaPrikaz.forEach(function (naziv) {
+      var opt = document.createElement('option');
+      opt.value = naziv;
+      opt.textContent = naziv;
+      odelSel.appendChild(opt);
+    });
+    odelSel.setAttribute('data-filled', '1');
   } catch (e) {}
+}
+
+/** По избор на оддел: лекари само за тој оддел (GET /lekari?specijalnost=...). */
+function onProsekOcenaOdelChange() {
+  var odelSel = document.getElementById('statistika-ocena-oddel-select');
+  var lekarSel = document.getElementById('statistika-ocena-lekar-select');
+  var container = document.getElementById('statistika-prosek-ocena-list');
+  if (!lekarSel || !odelSel) return;
+  var odel = (odelSel.value || '').trim();
+
+  lekarSel.innerHTML = '';
+  var oEmpty = document.createElement('option');
+  oEmpty.value = '';
+  oEmpty.textContent = odel ? '— Изберете лекар —' : '— Прво оддел —';
+  lekarSel.appendChild(oEmpty);
+
+  if (!odel) {
+    lekarSel.disabled = true;
+    if (container) {
+      container.innerHTML =
+        '<div class="loading">Изберете оддел, па лекар.</div>';
+    }
+    return;
+  }
+
+  lekarSel.disabled = true;
+  lekarSel.innerHTML = '<option value="">Вчитувам...</option>';
+
+  fetch(API_BASE + '/lekari?specijalnost=' + encodeURIComponent(odel))
+    .then(function (res) {
+      if (!res.ok) throw new Error('Грешка');
+      return res.json();
+    })
+    .then(function (lekari) {
+      lekarSel.innerHTML = '';
+      var oFirst = document.createElement('option');
+      oFirst.value = '';
+      oFirst.textContent = '— Изберете лекар —';
+      lekarSel.appendChild(oFirst);
+      if (!Array.isArray(lekari) || lekari.length === 0) {
+        lekarSel.disabled = true;
+        if (container) {
+          container.innerHTML =
+            '<div class="loading">Нема регистрирани лекари за овој оддел (специјалноста мора да одговара на името на одделот).</div>';
+        }
+        return;
+      }
+      lekarSel.disabled = false;
+      lekari.forEach(function (L) {
+        var opt = document.createElement('option');
+        opt.value = String(L.doctor_ID);
+        var sp = (L.specijalnost || '').trim();
+        opt.textContent = (L.name || '') + ' ' + (L.surname || '') + (sp ? ' — ' + sp : '');
+        lekarSel.appendChild(opt);
+      });
+      if (container) {
+        container.innerHTML =
+          '<div class="loading">Изберете лекар за приказ на оцените.</div>';
+      }
+    })
+    .catch(function () {
+      lekarSel.innerHTML = '';
+      var oErr = document.createElement('option');
+      oErr.value = '';
+      oErr.textContent = '— Изберете лекар —';
+      lekarSel.appendChild(oErr);
+      lekarSel.disabled = true;
+      if (container) {
+        container.innerHTML =
+          '<div class="loading" style="color:red;">Не успеа вчитувањето на лекари за овој оддел.</div>';
+      }
+    });
 }
 
 // Статистика: просечна оцена за избран лекар (директор)
@@ -2909,14 +2996,30 @@ async function loadAdminStatistikaProsekOcena() {
   const container = document.getElementById('statistika-prosek-ocena-list');
   if (!container || !currentLekar) return;
 
-  await fillStatistikaProsekOcenaLekarSelect();
+  await fillStatistikaProsekOcenaOdelSelect();
 
+  var odelSel = document.getElementById('statistika-ocena-oddel-select');
   var sel = document.getElementById('statistika-ocena-lekar-select');
+
+  if (odelSel && odelSel.options.length <= 1) {
+    container.innerHTML =
+      '<div class="loading">Нема оддели за кои во системот постои барем еден лекар чија специјалност е иста како името на одделот. Проверете дали одделите и специјалностите се усогласени.</div>';
+    return;
+  }
+
   var doctorId = sel && sel.value ? parseInt(sel.value, 10) : NaN;
 
   if (!sel || !sel.value || isNaN(doctorId)) {
+    if (!odelSel || !odelSel.value) {
+      container.innerHTML =
+        '<div class="loading">Изберете оддел, па лекар.</div>';
+      return;
+    }
+    if (sel.disabled) {
+      return;
+    }
     container.innerHTML =
-      '<div class="loading">Изберете лекар од паѓачкото мени за да се прикаже просечната оцена и бројот на оцени.</div>';
+      '<div class="loading">Изберете лекар за да се прикаже просечната оцена и бројот на оцени.</div>';
     return;
   }
 
@@ -2984,7 +3087,8 @@ async function loadAdminStatistikaProsekOcena() {
   }
 }
 
-window.fillStatistikaProsekOcenaLekarSelect = fillStatistikaProsekOcenaLekarSelect;
+window.fillStatistikaProsekOcenaOdelSelect = fillStatistikaProsekOcenaOdelSelect;
+window.onProsekOcenaOdelChange = onProsekOcenaOdelChange;
 
 async function loadAdminOglasi() {
   const container = document.getElementById('oglasi-admin-list');
