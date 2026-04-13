@@ -2,3 +2,11 @@
 {"sessionId": "ee0fe2", "timestamp": 1776111927067, "location": "pacienti.py:oceni_pregled:ok", "message": "feedback saved", "data": {"termin_id": 24, "feedback_id": 1}, "hypothesisId": "H5"}
 {"sessionId": "ee0fe2", "timestamp": 1776112375597, "location": "pacienti.py:oceni_pregled:entry", "message": "oceni_pregled called", "data": {"termin_id": 24, "pacient_id": 6, "ocena": 4, "has_komentar": true}, "hypothesisId": "H1"}
 {"sessionId": "ee0fe2", "timestamp": 1776112376498, "location": "pacienti.py:oceni_pregled:ok", "message": "feedback saved", "data": {"termin_id": 24, "feedback_id": 1}, "hypothesisId": "H5"}
+{"sessionId": "ee0fe2", "timestamp": 1776112554056, "location": "pacienti.py:oceni_pregled:entry", "message": "oceni_pregled called", "data": {"termin_id": 24, "pacient_id": 6, "ocena": 4, "has_komentar": true}, "hypothesisId": "H1"}
+{"sessionId": "ee0fe2", "timestamp": 1776112554988, "location": "pacienti.py:oceni_pregled:ok", "message": "feedback saved", "data": {"termin_id": 24, "feedback_id": 1}, "hypothesisId": "H5"}
+{"sessionId": "ee0fe2", "timestamp": 1776112572015, "location": "pacienti.py:oceni_pregled:entry", "message": "oceni_pregled called", "data": {"termin_id": 24, "pacient_id": 6, "ocena": 4, "has_komentar": true}, "hypothesisId": "H1"}
+{"sessionId": "ee0fe2", "timestamp": 1776112572942, "location": "pacienti.py:oceni_pregled:ok", "message": "feedback saved", "data": {"termin_id": 24, "feedback_id": 1}, "hypothesisId": "H5"}
+{"sessionId": "ee0fe2", "timestamp": 1776112637029, "location": "pacienti.py:oceni_pregled:entry", "message": "oceni_pregled called", "data": {"termin_id": 24, "pacient_id": 6, "ocena": 4, "has_komentar": true}, "hypothesisId": "H1"}
+{"sessionId": "ee0fe2", "timestamp": 1776112637929, "location": "pacienti.py:oceni_pregled:ok", "message": "feedback saved", "data": {"termin_id": 24, "feedback_id": 1}, "hypothesisId": "H5"}
+{"sessionId": "ee0fe2", "timestamp": 1776112654805, "location": "pacienti.py:oceni_pregled:entry", "message": "oceni_pregled called", "data": {"termin_id": 24, "pacient_id": 6, "ocena": 5, "has_komentar": true}, "hypothesisId": "H1"}
+{"sessionId": "ee0fe2", "timestamp": 1776112655718, "location": "pacienti.py:oceni_pregled:ok", "message": "feedback saved", "data": {"termin_id": 24, "feedback_id": 1}, "hypothesisId": "H5"}

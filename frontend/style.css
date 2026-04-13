@@ -4188,11 +4188,42 @@ html {
   resize: vertical;
 }
 
+.pacient-ocenka-done {
+  text-align: center;
+  padding: 0.35rem 0 0.25rem;
+}
+
+.pacient-ocenka-sum {
+  margin: 0 0 0.35rem;
+  font-size: 1rem;
+  color: #333;
+}
+
+.pacient-ocenka-kom-preview {
+  margin: 0 0 0.65rem;
+  font-size: 0.88rem;
+  color: #555;
+  line-height: 1.45;
+  font-style: italic;
+  max-width: 100%;
+  word-break: break-word;
+}
+
 .pacient-ocena-btn {
-  align-self: flex-start;
   margin-top: 0.35rem;
   padding: 0.45rem 1rem;
   font-size: 0.95rem;
+}
+
+.pacient-ocena-btn--center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  align-self: center;
+}
+
+.pacient-ocenka-done .btn-primary.pacient-ocena-btn--change {
+  margin: 0.65rem auto 0;
 }
 
 @media (max-width: 600px) {

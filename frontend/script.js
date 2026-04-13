@@ -289,6 +289,27 @@ function selectPacientOcena(terminId, n) {
 
 window.selectPacientOcena = selectPacientOcena;
 
+/** Сокриј резиме, прикажи ја формата за менување оцена. */
+function expandPacientOcena(terminId) {
+  var done = document.getElementById('pacient-ocenka-done-' + terminId);
+  var edit = document.getElementById('pacient-ocenka-edit-' + terminId);
+  if (done) done.style.display = 'none';
+  if (edit) edit.style.display = 'block';
+}
+
+window.expandPacientOcena = expandPacientOcena;
+
+function _pacientKomentarPreview(kom) {
+  if (!kom || !String(kom).trim()) return '';
+  var t = String(kom).trim();
+  if (t.length > 140) t = t.slice(0, 137) + '…';
+  return t
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 /**
  * Вчитај завршени прегледи за најавениот пациент и прикажи форма за оцена (секција #pacient-ocenki-section).
  */
@@ -336,12 +357,16 @@ async function loadPacientZavrseniZaOcenka() {
         var lek = p.ime_lekar || '—';
         var initialOcena =
           p.dadena_ocena != null && p.dadena_ocena >= 1 && p.dadena_ocena <= 5 ? p.dadena_ocena : null;
-        var hint = p.veke_ocenat
-          ? '<p class="pacient-ocenka-hint">Можете да ја промените оцената или коментарот и повторно да зачувате.</p>'
+        var rated = !!p.veke_ocenat;
+        var doneVis = rated ? 'block' : 'none';
+        var editVis = rated ? 'none' : 'block';
+        var ocenaTxt = initialOcena != null ? String(initialOcena) : '—';
+        var komPrev = p.komentar
+          ? '<p class="pacient-ocenka-kom-preview">' + _pacientKomentarPreview(p.komentar) + '</p>'
           : '';
         return (
           '<div class="pacient-ocenka-card' +
-          (p.veke_ocenat ? ' pacient-ocenka-card--rated' : '') +
+          (rated ? ' pacient-ocenka-card--rated' : '') +
           '" id="pacient-ocenka-card-' +
           tid +
           '">' +
@@ -351,7 +376,24 @@ async function loadPacientZavrseniZaOcenka() {
           '</span><span class="pacient-ocenka-doc">' +
           lek +
           '</span></div>' +
-          hint +
+          '<div class="pacient-ocenka-done" id="pacient-ocenka-done-' +
+          tid +
+          '" style="display:' +
+          doneVis +
+          '">' +
+          '<p class="pacient-ocenka-sum">Ваша оцена: <strong>' +
+          ocenaTxt +
+          '</strong> / 5</p>' +
+          komPrev +
+          '<button type="button" class="btn-primary pacient-ocena-btn pacient-ocena-btn--center pacient-ocena-btn--change" onclick="expandPacientOcena(' +
+          tid +
+          ')">Промени оцена</button>' +
+          '</div>' +
+          '<div class="pacient-ocenka-edit" id="pacient-ocenka-edit-' +
+          tid +
+          '" style="display:' +
+          editVis +
+          '">' +
           '<div class="pacient-ocenka-form">' +
           '<div class="pacient-ocena-block">' +
           '<span class="pacient-ocenka-label pacient-ocenka-label--ocena">Оцена</span>' +
@@ -365,10 +407,10 @@ async function loadPacientZavrseniZaOcenka() {
           '" class="pacient-ocena-kom" rows="4" placeholder="Коментар (опционално)..."></textarea>' +
           '<button type="button" id="pacient-ocena-submit-' +
           tid +
-          '" class="btn-primary pacient-ocena-btn" onclick="submitPacientOcena(' +
+          '" class="btn-primary pacient-ocena-btn pacient-ocena-btn--center" onclick="submitPacientOcena(' +
           tid +
           ')">Зачувај оцена</button>' +
-          '</div></div>'
+          '</div></div></div>'
         );
       })
       .join('');
@@ -431,7 +473,6 @@ async function submitPacientOcena(terminId) {
       return;
     }
     await loadPacientZavrseniZaOcenka();
-    alert(payload && payload.message ? payload.message : 'Оцената е зачувана.');
   } catch (err) {
     alert(err && err.message ? err.message : 'Грешка при поврзување.');
     if (btn) {

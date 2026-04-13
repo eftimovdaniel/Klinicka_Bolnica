@@ -1,35 +1,9 @@
-from pathlib import Path
-
 from fastapi import APIRouter, HTTPException, Query, Request
 from datetime import datetime, timedelta
-import json
 import secrets
-import time
-
-import mysql.connector
 
 from database import get_connection
 from password_utils import hash_password, verify_password
-
-_DEBUG_LOG_PATH = Path(__file__).resolve().parent.parent.parent / ".cursor" / "debug-ee0fe2.log"
-
-
-def _agent_dbg(location: str, message: str, data: dict, hypothesis_id: str = "H1") -> None:
-    # #region agent log
-    try:
-        payload = {
-            "sessionId": "ee0fe2",
-            "timestamp": int(time.time() * 1000),
-            "location": location,
-            "message": message,
-            "data": data,
-            "hypothesisId": hypothesis_id,
-        }
-        with open(_DEBUG_LOG_PATH, "a", encoding="utf-8") as _f:
-            _f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
-    # #endregion
 
 router = APIRouter(
     prefix="/pacienti",
@@ -287,15 +261,6 @@ async def oceni_pregled(request: Request):
         pacient_id = data.get("pacient_ID") or data.get("pacient_id")
         ocena_raw = data.get("ocena")
         komentar = (data.get("komentar") or "").strip() or None
-
-        # #region agent log
-        _agent_dbg(
-            "pacienti.py:oceni_pregled:entry",
-            "oceni_pregled called",
-            {"termin_id": termin_id, "pacient_id": pacient_id, "ocena": ocena_raw, "has_komentar": bool(komentar)},
-            "H1",
-        )
-        # #endregion
 
         if termin_id is None or pacient_id is None:
             raise HTTPException(
