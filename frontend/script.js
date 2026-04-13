@@ -271,24 +271,18 @@ function handleMainNavAuthClick() {
 window.openNavLoginChoice = openNavLoginChoice;
 window.closeNavLoginChoice = closeNavLoginChoice;
 
-/** Ажурирај го хедерот: гостинско „Најави се!“ или „Лекарски панел“ кога лекарот е најавен */
+/** Ажурирај го хедерот: „Најави се!“ само за гостин; одјавување за најавен лекар/пациент */
 function updateAuthHeader() {
-  var navBtn = document.getElementById('auto-login_btn');
   var guest = document.getElementById('nav-auth-guest');
   var loP = document.getElementById('nav-logout-pacient');
   var loL = document.getElementById('nav-logout-lekar');
-  if (currentLekar && currentLekar.doctor_ID) {
-    if (guest) guest.style.display = 'none';
-    if (navBtn) {
-      navBtn.style.display = 'inline-block';
-      navBtn.textContent = 'Лекарски панел';
-    }
-  } else {
-    if (guest) guest.style.display = 'inline-block';
-    if (navBtn) navBtn.style.display = 'none';
+  var loggedLekar = !!(currentLekar && currentLekar.doctor_ID);
+  var loggedPacient = !!currentPacient;
+  if (guest) {
+    guest.style.display = loggedLekar || loggedPacient ? 'none' : 'inline-block';
   }
   if (loP) loP.style.display = currentPacient ? 'inline-block' : 'none';
-  if (loL) loL.style.display = currentLekar && currentLekar.doctor_ID ? 'inline-block' : 'none';
+  if (loL) loL.style.display = loggedLekar ? 'inline-block' : 'none';
   updateNavForPacient();
 }
 
@@ -2272,7 +2266,7 @@ window.refreshLekarTerminiAll = async function refreshLekarTerminiAll() {
   }
 };
 
-// Филтер по избран датум – користи исти податоци како /lekari/termini (дијагноза/терапија остануваат во картичките)
+// Филтер по избран датум – ист извор како /lekari/termini, филтер во прелистувач
 window.loadMojRaspored = async function loadMojRaspored() {
   if (!currentLekar || !currentLekar.doctor_ID) {
     alert('Не сте најавени како лекар.');
@@ -2321,7 +2315,10 @@ window.loadMojRaspored = async function loadMojRaspored() {
     });
 
     if (filtered.length === 0) {
-      terminiList.innerHTML = '<div class="loading">Немате закажани термини за ' + datum + '. Кликнете „Сите термини“ за целосна листа.</div>';
+      terminiList.innerHTML =
+        '<div class="loading">Немате закажани термини за ' +
+        datum +
+        '. Кликнете „Сите термини“ за целосна листа.</div>';
       return;
     }
 
@@ -2460,48 +2457,6 @@ function showPacientRegisterError(message) {
   }
 }
 
-// Функции за управување со модалите за пациенти
-function openPacientLoginModal() {
-  const modal = document.getElementById('pacient-login-modal');
-  if (modal) {
-    modal.style.display = 'block';
-  }
-}
-
-function closePacientLoginModal() {
-  const modal = document.getElementById('pacient-login-modal');
-  if (modal) {
-    modal.style.display = 'none';
-    const form = document.getElementById('pacient-login-form');
-    if (form) {
-      form.reset();
-    }
-  }
-}
-
-function showPacientRegister() {
-  closePacientLoginModal();
-  const registerModal = document.getElementById('pacient-register-modal');
-  if (registerModal) {
-    registerModal.style.display = 'block';
-  }
-}
-
-function showPacientLogin() {
-  closePacientRegisterModal();
-  openPacientLoginModal();
-}
-
-function closePacientRegisterModal() {
-  const modal = document.getElementById('pacient-register-modal');
-  if (modal) {
-    modal.style.display = 'none';
-    const form = document.getElementById('pacient-register-form');
-    if (form) {
-      form.reset();
-    }
-  }
-}
 window.openLekarLoginModal = openLekarLoginModal;
 window.closeLekarLoginModal = closeLekarLoginModal;
 window.closeLekarDashboardModal = closeLekarDashboardModal;
@@ -2547,6 +2502,8 @@ function showAdminSubTab(subTabName) {
     loadAdminOglasi();
   } else if (subTabName === 'novosti-admin') {
     loadNovostiAdmin();
+  } else if (subTabName === 'statistika-optovaruvanje-admin') {
+    loadAdminStatistikaOptovaruvanje();
   }
 }
 
@@ -2599,6 +2556,61 @@ async function loadAdminDezurstva() {
 // Вчитување на огласи за администрација
 // Ги вчитува сите огласи за работа од базата и ги прикажува во административниот панел
 // Задолжително треба да се најавен лекар (currentLekar) и да е директорот
+// Статистика: завршени прегледи по специјалност (само директор)
+async function loadAdminStatistikaOptovaruvanje() {
+  const container = document.getElementById('statistika-optovaruvanje-list');
+  if (!container || !currentLekar) return;
+
+  var odEl = document.getElementById('statistika-datum-od');
+  var doEl = document.getElementById('statistika-datum-do');
+  var datumOd = odEl && odEl.value ? odEl.value : '';
+  var datumDo = doEl && doEl.value ? doEl.value : '';
+
+  try {
+    container.innerHTML = '<div class="loading">Вчитувам статистика...</div>';
+
+    var q = 'admin_doctor_id=' + encodeURIComponent(currentLekar.doctor_ID);
+    if (datumOd) q += '&datum_od=' + encodeURIComponent(datumOd);
+    if (datumDo) q += '&datum_do=' + encodeURIComponent(datumDo);
+
+    const res = await fetch(API_BASE + '/admin/statistika/optovaruvanje-oddeli?' + q);
+    if (!res.ok) {
+      const error = await res.json().catch(function () { return {}; });
+      throw new Error(error.detail || 'Грешка при вчитување');
+    }
+
+    const data = await res.json();
+    var razdeli = data.razdeli || [];
+    var vkupno = data.vkupno_zavrseni != null ? data.vkupno_zavrseni : 0;
+
+    if (razdeli.length === 0) {
+      container.innerHTML =
+        '<div class="loading">Нема завршени прегледи за избраните филтри (или нема податоци со статус „завршен“).</div>';
+      return;
+    }
+
+    var table =
+      '<p style="margin-bottom:0.75rem;"><strong>Вкупно завршени прегледи:</strong> ' +
+      vkupno +
+      '</p>' +
+      '<table class="statistika-oddeli-table" style="width:100%; border-collapse:collapse;">' +
+      '<thead><tr><th style="text-align:left; padding:0.5rem; border-bottom:2px solid #ddd;">Специјалност</th>' +
+      '<th style="text-align:right; padding:0.5rem; border-bottom:2px solid #ddd;">Завршени прегледи</th></tr></thead><tbody>';
+    razdeli.forEach(function (r) {
+      table +=
+        '<tr><td style="padding:0.45rem 0.5rem; border-bottom:1px solid #eee;">' +
+        (r.specijalnost || '—') +
+        '</td><td style="text-align:right; padding:0.45rem 0.5rem; border-bottom:1px solid #eee;">' +
+        (r.broj_zavrseni != null ? r.broj_zavrseni : 0) +
+        '</td></tr>';
+    });
+    table += '</tbody></table>';
+    container.innerHTML = table;
+  } catch (err) {
+    container.innerHTML = '<div class="loading" style="color: red;">Грешка: ' + err.message + '</div>';
+  }
+}
+
 async function loadAdminOglasi() {
   const container = document.getElementById('oglasi-admin-list');
   if (!container || !currentLekar) return;
@@ -3921,9 +3933,25 @@ function showLekarRegister() {
 function closeLekarLoginModal() { closeAuthModal(); }
 function closePacientLoginModal() { closeAuthModal(); }
 function closeLekarRegisterModal() { closeAuthModal(); }
-function closePacientRegisterModal() { closeAuthModal(); }
-function showPacientLogin() { showLogin(); }
-function showLekarLogin() { showLogin(); }
+function closePacientRegisterModal() {
+  var oldReg = document.getElementById('pacient-register-modal');
+  if (oldReg) {
+    oldReg.style.display = 'none';
+    var f = document.getElementById('pacient-register-form');
+    if (f) f.reset();
+  }
+  closeAuthModal();
+}
+function showPacientLogin() {
+  currentRole = 'pacient';
+  switchRole('pacient');
+  openLoginModal();
+}
+function showLekarLogin() {
+  currentRole = 'lekar';
+  switchRole('lekar');
+  openLoginModal();
+}
 
 // Експортирај ги функциите глобално
 window.openAuthModal = openLoginModal;

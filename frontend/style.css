@@ -1136,6 +1136,11 @@ footer {
 }
 
 /* Modal */
+/* auth-modal мора над nav-login-choice-overlay (11000) за да се гледа формата по „Пациент“ */
+#auth-modal.modal {
+  z-index: 12100;
+}
+
 .modal {
   display: none;
   position: fixed;

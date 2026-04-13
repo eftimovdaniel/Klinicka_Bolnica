@@ -34,11 +34,11 @@ def get_lekari(specijalnost: Optional[str] = None):                             
     conn = None         # se postavuva deka nema da ima konekcija na pocetokot, sekoja konekcija ja otvaram vo try, a ja zatvaram vo finally
     try:            
         conn = get_connection()                     # povrzuvanje so bazata na podatoci, vo conn se cuva konekcijata
-        db_cursor = conn.cursor(dictionary=True)       # db_cursor objekt sto ovozmozuva da se vrsi sql naredba, argumento (dictionary=True) ni go dava izlezot kako recenica ne kako tuples
+        posrednik = conn.cursor(dictionary=True)       # posrednik objekt sto ovozmozuva da se vrsi sql naredba, argumento (dictionary=True) ni go dava izlezot kako recenica ne kako tuples
         # tuka so voa izlezot ke mi e [ {'id': 1, 'ime': 'Ana', 'vozrast': 22},{'id': 2, 'ime': 'Marko', 'vozrast': 21}]
 
         if specijalnost and specijalnost.strip():   # se proveruva dali e izbrana specijalnost
-            db_cursor.execute("""
+            posrednik.execute("""
                 SELECT doctor_ID, name, surname, COALESCE(specialty, '') AS specijalnost, email
                 FROM Doctors
                 WHERE specialty = %s
@@ -46,12 +46,12 @@ def get_lekari(specijalnost: Optional[str] = None):                             
             """, (specijalnost.strip(),))
         else:
             # сите лекари – вклучувајќи ги и оние без специјалност (ќе се прикаже Н/П на frontend)
-            db_cursor.execute("""
+            posrednik.execute("""
                 SELECT doctor_ID, name, surname, COALESCE(specialty, '') AS specijalnost, email
                 FROM Doctors
                 ORDER BY name, surname
             """)
-        lekari = db_cursor.fetchall()  # fetchall() vraka lista na lekari vo vid na recinica i se zapisuvaat vo promenlivata lakari
+        lekari = posrednik.fetchall()  # fetchall() vraka lista na lekari vo vid na recinica i se zapisuvaat vo promenlivata lakari
         return lekari       # se vrakaat lekarite vo JSON format {"doctor_ID": 1, ...},{... }}
     except Exception as e:  # ako nastane greska, Exception, vo e e smenstena porakata za greska 
         traceback.print_exc()
@@ -80,13 +80,13 @@ async def login_lekar(request: Request):
             raise HTTPException(status_code=400, detail="Внесете лозинка")
         
         conn = get_connection()  # воспоставување конекција со базата на податоци
-        db_cursor = conn.cursor(dictionary=True)  # cursor за извршување SQL наредби со резултат како речник
+        posrednik = conn.cursor(dictionary=True)  # posrednik за извршување SQL наредби со резултат како речник
         
         # Проверка дали постои лекар со даденото корисничко име (име.презиме на латиница)
         # Корисничкото име е во формат "име.презиме" на латиница (напр. "ana.ivanovska")
         # Ги земаме сите лекари и проверуваме во Python дали транслитерираното корисничко име се совпаѓа
-        db_cursor.execute("SELECT doctor_ID, name, surname, email, specialty AS specijalnost, password FROM Doctors")
-        all_doctors = db_cursor.fetchall()
+        posrednik.execute("SELECT doctor_ID, name, surname, email, specialty AS specijalnost, password FROM Doctors")
+        all_doctors = posrednik.fetchall()
         doctor = None
         checked_usernames = []
         
@@ -163,7 +163,7 @@ async def login_lekar(request: Request):
         # Земаме термини со дијагноза и терапија од Termin_pregled табелата
         # ВАЖНО: Според базата, колоните се: Ime_pacient, Ime_lekar (со голема буква I)
         # COALESCE: ако дијагноза/терапија е NULL во базата, врати празен string '' наместо NULL
-        db_cursor.execute("""
+        posrednik.execute("""
             SELECT termin_ID, ime_pacient AS Ime_pacient, datum_pregled, vreme_pregled, email_pacient, telefon_pacient,
                    COALESCE(dijagnoza, '') AS dijagnoza, COALESCE(terapija, '') AS terapija
             FROM Termin_pregled
@@ -171,7 +171,7 @@ async def login_lekar(request: Request):
             ORDER BY datum_pregled, vreme_pregled
         """, (doctor_id,))
         
-        rows = db_cursor.fetchall()  # ги земаме сите термини за лекарот
+        rows = posrednik.fetchall()  # ги земаме сите термини за лекарот
         termini = []  # листа за термините
         
         for r in rows:  # r минува низ сите термини
@@ -253,9 +253,9 @@ async def promeni_lozinka_lekar(request: Request):
             raise HTTPException(status_code=400, detail=msg)
 
         conn = get_connection()
-        db_cursor = conn.cursor(dictionary=True)
-        db_cursor.execute("SELECT doctor_ID, password FROM Doctors WHERE doctor_ID = %s", (doctor_id,))
-        doctor = db_cursor.fetchone()
+        posrednik = conn.cursor(dictionary=True)
+        posrednik.execute("SELECT doctor_ID, password FROM Doctors WHERE doctor_ID = %s", (doctor_id,))
+        doctor = posrednik.fetchone()
         if not doctor:
             raise HTTPException(status_code=404, detail="Лекар не е пронајден")
 
@@ -267,7 +267,7 @@ async def promeni_lozinka_lekar(request: Request):
             raise HTTPException(status_code=401, detail="Тековната лозинка не е точна")
 
         nova_hash = hash_password(nova)
-        db_cursor.execute(
+        posrednik.execute(
             "UPDATE Doctors SET password = %s, must_change_password = 0 WHERE doctor_ID = %s",
             (nova_hash, doctor_id)
         )
@@ -292,15 +292,15 @@ async def forgot_password_lekar(request: Request):
     conn = None
     try:
         conn = get_connection()
-        cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT doctor_ID, name, surname FROM Doctors WHERE LOWER(email) = %s", (email,))
-        doctor = cur.fetchone()
+        posrednik = conn.cursor(dictionary=True)
+        posrednik.execute("SELECT doctor_ID, name, surname FROM Doctors WHERE LOWER(email) = %s", (email,))
+        doctor = posrednik.fetchone()
         if not doctor:
             return {"message": "Ако постои лекар со оваа е-пошта, ќе добиете код. За локална употреба погледнете го терминалот на серверот."}
-        cur.execute("DELETE FROM password_reset_tokens WHERE email = %s AND user_type = 'lekar'", (email,))
+        posrednik.execute("DELETE FROM password_reset_tokens WHERE email = %s AND user_type = 'lekar'", (email,))
         token = secrets.token_urlsafe(12)
         expires = datetime.utcnow() + timedelta(hours=1)
-        cur.execute(
+        posrednik.execute(
             "INSERT INTO password_reset_tokens (email, token, user_type, expires_at) VALUES (%s, %s, 'lekar', %s)",
             (email, token, expires),
         )
@@ -339,21 +339,21 @@ async def reset_password_lekar(request: Request):
     conn = None
     try:
         conn = get_connection()
-        cur = conn.cursor(dictionary=True)
-        cur.execute(
+        posrednik = conn.cursor(dictionary=True)
+        posrednik.execute(
             "SELECT id, email FROM password_reset_tokens WHERE token = %s AND user_type = 'lekar' AND expires_at > UTC_TIMESTAMP()",
             (token,),
         )
-        row = cur.fetchone()
+        row = posrednik.fetchone()
         if not row or (row.get("email") or "").strip().lower() != email:
             raise HTTPException(status_code=400, detail="Неважечки или истечен код. Побарајте нов код.")
-        cur.execute("SELECT doctor_ID FROM Doctors WHERE LOWER(email) = %s", (email,))
-        doctor = cur.fetchone()
+        posrednik.execute("SELECT doctor_ID FROM Doctors WHERE LOWER(email) = %s", (email,))
+        doctor = posrednik.fetchone()
         if not doctor:
             raise HTTPException(status_code=404, detail="Лекар не е пронајден")
         nova_hash = hash_password(nova)
-        cur.execute("UPDATE Doctors SET password = %s, must_change_password = 0 WHERE doctor_ID = %s", (nova_hash, doctor["doctor_ID"]))
-        cur.execute("DELETE FROM password_reset_tokens WHERE token = %s", (token,))
+        posrednik.execute("UPDATE Doctors SET password = %s, must_change_password = 0 WHERE doctor_ID = %s", (nova_hash, doctor["doctor_ID"]))
+        posrednik.execute("DELETE FROM password_reset_tokens WHERE token = %s", (token,))
         conn.commit()
         return {"message": "Лозинката е успешно променета. Можете да се најавите."}
     except HTTPException:
@@ -372,27 +372,27 @@ def get_lekari_termini(email: str):             # funkcija za vrakanje na termin
     conn = None         # nema konekcija
     try:
         conn = get_connection()     # konekcija so bazata na podatoci 
-        db_cursor = conn.cursor(dictionary=True) #db_cursor objekt sto ovozmozuva da se vrsi sql naredba, argumento (dictionary=True) ni go dava izlezot kak orecenica ne kako tuples
+        posrednik = conn.cursor(dictionary=True) #posrednik objekt sto ovozmozuva da se vrsi sql naredba, argumento (dictionary=True) ni go dava izlezot kak orecenica ne kako tuples
         # selekcija na lekar spore mail adresa vnesena i zapisana vo %s
-        db_cursor.execute(
+        posrednik.execute(
             "SELECT doctor_ID, name, surname, email, specialty AS specijalnost FROM Doctors WHERE email = %s",
             (email.strip(),) # se vmetnuva parametarot, mailot
         )
-        doctor = db_cursor.fetchone()      # se dava lekarot so mail, treba da bide eden bidejki sekoj lekar ima unikaten mail 
+        doctor = posrednik.fetchone()      # se dava lekarot so mail, treba da bide eden bidejki sekoj lekar ima unikaten mail 
         if not doctor:                  # ako ne e pronajden mail na lekar koj se sovpaga so nekoj od bazata 
             raise HTTPException(status_code=404, detail="Не е пронајден лекар со таква е-пошта")    # se dava 404 Not Found status i objasnuvanje
         doctor_id = doctor["doctor_ID"]     # ako e pronajden lekar so vnesenito mail se zema soodvetnoto id na lekarot
         # zema terminite so dijagnoza i terapija od Termin_pregled tabelata
         # COALESCE: ako dijagnoza/terapija e NULL vo bazata, vrati prazen string '' namesto NULL
         # ВАЖНО: Според базата, колоните се: Ime_pacient, Ime_lekar (со голема буква I)
-        db_cursor.execute("""
+        posrednik.execute("""
             SELECT termin_ID, ime_pacient AS Ime_pacient, datum_pregled, vreme_pregled, email_pacient, telefon_pacient,
                    COALESCE(dijagnoza, '') AS dijagnoza, COALESCE(terapija, '') AS terapija
             FROM Termin_pregled
             WHERE doctor_ID = %s AND (status_pregled IS NULL OR status_pregled = 'закажан')
             ORDER BY datum_pregled, vreme_pregled
         """, (doctor_id,))
-        rows = db_cursor.fetchall()    # vo rows se zemaat site termini kaj lekar
+        rows = posrednik.fetchall()    # vo rows se zemaat site termini kaj lekar
         termini = []                # lista za termini
         for r in rows:              # r minuva niz site termini
             d = r.get("datum_pregled")      # d- datum na pregled, ako najde termin se smestuva datumot na pregled
@@ -435,116 +435,6 @@ def get_lekari_termini(email: str):             # funkcija za vrakanje na termin
             conn.close()
 
 
-@router.get("/moj-raspored/{lekar_id}")
-def get_moj_raspored(lekar_id: int, datum: Optional[str] = None):
-    """
-    Endpoint за приказ на распоред на термини за одреден лекар.
-    Прифаќа lekar_id и опционален параметар datum (ако нема датум, користи го денешниот).
-    Прави JOIN со табелата patient за да ги извлече името и презимето на пациентот.
-    Резултатот е сортиран по време.
-    """
-    conn = None
-    try:
-        # Ако нема датум, користи го денешниот
-        if not datum:
-            datum = datetime.now().date().strftime("%Y-%m-%d")
-        else:
-            # Проверка за ISO формат
-            if "T" in datum:
-                datum = datum.split("T")[0]
-        
-        # Валидација на датумот
-        try:
-            appointment_date = datetime.strptime(datum, "%Y-%m-%d").date()
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Неважечки формат на датум")
-        
-        conn = get_connection()
-        db_cursor = conn.cursor(dictionary=True)
-        
-        # Проверка дали лекарот постои
-        db_cursor.execute("SELECT doctor_ID, name, surname FROM Doctors WHERE doctor_ID = %s", (lekar_id,))
-        doctor = db_cursor.fetchone()
-        if not doctor:
-            raise HTTPException(status_code=404, detail="Лекар не е пронајден")
-        
-        # Земи ги термините за лекарот на одреден датум со JOIN со patient табелата
-        # JOIN преку email_pacient од Termin_pregled со email од patient табелата
-        db_cursor.execute("""
-            SELECT 
-                tp.termin_ID,
-                tp.datum_pregled,
-                TIME(tp.vreme_pregled) as vreme_pregled,
-                tp.status_pregled,
-                tp.ime_pacient AS Ime_pacient,
-                tp.email_pacient,
-                COALESCE(p.name_patient, '') AS ime_pacient,
-                COALESCE(p.surname_patient, '') AS prezime_pacient
-            FROM Termin_pregled tp
-            LEFT JOIN patient p ON LOWER(TRIM(tp.email_pacient)) = LOWER(TRIM(p.email))
-            WHERE tp.doctor_ID = %s 
-                AND DATE(tp.datum_pregled) = %s
-                AND (tp.status_pregled IS NULL OR tp.status_pregled != 'откажан')
-            ORDER BY tp.vreme_pregled ASC
-        """, (lekar_id, datum))
-        
-        rows = db_cursor.fetchall()
-        raspored = []
-        
-        for r in rows:
-            # Форматирање на времето
-            vreme = r.get("vreme_pregled")
-            if vreme and hasattr(vreme, "strftime"):
-                vreme_str = vreme.strftime("%H:%M")
-            elif vreme and hasattr(vreme, "total_seconds"):
-                s = int(vreme.total_seconds())
-                vreme_str = f"{s // 3600:02d}:{(s % 3600) // 60:02d}"
-            else:
-                vreme_str = str(vreme)[:5] if vreme else ""
-            
-            # Ако имаме име и презиме од patient табелата, користи ги, инаку користи Ime_pacient
-            ime_pacient = ""
-            prezime_pacient = ""
-            
-            if r.get("ime_pacient") and r.get("prezime_pacient"):
-                ime_pacient = r.get("ime_pacient", "").strip()
-                prezime_pacient = r.get("prezime_pacient", "").strip()
-            elif r.get("Ime_pacient"):
-                # Ако нема JOIN, користи го комбинираното име од Termin_pregled
-                ime_puno = r.get("Ime_pacient", "").strip()
-                parts = ime_puno.split(" ", 1)
-                ime_pacient = parts[0] if len(parts) > 0 else ""
-                prezime_pacient = parts[1] if len(parts) > 1 else ""
-            
-            raspored.append({
-                "termin_ID": r.get("termin_ID"),
-                "datum": datum,
-                "vreme": vreme_str,
-                "status": r.get("status_pregled") or "закажан",
-                "ime_pacient": ime_pacient,
-                "prezime_pacient": prezime_pacient,
-                "ime_puno": f"{ime_pacient} {prezime_pacient}".strip() or r.get("Ime_pacient", "").strip(),
-                "email_pacient": r.get("email_pacient", "").strip()
-            })
-        
-        return {
-            "lekar": {
-                "doctor_ID": doctor["doctor_ID"],
-                "ime": doctor["name"],
-                "prezime": doctor["surname"]
-            },
-            "datum": datum,
-            "raspored": raspored
-        }
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        if conn and conn.is_connected():
-            conn.close()
-
-
 @router.get("/{doctor_id}/dezurstva")
 def get_dezurstva(doctor_id: int):
     """
@@ -554,23 +444,23 @@ def get_dezurstva(doctor_id: int):
     conn = None
     try:
         conn = get_connection()
-        db_cursor = conn.cursor(dictionary=True)
+        posrednik = conn.cursor(dictionary=True)
         
         # Земи ги податоците за лекарот
-        db_cursor.execute("SELECT doctor_ID, name, surname, specialty AS specijalnost FROM Doctors WHERE doctor_ID = %s", (doctor_id,))
-        doctor = db_cursor.fetchone()
+        posrednik.execute("SELECT doctor_ID, name, surname, specialty AS specijalnost FROM Doctors WHERE doctor_ID = %s", (doctor_id,))
+        doctor = posrednik.fetchone()
         if not doctor:
             raise HTTPException(status_code=404, detail="Лекар не е пронајден")
         
         # Прво провери дали има дежурства во базата
-        db_cursor.execute("""
+        posrednik.execute("""
             SELECT dezurstvo_ID, datum, oddel, vreme_od, vreme_do, napomena
             FROM Dezurstva
             WHERE doctor_ID = %s
             ORDER BY datum ASC, vreme_od ASC
         """, (doctor_id,))
         
-        dezurstva_from_db = db_cursor.fetchall()
+        dezurstva_from_db = posrednik.fetchall()
         
         if dezurstva_from_db:
             # Ако има дежурства во базата, врати ги
@@ -951,7 +841,7 @@ async def register_lekar(request: Request):
             raise HTTPException(status_code=400, detail=msg)
         
         conn = get_connection()
-        db_cursor = conn.cursor(dictionary=True)
+        posrednik = conn.cursor(dictionary=True)
         
         # Генерирање на корисничко име (име.презиме на латиница во мали букви)
         # ВАЖНО: Корисничкото име мора да биде на латиница, не на кирилица
@@ -961,8 +851,8 @@ async def register_lekar(request: Request):
         
         # Проверка дали веќе постои лекар со истото корисничко име (име.презиме на латиница)
         # Ги земаме сите лекари и проверуваме во Python дали транслитерираното корисничко име се совпаѓа
-        db_cursor.execute("SELECT doctor_ID, name, surname FROM Doctors")
-        existing_doctors = db_cursor.fetchall()
+        posrednik.execute("SELECT doctor_ID, name, surname FROM Doctors")
+        existing_doctors = posrednik.fetchall()
         for existing_doctor in existing_doctors:
             existing_ime_lat = transliterate_mk_to_lat(existing_doctor.get("name") or "")
             existing_prezime_lat = transliterate_mk_to_lat(existing_doctor.get("surname") or "")
@@ -971,21 +861,21 @@ async def register_lekar(request: Request):
                 raise HTTPException(status_code=400, detail="Лекар со ова име и презиме веќе постои")
         
         # Проверка дали веќе постои лекар со истата е-пошта
-        db_cursor.execute("SELECT doctor_ID FROM Doctors WHERE LOWER(email) = %s", (email,))
-        if db_cursor.fetchone():
+        posrednik.execute("SELECT doctor_ID FROM Doctors WHERE LOWER(email) = %s", (email,))
+        if posrednik.fetchone():
             raise HTTPException(status_code=400, detail="Лекар со оваа е-пошта веќе постои")
         
         # Хеширање на лозинката (bcrypt)
         password_hash = hash_password(password)
         
         # Креирање на нов лекар (при само-регистрација лозинката е веќе избрана, не мора да се менува)
-        db_cursor.execute("""
+        posrednik.execute("""
             INSERT INTO Doctors (name, surname, specialty, email, password, must_change_password)
             VALUES (%s, %s, %s, %s, %s, 0)
         """, (ime, prezime, specialty, email, password_hash))
         
         conn.commit()
-        doctor_id = db_cursor.lastrowid
+        doctor_id = posrednik.lastrowid
         
         return {
             "message": "Успешно се регистриравте!",

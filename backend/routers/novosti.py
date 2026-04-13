@@ -11,11 +11,14 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from database import get_connection
 from routers.admin import check_admin_access
 
-from azure.storage.blob import BlobServiceClient    # povrzuvanje na python so azure    
-AZURE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")      # 
-CONTAINER_NAME = os.getenv("AZURE_CONTAINER_NAME")      # vcituvanje na imeto na papkata kade ke se zapisuvaat slikite
+from azure.storage.blob import BlobServiceClient    # povrzuvanje na python so azure
+# ako nema .env / prazen string – nema Azure pri start (inaku from_connection_string(None) frla AttributeError)
+AZURE_CONNECTION_STRING = (os.getenv("AZURE_STORAGE_CONNECTION_STRING") or "").strip()
+CONTAINER_NAME = (os.getenv("AZURE_CONTAINER_NAME") or "").strip()
 
-blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
+blob_service_client = None
+if AZURE_CONNECTION_STRING and CONTAINER_NAME:
+    blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
 
 
 router = APIRouter(tags=["novosti"])
@@ -36,13 +39,23 @@ def _save_upload(file: UploadFile) -> Optional[str]:        # prima objekti od t
     
     name = f"{uuid.uuid4().hex}{ext}"       # generiranje na novo, unikatno ime za fajlot. Korisni e koga dvajca korisnici ke prikacat slika so isto ime
 
+    contents = file.file.read()     # go cita fajlot od memorijata na serverot, binarna forma
+    if blob_service_client and CONTAINER_NAME:
+        try:
+            blob_client = blob_service_client.get_blob_client(container=CONTAINER_NAME, blob=name)      # povrzuvanje so cloud provajderot i se koriste za save na fajlovi vo kontenjeri so unikatno ime
+            blob_client.upload_blob(contents, overwrite=True)   # gi praka podatocite na cloud
+            return blob_client.url
+        except Exception as e:
+            print(f"Грешка при Azure Upload:{e}")
+            return None
+    # lokalen dev: nema Azure – zacuvaj pod static/uploads/novosti, URL za frontend /static/...
     try:
-        blob_client = blob_service_client.get_blob_client(container=CONTAINER_NAME, blob=name)      # povrzuvanje so cloud provajderot i se koriste za save na fajlovi vo kontenjeri so unikatno ime
-        contents = file.file.read()     # go cita fajlot od memorijata na serverot, go pretvara vo binarna forma 
-        blob_client.upload_blob(contents, overwrite=True)   # gi praka podatocite na cloud
-        return blob_client.url
+        _ensure_upload_dir()
+        dest = UPLOAD_DIR / name
+        dest.write_bytes(contents)
+        return f"/static/uploads/novosti/{name}"
     except Exception as e:
-        print (f"Грешка при Azure Upload:{e}")
+        print(f"Грешка при локален upload:{e}")
         return None
     
 def _is_full_url(s: Optional[str]) -> bool:

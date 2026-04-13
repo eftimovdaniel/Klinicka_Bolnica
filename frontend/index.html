@@ -36,7 +36,6 @@
         <div id="nav-auth-guest" class="nav-auth-guest-wrap" aria-label="Најава">
           <button type="button" class="btn-lekar-login" onclick="openNavLoginChoice()">Најави се!</button>
         </div>
-        <button type="button" id="auto-login_btn" class="btn-lekar-login" style="display: none;" onclick="openLekarDashboardModal()">Лекарски панел</button>
         <button type="button" id="nav-logout-pacient" class="btn-nav-logout" style="display: none;" onclick="logoutPacient()" title="Одјавување од профилот на пациент">Одјави се (пациент)</button>
         <button type="button" id="nav-logout-lekar" class="btn-nav-logout" style="display: none;" onclick="logoutLekar()" title="Одјавување од профилот на лекар">Одјави се (лекар)</button>
       </nav>
@@ -656,6 +655,7 @@
           <button type="button" class="admin-sub-tab active" data-admin-subtab="dezurstva-admin" onclick="showAdminSubTab('dezurstva-admin')">Управување со дежурства</button>
           <button type="button" class="admin-sub-tab" data-admin-subtab="oglasi-admin" onclick="showAdminSubTab('oglasi-admin')">Управување со огласи</button>
           <button type="button" class="admin-sub-tab" data-admin-subtab="novosti-admin" onclick="showAdminSubTab('novosti-admin')">Новости</button>
+          <button type="button" class="admin-sub-tab" data-admin-subtab="statistika-optovaruvanje-admin" onclick="showAdminSubTab('statistika-optovaruvanje-admin')">Статистика – оптовареност</button>
         </div>
         
         <!-- Под-таб за дежурства -->
@@ -681,6 +681,28 @@
           <button type="button" class="btn-primary btn-admin-add" onclick="openNovostForm()" style="margin-bottom: 1rem;">+ Додади новост</button>
           <div id="novosti-admin-list" class="admin-list">
             <div class="loading">Вчитувам новости...</div>
+          </div>
+        </div>
+
+        <!-- Под-таб: завршени прегледи по специјалност (директор) -->
+        <div id="statistika-optovaruvanje-admin" class="admin-sub-tab-content">
+          <h4>Оптовареност по специјалност</h4>
+          <p class="lekar-termini-hint" style="margin-bottom: 1rem; color: #555; font-size: 0.95rem;">
+            Број на <strong>завршени</strong> прегледи по специјалност на лекарот (од табелата Termin_pregled). Празен опсег = сите датуми.
+          </p>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end; margin-bottom: 1rem;">
+            <div class="form-group" style="margin: 0;">
+              <label for="statistika-datum-od">Од датум</label>
+              <input type="date" id="statistika-datum-od" />
+            </div>
+            <div class="form-group" style="margin: 0;">
+              <label for="statistika-datum-do">До датум</label>
+              <input type="date" id="statistika-datum-do" />
+            </div>
+            <button type="button" class="btn-raspored-load" onclick="loadAdminStatistikaOptovaruvanje()">Освежи</button>
+          </div>
+          <div id="statistika-optovaruvanje-list" class="admin-list">
+            <div class="loading">Изберете го табот за да се вчита статистиката.</div>
           </div>
         </div>
       </div>
@@ -822,8 +844,8 @@
       <h3 id="nav-login-choice-title">Најавете се</h3>
       <p class="nav-login-choice-hint">Изберете како сакате да се најавите:</p>
       <div class="role-tabs nav-login-choice-tabs" role="tablist">
-        <button type="button" class="role-tab active" onclick="closeNavLoginChoice(); openPacientLoginModal();">Пациент</button>
-        <button type="button" class="role-tab" onclick="closeNavLoginChoice(); openLekarLoginModal();">Лекар</button>
+        <button type="button" class="role-tab active" onclick="event.stopPropagation(); closeNavLoginChoice(); openPacientLoginModal();">Пациент</button>
+        <button type="button" class="role-tab" onclick="event.stopPropagation(); closeNavLoginChoice(); openLekarLoginModal();">Лекар</button>
       </div>
       <button type="button" class="btn-secondary nav-login-choice-cancel" onclick="closeNavLoginChoice()">Откажи</button>
     </div>

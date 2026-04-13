@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime, date, time
 from database import get_connection
 
@@ -544,6 +544,83 @@ def delete_oglas(oglas_id: int, admin_doctor_id: Optional[int] = None):
         conn.commit()
         
         return {"message": "Огласот е успешно избришан"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
+
+
+# ============================================================================
+# СТАТИСТИКА – оптовареност по специјалност (завршени прегледи)
+# ============================================================================
+
+@router.get("/statistika/optovaruvanje-oddeli")
+def get_statistika_optovaruvanje_oddeli(
+    admin_doctor_id: int,
+    datum_od: Optional[str] = None,
+    datum_do: Optional[str] = None,
+):
+    """
+    Број на завршени термини по специјалност на лекарот (од Doctors.specialty).
+    Само редови со status_pregled = 'завршен'. Опционален опсег на datum_pregled.
+    """
+    if not check_admin_access(admin_doctor_id):
+        raise HTTPException(status_code=403, detail="Немате пристап до административниот панел")
+
+    conn = None
+    try:
+        conn = get_connection()
+        db_cursor = conn.cursor(dictionary=True)
+
+        query = """
+            SELECT
+                COALESCE(NULLIF(TRIM(d.specialty), ''), 'Непознато') AS specijalnost,
+                COUNT(*) AS broj_zavrseni
+            FROM Termin_pregled tp
+            INNER JOIN Doctors d ON tp.doctor_ID = d.doctor_ID
+            WHERE tp.status_pregled = 'завршен'
+        """
+        params = []
+
+        if datum_od and str(datum_od).strip():
+            if "T" in str(datum_od):
+                datum_od = str(datum_od).split("T")[0]
+            query += " AND DATE(tp.datum_pregled) >= %s"
+            params.append(datum_od.strip())
+
+        if datum_do and str(datum_do).strip():
+            if "T" in str(datum_do):
+                datum_do = str(datum_do).split("T")[0]
+            query += " AND DATE(tp.datum_pregled) <= %s"
+            params.append(datum_do.strip())
+
+        query += """
+            GROUP BY COALESCE(NULLIF(TRIM(d.specialty), ''), 'Непознато')
+            ORDER BY broj_zavrseni DESC, specijalnost ASC
+        """
+
+        db_cursor.execute(query, params)
+        rows = db_cursor.fetchall()
+
+        razdeli = []
+        vkupno = 0
+        for row in rows:
+            n = int(row["broj_zavrseni"] or 0)
+            vkupno += n
+            razdeli.append({
+                "specijalnost": row["specijalnost"] or "Непознато",
+                "broj_zavrseni": n,
+            })
+
+        return {
+            "razdeli": razdeli,
+            "vkupno_zavrseni": vkupno,
+            "datum_od": datum_od.strip() if datum_od and str(datum_od).strip() else None,
+            "datum_do": datum_do.strip() if datum_do and str(datum_do).strip() else None,
+        }
     except HTTPException:
         raise
     except Exception as e:
