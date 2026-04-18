@@ -30,7 +30,7 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
-# Рутери
+# site ruti gi povikuvam da ne mi e se vo main
 app.include_router(lekari.router)
 app.include_router(pacienti.router)
 app.include_router(termini.router)
