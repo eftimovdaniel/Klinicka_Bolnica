@@ -43,7 +43,7 @@ def get_connection():
         "autocommit": False,
         "charset": "utf8mb4",
         "collation": "utf8mb4_unicode_ci",
-        "use_pure": True,  # Избегнува грешка 'mysql_native_password cannot be loaded'
+        "use_pure": True,  
     }
 
     ssl_ca = os.getenv("DB_SSL_CA", "").strip()
