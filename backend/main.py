@@ -87,7 +87,7 @@ def debug_kariera():
     except Exception as e:
         return {"error": str(e)}
 
-
+# isto kako i prethodnite dva
 @app.get("/debug-db")
 def debug_db():
     """Проверка на конекција и табели – прикажува точна грешка при проблем."""
