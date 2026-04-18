@@ -46,7 +46,7 @@ app.include_router(kariera.app_router)  # /aplikacija (пријава за ог�
 def root():
     return {"message": "Клиничка Болница Штип – API", "docs": "/docs"}
 
-
+# vie treba da gi proveram ama mislam deka nema da mi trebat, voa mi bese za debug 
 @app.get("/debug-novosti")
 def debug_novosti():
     """Приказ на slika_path и slike_extra за сите новости – за проверка што е во базата."""
