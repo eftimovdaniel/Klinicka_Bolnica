@@ -62,7 +62,7 @@ def debug_novosti():
     except Exception as e:
         return {"error": str(e)}
 
-
+# isto i vaj endpoint nema da mi treba za kraj, prezentacija na proekt
 @app.get("/debug-kariera")
 def debug_kariera():
     """Приказ на огласи од Vrabotuvanje – за проверка зошто кариера не се прикажува."""
