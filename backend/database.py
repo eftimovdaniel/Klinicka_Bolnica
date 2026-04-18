@@ -85,7 +85,7 @@ def get_connection():
             print(f"[DEBUG_DB] Грешка при конекција: {e}")
         raise RuntimeError(f"Не може да се поврзе со базата: {e}") from e
 
-
+# voa mi trebase bidejki ne mi gi davase site lekari
 if __name__ == "__main__":
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
