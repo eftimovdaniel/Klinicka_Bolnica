@@ -21,3 +21,6 @@ POST /recepti: Креирање дигитален рецепт поврзан �
 POST /notifikacii/isprati-potvrda: Ендпоинт кој би испраќал автоматски email до пациентот за потврда на неговиот термин.
 
 GET /izvestuvanja/admin: Глобални известувања за сите вработени (на пр. промена во работно време или нови огласи за кариера).
+
+
+voa mi se nekoj raboti so moze da gi dodadam 
