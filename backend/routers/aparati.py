@@ -24,7 +24,7 @@ def get_aparati():
         return aparati
     except Exception as e:
         # Ако табелата не постои или има грешка, врати празна листа
-        # Ова овозможува постепено додавање на апарати во базата
+        # Ова овозможува постепено додавање на апарати во базата на податоци
         return []
     finally:
         if conn and conn.is_connected():
