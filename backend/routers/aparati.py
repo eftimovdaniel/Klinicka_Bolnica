@@ -93,7 +93,7 @@ def check_aparat_dostapnost(aparat: str, datum: str, vreme: str, lekar_id: int =
                 dostapen = False
                 poraki.append("Пациентот има закажан преглед за избраниот датум и време")
         
-        # Проверка дали лекарот има закажан преглед (со било кој пациент) за тоа време
+        # Проверка дали лекарот има закажан преглед (со било кој пациент) за тоа конкретно време 
         if lekar_id:
             db_cursor.execute("""
                 SELECT COUNT(*) as count
