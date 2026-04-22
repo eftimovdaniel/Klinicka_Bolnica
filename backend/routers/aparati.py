@@ -194,7 +194,7 @@ async def create_aparat_termin(request: Request):
         pacient_ime_prezime = f"{pacient_ime} {pacient_prezime}".strip()
         
         # Проверка дали пациентот има закажан преглед за тоа време
-        # Ако има, не може да закаже термин на апарат во исто време
+        # Ако има, не може да закаже термин на апарат во истото време
         db_cursor.execute("""
             SELECT COUNT(*) as count
             FROM Termin_pregled
