@@ -44,7 +44,7 @@ def get_uslugi():       # funkcija za da se prikazat site uslugi na KB, nema pro
     except Exception as e:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))         
-    finally:                                                            # blok za proverka   
+    finally:                                                            # finalen blok za proverka
         if conn and conn.is_connected():                                # se proveruva za konekcija, ako najde aktivna konekcija se zatvara
             conn.close()
 
