@@ -55,7 +55,7 @@ def check_aparat_dostapnost(aparat: str, datum: str, vreme: str, lekar_id: int =
         except ValueError:
             raise HTTPException(status_code=400, detail="Неважечки формат на датум и време")
         
-        # Проверка дали има закажан термин за истиот апарат, датум и време
+        # Проверка дали има закажан термин за истиот апарат, датум и време 
         db_cursor.execute("""
             SELECT COUNT(*) as count
             FROM Aparati_termini
