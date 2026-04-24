@@ -109,7 +109,7 @@ a.nav-maticni-lekari:hover {
 /* Hero Section */
 .hero {
   position: relative;
-  height: 720px; /* целиот екран */
+  height: 720px; 
   overflow: hidden;
   display: flex;
   align-items: center;
