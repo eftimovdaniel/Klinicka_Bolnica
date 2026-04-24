@@ -193,7 +193,7 @@ a.nav-maticni-lekari:hover {
   left: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover; /* сликата го пополнува целиот простор */
+  object-fit: cover; 
   z-index: 1;
 }
 
