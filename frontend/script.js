@@ -3918,9 +3918,6 @@ document.addEventListener('DOMContentLoaded', () =>{
     }
   }
 });
-// ============================================================================
-// НОВИ ФУНКЦИИ ЗА ЕДИНСТВЕН AUTH МОДАЛ
-// ============================================================================
 
 let currentRole = 'pacient'; // 'pacient' или 'lekar'
 let currentAuthMode = 'login'; // 'login' или 'register'
