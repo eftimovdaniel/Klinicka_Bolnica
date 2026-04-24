@@ -47,7 +47,7 @@ async function loadOddelDetails() {
   const description = oddelDescriptions[oddelNaziv] || oddelDescriptions['default'];
   document.getElementById('oddel-description-text').textContent = description;
   
-  // Вчитај лекари од овој оддел
+  
   await loadLekariForOddel(oddelNaziv);
 }
 
