@@ -1,4 +1,5 @@
-FROM python:3.11-slim
+# koja verzija na python ke koristam
+FROM python:3.11-slim   
 
 #avi rabotna papka vnatre vo kontejnerot kade shto kje stoi celiot tvoj kod.
 WORKDIR /app  
@@ -13,5 +14,6 @@ COPY . .
 #frontendot da komunicira so backendot.
 EXPOSE 8000
 
-#: Ja vkluchuva aplikacijata i ja pushta da raboti na Azure serverot.
+#: Ja vkluchuva aplikacijata i ja pushta da raboti na Azure serverot
+# se odviva na porta 8000
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
