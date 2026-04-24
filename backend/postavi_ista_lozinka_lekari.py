@@ -10,6 +10,8 @@
   2. Трчајте: python postavi_ista_lozinka_lekari.py
   3. Сите лекари добиваат лозинка Test123.. и при прва најава мораат да ја сменат.
 """
+
+# postauvanje na site lozinka kaj site lekari, sekoj si ja mene po prvata najava, za da mi se olesen rabotata pri procesot na test
 import sys
 
 # Иста привремена лозинка за сите лекари (мин. 8, голема, број, знак)
