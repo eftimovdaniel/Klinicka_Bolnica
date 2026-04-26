@@ -3987,7 +3987,7 @@ function showForgotPassword() {
   if (title) title.textContent = currentRole === 'lekar' ? 'Заборавена лозинка (лекар)' : 'Заборавена лозинка (пациент)';
 }
 
-// Менаѓање на улога (Пациент/Лекар)
+// promena na ulogata
 function switchRole(role) {
   currentRole = role;
   
