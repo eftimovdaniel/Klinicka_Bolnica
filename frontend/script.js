@@ -3943,7 +3943,7 @@ function openRegisterModal() {
   resetAuthForms();
 }
 
-// Затворање на модалот
+// zatvaranje na modulot
 function closeAuthModal() {
   document.getElementById('auth-modal').style.display = 'none';
   resetAuthForms();
