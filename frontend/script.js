@@ -3932,7 +3932,7 @@ function openLoginModal() {
   resetAuthForms();
 }
 
-// Отворање на модалот за регистрација
+// modul za registracija
 function openRegisterModal() {
   currentAuthMode = 'register';
   document.getElementById('auth-subtitle').textContent = 'Креирајте нов профил';
