@@ -3919,7 +3919,7 @@ document.addEventListener('DOMContentLoaded', () =>{
   }
 });
 
-let currentRole = 'pacient'; // 'pacient' или 'lekar'
+let currentRole = 'pacient'; // pacient ili lekar
 let currentAuthMode = 'login'; // 'login' или 'register'
 
 // Отворање на модалот за најава
