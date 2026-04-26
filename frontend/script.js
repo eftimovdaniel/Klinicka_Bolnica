@@ -3922,7 +3922,7 @@ document.addEventListener('DOMContentLoaded', () =>{
 let currentRole = 'pacient'; // pacient ili lekar
 let currentAuthMode = 'login'; // log in ili regostracija
 
-// Отворање на модалот за најава
+// Modul za najava
 function openLoginModal() {
   currentAuthMode = 'login';
   document.getElementById('auth-subtitle').textContent = 'Најавете се на вашиот профил';
