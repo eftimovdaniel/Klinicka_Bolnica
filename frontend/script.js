@@ -4011,7 +4011,7 @@ function switchRole(role) {
     updateRegisterFields();
   }
   
-  // Ажурирај placeholder за најава (идентификатор: е-пошта за пациент, корисничко име за лекар)
+  // azuriranje na placeholderot za najava
   const identifierInput = document.getElementById('login-identifier');
   if (identifierInput && role === 'lekar') {
     identifierInput.placeholder = 'ime.prezime (од регистрацијата)';
