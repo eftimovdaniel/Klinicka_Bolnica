@@ -4020,7 +4020,7 @@ function switchRole(role) {
   }
 }
 
-// Ажурирање на полињата за регистрација според улогата
+// azuriranje na poleto za najava spored uloga, pacient, lekar
 function updateRegisterFields() {
   const pacientFields = document.getElementById('pacient-only-fields');
   const lekarFields = document.getElementById('lekar-only-fields');
