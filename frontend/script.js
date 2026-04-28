@@ -4006,7 +4006,7 @@ function switchRole(role) {
     setNavAuthRoleTab(role);
   }
   
-  // Ажурирај полиња за регистрација
+  // azuriranje na pole za registracija
   if (currentAuthMode === 'register') {
     updateRegisterFields();
   }
