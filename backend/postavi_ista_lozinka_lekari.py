@@ -24,7 +24,6 @@ def main():
         from password_utils import hash_password
     except Exception as e:
         print("Грешка при поврзување со базата:", e)
-        print("Прочитај го  backend/ директориумот: python postavi_ista_lozinka_lekari.py")
         sys.exit(1)
 
     password = DEFAULT_LOZINKA_LEKARI
