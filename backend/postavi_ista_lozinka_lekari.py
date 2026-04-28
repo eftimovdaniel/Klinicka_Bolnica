@@ -12,6 +12,7 @@
 """
 
 # postauvanje na site lozinka kaj site lekari, sekoj si ja mene po prvata najava, za da mi se olesen rabotata pri procesot na test
+# lozinkata mora da se menuva koga ke se najave lekarot, sega na site e hardcoded lozinka = Test123.., posle toa se mene spored dadeni pravila vo soodvetno pole
 import sys
 
 # Иста привремена лозинка за сите лекари (мин. 8, голема, број, знак)
