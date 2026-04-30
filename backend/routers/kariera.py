@@ -104,6 +104,7 @@ async def create_aplikacija(request: Request):          # site prijaveni kandida
             conn.close()
 
 
+# endpoint za postavuvanje, kreiranje na novi oglasi za rabota
 @router.post("/oglas")
 async def create_oglas(request: Request):    # funkcija za kreiranje na nov oglas za rabota
     conn = None
