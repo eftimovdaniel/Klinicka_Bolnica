@@ -173,6 +173,8 @@ async def create_oglas(request: Request):    # funkcija za kreiranje na nov ogla
         raise
     except Exception as e:              # bilo koja druga greska, so statusen kod i soodvetno objasnuvanje
         raise HTTPException(status_code=500, detail=str(e))
+    
+    # za pogolema bezbednost, zatvaranje na site konekcii
     finally:                    # blok koj ja zatvara konekcija bez razlika dali ima ili nema greska
         if conn and conn.is_connected():
             conn.close()
