@@ -19,6 +19,12 @@ let currentLekar = null;  // Податоци за моментално наја
 let currentPacient = null;  // Податоци за моментално најавениот пациент (за закажување на прегледи)
 // Колку лекари да се исцртаат; се ажурира на бројот на вчитани/филтрирани за да се видат сите
 let displayedDoctorsCount = 8;
+let aiAgentState = {
+  doctor_id: null,
+  doctor_name: '',
+  date: '',
+  freeSlots: []
+};
 
 var KB_KEY_PACIENT = 'currentPacient';
 var KB_KEY_LEKAR = 'currentLekar';
@@ -562,6 +568,7 @@ function updateAuthHeader() {
   if (loL) loL.style.display = loggedLekar ? 'inline-block' : 'none';
   updateNavForPacient();
   updateLekarAdminTabVisibility();
+  updateAiAgentVisibility();
 }
 
 function logoutPacient() {
@@ -610,6 +617,108 @@ function closeAppointmentSuccess() {
     if (currentPacient) persistPacientToStorage();
   } catch (e) {}
   if (typeof updateAuthHeader === 'function') updateAuthHeader();
+}
+
+function updateAiAgentVisibility() {
+  var section = document.getElementById('ai-agent-termini');
+  var panel = document.getElementById('ai-agent-panel');
+  var toggle = document.getElementById('ai-agent-toggle');
+  var prompt = document.getElementById('ai-agent-prompt');
+  var sendBtn = document.getElementById('ai-agent-send');
+  var response = document.getElementById('ai-agent-response');
+  if (!section || !panel || !toggle || !prompt || !sendBtn) return;
+  section.style.display = 'block';
+  if (currentPacient) {
+    prompt.disabled = false;
+    sendBtn.disabled = false;
+    toggle.disabled = false;
+    if (response && !response.dataset.hasResult) {
+      response.textContent = 'AI асистентот е активен. Поставете промпт за проверка на термини или закажување.';
+    }
+  } else {
+    prompt.disabled = true;
+    sendBtn.disabled = true;
+    toggle.disabled = false;
+    if (response) {
+      response.textContent = 'Најавете се како пациент за да го користите AI асистентот.';
+      response.dataset.hasResult = '';
+    }
+  }
+}
+
+function toggleAiAgentPanel() {
+  var panel = document.getElementById('ai-agent-panel');
+  var toggle = document.getElementById('ai-agent-toggle');
+  if (!panel || !toggle) return;
+  var isOpen = panel.style.display !== 'none';
+  panel.style.display = isOpen ? 'none' : 'block';
+  toggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
+}
+
+async function handleAiAgentPrompt() {
+  var promptEl = document.getElementById('ai-agent-prompt');
+  var outEl = document.getElementById('ai-agent-response');
+  if (!promptEl || !outEl) return;
+  var prompt = (promptEl.value || '').trim();
+  if (!prompt) {
+    outEl.textContent = 'Внесете промпт.';
+    return;
+  }
+  if (!currentPacient) {
+    outEl.textContent = 'Потребно е да бидете најавени како пациент.';
+    return;
+  }
+
+  outEl.textContent = 'Обработувам...';
+  outEl.dataset.hasResult = '1';
+
+  try {
+    const res = await fetch(API_BASE + '/ai-agent/termini', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        prompt: prompt,
+        pacient: currentPacient,
+        state: {
+          doctor_id: aiAgentState.doctor_id,
+          doctor_name: aiAgentState.doctor_name,
+          date: aiAgentState.date,
+          free_slots: aiAgentState.freeSlots
+        }
+      })
+    });
+    const data = await res.json().catch(function() { return {}; });
+    if (!res.ok) {
+      throw new Error(data.detail || data.message || 'Грешка при комуникација со AI backend.');
+    }
+    if (data && data.state) {
+      aiAgentState.doctor_id = data.state.doctor_id || null;
+      aiAgentState.doctor_name = data.state.doctor_name || '';
+      aiAgentState.date = data.state.date || '';
+      aiAgentState.freeSlots = Array.isArray(data.state.free_slots) ? data.state.free_slots : [];
+    }
+    outEl.textContent = data.message || 'Нема одговор од AI backend.';
+    if (data.intent === 'book' && data.ok) {
+      promptEl.value = '';
+    }
+  } catch (err) {
+    outEl.textContent = err && err.message ? err.message : 'Настана грешка при обработка на барањето.';
+  }
+}
+
+function setupAiAgent() {
+  var toggle = document.getElementById('ai-agent-toggle');
+  var btn = document.getElementById('ai-agent-send');
+  var input = document.getElementById('ai-agent-prompt');
+  if (!toggle || !btn || !input) return;
+  toggle.addEventListener('click', toggleAiAgentPanel);
+  btn.addEventListener('click', handleAiAgentPrompt);
+  input.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      handleAiAgentPrompt();
+    }
+  });
+  updateAiAgentVisibility();
 }
 
 // Функција за отворање на модален прозорец за закажување на преглед
@@ -1432,6 +1541,7 @@ function initialize() {
   setupModal();
   setupAppointmentForm();
   setupAparatiForm();
+  setupAiAgent();
   setupSmoothScroll();
   setupLekarLogin();
   setupLekarPasswordForms();

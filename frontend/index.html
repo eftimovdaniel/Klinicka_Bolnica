@@ -135,6 +135,23 @@
     </div>
   </section>
 
+  <section id="ai-agent-termini" class="ai-agent-widget" aria-label="AI асистент за закажување термини">
+    <button type="button" id="ai-agent-toggle" class="ai-agent-toggle" aria-expanded="false" title="Отвори AI асистент">
+      <span class="ai-agent-robot">🤖</span>
+    </button>
+    <div id="ai-agent-panel" class="ai-agent-panel" style="display: none;">
+      <h2>AI асистент за термини</h2>
+      <p class="ai-agent-intro">Промпт пример: „Провери слободни термини кај Д-р Име Презиме за 2026-05-12“.</p>
+      <div class="ai-agent-box">
+        <textarea id="ai-agent-prompt" rows="4" placeholder="Напишете го вашиот промпт..."></textarea>
+        <button type="button" id="ai-agent-send" class="btn-primary">Испрати промпт</button>
+        <div id="ai-agent-response" class="ai-agent-response" role="status" aria-live="polite">
+          Најавете се како пациент за да го користите AI асистентот.
+        </div>
+      </div>
+    </div>
+  </section>
+
   <section id="pacient-ocenki-section" class="section pacient-ocenki-section" style="display: none;" aria-label="Оцени завршени прегледи">
     <div class="container">
       <h2>Оцени ги завршените прегледи</h2>
