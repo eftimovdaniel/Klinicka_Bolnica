@@ -80,6 +80,7 @@ def create_novost(
     slike_extra_urls: Optional[str] = Form(None),
     sliki_extra: List[UploadFile] = File(default=[]),
 ):
+    # proverka dali e najaven administrator i dali site potrebni polinja se popolneti ili ne
     if not check_admin_access(admin_doctor_id):
         raise HTTPException(status_code=403, detail="За зал немате пристап, новости се додаваат само од овластени лица во установата. Би благодариме на разбиранјето.")
     naslov = (naslov or "").strip()
