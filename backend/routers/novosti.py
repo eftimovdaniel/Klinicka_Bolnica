@@ -66,7 +66,7 @@ def _is_full_url(s: Optional[str]) -> bool:
     s = s.strip()
     return s.startswith("http://") or s.startswith("https://")
 
-
+# endpoint kade administratoto moze da stavam novosi na sajto na bolncicata, vo ovoj slucj direktorot na ustanovata
 @router.post("/admin/novosti")
 def create_novost(
     naslov: str = Form(...),
