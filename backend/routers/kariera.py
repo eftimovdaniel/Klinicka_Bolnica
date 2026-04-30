@@ -124,7 +124,6 @@ async def create_oglas(request: Request):    # funkcija za kreiranje na nov ogla
         conn = get_connection()         # konekcija so bazata
         db_cursor = conn.cursor(dictionary=True)       # posrednik so bazata
         
-        # Валидацијата за позицијата е отстранета - администраторот може да креира огласи со каква било позиција
         
         # formatiranje na datumite ako se stringovi - proverka i konverzija vo datetime objekt
         # ova e potrebno bidejki frontend moze da prati datum kako string vo razlicni formati
