@@ -24,6 +24,7 @@ if AZURE_CONNECTION_STRING and CONTAINER_NAME:
 
 router = APIRouter(tags=["novosti"])
 
+# pateka do kade ke odat slikite i site dozvoleni formati koj moze da se stavat kako slika video od strana na admin bez da se naprave prob 
 UPLOAD_DIR = Path(__file__).resolve().parent.parent / "static" / "uploads" / "novosti"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
 
