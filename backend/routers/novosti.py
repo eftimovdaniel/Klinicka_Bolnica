@@ -114,6 +114,7 @@ def create_novost(
         conn = get_connection()
         cur = conn.cursor(dictionary=True)
         try:
+            # se vmetnuva site vneseni podatoci vo bazata
             cur.execute(
                 "INSERT INTO Novosti (naslov, sodrzina, slika_path, slika_position, slika_height, video_url, slike_extra, author_doctor_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
                 (naslov, sodrzina, slika_path, slika_position, slika_height, video_url, slike_extra_json, admin_doctor_id),
