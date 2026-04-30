@@ -11,6 +11,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from database import get_connection
 from routers.admin import check_admin_access
 
+# site sliki od novosti se smestuvat vo blob ne lokalno na serverot
 from azure.storage.blob import BlobServiceClient    # povrzuvanje na python so azure
 # ako nema .env / prazen string – nema Azure pri start (inaku from_connection_string(None) frla AttributeError)
 AZURE_CONNECTION_STRING = (os.getenv("AZURE_STORAGE_CONNECTION_STRING") or "").strip()
