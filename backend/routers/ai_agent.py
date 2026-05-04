@@ -93,6 +93,7 @@ def _build_workday_slots():
     return slots
 
 
+# api za termini preku ai agentoto
 @router.post("/termini")
 async def ai_agent_termini(request: Request):
     conn = None
