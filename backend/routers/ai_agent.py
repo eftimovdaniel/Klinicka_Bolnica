@@ -53,7 +53,7 @@ def _normalize_intent(value: str) -> str:
         return "availability"
     return ""
 
-
+# tuka se gleda dali i koj termini se slobodni 
 def _list_busy_times(db_cursor, doctor_id: int, date_iso: str):
     db_cursor.execute(
         """
