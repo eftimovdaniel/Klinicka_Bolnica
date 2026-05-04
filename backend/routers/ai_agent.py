@@ -71,6 +71,7 @@ def _list_busy_times(db_cursor, doctor_id: int, date_iso: str):
     rows = db_cursor.fetchall() or []
     out = set()
     for r in rows:
+        # tuka se gledaat slobodnite vreminja
         v = r.get("vreme")
         if v is None:
             continue
