@@ -67,6 +67,7 @@ def _list_busy_times(db_cursor, doctor_id: int, date_iso: str):
         """,
         (doctor_id, date_iso, doctor_id, date_iso),
     )
+    # se zimat site redovi so se free ako ima, onala se vraka [prazna lista]
     rows = db_cursor.fetchall() or []
     out = set()
     for r in rows:
