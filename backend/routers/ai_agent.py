@@ -1,9 +1,11 @@
 import re
 from datetime import datetime
+import os
 
 from fastapi import APIRouter, HTTPException, Request
 
 from database import get_connection
+from services.llama_parser import parse_prompt_with_llama
 
 router = APIRouter(prefix="/ai-agent", tags=["ai-agent"])
 
@@ -37,6 +39,17 @@ def _detect_intent(prompt_text: str) -> str:
     if "закаж" in text:
         return "book"
     if "слобод" in text or "достап" in text or "провери" in text:
+        return "availability"
+    return ""
+
+
+def _normalize_intent(value: str) -> str:
+    v = _mk_lower(value)
+    if v in ("availability", "book"):
+        return v
+    if "закаж" in v:
+        return "book"
+    if "слобод" in v or "достап" in v or "провери" in v:
         return "availability"
     return ""
 
@@ -92,7 +105,9 @@ async def ai_agent_termini(request: Request):
         if not pacient:
             raise HTTPException(status_code=400, detail="Недостигаат податоци за пациент.")
 
-        intent = _detect_intent(prompt)
+        use_llama = os.getenv("AI_USE_LLAMA", "true").strip().lower() in ("1", "true", "yes")
+        llama_out = parse_prompt_with_llama(prompt) if use_llama else None
+        intent = _normalize_intent((llama_out or {}).get("intent", "")) or _detect_intent(prompt)
         if not intent:
             return {
                 "ok": False,
@@ -104,13 +119,14 @@ async def ai_agent_termini(request: Request):
         db_cursor = conn.cursor(dictionary=True)
 
         prompt_l = _mk_lower(prompt)
+        parsed_doctor_name = _mk_lower((llama_out or {}).get("doctor_name", ""))
         db_cursor.execute("SELECT doctor_ID, name, surname, specialty, email FROM Doctors")
         doctors = db_cursor.fetchall() or []
 
         selected_doctor = None
         for d in doctors:
             full = _mk_lower(f"{d.get('name', '')} {d.get('surname', '')}")
-            if full and full in prompt_l:
+            if full and (full in prompt_l or (parsed_doctor_name and full in parsed_doctor_name)):
                 selected_doctor = d
                 break
 
@@ -120,7 +136,11 @@ async def ai_agent_termini(request: Request):
                     selected_doctor = d
                     break
 
-        date_iso = _extract_iso_date(prompt) or (state.get("date") or "")
+        date_iso = (
+            (llama_out or {}).get("date")
+            or _extract_iso_date(prompt)
+            or (state.get("date") or "")
+        )
         if not selected_doctor:
             return {"ok": False, "message": "Не најдов лекар во промптот. Напишете име и презиме на лекарот.", "state": state}
         if not date_iso:
@@ -163,8 +183,8 @@ async def ai_agent_termini(request: Request):
                 "state": new_state,
             }
 
-        time_hhmm = _extract_time(prompt)
-        note = _extract_note(prompt)
+        time_hhmm = (llama_out or {}).get("time") or _extract_time(prompt)
+        note = (llama_out or {}).get("note") or _extract_note(prompt)
         if not time_hhmm:
             return {"ok": False, "message": "Недостига време (на пр. 10:30).", "state": new_state}
         if time_hhmm in busy:
