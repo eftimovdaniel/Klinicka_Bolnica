@@ -619,29 +619,42 @@ function closeAppointmentSuccess() {
   if (typeof updateAuthHeader === 'function') updateAuthHeader();
 }
 
+function setAiAgentResult(statusKind, statusText, bodyText) {
+  var line = document.getElementById('ai-agent-status-line');
+  var out = document.getElementById('ai-agent-output');
+  if (!line || !out) return;
+  line.className = 'ai-agent-status-line';
+  if (statusKind === 'running') line.classList.add('ai-agent-status-line--running');
+  else if (statusKind === 'ok') line.classList.add('ai-agent-status-line--ok');
+  else if (statusKind === 'fail') line.classList.add('ai-agent-status-line--fail');
+  else line.classList.add('ai-agent-status-line--idle');
+  line.textContent = statusText || '';
+  out.textContent = bodyText || '';
+}
+
 function updateAiAgentVisibility() {
   var section = document.getElementById('ai-agent-termini');
   var panel = document.getElementById('ai-agent-panel');
   var toggle = document.getElementById('ai-agent-toggle');
   var prompt = document.getElementById('ai-agent-prompt');
   var sendBtn = document.getElementById('ai-agent-send');
-  var response = document.getElementById('ai-agent-response');
+  var result = document.getElementById('ai-agent-result');
   if (!section || !panel || !toggle || !prompt || !sendBtn) return;
   section.style.display = 'block';
   if (currentPacient) {
     prompt.disabled = false;
     sendBtn.disabled = false;
     toggle.disabled = false;
-    if (response && !response.dataset.hasResult) {
-      response.textContent = 'AI асистентот е активен. Поставете промпт за проверка на термини или закажување.';
+    if (result && !result.dataset.hasRun) {
+      setAiAgentResult('idle', 'Статус: подготвен', 'Внесете наредба подолу. Агентот ќе провери термини или ќе закаже преглед со вашите податоци од профилот.');
     }
   } else {
     prompt.disabled = true;
     sendBtn.disabled = true;
     toggle.disabled = false;
-    if (response) {
-      response.textContent = 'Најавете се како пациент за да го користите AI асистентот.';
-      response.dataset.hasResult = '';
+    if (result) {
+      result.dataset.hasRun = '';
+      setAiAgentResult('idle', 'Статус: неактивен', 'Најавете се како пациент за да може агентот да извршува задачи во ваше име.');
     }
   }
 }
@@ -657,20 +670,20 @@ function toggleAiAgentPanel() {
 
 async function handleAiAgentPrompt() {
   var promptEl = document.getElementById('ai-agent-prompt');
-  var outEl = document.getElementById('ai-agent-response');
-  if (!promptEl || !outEl) return;
+  var result = document.getElementById('ai-agent-result');
+  if (!promptEl) return;
   var prompt = (promptEl.value || '').trim();
   if (!prompt) {
-    outEl.textContent = 'Внесете промпт.';
+    setAiAgentResult('fail', 'Статус: неуспешно', 'Наредбата е празна. Опишете што треба да се направи.');
     return;
   }
   if (!currentPacient) {
-    outEl.textContent = 'Потребно е да бидете најавени како пациент.';
+    setAiAgentResult('fail', 'Статус: неуспешно', 'Најавете се како пациент за да работи агентот во ваше име.');
     return;
   }
 
-  outEl.textContent = 'Обработувам...';
-  outEl.dataset.hasResult = '1';
+  if (result) result.dataset.hasRun = '1';
+  setAiAgentResult('running', 'Статус: извршување…', 'Се повикува серверот и се обработува наредбата.');
 
   try {
     const res = await fetch(API_BASE + '/ai-agent/termini', {
@@ -689,7 +702,7 @@ async function handleAiAgentPrompt() {
     });
     const data = await res.json().catch(function() { return {}; });
     if (!res.ok) {
-      throw new Error(data.detail || data.message || 'Грешка при комуникација со AI backend.');
+      throw new Error(data.detail || data.message || 'Грешка на серверот.');
     }
     if (data && data.state) {
       aiAgentState.doctor_id = data.state.doctor_id || null;
@@ -697,12 +710,18 @@ async function handleAiAgentPrompt() {
       aiAgentState.date = data.state.date || '';
       aiAgentState.freeSlots = Array.isArray(data.state.free_slots) ? data.state.free_slots : [];
     }
-    outEl.textContent = data.message || 'Нема одговор од AI backend.';
-    if (data.intent === 'book' && data.ok) {
+    var msg = data.message || 'Нема извештај од агентот.';
+    var ok = !!data.ok;
+    if (data.intent === 'book' && ok) {
+      setAiAgentResult('ok', 'Статус: завршено', 'Задачата е извршена.\n\n' + msg);
       promptEl.value = '';
+    } else if (ok) {
+      setAiAgentResult('ok', 'Статус: завршено', msg);
+    } else {
+      setAiAgentResult('fail', 'Статус: неуспешно / нецелосно', msg);
     }
   } catch (err) {
-    outEl.textContent = err && err.message ? err.message : 'Настана грешка при обработка на барањето.';
+    setAiAgentResult('fail', 'Статус: грешка', err && err.message ? err.message : 'Неуспешна врска со серверот.');
   }
 }
 

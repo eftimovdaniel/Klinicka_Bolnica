@@ -135,18 +135,23 @@
     </div>
   </section>
 
-  <section id="ai-agent-termini" class="ai-agent-widget" aria-label="AI асистент за закажување термини">
-    <button type="button" id="ai-agent-toggle" class="ai-agent-toggle" aria-expanded="false" title="Отвори AI асистент">
-      <span class="ai-agent-robot">🤖</span>
+  <section id="ai-agent-termini" class="ai-agent-widget" aria-label="AI агент за автоматски задачи">
+    <button type="button" id="ai-agent-toggle" class="ai-agent-toggle" aria-expanded="false" title="Отвори AI агент">
+      <span class="ai-agent-robot" aria-hidden="true">🤖</span>
     </button>
     <div id="ai-agent-panel" class="ai-agent-panel" style="display: none;">
-      <h2>AI асистент за термини</h2>
-      <p class="ai-agent-intro">Промпт пример: „Провери слободни термини кај Д-р Име Презиме за 2026-05-12“.</p>
+      <div class="ai-agent-panel-head">
+        <h2 class="ai-agent-title">AI агент</h2>
+        <p class="ai-agent-tagline">Ги завршува задачите наместо вас (термини, проверки).</p>
+      </div>
+      <p class="ai-agent-intro">Опишете што треба да се направи. Пример: проверка на слободни термини кај избран лекар за датум 2026-05-12, или закажување со датум, време и напомена.</p>
       <div class="ai-agent-box">
-        <textarea id="ai-agent-prompt" rows="4" placeholder="Напишете го вашиот промпт..."></textarea>
-        <button type="button" id="ai-agent-send" class="btn-primary">Испрати промпт</button>
-        <div id="ai-agent-response" class="ai-agent-response" role="status" aria-live="polite">
-          Најавете се како пациент за да го користите AI асистентот.
+        <label class="ai-agent-field-label" for="ai-agent-prompt">Наредба</label>
+        <textarea id="ai-agent-prompt" rows="3" placeholder="На пр.: Провери слободни термини кај Име Презиме за 2026-05-12"></textarea>
+        <button type="button" id="ai-agent-send" class="btn-primary ai-agent-exec-btn">Изврши</button>
+        <div id="ai-agent-result" class="ai-agent-result" role="region" aria-live="polite" aria-label="Резултат од агентот">
+          <div id="ai-agent-status-line" class="ai-agent-status-line"></div>
+          <div id="ai-agent-output" class="ai-agent-output"></div>
         </div>
       </div>
     </div>

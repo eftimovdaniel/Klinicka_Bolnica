@@ -4348,10 +4348,31 @@ html {
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
 }
 
+.ai-agent-panel-head {
+  margin-bottom: 0.5rem;
+}
+
+.ai-agent-title {
+  font-size: 1.1rem;
+  margin: 0 0 0.2rem;
+  color: #0f172a;
+  letter-spacing: -0.02em;
+}
+
+.ai-agent-tagline {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+}
+
 .ai-agent-intro {
   color: #374151;
   margin: 0 0 0.75rem;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
+  line-height: 1.45;
 }
 
 .ai-agent-box {
@@ -4360,12 +4381,15 @@ html {
   border-radius: 10px;
   padding: 0.75rem;
   display: grid;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 
-.ai-agent-panel h2 {
-  font-size: 1.05rem;
-  margin: 0 0 0.45rem;
+.ai-agent-field-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #475569;
 }
 
 #ai-agent-prompt {
@@ -4373,19 +4397,53 @@ html {
   border: 1px solid #cfd8e3;
   border-radius: 8px;
   padding: 0.75rem;
-  font-size: 1rem;
+  font-size: 0.95rem;
   resize: vertical;
 }
 
-.ai-agent-response {
-  background: #f3f7fb;
-  border: 1px solid #d8e4f0;
+.ai-agent-exec-btn {
+  justify-self: start;
+}
+
+.ai-agent-result {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
-  padding: 0.75rem;
-  color: #1f2937;
-  white-space: pre-line;
-  min-height: 3rem;
-  max-height: 180px;
+  padding: 0.65rem 0.75rem;
+  min-height: 3.25rem;
+}
+
+.ai-agent-status-line {
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+  color: #334155;
+}
+
+.ai-agent-status-line--running {
+  color: #b45309;
+}
+
+.ai-agent-status-line--ok {
+  color: #047857;
+}
+
+.ai-agent-status-line--fail {
+  color: #b91c1c;
+}
+
+.ai-agent-status-line--idle {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.ai-agent-output {
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: #1e293b;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
   overflow: auto;
 }
 
