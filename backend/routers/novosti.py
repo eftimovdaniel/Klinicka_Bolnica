@@ -346,6 +346,40 @@ def get_novost(novost_id: int):
             conn.close()
 
 
+def insert_novost_from_ai(naslov: str, sodrzina: str, admin_doctor_id: int) -> int:
+    """Вметнува нова новост само со наслов и содржина (користи го AI агентот за директорот)."""
+    if not check_admin_access(admin_doctor_id):
+        raise HTTPException(
+            status_code=403,
+            detail="Немате пристап. Само директорот може да објавува новости преку AI.",
+        )
+    naslov = (naslov or "").strip()
+    sodrzina = (sodrzina or "").strip()
+    if not naslov or not sodrzina:
+        raise HTTPException(status_code=400, detail="Насловот и содржината се задолжителни.")
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        try:
+            cur.execute(
+                "INSERT INTO Novosti (naslov, sodrzina, slika_path, slika_position, slika_height, video_url, slike_extra, author_doctor_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
+                (naslov, sodrzina, None, None, None, None, None, admin_doctor_id),
+            )
+        except Exception as ins_err:
+            if "Unknown column" in str(ins_err) or "unknown column" in str(ins_err).lower():
+                cur.execute(
+                    "INSERT INTO Novosti (naslov, sodrzina, slika_path, author_doctor_id) VALUES (%s, %s, %s, %s)",
+                    (naslov, sodrzina, None, admin_doctor_id),
+                )
+            else:
+                raise
+        conn.commit()
+        return int(cur.lastrowid)
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
+
 
 @router.delete("/admin/novosti/{novost_id}")
 def delete_novost(novost_id: int, admin_doctor_id: Optional[int] = None):

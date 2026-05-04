@@ -1,28 +1,21 @@
 import json
-import os
 import re
-from urllib import error, request
+from typing import Any, Dict, Optional
+
+from services.llama_client import ollama_chat_safe
+from services.prompt_loader import get_section
 
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434").rstrip("/")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
-OLLAMA_TIMEOUT_SECONDS = int(os.getenv("OLLAMA_TIMEOUT_SECONDS", "25"))
-
-
-def _extract_first_json_block(text: str):
+def _extract_first_json_block(text: str) -> Optional[dict]:
     s = str(text or "").strip()
     if not s:
         return None
-
-    # First try direct JSON parse.
     try:
         data = json.loads(s)
         if isinstance(data, dict):
             return data
     except Exception:
         pass
-
-    # Fallback: find first {...} block.
     m = re.search(r"\{[\s\S]*\}", s)
     if not m:
         return None
@@ -33,53 +26,57 @@ def _extract_first_json_block(text: str):
         return None
 
 
-def parse_prompt_with_llama(prompt_text: str):
+def parse_prompt_with_llama(prompt_text: str) -> Optional[Dict[str, Any]]:
     """
-    Returns dict with keys:
-      intent: availability|book|''
-      doctor_name: str
-      date: YYYY-MM-DD or ''
-      time: HH:MM or ''
-      note: str
-    Returns None if parsing failed/unavailable.
+    Ollama + промпти од data/ai_system_prompts.json (appointment_parse.system).
+    Враќа dict: intent, doctor_name, date, time, note, workdays (int, опционално).
     """
-    instruction = (
-        "You extract appointment intent for a hospital assistant.\n"
-        "Return ONLY valid JSON object with keys: intent, doctor_name, date, time, note.\n"
-        "Rules:\n"
-        "- intent must be 'availability' or 'book' or ''.\n"
-        "- date format strictly YYYY-MM-DD or ''.\n"
-        "- time format strictly HH:MM (24h) or ''.\n"
-        "- doctor_name should be full name if present, else ''.\n"
-        "- note should be text after note/napomena if present, else ''.\n"
-    )
-    payload = {
-        "model": OLLAMA_MODEL,
-        "prompt": f"{instruction}\nUser prompt:\n{prompt_text}\n",
-        "stream": False,
-        "options": {"temperature": 0},
-    }
-    req = request.Request(
-        f"{OLLAMA_URL}/api/generate",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-
-    try:
-        with request.urlopen(req, timeout=OLLAMA_TIMEOUT_SECONDS) as resp:
-            raw = resp.read().decode("utf-8", errors="replace")
-            outer = json.loads(raw)
-            content = outer.get("response", "")
-            parsed = _extract_first_json_block(content)
-            if not parsed:
-                return None
-            return {
-                "intent": str(parsed.get("intent", "")).strip(),
-                "doctor_name": str(parsed.get("doctor_name", "")).strip(),
-                "date": str(parsed.get("date", "")).strip(),
-                "time": str(parsed.get("time", "")).strip(),
-                "note": str(parsed.get("note", "")).strip(),
-            }
-    except (error.URLError, TimeoutError, json.JSONDecodeError, ValueError):
+    system = get_section("appointment_parse", "system")
+    if not system:
+        system = (
+            "Return ONLY JSON with keys: intent, doctor_name, date, time, note, workdays. "
+            "intent: availability|book|availability_multi|''. date YYYY-MM-DD. time HH:MM."
+        )
+    content = ollama_chat_safe(system, f"Кориснички текст:\n{prompt_text}\n\nВрати само JSON објект.")
+    if not content:
         return None
+    parsed = _extract_first_json_block(content)
+    if not parsed:
+        return None
+    wd = parsed.get("workdays", 5)
+    try:
+        workdays = int(wd)
+    except (TypeError, ValueError):
+        workdays = 5
+    workdays = max(1, min(14, workdays))
+    return {
+        "intent": str(parsed.get("intent", "")).strip(),
+        "doctor_name": str(parsed.get("doctor_name", "")).strip(),
+        "date": str(parsed.get("date", "")).strip(),
+        "time": str(parsed.get("time", "")).strip(),
+        "note": str(parsed.get("note", "")).strip(),
+        "workdays": workdays,
+    }
+
+
+def parse_news_with_llama(source_excerpts: str, director_note: str) -> Optional[Dict[str, str]]:
+    """Ollama → JSON {naslov, sodrzina} за новост."""
+    system = get_section("director_news_from_sources", "system")
+    if not system:
+        system = 'Врати само JSON: {"naslov":"...","sodrzina":"..."} на македонски.'
+    user = (
+        "Извори (извлечен текст од веб-страници):\n"
+        f"{source_excerpts}\n\n"
+        f"Порака од директорот (контекст):\n{director_note}\n"
+    )
+    content = ollama_chat_safe(system, user)
+    if not content:
+        return None
+    parsed = _extract_first_json_block(content)
+    if not parsed:
+        return None
+    naslov = str(parsed.get("naslov", "")).strip()
+    sodrzina = str(parsed.get("sodrzina", "")).strip()
+    if not naslov or not sodrzina:
+        return None
+    return {"naslov": naslov, "sodrzina": sodrzina}
