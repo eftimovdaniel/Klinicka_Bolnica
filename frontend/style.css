@@ -4331,6 +4331,12 @@ html {
   font-size: 1.8rem;
   cursor: pointer;
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+.ai-agent-toggle:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 30px rgba(15, 23, 42, 0.3);
 }
 
 .ai-agent-robot {
@@ -4341,11 +4347,11 @@ html {
 .ai-agent-panel {
   margin-top: 0.65rem;
   width: min(420px, calc(100vw - 2rem));
-  background: #f8fafc;
-  padding: 0.75rem;
-  border: 1px solid #dbe2ea;
-  border-radius: 12px;
-  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
+  background: linear-gradient(180deg, #f8fbff 0%, #f8fafc 100%);
+  padding: 0.9rem;
+  border: 1px solid #d8e3f0;
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.22);
 }
 
 .ai-agent-panel-head {
@@ -4353,9 +4359,9 @@ html {
 }
 
 .ai-agent-title {
-  font-size: 1.1rem;
+  font-size: 1.12rem;
   margin: 0 0 0.2rem;
-  color: #0f172a;
+  color: #0b1220;
   letter-spacing: -0.02em;
 }
 
@@ -4369,9 +4375,9 @@ html {
 }
 
 .ai-agent-intro {
-  color: #374151;
+  color: #334155;
   margin: 0 0 0.75rem;
-  font-size: 0.88rem;
+  font-size: 0.87rem;
   line-height: 1.45;
 }
 
@@ -4399,10 +4405,58 @@ html {
   padding: 0.75rem;
   font-size: 0.95rem;
   resize: vertical;
+  min-height: 82px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#ai-agent-prompt:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+}
+
+.ai-agent-quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.ai-agent-quick-btn {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #1e3a8a;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  cursor: pointer;
+}
+
+.ai-agent-quick-btn:hover {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.ai-agent-actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.ai-agent-hotkey {
+  color: #64748b;
+  font-size: 0.76rem;
 }
 
 .ai-agent-exec-btn {
   justify-self: start;
+  min-width: 110px;
+}
+
+.ai-agent-exec-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .ai-agent-result {
@@ -4454,5 +4508,12 @@ html {
   }
   .ai-agent-panel {
     width: min(360px, calc(100vw - 1rem));
+  }
+  .ai-agent-actions-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ai-agent-exec-btn {
+    width: 100%;
   }
 }

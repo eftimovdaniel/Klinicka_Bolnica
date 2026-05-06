@@ -671,6 +671,7 @@ function toggleAiAgentPanel() {
 async function handleAiAgentPrompt() {
   var promptEl = document.getElementById('ai-agent-prompt');
   var result = document.getElementById('ai-agent-result');
+  var sendBtn = document.getElementById('ai-agent-send');
   if (!promptEl) return;
   var prompt = (promptEl.value || '').trim();
   if (!prompt) {
@@ -683,10 +684,11 @@ async function handleAiAgentPrompt() {
   }
 
   if (result) result.dataset.hasRun = '1';
+  if (sendBtn) sendBtn.disabled = true;
   setAiAgentResult('running', 'Статус: извршување…', 'Се повикува серверот и се обработува наредбата.');
 
   try {
-    const res = await fetch(API_BASE + '/ai-agent/termini', {
+    const res = await fetch(API_BASE + '/ai-agent/baranja', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -722,6 +724,8 @@ async function handleAiAgentPrompt() {
     }
   } catch (err) {
     setAiAgentResult('fail', 'Статус: грешка', err && err.message ? err.message : 'Неуспешна врска со серверот.');
+  } finally {
+    if (sendBtn) sendBtn.disabled = false;
   }
 }
 
@@ -729,9 +733,18 @@ function setupAiAgent() {
   var toggle = document.getElementById('ai-agent-toggle');
   var btn = document.getElementById('ai-agent-send');
   var input = document.getElementById('ai-agent-prompt');
+  var quickButtons = document.querySelectorAll('.ai-agent-quick-btn');
   if (!toggle || !btn || !input) return;
   toggle.addEventListener('click', toggleAiAgentPanel);
   btn.addEventListener('click', handleAiAgentPrompt);
+  quickButtons.forEach(function(el) {
+    el.addEventListener('click', function() {
+      var txt = (el.getAttribute('data-ai-prompt') || '').trim();
+      if (!txt) return;
+      input.value = txt;
+      input.focus();
+    });
+  });
   input.addEventListener('keydown', function(e) {
     if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
       handleAiAgentPrompt();

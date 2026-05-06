@@ -19,12 +19,12 @@ def _mk_lower(s: str) -> str:
     return str(s or "").strip().lower()
 
 
-def _extract_iso_date(prompt_text: str) -> str:
+def _izvadi_iso_datum(prompt_text: str) -> str:
     m = re.search(r"\b(20\d{2}-\d{2}-\d{2})\b", str(prompt_text or ""))
     return m.group(1) if m else ""
 
 
-def _extract_relative_or_iso_date(prompt_text: str, fallback_iso: str = "") -> str:
+def _izvadi_relativen_ili_iso_datum(prompt_text: str, fallback_iso: str = "") -> str:
     text = _mk_lower(prompt_text)
     today = datetime.now().date()
     if "задутре" in text:
@@ -33,7 +33,7 @@ def _extract_relative_or_iso_date(prompt_text: str, fallback_iso: str = "") -> s
         return (today + timedelta(days=1)).isoformat()
     if "денес" in text:
         return today.isoformat()
-    return _extract_iso_date(prompt_text) or fallback_iso
+    return _izvadi_iso_datum(prompt_text) or fallback_iso
 
 
 def _extract_time(prompt_text: str) -> str:
@@ -53,6 +53,10 @@ def _extract_note(prompt_text: str) -> str:
 
 def _detect_intent(prompt_text: str) -> str:
     text = _mk_lower(prompt_text)
+    if ("кој лекари" in text or "кои лекари" in text or "кој доктори" in text or "кои доктори" in text) and (
+        "работ" in text or "оддел" in text or "служб" in text
+    ):
+        return "department_doctors"
     if "да, објави" in text or "да објави" in text or text.strip() == "објави":
         return "news_publish_confirm"
     if ("објави" in text and "вест" in text) and ("http://" in text or "https://" in text or "линк" in text):
@@ -75,6 +79,7 @@ def _normalize_intent(value: str) -> str:
         "book",
         "specialty_week_availability",
         "department_equipment",
+        "department_doctors",
         "news_publish_preview",
         "news_publish_confirm",
     ):
@@ -85,6 +90,8 @@ def _normalize_intent(value: str) -> str:
         return "news_publish_preview"
     if "aparat" in v or "equipment" in v:
         return "department_equipment"
+    if "doctor" in v and "department" in v:
+        return "department_doctors"
     if "specialty" in v and "week" in v:
         return "specialty_week_availability"
     if "закаж" in v:
@@ -183,6 +190,10 @@ def _extract_specialty(prompt_text: str, state):
         return "Педијатрија"
     if "хирург" in text:
         return "Хирургија"
+    if "уролог" in text:
+        return "Урологија"
+    if "интерна" in text:
+        return "Интерна медицина"
     if "овој оддел" in text and state.get("specialty"):
         return state.get("specialty")
     return state.get("specialty", "")
@@ -268,7 +279,10 @@ def _remaining_weekdays():
     return out
 
 
-# api za termini preku ai agentoto
+# API за барања преку AI асистент.
+# Ново (македонски): /ai-agent/baranja
+# Алијас за постоечки клиенти: /ai-agent/termini
+@router.post("/baranja")
 @router.post("/termini")
 async def ai_agent_termini(request: Request):
     conn = None
@@ -417,6 +431,39 @@ async def ai_agent_termini(request: Request):
         if not pacient:
             raise HTTPException(status_code=400, detail="Недостигаат податоци за пациент.")
 
+        if intent == "department_doctors":
+            if not specialty:
+                return {
+                    "ok": False,
+                    "intent": intent,
+                    "message": "Не ја препознав специјалноста. Наведете оддел (на пр. Урологија).",
+                    "state": state,
+                }
+
+            department_doctors = [
+                d for d in doctors
+                if specialty.lower() in _mk_lower(d.get("specialty", ""))
+            ]
+            if not department_doctors:
+                return {
+                    "ok": True,
+                    "intent": intent,
+                    "message": f"Во моментов нема евидентирани лекари за одделот {specialty}.",
+                    "state": {"specialty": specialty},
+                }
+
+            doctor_lines = [f"- Д-р {d.get('name', '')} {d.get('surname', '')}".strip() for d in department_doctors]
+            return {
+                "ok": True,
+                "intent": intent,
+                "message": (
+                    f"На одделот за {specialty.lower()} работат:\n"
+                    + "\n".join(doctor_lines)
+                    + "\n\nДали сакате да проверам слободни термини кај некој од нив?"
+                ),
+                "state": {"specialty": specialty},
+            }
+
         if intent == "specialty_week_availability":
             if not specialty:
                 return {
@@ -515,7 +562,7 @@ async def ai_agent_termini(request: Request):
 
         date_iso = (
             (llama_out or {}).get("date")
-            or _extract_relative_or_iso_date(prompt)
+            or _izvadi_relativen_ili_iso_datum(prompt)
             or (state.get("date") or "")
         )
         if not selected_doctor:

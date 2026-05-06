@@ -12,13 +12,16 @@ from database import get_connection
 from routers.admin import check_admin_access
 
 # site sliki od novosti se smestuvat vo blob ne lokalno na serverot
-from azure.storage.blob import BlobServiceClient    # povrzuvanje na python so azure
+try:
+    from azure.storage.blob import BlobServiceClient    # povrzuvanje na python so azure
+except ImportError:
+    BlobServiceClient = None
 # ako nema .env / prazen string – nema Azure pri start (inaku from_connection_string(None) frla AttributeError)
 AZURE_CONNECTION_STRING = (os.getenv("AZURE_STORAGE_CONNECTION_STRING") or "").strip()
 CONTAINER_NAME = (os.getenv("AZURE_CONTAINER_NAME") or "").strip()
 
 blob_service_client = None
-if AZURE_CONNECTION_STRING and CONTAINER_NAME:
+if BlobServiceClient and AZURE_CONNECTION_STRING and CONTAINER_NAME:
     blob_service_client = BlobServiceClient.from_connection_string(AZURE_CONNECTION_STRING)
 
 
