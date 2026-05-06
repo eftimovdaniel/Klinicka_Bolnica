@@ -346,8 +346,14 @@ def get_novost(novost_id: int):
             conn.close()
 
 
-def insert_novost_from_ai(naslov: str, sodrzina: str, admin_doctor_id: int) -> int:
-    """Вметнува нова новост само со наслов и содржина (користи го AI агентот за директорот)."""
+def insert_novost_from_ai(
+    naslov: str,
+    sodrzina: str,
+    admin_doctor_id: int,
+    slika_url: Optional[str] = None,
+    video_url: Optional[str] = None,
+) -> int:
+    """Вметнува нова AI новост (наслов, содржина и опционално слика/видео URL)."""
     if not check_admin_access(admin_doctor_id):
         raise HTTPException(
             status_code=403,
@@ -355,6 +361,8 @@ def insert_novost_from_ai(naslov: str, sodrzina: str, admin_doctor_id: int) -> i
         )
     naslov = (naslov or "").strip()
     sodrzina = (sodrzina or "").strip()
+    slika_url = (slika_url or "").strip() or None
+    video_url = (video_url or "").strip() or None
     if not naslov or not sodrzina:
         raise HTTPException(status_code=400, detail="Насловот и содржината се задолжителни.")
     conn = None
@@ -364,13 +372,13 @@ def insert_novost_from_ai(naslov: str, sodrzina: str, admin_doctor_id: int) -> i
         try:
             cur.execute(
                 "INSERT INTO Novosti (naslov, sodrzina, slika_path, slika_position, slika_height, video_url, slike_extra, author_doctor_id) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)",
-                (naslov, sodrzina, None, None, None, None, None, admin_doctor_id),
+                (naslov, sodrzina, slika_url, None, None, video_url, None, admin_doctor_id),
             )
         except Exception as ins_err:
             if "Unknown column" in str(ins_err) or "unknown column" in str(ins_err).lower():
                 cur.execute(
                     "INSERT INTO Novosti (naslov, sodrzina, slika_path, author_doctor_id) VALUES (%s, %s, %s, %s)",
-                    (naslov, sodrzina, None, admin_doctor_id),
+                    (naslov, sodrzina, slika_url, admin_doctor_id),
                 )
             else:
                 raise

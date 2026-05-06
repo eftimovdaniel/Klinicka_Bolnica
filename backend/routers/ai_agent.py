@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 import os
 import html
 import urllib.request
+from urllib.parse import urljoin
 
 from fastapi import APIRouter, HTTPException, Request
 
@@ -192,16 +193,18 @@ def _extract_first_url(prompt_text: str) -> str:
     return m.group(1).strip() if m else ""
 
 
-def _extract_webpage_text(url: str) -> str:
+def _download_webpage_html(url: str) -> str:
     req = urllib.request.Request(
         url,
-        headers={
-            "User-Agent": "Mozilla/5.0 (compatible; KBStipAI/1.0)"
-        },
+        headers={"User-Agent": "Mozilla/5.0 (compatible; KBStipAI/1.0)"},
     )
     with urllib.request.urlopen(req, timeout=15) as resp:
         charset = resp.headers.get_content_charset() or "utf-8"
-        raw = resp.read().decode(charset, errors="ignore")
+        return resp.read().decode(charset, errors="ignore")
+
+
+def _extract_text_from_html(raw_html: str) -> str:
+    raw = str(raw_html or "")
     raw = re.sub(r"(?is)<script.*?>.*?</script>", " ", raw)
     raw = re.sub(r"(?is)<style.*?>.*?</style>", " ", raw)
     raw = re.sub(r"(?is)<noscript.*?>.*?</noscript>", " ", raw)
@@ -209,6 +212,45 @@ def _extract_webpage_text(url: str) -> str:
     raw = html.unescape(raw)
     raw = re.sub(r"\s+", " ", raw).strip()
     return raw
+
+
+def _extract_media_urls_from_html(raw_html: str, source_url: str):
+    html_text = str(raw_html or "")
+
+    image_url = ""
+    video_url = ""
+
+    og_img = re.search(r'(?is)<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']', html_text)
+    if og_img:
+        image_url = og_img.group(1).strip()
+
+    if not image_url:
+        first_img = re.search(r'(?is)<img[^>]+src=["\']([^"\']+)["\']', html_text)
+        if first_img:
+            image_url = first_img.group(1).strip()
+
+    og_video = re.search(r'(?is)<meta[^>]+property=["\']og:video(?::url)?["\'][^>]+content=["\']([^"\']+)["\']', html_text)
+    if og_video:
+        video_url = og_video.group(1).strip()
+
+    if not video_url:
+        first_video = re.search(r'(?is)<video[^>]+src=["\']([^"\']+)["\']', html_text)
+        if first_video:
+            video_url = first_video.group(1).strip()
+
+    if not video_url:
+        iframe = re.search(r'(?is)<iframe[^>]+src=["\']([^"\']+)["\']', html_text)
+        if iframe:
+            iframe_url = iframe.group(1).strip()
+            if "youtube.com" in _mk_lower(iframe_url) or "vimeo.com" in _mk_lower(iframe_url):
+                video_url = iframe_url
+
+    if image_url and not image_url.startswith("http://") and not image_url.startswith("https://"):
+        image_url = urljoin(source_url, image_url)
+    if video_url and not video_url.startswith("http://") and not video_url.startswith("https://"):
+        video_url = urljoin(source_url, video_url)
+
+    return image_url, video_url
 
 
 def _mk_weekday_name_mk(day_date):
@@ -262,7 +304,7 @@ async def ai_agent_termini(request: Request):
                     "state": state,
                 }
             try:
-                source_text = _extract_webpage_text(source_url)
+                raw_html = _download_webpage_html(source_url)
             except Exception:
                 return {
                     "ok": False,
@@ -270,6 +312,8 @@ async def ai_agent_termini(request: Request):
                     "message": "Не можев да ја прочитам содржината од линкот. Проверете дали линкот е достапен.",
                     "state": state,
                 }
+            source_text = _extract_text_from_html(raw_html)
+            media_image_url, media_video_url = _extract_media_urls_from_html(raw_html, source_url)
             ai_news = parse_news_with_llama(source_text[:8000], prompt) if use_llama else None
             if not ai_news:
                 return {
@@ -292,14 +336,22 @@ async def ai_agent_termini(request: Request):
                 "naslov": naslov,
                 "sodrzina": sodrzina,
                 "source_url": source_url,
+                "slika_url": media_image_url,
+                "video_url": media_video_url,
             }
+            media_note = []
+            if media_image_url:
+                media_note.append(f"Слика: {media_image_url}")
+            if media_video_url:
+                media_note.append(f"Видео: {media_video_url}")
+            media_block = f"\n{chr(10).join(media_note)}\n" if media_note else "\n"
             return {
                 "ok": True,
                 "intent": intent,
                 "message": (
                     "Веста е обработена. Еве го предлогот за објава:\n"
                     f"Наслов: {naslov}\n"
-                    f"Текст: {sodrzina}\n\n"
+                    f"Текст: {sodrzina}{media_block}\n"
                     "Дали сакате веднаш да ја објавам оваа содржина на почетната страна на веб-сајтот?"
                 ),
                 "state": new_state,
@@ -309,6 +361,8 @@ async def ai_agent_termini(request: Request):
             pending_news = (state or {}).get("pending_news") or {}
             naslov = (pending_news.get("naslov") or "").strip()
             sodrzina = (pending_news.get("sodrzina") or "").strip()
+            slika_url = (pending_news.get("slika_url") or "").strip()
+            video_url = (pending_news.get("video_url") or "").strip()
             if not naslov or not sodrzina:
                 return {
                     "ok": False,
@@ -335,7 +389,13 @@ async def ai_agent_termini(request: Request):
                     "state": state,
                 }
 
-            new_id = insert_novost_from_ai(naslov, sodrzina, admin_doctor_id)
+            new_id = insert_novost_from_ai(
+                naslov=naslov,
+                sodrzina=sodrzina,
+                admin_doctor_id=admin_doctor_id,
+                slika_url=slika_url,
+                video_url=video_url,
+            )
             new_state = dict(state)
             new_state.pop("pending_news", None)
             return {
