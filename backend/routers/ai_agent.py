@@ -51,23 +51,29 @@ def _extract_note(prompt_text: str) -> str:
     return re.sub(r"^[:\s-]+", "", text[idx + len("напомена"):]).strip()
 
 
+def _contains_any(text: str, needles) -> bool:
+    t = _mk_lower(text)
+    return any(n in t for n in needles)
+
+
 def _detect_intent(prompt_text: str) -> str:
     text = _mk_lower(prompt_text)
-    if ("кој лекари" in text or "кои лекари" in text or "кој доктори" in text or "кои доктори" in text) and (
-        "работ" in text or "оддел" in text or "служб" in text
-    ):
+    asks_people = _contains_any(text, ["кој", "кои", "каков состав", "листа"])
+    mentions_doctors = _contains_any(text, ["лекар", "доктор", "уролог", "кардиолог", "радиолог", "педијатар", "хирург"])
+    mentions_department = _contains_any(text, ["оддел", "служб", "специјалност", "област", "тим"])
+    if asks_people and (mentions_doctors or mentions_department):
         return "department_doctors"
-    if "да, објави" in text or "да објави" in text or text.strip() == "објави":
+    if _contains_any(text, ["да, објави", "да објави", "објави веднаш"]) or text.strip() == "објави":
         return "news_publish_confirm"
-    if ("објави" in text and "вест" in text) and ("http://" in text or "https://" in text or "линк" in text):
+    if _contains_any(text, ["објави", "вести", "вест"]) and ("http://" in text or "https://" in text or "линк" in text):
         return "news_publish_preview"
-    if ("какви апарати" in text or "со какви апарати" in text or "апарати" in text) and ("оддел" in text or "област" in text):
+    if _contains_any(text, ["апарат", "опрема", "уред"]) and _contains_any(text, ["оддел", "област", "служб", "специјалност"]):
         return "department_equipment"
-    if ("кои лекари" in text or "кои доктори" in text) and ("оваа недела" in text or "недела" in text):
+    if mentions_doctors and _contains_any(text, ["недела", "оваа недела", "во неделава", "седмица"]):
         return "specialty_week_availability"
-    if "закаж" in text:
+    if _contains_any(text, ["закаж", "резерв", "термин во"]):
         return "book"
-    if "слобод" in text or "достап" in text or "провери" in text:
+    if _contains_any(text, ["слобод", "достап", "провери", "има ли", "кога има"]):
         return "availability"
     return ""
 
@@ -182,17 +188,17 @@ def _find_selected_doctor(doctors, prompt_l: str, parsed_doctor_name: str, state
 
 def _extract_specialty(prompt_text: str, state):
     text = _mk_lower(prompt_text)
-    if "кардиолог" in text:
+    if _contains_any(text, ["кардиолог", "кардио"]):
         return "Кардиологија"
-    if "радиолог" in text:
+    if _contains_any(text, ["радиолог", "радио оддел"]):
         return "Радиологија"
-    if "педијатр" in text:
+    if _contains_any(text, ["педијатр", "детски"]):
         return "Педијатрија"
-    if "хирург" in text:
+    if _contains_any(text, ["хирург", "хирурш", "оператив"]):
         return "Хирургија"
-    if "уролог" in text:
+    if _contains_any(text, ["уролог", "уролош", "уро"]):
         return "Урологија"
-    if "интерна" in text:
+    if _contains_any(text, ["интерна", "внатрешни болести"]):
         return "Интерна медицина"
     if "овој оддел" in text and state.get("specialty"):
         return state.get("specialty")
