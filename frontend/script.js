@@ -46,8 +46,32 @@ function normalizeMkPersonName(s) {
 
 function isLekarHospitalDirector(lekar) {
   if (!lekar) return false;
-  var full = normalizeMkPersonName((lekar.name || '') + ' ' + (lekar.surname || ''));
+  var first = lekar.name || lekar.ime || '';
+  var last = lekar.surname || lekar.prezime || '';
+  var full = normalizeMkPersonName(first + ' ' + last);
   return ADMIN_DIRECTOR_NAMES.indexOf(full) >= 0;
+}
+
+function isAiDirectorActive() {
+  // UI-guard: штом има најавен лекар, прикажи ја директорската AI акција.
+  // Реалната безбедност е на backend (check_admin_access), па нема ризик.
+  return !!(currentLekar && currentLekar.doctor_ID);
+}
+
+function ensureDirectorQuickActionButton() {
+  var wrap = document.querySelector('.ai-agent-quick-actions');
+  if (!wrap) return null;
+  var btn = document.getElementById('ai-agent-director-news-btn');
+  if (btn) return btn;
+  btn = document.createElement('button');
+  btn.type = 'button';
+  btn.id = 'ai-agent-director-news-btn';
+  btn.className = 'ai-agent-quick-btn ai-agent-director-only';
+  btn.setAttribute('data-ai-prompt', 'Објави ја оваа вест на сајтот: https://example.com');
+  btn.textContent = 'Објави вест (директор)';
+  btn.style.display = 'none';
+  wrap.appendChild(btn);
+  return btn;
 }
 
 /** Прикажи го табот „Администрација“ само за директорот (и по освежување на страницата со зачувана сесија). */
@@ -56,9 +80,11 @@ function updateLekarAdminTabVisibility() {
   if (!btn) return;
   if (!currentLekar || !currentLekar.doctor_ID) {
     btn.style.display = 'none';
+    if (typeof updateAiAgentVisibility === 'function') updateAiAgentVisibility();
     return;
   }
   btn.style.display = isLekarHospitalDirector(currentLekar) ? 'inline-block' : 'none';
+  if (typeof updateAiAgentVisibility === 'function') updateAiAgentVisibility();
 }
 
 function persistPacientToStorage() {
@@ -639,14 +665,22 @@ function updateAiAgentVisibility() {
   var prompt = document.getElementById('ai-agent-prompt');
   var sendBtn = document.getElementById('ai-agent-send');
   var result = document.getElementById('ai-agent-result');
+  ensureDirectorQuickActionButton();
+  var directorOnly = document.querySelectorAll('.ai-agent-director-only');
   if (!section || !panel || !toggle || !prompt || !sendBtn) return;
   section.style.display = 'block';
-  if (currentPacient) {
+  var directorLogged = isAiDirectorActive();
+  directorOnly.forEach(function(el) { el.style.display = directorLogged ? 'inline-flex' : 'none'; });
+  if (currentPacient || directorLogged) {
     prompt.disabled = false;
     sendBtn.disabled = false;
     toggle.disabled = false;
     if (result && !result.dataset.hasRun) {
-      setAiAgentResult('idle', 'Статус: подготвен', 'Внесете наредба подолу. Агентот ќе провери термини или ќе закаже преглед со вашите податоци од профилот.');
+      if (directorLogged && !currentPacient) {
+        setAiAgentResult('idle', 'Статус: подготвен', 'Најавени сте како директор. Можете да користите AI команди, вклучувајќи објавување новости.');
+      } else {
+        setAiAgentResult('idle', 'Статус: подготвен', 'Внесете наредба подолу. Агентот ќе провери термини или ќе закаже преглед со вашите податоци од профилот.');
+      }
     }
   } else {
     prompt.disabled = true;
@@ -678,8 +712,9 @@ async function handleAiAgentPrompt() {
     setAiAgentResult('fail', 'Статус: неуспешно', 'Наредбата е празна. Опишете што треба да се направи.');
     return;
   }
-  if (!currentPacient) {
-    setAiAgentResult('fail', 'Статус: неуспешно', 'Најавете се како пациент за да работи агентот во ваше име.');
+  var directorLogged = isAiDirectorActive();
+  if (!currentPacient && !directorLogged) {
+    setAiAgentResult('fail', 'Статус: неуспешно', 'Најавете се како пациент или директор за да работи агентот во ваше име.');
     return;
   }
 
@@ -693,8 +728,9 @@ async function handleAiAgentPrompt() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         prompt: prompt,
-        pacient: currentPacient,
+        pacient: currentPacient || currentLekar || {},
         state: {
+          admin_doctor_id: (currentLekar && currentLekar.doctor_ID) ? currentLekar.doctor_ID : null,
           doctor_id: aiAgentState.doctor_id,
           doctor_name: aiAgentState.doctor_name,
           date: aiAgentState.date,
@@ -733,11 +769,14 @@ function setupAiAgent() {
   var toggle = document.getElementById('ai-agent-toggle');
   var btn = document.getElementById('ai-agent-send');
   var input = document.getElementById('ai-agent-prompt');
-  var quickButtons = document.querySelectorAll('.ai-agent-quick-btn');
   if (!toggle || !btn || !input) return;
+  ensureDirectorQuickActionButton();
+  var quickButtons = document.querySelectorAll('.ai-agent-quick-btn');
   toggle.addEventListener('click', toggleAiAgentPanel);
   btn.addEventListener('click', handleAiAgentPrompt);
   quickButtons.forEach(function(el) {
+    if (el.dataset.aiBound === '1') return;
+    el.dataset.aiBound = '1';
     el.addEventListener('click', function() {
       var txt = (el.getAttribute('data-ai-prompt') || '').trim();
       if (!txt) return;
