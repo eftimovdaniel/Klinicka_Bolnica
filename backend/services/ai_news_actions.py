@@ -4,7 +4,6 @@ import re
 import urllib.parse
 import urllib.request
 from urllib.parse import urljoin
-
 from routers.admin import check_admin_access
 from routers.novosti import insert_novost_from_ai
 from services.ai_parser import parse_news
