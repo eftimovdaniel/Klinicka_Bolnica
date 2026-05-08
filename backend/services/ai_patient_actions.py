@@ -52,6 +52,49 @@ def _appointment_brief(row: dict) -> str:
     return f"{row.get('datum')} во {row.get('vreme')} кај {row.get('ime_lekar')}"
 
 
+def _time_to_minutes(hhmm: str) -> int:
+    try:
+        h, m = str(hhmm).split(":")
+        return int(h) * 60 + int(m)
+    except (ValueError, AttributeError):
+        return 0
+
+
+def _minutes_to_time(total: int) -> str:
+    h = total // 60
+    m = total % 60
+    return f"{h:02d}:{m:02d}"
+
+
+def _load_taken_times_for_doctor_date(db_cursor, doctor_id: int, date_iso: str):
+    db_cursor.execute(
+        """
+        SELECT TIME_FORMAT(vreme_pregled, '%%H:%%i') AS vreme
+        FROM Termin_pregled
+        WHERE doctor_ID = %s
+          AND DATE(datum_pregled) = %s
+          AND status_pregled = 'закажан'
+        """,
+        (doctor_id, date_iso),
+    )
+    return {str((r or {}).get("vreme") or "").strip() for r in (db_cursor.fetchall() or [])}
+
+
+def _suggest_alternative_times(db_cursor, doctor_id: int, date_iso: str, desired_time: str, limit: int = 3):
+    start_min = 9 * 60
+    end_min = 16 * 60 + 30
+    taken = _load_taken_times_for_doctor_date(db_cursor, int(doctor_id), date_iso)
+    desired_min = _time_to_minutes(desired_time or "00:00")
+    candidates = []
+    for minute in range(start_min, end_min + 1, 30):
+        t = _minutes_to_time(minute)
+        if t in taken:
+            continue
+        candidates.append(t)
+    candidates.sort(key=lambda t: abs(_time_to_minutes(t) - desired_min))
+    return candidates[:limit]
+
+
 def _load_upcoming_appointments(db_cursor, patient_email: str):
     db_cursor.execute(
         """
@@ -133,6 +176,27 @@ def handle_patient_action(intent: str, db_cursor, conn, prompt: str, pacient: di
                 "message": "Акцијата е откажана. Можете да внесете ново барање.",
                 "state": new_state,
             }
+        if pending.get("intent") == "patient_reschedule_appointment" and pending.get("awaiting_alternative_pick"):
+            picked_time = _extract_time(prompt)
+            if picked_time:
+                pending["new_time"] = picked_time
+                pending["awaiting_alternative_pick"] = False
+                new_state["pending_action"] = pending
+                return {
+                    "ok": False,
+                    "intent": "patient_reschedule_appointment",
+                    "message": (
+                        f"Избрано е ново време {picked_time} за {pending.get('new_date')}.\n"
+                        "Потврдете со: „Да, потврди“."
+                    ),
+                    "state": new_state,
+                }
+            return {
+                "ok": False,
+                "intent": "patient_reschedule_appointment",
+                "message": "Изберете едно од предложените времиња (пример: 14:00).",
+                "state": new_state,
+            }
         if _is_confirmation(prompt):
             items = _load_upcoming_appointments(db_cursor, patient_email)
             target = _find_item_by_id(items, int(pending.get("termin_id") or 0))
@@ -193,6 +257,27 @@ def handle_patient_action(intent: str, db_cursor, conn, prompt: str, pacient: di
                     (int(target["doctor_ID"]), new_date, new_time, int(target["termin_ID"])),
                 )
                 if db_cursor.fetchone():
+                    alternatives = _suggest_alternative_times(
+                        db_cursor,
+                        int(target["doctor_ID"]),
+                        new_date,
+                        new_time,
+                        limit=3,
+                    )
+                    if alternatives:
+                        pending["awaiting_alternative_pick"] = True
+                        pending["suggested_times"] = alternatives
+                        new_state["pending_action"] = pending
+                        return {
+                            "ok": False,
+                            "intent": p_intent,
+                            "message": (
+                                f"Бараниот термин ({new_date} во {new_time}) е зафатен.\n"
+                                f"Предлог алтернативи: {', '.join(alternatives)}.\n"
+                                "Изберете едно време (на пр. 14:00), па потоа потврдете."
+                            ),
+                            "state": new_state,
+                        }
                     new_state.pop("pending_action", None)
                     return {
                         "ok": False,
@@ -293,6 +378,7 @@ def handle_patient_action(intent: str, db_cursor, conn, prompt: str, pacient: di
             "termin_id": int(target["termin_ID"]),
             "new_date": new_date,
             "new_time": new_time,
+            "awaiting_alternative_pick": False,
         }
         return {
             "ok": False,
