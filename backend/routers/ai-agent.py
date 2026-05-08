@@ -1,14 +1,13 @@
 import re
 from datetime import datetime, timedelta
-import os
 import html
 import urllib.request
 from urllib.parse import urljoin
 from fastapi import APIRouter, HTTPException, Request
 from database import get_connection
-from services.llama_parser import parse_news_with_llama, parse_prompt_with_llama
 from routers.admin import check_admin_access
 from routers.novosti import insert_novost_from_ai
+from services.ai_parser import parse_news, parse_prompt
 
 router = APIRouter(prefix = "/ai-agent", tags=["ai-agent"])
 
@@ -19,9 +18,9 @@ def _izvadi_iso_datum (prompt_text: str) -> str:
     m = re.search(r"\b(20\d{2}-\d{2}-\d{2})\b", str(prompt_text or ""))
     return m.group(1) if m else ""
 
-def izvadi_relativen_ili_iso_datum(prompt_text: str, fallback_iso: str = "") -> str:
+def _izvadi_relativen_ili_iso_datum(prompt_text: str, fallback_iso: str = "") -> str:
     text = _mk_lower(prompt_text)
-    today = datetime.now().data()
+    today = datetime.now().date()
     if "задутре" in text:
         return (today + timedelta(days=2)).isoformat()
     if "утре" in text:
@@ -117,7 +116,7 @@ def _list_busy_times(db_cursor, doctor_id: int, date_iso:str):
             continue
         if hasattr(v, "strftime"):
             out.add(v.strftime("%H:%M"))
-        elif hasattr (v, "totak_seconds"):
+        elif hasattr(v, "total_seconds"):
             s = int(v.total_seconds())
             out.add(f"{s // 3600:02d}:{(s % 3600) // 60:02d}")
         else:
@@ -276,9 +275,8 @@ async def ai_agent_termini(request: Request):
         if not prompt:
             raise HTTPException(status_code=400, detail="Недостига prompt.")
 
-        use_llama = os.getenv("AI_USE_LLAMA", "true").strip().lower() in ("1", "true", "yes")
-        llama_out = parse_prompt_with_llama(prompt) if use_llama else None
-        intent = _normalize_intent((llama_out or {}).get("intent", "")) or _detect_intent(prompt)
+        ai_out = parse_prompt(prompt)
+        intent = _normalize_intent((ai_out or {}).get("intent", "")) or _detect_intent(prompt)
         if not intent:
             return {
                 "ok": False,
@@ -309,12 +307,12 @@ async def ai_agent_termini(request: Request):
                 }
             source_text = _extract_text_from_html(raw_html)
             media_image_url, media_video_url = _extract_media_urls_from_html(raw_html, source_url)
-            ai_news = parse_news_with_llama(source_text[:8000], prompt) if use_llama else None
+            ai_news = parse_news(source_text[:8000], prompt)
             if not ai_news:
                 return {
                     "ok": False,
                     "intent": intent,
-                    "message": "Не успеав да генерирам предлог за вест преку Ollama. Обидете се повторно со друг линк.",
+                    "message": "Не успеав да генерирам предлог за вест преку AI. Обидете се повторно со друг линк.",
                     "state": state,
                 }
             naslov = (ai_news.get("naslov") or "").strip()
@@ -323,7 +321,7 @@ async def ai_agent_termini(request: Request):
                 return {
                     "ok": False,
                     "intent": intent,
-                    "message": "Ollama врати нецелосен одговор за веста. Обидете се повторно.",
+                    "message": "AI врати нецелосен одговор за веста. Обидете се повторно.",
                     "state": state,
                 }
             new_state = dict(state)
@@ -402,7 +400,7 @@ async def ai_agent_termini(request: Request):
             }
 
         prompt_l = _mk_lower(prompt)
-        parsed_doctor_name = _mk_lower((llama_out or {}).get("doctor_name", ""))
+        parsed_doctor_name = _mk_lower((ai_out or {}).get("doctor_name", ""))
         db_cursor.execute("SELECT doctor_ID, name, surname, specialty, email FROM Doctors")
         doctors = db_cursor.fetchall() or []
 
@@ -542,7 +540,7 @@ async def ai_agent_termini(request: Request):
             }
 
         date_iso = (
-            (llama_out or {}).get("date")
+            (ai_out or {}).get("date")
             or _izvadi_relativen_ili_iso_datum(prompt)
             or (state.get("date") or "")
         )
@@ -589,8 +587,8 @@ async def ai_agent_termini(request: Request):
                 "state": new_state,
             }
 
-        time_hhmm = (llama_out or {}).get("time") or _extract_time(prompt)
-        note = (llama_out or {}).get("note") or _extract_note(prompt)
+        time_hhmm = (ai_out or {}).get("time") or _extract_time(prompt)
+        note = (ai_out or {}).get("note") or _extract_note(prompt)
         if not time_hhmm:
             return {"ok": False, "message": "Недостига време (на пр. 10:30).", "state": new_state}
         if time_hhmm in busy:
