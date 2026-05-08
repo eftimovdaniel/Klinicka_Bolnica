@@ -9,6 +9,7 @@ from urllib.parse import urljoin
 from fastapi import APIRouter, HTTPException, Request
 
 from database import get_connection
+from services.ai_doctor_actions import handle_doctor_action
 from services.ai_parser import parse_news, parse_prompt
 from services.ai_patient_actions import handle_patient_action
 from routers.admin import check_admin_access
@@ -65,6 +66,14 @@ def _detect_intent(prompt_text: str) -> str:
     text = _mk_lower(prompt_text)
     if _contains_any(text, ["да, потврди", "да потврди", "потврди", "во ред", "ok"]):
         return "patient_action_confirm"
+    if _contains_any(text, ["кој лекар", "кои лекари"]) and _contains_any(text, ["кои пациенти", "пациенти ги има", "има пациенти"]):
+        return "doctor_patients_overview"
+    if _contains_any(text, ["кои пациенти ги имам денес", "распоред денес", "денешни пациенти", "листа за денес"]):
+        return "doctor_today_schedule"
+    if _contains_any(text, ["кој е следен", "следен пациент", "next patient"]):
+        return "doctor_next_patient"
+    if _contains_any(text, ["кој доцни", "кои доцнат", "доцнење", "delayed patients"]):
+        return "doctor_delayed_patients"
     if _contains_any(text, ["најнови информации", "што е ново", "новости", "нови вести"]) and _contains_any(text, ["болница", "пациент", "пациенти"]):
         return "hospital_updates"
     asks_people = _contains_any(text, ["кој", "кои", "каков состав", "листа"])
@@ -111,6 +120,10 @@ def _normalize_intent(value: str) -> str:
         "patient_reschedule_appointment",
         "patient_set_reminder",
         "patient_action_confirm",
+        "doctor_today_schedule",
+        "doctor_next_patient",
+        "doctor_delayed_patients",
+        "doctor_patients_overview",
     ):
         return v
     if "publish" in v and "confirm" in v:
@@ -137,6 +150,14 @@ def _normalize_intent(value: str) -> str:
         return "patient_set_reminder"
     if "confirm" in v:
         return "patient_action_confirm"
+    if "doctor" in v and "today" in v:
+        return "doctor_today_schedule"
+    if "next" in v and "patient" in v:
+        return "doctor_next_patient"
+    if "delay" in v and "patient" in v:
+        return "doctor_delayed_patients"
+    if "doctor" in v and "patient" in v:
+        return "doctor_patients_overview"
     if "слобод" in v or "достап" in v or "провери" in v:
         return "availability"
     return ""
@@ -569,6 +590,16 @@ async def ai_agent_termini(request: Request):
             patient_resp = handle_patient_action(intent, db_cursor, conn, prompt, pacient, state, ai_out or {})
             if patient_resp is not None:
                 return patient_resp
+
+        if intent in (
+            "doctor_today_schedule",
+            "doctor_next_patient",
+            "doctor_delayed_patients",
+            "doctor_patients_overview",
+        ):
+            doctor_resp = handle_doctor_action(intent, db_cursor, prompt, pacient, state)
+            if doctor_resp is not None:
+                return doctor_resp
 
         if intent == "hospital_updates":
             try:
