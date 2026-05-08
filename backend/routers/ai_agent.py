@@ -1,6 +1,5 @@
 import re
 from datetime import datetime, timedelta
-import os
 import html
 import json
 import urllib.request
@@ -10,11 +9,15 @@ from urllib.parse import urljoin
 from fastapi import APIRouter, HTTPException, Request
 
 from database import get_connection
-from services.llama_parser import parse_news_with_llama, parse_prompt_with_llama
+from services.ai_parser import parse_news, parse_prompt
+from services.ai_patient_actions import handle_patient_action
 from routers.admin import check_admin_access
 from routers.novosti import insert_novost_from_ai
 
 router = APIRouter(prefix="/ai-agent", tags=["ai-agent"])
+# Fallback cache за 2-чекор flow (preview -> confirm), ако frontend не го прати state.
+# Клуч: admin_doctor_id, Вредност: pending_news dict
+PENDING_NEWS_CACHE = {}
 
 
 def _mk_lower(s: str) -> str:
@@ -69,12 +72,20 @@ def _detect_intent(prompt_text: str) -> str:
         return "department_doctors"
     if _contains_any(text, ["да, објави", "да објави", "објави веднаш"]) or text.strip() == "објави":
         return "news_publish_confirm"
-    if _contains_any(text, ["објави", "вести", "вест"]) and ("http://" in text or "https://" in text or "линк" in text):
+    if _contains_any(text, ["објави", "вести", "вест", "новост", "додади новост", "објава"]):
         return "news_publish_preview"
     if _contains_any(text, ["апарат", "опрема", "уред"]) and _contains_any(text, ["оддел", "област", "служб", "специјалност"]):
         return "department_equipment"
     if mentions_doctors and _contains_any(text, ["недела", "оваа недела", "во неделава", "седмица"]):
         return "specialty_week_availability"
+    if _contains_any(text, ["мои термини", "моите термини", "мој термин", "моите закажани"]):
+        return "patient_list_appointments"
+    if _contains_any(text, ["откажи", "поништи термин", "избриши термин"]):
+        return "patient_cancel_appointment"
+    if _contains_any(text, ["промени термин", "премести термин", "презакажи"]):
+        return "patient_reschedule_appointment"
+    if _contains_any(text, ["потсетник", "потсети ме", "подсети ме"]):
+        return "patient_set_reminder"
     if _contains_any(text, ["закаж", "резерв", "термин во"]):
         return "book"
     if _contains_any(text, ["слобод", "достап", "провери", "има ли", "кога има"]):
@@ -93,6 +104,10 @@ def _normalize_intent(value: str) -> str:
         "hospital_updates",
         "news_publish_preview",
         "news_publish_confirm",
+        "patient_list_appointments",
+        "patient_cancel_appointment",
+        "patient_reschedule_appointment",
+        "patient_set_reminder",
     ):
         return v
     if "publish" in v and "confirm" in v:
@@ -109,6 +124,14 @@ def _normalize_intent(value: str) -> str:
         return "hospital_updates"
     if "закаж" in v:
         return "book"
+    if "cancel" in v:
+        return "patient_cancel_appointment"
+    if "reschedule" in v or "change appointment" in v:
+        return "patient_reschedule_appointment"
+    if "my appointment" in v or "list appointment" in v:
+        return "patient_list_appointments"
+    if "reminder" in v:
+        return "patient_set_reminder"
     if "слобод" in v or "достап" in v or "провери" in v:
         return "availability"
     return ""
@@ -146,11 +169,7 @@ def _list_busy_times(db_cursor, doctor_id: int, date_iso: str):
 
 
 def _build_workday_slots():
-    slots = []
-    for h in range(9, 17):
-        slots.append(f"{h:02d}:00")
-        slots.append(f"{h:02d}:30")
-    return slots
+    return [f"{h:02d}:{m:02d}" for h in range(9, 17) for m in (0, 30)]
 
 
 def _format_mk_date(date_iso: str) -> str:
@@ -212,6 +231,21 @@ def _extract_specialty(prompt_text: str, state):
     return state.get("specialty", "")
 
 
+def _doctors_by_specialty(doctors, specialty: str):
+    s = _mk_lower(specialty)
+    return [d for d in doctors if s in _mk_lower(d.get("specialty", ""))]
+
+
+def _validate_workday_date(date_iso: str):
+    try:
+        d = datetime.strptime(date_iso, "%Y-%m-%d").date()
+    except ValueError:
+        return False, "Неважечки датум. Користете YYYY-MM-DD."
+    if d.weekday() >= 5:
+        return False, "Не се закажуваат прегледи во сабота и недела."
+    return True, ""
+
+
 def _extract_first_url(prompt_text: str) -> str:
     m = re.search(r"(https?://[^\s\])>\"']+)", str(prompt_text or ""))
     return m.group(1).strip() if m else ""
@@ -220,6 +254,87 @@ def _extract_first_url(prompt_text: str) -> str:
 def _is_youtube_url(url: str) -> bool:
     u = _mk_lower(url)
     return "youtube.com/" in u or "youtu.be/" in u
+
+
+def _extract_youtube_video_id(url: str) -> str:
+    u = str(url or "").strip()
+    m = re.search(r"(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/)([A-Za-z0-9_-]{6,})", u)
+    return m.group(1) if m else ""
+
+
+def _fetch_youtube_transcript(source_url: str, raw_html: str) -> str:
+    """
+    Вади транскрипт од YouTube captions ако се достапни.
+    """
+    html_text = str(raw_html or "")
+    video_id = _extract_youtube_video_id(source_url)
+    if not video_id:
+        return ""
+
+    tracks_match = re.search(r'"captionTracks":(\[.*?\])', html_text)
+    if not tracks_match:
+        return ""
+
+    try:
+        tracks = json.loads(tracks_match.group(1))
+    except Exception:
+        return ""
+    if not isinstance(tracks, list) or not tracks:
+        return ""
+
+    # Prefer Macedonian/Serbian/Croatian/Bulgarian/English captions if present.
+    preferred_langs = ("mk", "sr", "hr", "bg", "en")
+    chosen = None
+    for lang in preferred_langs:
+        for t in tracks:
+            code = str((t or {}).get("languageCode") or "").lower()
+            if code.startswith(lang):
+                chosen = t
+                break
+        if chosen:
+            break
+    if not chosen:
+        chosen = tracks[0]
+
+    base_url = str((chosen or {}).get("baseUrl") or "").strip()
+    if not base_url:
+        return ""
+
+    # json3 format is easiest for parsing subtitles.
+    if "fmt=" not in base_url:
+        sep = "&" if "?" in base_url else "?"
+        base_url = f"{base_url}{sep}fmt=json3"
+
+    req = urllib.request.Request(base_url, headers={"User-Agent": "Mozilla/5.0 (compatible; KBStipAI/1.0)"})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        body = resp.read().decode("utf-8", errors="ignore")
+
+    # Preferred: json3 subtitles
+    try:
+        payload = json.loads(body)
+        events = payload.get("events") or []
+        out = []
+        for ev in events:
+            segs = (ev or {}).get("segs") or []
+            chunk = "".join(str((s or {}).get("utf8") or "") for s in segs)
+            chunk = re.sub(r"\s+", " ", html.unescape(chunk)).strip()
+            if chunk:
+                out.append(chunk)
+        if out:
+            return " ".join(out).strip()
+    except Exception:
+        pass
+
+    # Fallback: XML/TTML subtitles
+    chunks = re.findall(r'>([^<]+)<', body)
+    cleaned = []
+    for c in chunks:
+        txt = re.sub(r"\s+", " ", html.unescape(c)).strip()
+        # Skip metadata-like fragments
+        if not txt or txt.startswith("<?xml") or txt.lower() in ("transcript",):
+            continue
+        cleaned.append(txt)
+    return " ".join(cleaned).strip()
 
 
 def _extract_actor_id(pacient: dict, state: dict) -> int:
@@ -259,19 +374,32 @@ def _extract_text_from_html(raw_html: str) -> str:
 
 def _extract_youtube_text(raw_html: str, source_url: str) -> str:
     html_text = str(raw_html or "")
-    pieces = []
+    title = ""
+    description = ""
+    author = ""
 
-    title_m = re.search(r"(?is)<title>(.*?)</title>", html_text)
-    if title_m:
-        pieces.append(re.sub(r"\s+", " ", html.unescape(title_m.group(1))).strip())
+    og_title_m = re.search(r'(?is)<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)["\']', html_text)
+    if og_title_m:
+        title = re.sub(r"\s+", " ", html.unescape(og_title_m.group(1))).strip()
 
-    desc_m = re.search(r'(?is)<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']+)["\']', html_text)
-    if desc_m:
-        pieces.append(re.sub(r"\s+", " ", html.unescape(desc_m.group(1))).strip())
+    if not title:
+        title_m = re.search(r"(?is)<title>(.*?)</title>", html_text)
+        if title_m:
+            title = re.sub(r"\s+", " ", html.unescape(title_m.group(1))).strip()
+    title = re.sub(r"\s*-\s*YouTube\s*$", "", title, flags=re.IGNORECASE).strip()
+
+    og_desc_m = re.search(r'(?is)<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']+)["\']', html_text)
+    if og_desc_m:
+        description = re.sub(r"\s+", " ", html.unescape(og_desc_m.group(1))).strip()
+    if not description:
+        desc_m = re.search(r'(?is)<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']+)["\']', html_text)
+        if desc_m:
+            description = re.sub(r"\s+", " ", html.unescape(desc_m.group(1))).strip()
+    description = re.sub(r"https?://\S+", "", description).strip()
 
     chan_m = re.search(r'(?is)<meta[^>]+itemprop=["\']author["\'][^>]+content=["\']([^"\']+)["\']', html_text)
     if chan_m:
-        pieces.append(f"Канал: {re.sub(r'\\s+', ' ', html.unescape(chan_m.group(1))).strip()}")
+        author = re.sub(r"\s+", " ", html.unescape(chan_m.group(1))).strip()
 
     # YouTube oEmbed provides a reliable title/author fallback.
     try:
@@ -279,15 +407,28 @@ def _extract_youtube_text(raw_html: str, source_url: str) -> str:
         req = urllib.request.Request(oembed_url, headers={"User-Agent": "Mozilla/5.0 (compatible; KBStipAI/1.0)"})
         with urllib.request.urlopen(req, timeout=10) as resp:
             payload = json.loads(resp.read().decode("utf-8", errors="ignore"))
-            if payload.get("title"):
-                pieces.append(f"Наслов на видео: {str(payload.get('title')).strip()}")
-            if payload.get("author_name"):
-                pieces.append(f"Автор: {str(payload.get('author_name')).strip()}")
+            if payload.get("title") and not title:
+                title = str(payload.get("title")).strip()
+                title = re.sub(r"\s*-\s*YouTube\s*$", "", title, flags=re.IGNORECASE).strip()
+            if payload.get("author_name") and not author:
+                author = str(payload.get("author_name")).strip()
     except Exception:
         pass
 
-    text = "\n".join([p for p in pieces if p])
-    return text.strip()
+    transcript = _fetch_youtube_transcript(source_url, raw_html)
+
+    parts = []
+    if title:
+        parts.append(f"Наслов на видео: {title}")
+    if author:
+        parts.append(f"Автор: {author}")
+    if transcript:
+        # Use transcript as primary source when available.
+        parts.append(f"Транскрипт: {transcript}")
+    if description:
+        parts.append(f"Краток опис: {description[:500]}")
+    parts.append(f"Извор: {source_url}")
+    return "\n".join(parts).strip()
 
 
 def _fallback_news_draft(source_text: str, source_url: str):
@@ -313,6 +454,22 @@ def _fallback_news_draft(source_text: str, source_url: str):
             "Ова е автоматски подготвен предлог и може да се доуреди пред објава."
         ).strip()
     return naslov, sodrzina
+
+
+def _clean_generated_news(naslov: str, sodrzina: str) -> tuple[str, str]:
+    clean_title = re.sub(r"\s*-\s*YouTube\s*$", "", str(naslov or ""), flags=re.IGNORECASE).strip()
+    clean_title = re.sub(r"\s+", " ", clean_title)
+    clean_title = re.sub(r"https?://\S+", "", clean_title).strip(" .,:;-")
+    if len(clean_title) < 8:
+        clean_title = "Нова информација од медиум"
+
+    clean_body = str(sodrzina or "")
+    clean_body = re.sub(r"https?://\S+", "", clean_body)
+    clean_body = re.sub(r"\b(?:Наслов на видео|Автор|Канал)\s*:\s*", "", clean_body, flags=re.IGNORECASE)
+    clean_body = re.sub(r"\s+", " ", clean_body).strip()
+    if len(clean_body) > 900:
+        clean_body = clean_body[:900].rsplit(" ", 1)[0].strip() + "..."
+    return clean_title, clean_body
 
 
 def _extract_media_urls_from_html(raw_html: str, source_url: str):
@@ -385,9 +542,8 @@ async def ai_agent_termini(request: Request):
         if not prompt:
             raise HTTPException(status_code=400, detail="Недостига prompt.")
 
-        use_llama = os.getenv("AI_USE_LLAMA", "true").strip().lower() in ("1", "true", "yes")
-        llama_out = parse_prompt_with_llama(prompt) if use_llama else None
-        intent = _normalize_intent((llama_out or {}).get("intent", "")) or _detect_intent(prompt)
+        ai_out = parse_prompt(prompt)
+        intent = _normalize_intent((ai_out or {}).get("intent", "")) or _detect_intent(prompt)
         if not intent:
             return {
                 "ok": False,
@@ -397,6 +553,16 @@ async def ai_agent_termini(request: Request):
 
         conn = get_connection()
         db_cursor = conn.cursor(dictionary=True)
+
+        if intent in (
+            "patient_list_appointments",
+            "patient_cancel_appointment",
+            "patient_reschedule_appointment",
+            "patient_set_reminder",
+        ):
+            patient_resp = handle_patient_action(intent, db_cursor, conn, prompt, pacient, state, ai_out or {})
+            if patient_resp is not None:
+                return patient_resp
 
         if intent == "hospital_updates":
             try:
@@ -475,9 +641,7 @@ async def ai_agent_termini(request: Request):
                     f"Извор: {source_url}. Подготви краток формален предлог за болничка вест."
                 )
             media_image_url, media_video_url = _extract_media_urls_from_html(raw_html, source_url)
-            # parse_news_with_llama uses the configured LLM provider
-            # (Ollama or Google AI Studio) via llama_client.llm_chat().
-            ai_news = parse_news_with_llama(source_text[:8000], prompt)
+            ai_news = parse_news(source_text[:8000], prompt)
             if not ai_news:
                 naslov, sodrzina = _fallback_news_draft(source_text, source_url)
             else:
@@ -485,6 +649,7 @@ async def ai_agent_termini(request: Request):
                 sodrzina = (ai_news.get("sodrzina") or "").strip()
                 if not naslov or not sodrzina:
                     naslov, sodrzina = _fallback_news_draft(source_text, source_url)
+            naslov, sodrzina = _clean_generated_news(naslov, sodrzina)
             new_state = dict(state)
             new_state["pending_news"] = {
                 "naslov": naslov,
@@ -493,6 +658,8 @@ async def ai_agent_termini(request: Request):
                 "slika_url": media_image_url,
                 "video_url": media_video_url,
             }
+            if admin_doctor_id:
+                PENDING_NEWS_CACHE[int(admin_doctor_id)] = dict(new_state["pending_news"])
             media_note = []
             if media_image_url:
                 media_note.append(f"Слика: {media_image_url}")
@@ -512,7 +679,10 @@ async def ai_agent_termini(request: Request):
             }
 
         if intent == "news_publish_confirm":
+            admin_doctor_id = _extract_actor_id(pacient, state)
             pending_news = (state or {}).get("pending_news") or {}
+            if not pending_news and admin_doctor_id:
+                pending_news = PENDING_NEWS_CACHE.get(int(admin_doctor_id), {}) or {}
             naslov = (pending_news.get("naslov") or "").strip()
             sodrzina = (pending_news.get("sodrzina") or "").strip()
             slika_url = (pending_news.get("slika_url") or "").strip()
@@ -525,7 +695,6 @@ async def ai_agent_termini(request: Request):
                     "state": state,
                 }
 
-            admin_doctor_id = _extract_actor_id(pacient, state)
             if not admin_doctor_id or not check_admin_access(admin_doctor_id):
                 return {
                     "ok": False,
@@ -543,6 +712,8 @@ async def ai_agent_termini(request: Request):
             )
             new_state = dict(state)
             new_state.pop("pending_news", None)
+            if admin_doctor_id:
+                PENDING_NEWS_CACHE.pop(int(admin_doctor_id), None)
             return {
                 "ok": True,
                 "intent": intent,
@@ -552,7 +723,7 @@ async def ai_agent_termini(request: Request):
             }
 
         prompt_l = _mk_lower(prompt)
-        parsed_doctor_name = _mk_lower((llama_out or {}).get("doctor_name", ""))
+        parsed_doctor_name = _mk_lower((ai_out or {}).get("doctor_name", ""))
         db_cursor.execute("SELECT doctor_ID, name, surname, specialty, email FROM Doctors")
         doctors = db_cursor.fetchall() or []
 
@@ -571,10 +742,7 @@ async def ai_agent_termini(request: Request):
                     "state": state,
                 }
 
-            department_doctors = [
-                d for d in doctors
-                if specialty.lower() in _mk_lower(d.get("specialty", ""))
-            ]
+            department_doctors = _doctors_by_specialty(doctors, specialty)
             if not department_doctors:
                 return {
                     "ok": True,
@@ -604,10 +772,7 @@ async def ai_agent_termini(request: Request):
                     "state": state,
                 }
 
-            specialty_doctors = [
-                d for d in doctors
-                if specialty.lower() in _mk_lower(d.get("specialty", ""))
-            ]
+            specialty_doctors = _doctors_by_specialty(doctors, specialty)
             if not specialty_doctors:
                 return {
                     "ok": False,
@@ -692,7 +857,7 @@ async def ai_agent_termini(request: Request):
             }
 
         date_iso = (
-            (llama_out or {}).get("date")
+            (ai_out or {}).get("date")
             or _izvadi_relativen_ili_iso_datum(prompt)
             or (state.get("date") or "")
         )
@@ -701,12 +866,9 @@ async def ai_agent_termini(request: Request):
         if not date_iso:
             return {"ok": False, "message": "Недостига датум во формат YYYY-MM-DD.", "state": state}
 
-        try:
-            d = datetime.strptime(date_iso, "%Y-%m-%d").date()
-            if d.weekday() >= 5:
-                return {"ok": False, "message": "Не се закажуваат прегледи во сабота и недела.", "state": state}
-        except ValueError:
-            return {"ok": False, "message": "Неважечки датум. Користете YYYY-MM-DD.", "state": state}
+        ok_date, date_err = _validate_workday_date(date_iso)
+        if not ok_date:
+            return {"ok": False, "message": date_err, "state": state}
 
         busy = _list_busy_times(db_cursor, int(selected_doctor["doctor_ID"]), date_iso)
         all_slots = _build_workday_slots()
@@ -739,8 +901,8 @@ async def ai_agent_termini(request: Request):
                 "state": new_state,
             }
 
-        time_hhmm = (llama_out or {}).get("time") or _extract_time(prompt)
-        note = (llama_out or {}).get("note") or _extract_note(prompt)
+        time_hhmm = (ai_out or {}).get("time") or _extract_time(prompt)
+        note = (ai_out or {}).get("note") or _extract_note(prompt)
         if not time_hhmm:
             return {"ok": False, "message": "Недостига време (на пр. 10:30).", "state": new_state}
         if time_hhmm in busy:

@@ -23,7 +23,8 @@ let aiAgentState = {
   doctor_id: null,
   doctor_name: '',
   date: '',
-  freeSlots: []
+  freeSlots: [],
+  rawState: {}
 };
 
 var KB_KEY_PACIENT = 'currentPacient';
@@ -729,13 +730,13 @@ async function handleAiAgentPrompt() {
       body: JSON.stringify({
         prompt: prompt,
         pacient: currentPacient || currentLekar || {},
-        state: {
+        state: Object.assign({}, aiAgentState.rawState || {}, {
           admin_doctor_id: (currentLekar && currentLekar.doctor_ID) ? currentLekar.doctor_ID : null,
           doctor_id: aiAgentState.doctor_id,
           doctor_name: aiAgentState.doctor_name,
           date: aiAgentState.date,
           free_slots: aiAgentState.freeSlots
-        }
+        })
       })
     });
     const data = await res.json().catch(function() { return {}; });
@@ -743,6 +744,7 @@ async function handleAiAgentPrompt() {
       throw new Error(data.detail || data.message || 'Грешка на серверот.');
     }
     if (data && data.state) {
+      aiAgentState.rawState = data.state || {};
       aiAgentState.doctor_id = data.state.doctor_id || null;
       aiAgentState.doctor_name = data.state.doctor_name || '';
       aiAgentState.date = data.state.date || '';
@@ -753,6 +755,15 @@ async function handleAiAgentPrompt() {
     if (data.intent === 'book' && ok) {
       setAiAgentResult('ok', 'Статус: завршено', 'Задачата е извршена.\n\n' + msg);
       promptEl.value = '';
+    } else if (data.intent === 'news_publish_confirm' && ok) {
+      setAiAgentResult('ok', 'Статус: завршено', 'Задачата е извршена.\n\n' + msg);
+      promptEl.value = '';
+      if (typeof loadNovostiAdmin === 'function') {
+        loadNovostiAdmin();
+      }
+      if (typeof loadNovosti === 'function') {
+        loadNovosti();
+      }
     } else if (ok) {
       setAiAgentResult('ok', 'Статус: завршено', msg);
     } else {

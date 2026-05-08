@@ -2,7 +2,7 @@ import json
 import re
 from typing import Any, Dict, Optional
 
-from services.llama_client import ollama_chat_safe
+from services.google_ai_client import chat_safe
 from services.prompt_loader import get_section
 
 
@@ -26,9 +26,9 @@ def _extract_first_json_block(text: str) -> Optional[dict]:
         return None
 
 
-def parse_prompt_with_llama(prompt_text: str) -> Optional[Dict[str, Any]]:
+def parse_prompt(prompt_text: str) -> Optional[Dict[str, Any]]:
     """
-    Ollama + промпти од data/ai_system_prompts.json (appointment_parse.system).
+    Google AI Studio + промпти од data/ai_system_prompts.json (appointment_parse.system).
     Враќа dict: intent, doctor_name, date, time, note, workdays (int, опционално).
     """
     system = get_section("appointment_parse", "system")
@@ -37,7 +37,7 @@ def parse_prompt_with_llama(prompt_text: str) -> Optional[Dict[str, Any]]:
             "Return ONLY JSON with keys: intent, doctor_name, date, time, note, workdays. "
             "intent: availability|book|availability_multi|''. date YYYY-MM-DD. time HH:MM."
         )
-    content = ollama_chat_safe(system, f"Кориснички текст:\n{prompt_text}\n\nВрати само JSON објект.")
+    content = chat_safe(system, f"Кориснички текст:\n{prompt_text}\n\nВрати само JSON објект.")
     if not content:
         return None
     parsed = _extract_first_json_block(content)
@@ -59,8 +59,8 @@ def parse_prompt_with_llama(prompt_text: str) -> Optional[Dict[str, Any]]:
     }
 
 
-def parse_news_with_llama(source_excerpts: str, director_note: str) -> Optional[Dict[str, str]]:
-    """Ollama → JSON {naslov, sodrzina} за новост."""
+def parse_news(source_excerpts: str, director_note: str) -> Optional[Dict[str, str]]:
+    """Google AI Studio → JSON {naslov, sodrzina} за новост."""
     system = get_section("director_news_from_sources", "system")
     if not system:
         system = 'Врати само JSON: {"naslov":"...","sodrzina":"..."} на македонски.'
@@ -69,7 +69,7 @@ def parse_news_with_llama(source_excerpts: str, director_note: str) -> Optional[
         f"{source_excerpts}\n\n"
         f"Порака од директорот (контекст):\n{director_note}\n"
     )
-    content = ollama_chat_safe(system, user)
+    content = chat_safe(system, user)
     if not content:
         return None
     parsed = _extract_first_json_block(content)
