@@ -63,6 +63,8 @@ def _contains_any(text: str, needles) -> bool:
 
 def _detect_intent(prompt_text: str) -> str:
     text = _mk_lower(prompt_text)
+    if _contains_any(text, ["да, потврди", "да потврди", "потврди", "во ред", "ok"]):
+        return "patient_action_confirm"
     if _contains_any(text, ["најнови информации", "што е ново", "новости", "нови вести"]) and _contains_any(text, ["болница", "пациент", "пациенти"]):
         return "hospital_updates"
     asks_people = _contains_any(text, ["кој", "кои", "каков состав", "листа"])
@@ -108,6 +110,7 @@ def _normalize_intent(value: str) -> str:
         "patient_cancel_appointment",
         "patient_reschedule_appointment",
         "patient_set_reminder",
+        "patient_action_confirm",
     ):
         return v
     if "publish" in v and "confirm" in v:
@@ -132,6 +135,8 @@ def _normalize_intent(value: str) -> str:
         return "patient_list_appointments"
     if "reminder" in v:
         return "patient_set_reminder"
+    if "confirm" in v:
+        return "patient_action_confirm"
     if "слобод" in v or "достап" in v or "провери" in v:
         return "availability"
     return ""
@@ -559,6 +564,7 @@ async def ai_agent_termini(request: Request):
             "patient_cancel_appointment",
             "patient_reschedule_appointment",
             "patient_set_reminder",
+            "patient_action_confirm",
         ):
             patient_resp = handle_patient_action(intent, db_cursor, conn, prompt, pacient, state, ai_out or {})
             if patient_resp is not None:
