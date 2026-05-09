@@ -4,10 +4,16 @@ from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Request
 
 from database import get_connection
+from routers.admin import check_admin_access
 from services.ai_doctor_actions import handle_doctor_action
 from services.ai_news_actions import handle_news_intent
 from services.ai_parser import parse_prompt
 from services.ai_patient_actions import handle_patient_action
+from services.doctor_brief_service import (
+    get_today_brief_for_doctor,
+    mark_brief_as_read,
+    run_doctor_briefs,
+)
 
 router = APIRouter(prefix="/ai-agent", tags=["ai-agent"])
 PATIENT_ACTION_INTENTS = {
@@ -621,3 +627,62 @@ async def ai_agent_termini(request: Request):
     finally:
         if conn and conn.is_connected():
             conn.close()
+
+
+# ============================================================================
+# DOCTOR BRIEF ENDPOINTS
+# ============================================================================
+
+@router.get("/doctor-brief/{doctor_id}")
+def api_get_doctor_brief(doctor_id: int):
+    """Vrakame denesen brif za daden lekar (ako postoi).
+    Frontendot mozhe da go povika koga lekarot ke se najavi.
+    """
+    try:
+        brief = get_today_brief_for_doctor(int(doctor_id))
+        if not brief:
+            return {
+                "ok": True,
+                "has_brief": False,
+                "message": "Сè уште нема генериран брифинг за денес. Ќе биде достапен по 08:00.",
+            }
+        # konvertirame date/datetime vo ISO string za JSON
+        out = dict(brief)
+        if hasattr(out.get("brief_date"), "isoformat"):
+            out["brief_date"] = out["brief_date"].isoformat()
+        if hasattr(out.get("kreiran_na"), "isoformat"):
+            out["kreiran_na"] = out["kreiran_na"].isoformat()
+        if out.get("procitan_na") and hasattr(out["procitan_na"], "isoformat"):
+            out["procitan_na"] = out["procitan_na"].isoformat()
+        return {"ok": True, "has_brief": True, "brief": out}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/doctor-brief/{brief_id}/read")
+def api_mark_brief_read(brief_id: int):
+    """Markira brif kako prochitan (frontend povikuva otkako lekarot ke go vidi)."""
+    try:
+        ok = mark_brief_as_read(int(brief_id))
+        return {"ok": True, "updated": ok}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/doctor-briefs/run-now")
+async def api_trigger_briefs_now(request: Request):
+    """Manuelen triger za testiranje - generira brifovi za site lekari ODMA.
+    Dostapno samo za admin (direktor).
+    Body: {"admin_doctor_id": <int>}
+    """
+    try:
+        data = await request.json()
+        admin_doctor_id = int((data or {}).get("admin_doctor_id") or 0)
+        if not admin_doctor_id or not check_admin_access(admin_doctor_id):
+            raise HTTPException(status_code=403, detail="Само директорот може рачно да активира брифинзи.")
+        stats = run_doctor_briefs()
+        return {"ok": True, "stats": stats}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

@@ -1,9 +1,95 @@
 import re
 from datetime import datetime, timedelta
 
+# default offset za potsetnik: 24 chasa pred terminot
+DEFAULT_REMINDER_OFFSET_MINUTES = 24 * 60
+
 
 def _mk_lower(s: str) -> str:
     return str(s or "").strip().lower()
+
+
+def _parse_reminder_offset_minutes(prompt: str) -> int:
+    """Vlecuvajki broj na minuti pred terminot za potsetnik od korisnickiot tekst.
+    Primeri: "1 chas pred", "30 minuti pred", "2 dena pred".
+    Ako ne se spomenuva, vrakame default (24 chasa).
+    """
+    text = _mk_lower(prompt)
+    # baranje na izrazi tipa "X chas/min/den pred"
+    m = re.search(r"(\d{1,3})\s*(минут|мин|час|саат|саати|ден|дена)\s*(пред|before)?", text)
+    if not m:
+        # alternativna fraza "ден претходно", "час претходно"
+        if "час претходно" in text or "саат претходно" in text:
+            return 60
+        if "ден претходно" in text:
+            return 24 * 60
+        return DEFAULT_REMINDER_OFFSET_MINUTES
+    try:
+        amount = int(m.group(1))
+    except ValueError:
+        return DEFAULT_REMINDER_OFFSET_MINUTES
+    unit = m.group(2)
+    # spored edinicata, presmetuvame minuti
+    if unit.startswith("минут") or unit == "мин":
+        return max(5, amount)
+    if unit.startswith("час") or unit.startswith("саат"):
+        return max(5, amount * 60)
+    if unit.startswith("ден"):
+        return max(5, amount * 24 * 60)
+    return DEFAULT_REMINDER_OFFSET_MINUTES
+
+
+def _format_offset_human(minutes: int) -> str:
+    """Vrakame chovecki citliva forma (na pr. '1 chas', '30 minuti', '2 dena')."""
+    if minutes < 60:
+        return f"{minutes} минути"
+    if minutes < 24 * 60:
+        h = minutes // 60
+        return f"{h} {'час' if h == 1 else 'часа'}"
+    d = minutes // (24 * 60)
+    return f"{d} {'ден' if d == 1 else 'дена'}"
+
+
+def _compute_reminder_datetime(target_row: dict, offset_minutes: int) -> datetime | None:
+    """Presmetka na konkreten DATETIME koga treba da se prati potsetnikot.
+    Vrakame None ako vremeto bi bilo vo minato.
+    """
+    date_str = (target_row.get("datum") or "").strip()
+    time_str = (target_row.get("vreme") or "").strip()
+    if not date_str or not time_str:
+        return None
+    try:
+        # spojuvanje na YYYY-MM-DD i HH:MM vo eden datetime objekt
+        appointment_dt = datetime.strptime(f"{date_str} {time_str}", "%Y-%m-%d %H:%M")
+    except ValueError:
+        return None
+    # oduzemame offsetot za da dobieme momentot na potsetuvanje
+    reminder_dt = appointment_dt - timedelta(minutes=offset_minutes)
+    # ako vremeto za potsetuvanje vekje pominalo, vrakame None
+    if reminder_dt <= datetime.now():
+        return None
+    return reminder_dt
+
+
+def _insert_reminder(db_cursor, conn, termin_id: int, email: str, telefon: str, reminder_dt: datetime, kanal: str = "email") -> int:
+    """INSERT vo tabelata Potsetnici. Vrakame ID-to na noviot zapis."""
+    db_cursor.execute(
+        """
+        INSERT INTO Potsetnici
+            (termin_ID, email_pacient, telefon_pacient, vreme_potsetuvanje, kanal, status_potsetnik)
+        VALUES
+            (%s, %s, %s, %s, %s, 0)
+        """,
+        (
+            int(termin_id),
+            (email or "").strip().lower(),
+            (telefon or "").strip() or None,
+            reminder_dt.strftime("%Y-%m-%d %H:%M:%S"),
+            (kanal or "email").strip().lower(),
+        ),
+    )
+    conn.commit()
+    return int(getattr(db_cursor, "lastrowid", 0) or 0)
 
 
 def _extract_iso_date(prompt_text: str) -> str:
@@ -225,11 +311,52 @@ def handle_patient_action(intent: str, db_cursor, conn, prompt: str, pacient: di
                 }
 
             if p_intent == "patient_set_reminder":
+                # vlecuvame parametri od pending_action: koga (offset) i kade (kanal)
+                offset_minutes = int(pending.get("offset_minutes") or DEFAULT_REMINDER_OFFSET_MINUTES)
+                kanal = (pending.get("kanal") or "email").strip().lower()
+                # presmetka na momentot koga treba da se prati potsetnikot
+                reminder_dt = _compute_reminder_datetime(target, offset_minutes)
+                # ako vremeto vekje pominalo (pr. termin za 1 chas, a se bara potsetnik 24h pred)
+                if not reminder_dt:
+                    new_state.pop("pending_action", None)
+                    return {
+                        "ok": False,
+                        "intent": p_intent,
+                        "message": (
+                            f"Не може да се постави потсетник {_format_offset_human(offset_minutes)} пред терминот "
+                            f"({_appointment_brief(target)}) - тоа време веќе помина."
+                        ),
+                        "state": new_state,
+                    }
+                # realen INSERT vo bazata
+                try:
+                    reminder_id = _insert_reminder(
+                        db_cursor,
+                        conn,
+                        termin_id=int(target["termin_ID"]),
+                        email=(pacient or {}).get("email", ""),
+                        telefon=(pacient or {}).get("telefon", "") or (pacient or {}).get("phone_number", ""),
+                        reminder_dt=reminder_dt,
+                        kanal=kanal,
+                    )
+                except Exception as e:
+                    new_state.pop("pending_action", None)
+                    return {
+                        "ok": False,
+                        "intent": p_intent,
+                        "message": f"Грешка при зачувување на потсетникот: {e}",
+                        "state": new_state,
+                    }
                 new_state.pop("pending_action", None)
                 return {
                     "ok": True,
                     "intent": p_intent,
-                    "message": f"Поставен е потсетник за терминот {_appointment_brief(target)}.",
+                    "reminder_id": reminder_id,
+                    "message": (
+                        f"Потсетникот е активен. Ќе ве известиме на {kanal} "
+                        f"{_format_offset_human(offset_minutes)} пред терминот "
+                        f"{_appointment_brief(target)} (точно во {reminder_dt.strftime('%d.%m.%Y во %H:%M')})."
+                    ),
                     "state": new_state,
                 }
 
@@ -400,15 +527,35 @@ def handle_patient_action(intent: str, db_cursor, conn, prompt: str, pacient: di
                 "message": "Немате термин за кој може да поставиме потсетник.",
                 "state": new_state,
             }
+        # parsiranje na koga sakaat da se potseti (offset vo minuti)
+        offset_minutes = _parse_reminder_offset_minutes(prompt)
+        # validacija deka vremeto se uste ne pominalo (pred preview da se prati)
+        reminder_dt_preview = _compute_reminder_datetime(target, offset_minutes)
+        if not reminder_dt_preview:
+            return {
+                "ok": False,
+                "intent": intent,
+                "message": (
+                    f"Не може потсетник {_format_offset_human(offset_minutes)} пред терминот "
+                    f"({_appointment_brief(target)}) - тоа време веќе помина. "
+                    "Пробајте пократок интервал (на пр. 30 минути пред)."
+                ),
+                "state": new_state,
+            }
+        # default kanal e email; ako pacientot ima telefon i spomenuva 'sms', koristi sms
+        kanal = "sms" if "sms" in _mk_lower(prompt) and (pacient or {}).get("telefon") else "email"
         new_state["pending_action"] = {
             "intent": intent,
             "termin_id": int(target["termin_ID"]),
+            "offset_minutes": int(offset_minutes),
+            "kanal": kanal,
         }
         return {
             "ok": False,
             "intent": intent,
             "message": (
-                f"Ќе поставам потсетник за терминот {_appointment_brief(target)}.\n"
+                f"Ќе поставам потсетник за терминот {_appointment_brief(target)} - "
+                f"{_format_offset_human(offset_minutes)} пред (преку {kanal}).\n"
                 "Потврдете со: „Да, потврди“."
             ),
             "state": new_state,
