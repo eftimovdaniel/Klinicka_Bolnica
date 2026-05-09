@@ -578,7 +578,23 @@
       
       <span class="close" onclick="closeLekarDashboardModal()">&times;</span>
       <div id="lekar-info" class="doctor-info-modal"></div>
-      
+
+      <!-- AI агент: дневен бриф за лекарот (се вчитува автоматски по најава) -->
+      <div id="lekar-ai-brief" class="lekar-ai-brief" style="display: none;" role="region" aria-label="Дневен бриф од AI агентот">
+        <div class="lekar-ai-brief__icon" aria-hidden="true">🌅</div>
+        <div class="lekar-ai-brief__body">
+          <div class="lekar-ai-brief__header">
+            <span class="lekar-ai-brief__badge">AI агент</span>
+            <span class="lekar-ai-brief__title">Вашиот дневен бриф</span>
+          </div>
+          <div id="lekar-ai-brief-message" class="lekar-ai-brief__message"></div>
+          <div class="lekar-ai-brief__actions">
+            <button type="button" id="lekar-ai-brief-read-btn" class="lekar-ai-brief__btn" onclick="markDoctorBriefAsRead()">Прочитав</button>
+            <button type="button" class="lekar-ai-brief__btn lekar-ai-brief__btn--ghost" onclick="hideDoctorBrief()">Скриј</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Навигација во интерфејсот за лекари -->
       <div class="lekar-nav-tabs">
         <button type="button" class="nav-tab active" data-lekar-tab="pacienti" onclick="showLekarTab('pacienti')">Преглед на пациенти</button>

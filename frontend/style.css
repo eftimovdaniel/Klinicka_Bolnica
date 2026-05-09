@@ -4517,3 +4517,114 @@ html {
     width: 100%;
   }
 }
+
+/* ========== AI агент: дневен бриф за лекар ========== */
+/* Прикажан како истакнат банер на врвот од dashboard-от по најава. */
+.lekar-ai-brief {
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  padding: 1.1rem 1.25rem;
+  margin: 0 0 1.5rem 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(102, 126, 234, 0.25);
+  position: relative;
+  overflow: hidden;
+  animation: lekarAiBriefSlideIn 0.4s ease-out;
+}
+
+@keyframes lekarAiBriefSlideIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.lekar-ai-brief__icon {
+  font-size: 2rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
+}
+
+.lekar-ai-brief__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.lekar-ai-brief__header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.lekar-ai-brief__badge {
+  background: rgba(255, 255, 255, 0.22);
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.lekar-ai-brief__title {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.lekar-ai-brief__message {
+  font-size: 0.98rem;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  color: rgba(255, 255, 255, 0.96);
+  margin-bottom: 0.85rem;
+}
+
+.lekar-ai-brief__actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.lekar-ai-brief__btn {
+  background: #fff;
+  color: #5a67d8;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.lekar-ai-brief__btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.lekar-ai-brief__btn--ghost {
+  background: transparent;
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.lekar-ai-brief__btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+@media (max-width: 600px) {
+  .lekar-ai-brief {
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 1rem;
+  }
+  .lekar-ai-brief__icon {
+    font-size: 1.6rem;
+  }
+}

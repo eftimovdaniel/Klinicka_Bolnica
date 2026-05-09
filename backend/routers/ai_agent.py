@@ -1,7 +1,7 @@
 import re
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from database import get_connection
 from routers.admin import check_admin_access
@@ -670,16 +670,30 @@ def api_mark_brief_read(brief_id: int):
 
 
 @router.post("/doctor-briefs/run-now")
-async def api_trigger_briefs_now(request: Request):
+async def api_trigger_briefs_now(
+    request: Request,
+    admin_doctor_id: int | None = Query(default=None),
+):
     """Manuelen triger za testiranje - generira brifovi za site lekari ODMA.
     Dostapno samo za admin (direktor).
-    Body: {"admin_doctor_id": <int>}
+    Prifaka admin_doctor_id i kako query parametar i kako JSON body:
+      curl -X POST '.../run-now?admin_doctor_id=46'
+      curl -X POST '.../run-now' -H 'Content-Type: application/json' -d '{"admin_doctor_id": 46}'
     """
     try:
-        data = await request.json()
-        admin_doctor_id = int((data or {}).get("admin_doctor_id") or 0)
-        if not admin_doctor_id or not check_admin_access(admin_doctor_id):
-            raise HTTPException(status_code=403, detail="Само директорот може рачно да активира брифинзи.")
+        # Ako admin_doctor_id ne e podaden kako query param, probaj od JSON body.
+        if not admin_doctor_id:
+            try:
+                data = await request.json()
+                admin_doctor_id = int((data or {}).get("admin_doctor_id") or 0)
+            except Exception:
+                admin_doctor_id = 0
+
+        if not admin_doctor_id or not check_admin_access(int(admin_doctor_id)):
+            raise HTTPException(
+                status_code=403,
+                detail="Само директорот може рачно да активира брифинзи.",
+            )
         stats = run_doctor_briefs()
         return {"ok": True, "stats": stats}
     except HTTPException:

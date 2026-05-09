@@ -1879,6 +1879,104 @@ function showLekarTab(tabName) {
 // Функција за прикажување на главниот dashboard за лекари
 // Параметри: data - податоци за лекарот и неговите термини од API-то
 // Прикажува информации за лекарот, неговите термини и проверува дали е администратор
+// ============================================================================
+// AI АГЕНТ: ДНЕВЕН БРИФ ЗА ЛЕКАР
+// ============================================================================
+// Backend-от секое утро во 08:00 автоматски генерира бриф за секој лекар
+// (закажани термини за денес, прв пациент, следно дежурство, заостанати termini).
+// Овие функции го вчитуваат и приказуваат брифот во dashboard-от по најава.
+
+// ID на моментално прикажаниот брифинг (потребно за маркирање како „прочитано")
+let currentDoctorBriefId = null;
+
+// Се повикува автоматски од displayLekarDashboard() — го бара брифот од backend-от.
+// Ако брифот не е најден (пр. сè уште не е генериран за денес) – банерот останува скриен.
+async function loadDoctorBriefForDashboard() {
+  const banner = document.getElementById('lekar-ai-brief');
+  const messageEl = document.getElementById('lekar-ai-brief-message');
+  const readBtn = document.getElementById('lekar-ai-brief-read-btn');
+  if (!banner || !messageEl) return;
+
+  if (!currentLekar || !currentLekar.doctor_ID) {
+    banner.style.display = 'none';
+    return;
+  }
+
+  banner.style.display = 'none';
+  currentDoctorBriefId = null;
+
+  try {
+    const res = await fetch(`${API_BASE}/ai-agent/doctor-brief/${currentLekar.doctor_ID}`);
+    if (!res.ok) {
+      // 404 = нема бриф за денес – тоа е во ред, банерот останува скриен
+      return;
+    }
+
+    // Backend враќа: { ok: true, has_brief: true, brief: { brief_ID, message, read_status, ... } }
+    // или { ok: true, has_brief: false, message: "..." } ако нема бриф за денес.
+    const data = await res.json();
+    if (!data || !data.has_brief || !data.brief) {
+      return;
+    }
+    const brief = data.brief;
+    if (!brief.message) {
+      return;
+    }
+
+    currentDoctorBriefId = brief.brief_ID || null;
+    messageEl.textContent = brief.message;
+
+    // Ако брифот е веќе прочитан – сменете го текстот на копчето
+    if (readBtn) {
+      if (brief.read_status) {
+        readBtn.textContent = 'Прочитано ✓';
+        readBtn.disabled = true;
+      } else {
+        readBtn.textContent = 'Прочитав';
+        readBtn.disabled = false;
+      }
+    }
+
+    banner.style.display = 'flex';
+  } catch (err) {
+    console.warn('[doctor-brief] Не успеа вчитување:', err);
+  }
+}
+
+// Кога лекарот ќе кликне „Прочитав" – го праќаме статусот во backend-от
+async function markDoctorBriefAsRead() {
+  if (!currentDoctorBriefId) {
+    hideDoctorBrief();
+    return;
+  }
+  const readBtn = document.getElementById('lekar-ai-brief-read-btn');
+  try {
+    const res = await fetch(`${API_BASE}/ai-agent/doctor-brief/${currentDoctorBriefId}/read`, {
+      method: 'POST'
+    });
+    if (res.ok) {
+      if (readBtn) {
+        readBtn.textContent = 'Прочитано ✓';
+        readBtn.disabled = true;
+      }
+      // По кратко време го скриваме банерот за да не пречи
+      setTimeout(hideDoctorBrief, 800);
+    }
+  } catch (err) {
+    console.warn('[doctor-brief] Не успеа маркирање:', err);
+  }
+}
+
+// Само го скрива банерот од DOM-от за тековната сесија
+function hideDoctorBrief() {
+  const banner = document.getElementById('lekar-ai-brief');
+  if (banner) banner.style.display = 'none';
+}
+
+// Експонирани во window за onclick атрибутите во HTML-от
+window.markDoctorBriefAsRead = markDoctorBriefAsRead;
+window.hideDoctorBrief = hideDoctorBrief;
+
 function displayLekarDashboard(data) {
   const doctorInfo = document.getElementById('lekar-info');
   const terminiList = document.getElementById('lekar-termini-list');
@@ -1915,6 +2013,10 @@ function displayLekarDashboard(data) {
     rds.value = today.toISOString().split('T')[0];
   }
   // НЕ повикувај loadMojRaspored при најава: тој прикажуваше само денешен датум и го бришеше целосниот список.
+
+  // AI агент: вчитај го дневниот бриф (генериран автоматски од backend-от во 08:00).
+  // Се повикува тука за да работи и за нова најава и за повторно отворање на dashboard-от.
+  loadDoctorBriefForDashboard();
 }
 
 // Функција за вчитување на распоред на дежурства
