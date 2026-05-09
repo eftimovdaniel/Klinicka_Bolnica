@@ -18,6 +18,7 @@ from email.mime.text import MIMEText
 from email.utils import formataddr
 from typing import Optional
 
+
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
