@@ -22,6 +22,13 @@ from services.preparation_service import (
     load_preparations,
     match_preparation,
 )
+from services.faq_service import (
+    answer_faq,
+    build_unmatched_response_message as build_faq_unmatched_message,
+    get_faq_by_id,
+    list_active_faqs,
+    list_categories as list_faq_categories,
+)
 
 router = APIRouter(prefix="/ai-agent", tags=["ai-agent"])
 PATIENT_ACTION_INTENTS = {
@@ -123,6 +130,22 @@ def _detect_intent(prompt_text: str) -> str:
         "што да понесам", "што треба да земам со себе"
     ]):
         return "patient_preparation_info"
+    # Patient pita opšto prashanje (FAQ) - rabotno vreme, lokacii, upati, kontakti...
+    # Klucnite zborovi se sklonuvaat na strani da ne se preklopuvaat so 'book' / 'availability'.
+    if _contains_any(text, [
+        "работно време", "кога работи", "кога е отворено", "кога е затворено",
+        "каде е", "каде се наоѓа", "каде се наоѓаат", "локација",
+        "дали ми треба", "дали треба упат", "потребен упат", "потребна упатница",
+        "телефонски број", "телефон за", "контакт", "како да повикам",
+        "паркинг", "паркирање", "како да дојдам",
+        "посета", "посетители", "време за посета", "кога може да посетам",
+        "матичен лекар", "промена на лекар",
+        "колку време чекам", "колку се чека", "кога ќе бидат готови",
+        "ургент", "итна помош", "24 часа",
+        "како да закажам", "како да откажам", "како да поместам",
+        "без термин", "без закажување",
+    ]):
+        return "patient_faq"
     if _contains_any(text, ["закаж", "резерв", "термин во"]):
         return "book"
     if _contains_any(text, ["слобод", "достап", "провери", "има ли", "кога има"]):
@@ -147,6 +170,7 @@ def _normalize_intent(value: str) -> str:
         "patient_set_reminder",
         "patient_action_confirm",
         "patient_preparation_info",
+        "patient_faq",
         "doctor_today_schedule",
         "doctor_next_patient",
         "doctor_delayed_patients",
