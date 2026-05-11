@@ -14,6 +14,14 @@ from services.doctor_brief_service import (
     mark_brief_as_read,
     run_doctor_briefs,
 )
+from services.preparation_service import (
+    build_unmatched_response_message,
+    find_preparation_by_id,
+    format_preparation_message,
+    list_available_titles,
+    load_preparations,
+    match_preparation,
+)
 
 router = APIRouter(prefix="/ai-agent", tags=["ai-agent"])
 PATIENT_ACTION_INTENTS = {
@@ -107,6 +115,14 @@ def _detect_intent(prompt_text: str) -> str:
         return "patient_reschedule_appointment"
     if _contains_any(text, ["потсетник", "потсети ме", "подсети ме"]):
         return "patient_set_reminder"
+    # Patient pita kako da se podgotvi za pregled / ispituvanje
+    if _contains_any(text, [
+        "како да се подготвам", "како се подготвувам", "како да се подготв",
+        "подготовка за", "подготвам за", "пред преглед", "пред анализа",
+        "пред тест", "пред испитување", "гладување за", "гладувам пред",
+        "што да понесам", "што треба да земам со себе"
+    ]):
+        return "patient_preparation_info"
     if _contains_any(text, ["закаж", "резерв", "термин во"]):
         return "book"
     if _contains_any(text, ["слобод", "достап", "провери", "има ли", "кога има"]):
@@ -130,6 +146,7 @@ def _normalize_intent(value: str) -> str:
         "patient_reschedule_appointment",
         "patient_set_reminder",
         "patient_action_confirm",
+        "patient_preparation_info",
         "doctor_today_schedule",
         "doctor_next_patient",
         "doctor_delayed_patients",
@@ -358,6 +375,27 @@ async def ai_agent_termini(request: Request):
             doctor_resp = handle_doctor_action(intent, db_cursor, prompt, pacient, state)
             if doctor_resp is not None:
                 return doctor_resp
+
+        # Patient pita kako da se podgotvi za pregled - vrakame staticki upatstva od JSON.
+        # Ne barame da bide najavemr - informacijata e javna.
+        if intent == "patient_preparation_info":
+            matched = match_preparation(prompt)
+            if matched is None:
+                return {
+                    "ok": True,
+                    "intent": intent,
+                    "message": build_unmatched_response_message(),
+                    "state": state,
+                    "available_preparations": list_available_titles(),
+                }
+            return {
+                "ok": True,
+                "intent": intent,
+                "message": format_preparation_message(matched),
+                "state": state,
+                "preparation_id": matched.get("id"),
+                "preparation_title": matched.get("title"),
+            }
 
         if intent == "hospital_updates":
             try:
@@ -696,6 +734,84 @@ async def api_trigger_briefs_now(
             )
         stats = run_doctor_briefs()
         return {"ok": True, "stats": stats}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# PREPARATION INSTRUCTIONS ENDPOINTS
+# ============================================================================
+# Pacientite mozat da gi prashuvaat preku /baranja chat-ot (intent: patient_preparation_info),
+# no isto taka frontend-ot mozhe da prikaze celosna lista ili specificen zapis direktno.
+
+@router.get("/preparations")
+def api_list_preparations():
+    """Vrakame lista od site dostapni podgotovki - korisno za UI prikaz (dropdown / kartichki)."""
+    try:
+        data = load_preparations()
+        items = data.get("preparations", []) or []
+        # vrakame samo osnovni polinja - klientot ke prashuva za detali po id
+        summary = [
+            {
+                "id": item.get("id"),
+                "title": item.get("title"),
+                "duration_minutes": item.get("duration_minutes"),
+                "fasting_required": bool((item.get("fasting") or {}).get("required")),
+            }
+            for item in items
+            if item.get("id")
+        ]
+        return {"ok": True, "count": len(summary), "preparations": summary}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/preparations/{prep_id}")
+def api_get_preparation(prep_id: str):
+    """Vrakame celosno upatstvo (formatiran tekst + raw JSON) za daden ID."""
+    try:
+        item = find_preparation_by_id(prep_id)
+        if not item:
+            raise HTTPException(status_code=404, detail=f"Не е најдена подготовка со id={prep_id}.")
+        return {
+            "ok": True,
+            "preparation": item,
+            "message": format_preparation_message(item),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/preparations/search")
+async def api_search_preparation(request: Request):
+    """Slobodno tekstualno baranje - ist algoritam kako vo intent-ot, no za direkten povik.
+    Body: {"query": "..."}
+    """
+    try:
+        data = await request.json()
+        query = (data or {}).get("query", "")
+        if not query or not str(query).strip():
+            raise HTTPException(status_code=400, detail="Недостасува параметар 'query'.")
+        matched = match_preparation(str(query))
+        if not matched:
+            return {
+                "ok": True,
+                "matched": False,
+                "message": build_unmatched_response_message(),
+                "available_titles": list_available_titles(),
+            }
+        return {
+            "ok": True,
+            "matched": True,
+            "preparation_id": matched.get("id"),
+            "preparation_title": matched.get("title"),
+            "preparation": matched,
+            "message": format_preparation_message(matched),
+        }
     except HTTPException:
         raise
     except Exception as e:

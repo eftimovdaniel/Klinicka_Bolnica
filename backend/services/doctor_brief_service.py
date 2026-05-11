@@ -1,16 +1,3 @@
-"""
-Servis za avtomatski dneven brif za sekoj lekar.
-
-Sekoe utro vo 08:00 (lokalno vreme), schedulerot za sekoj lekar:
-  1) gi vlece denesnite zakazani termini
-  2) ja proveruva najblizkata dezurstvo
-  3) generira chovecki citliv tekst na makedonski
-  4) snimuva vo Doctor_briefs (UNIQUE per doctor+date - bez duplikati)
-  5) (opcionalno) prati email ako SMTP_HOST e konfiguriran vo .env
-
-Schedulerot se startuva preku start_scheduler() povikana od main.py lifespan.
-Mozhe da se isklucи preko env: AI_BRIEF_SCHEDULER_ENABLED=0
-"""
 import os
 import smtplib
 from datetime import datetime, date, timedelta
