@@ -132,15 +132,15 @@ def format_preparation_message(item: Dict[str, Any]) -> str:
     else:
         note = (fasting.get("note") or "").strip()
         if note:
-            lines.append(f"🍽  Гладување: не е задолжително. {note}")
+            lines.append(f"Гладување: не е задолжително. {note}")
         else:
-            lines.append("🍽  Гладување: не е потребно.")
+            lines.append(" Гладување: не е потребно.")
 
     # Glavni instrukcii (poslednite tri ako se mnogu - pak gi prikazuvame site)
     instructions = item.get("instructions") or []
     if instructions:
         lines.append("")
-        lines.append("📌 Упатства:")
+        lines.append("Упатства:")
         for i, instr in enumerate(instructions, 1):
             lines.append(f"  {i}. {instr}")
 
@@ -148,7 +148,7 @@ def format_preparation_message(item: Dict[str, Any]) -> str:
     what_to_bring = item.get("what_to_bring") or []
     if what_to_bring:
         lines.append("")
-        lines.append("🎒 Понесете со себе:")
+        lines.append("Понесете со себе:")
         for w in what_to_bring:
             lines.append(f"  • {w}")
 
@@ -156,7 +156,7 @@ def format_preparation_message(item: Dict[str, Any]) -> str:
     warnings = item.get("warnings") or []
     if warnings:
         lines.append("")
-        lines.append("⚠️  Важно:")
+        lines.append("Важно:")
         for w in warnings:
             lines.append(f"  ! {w}")
 
@@ -164,10 +164,10 @@ def format_preparation_message(item: Dict[str, Any]) -> str:
     duration = item.get("duration_minutes")
     if duration:
         lines.append("")
-        lines.append(f"⏱  Очекувано траење: {int(duration)} минути.")
+        lines.append(f"Очекувано траење: {int(duration)} минути.")
 
     lines.append("")
-    lines.append("ℹ️  Овие упатства се општи. Секогаш проверете со вашиот лекар за конкретни забелешки.")
+    lines.append("ℹОвие упатства се општи. Секогаш проверете со вашиот лекар за конкретни забелешки.")
     return "\n".join(lines)
 
 
