@@ -21,6 +21,7 @@ DROP TABLE IF EXISTS Aparati_termini;
 DROP TABLE IF EXISTS Pregled_feedback;
 DROP TABLE IF EXISTS Potsetnici;
 DROP TABLE IF EXISTS Doctor_briefs;
+DROP TABLE IF EXISTS FAQ;
 DROP TABLE IF EXISTS Termin_pregled;
 DROP TABLE IF EXISTS prijaveni_lekari;
 DROP TABLE IF EXISTS Dezurstva;
@@ -145,6 +146,25 @@ CREATE TABLE Doctor_briefs (
   KEY idx_brief_doctor (doctor_ID),
   CONSTRAINT fk_brief_doctor FOREIGN KEY (doctor_ID) REFERENCES Doctors (doctor_ID)
     ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------------------------------------------------------------
+-- FAQ – често поставувани прашања (база на знаење за AI агентот)
+-- ---------------------------------------------------------------------------
+CREATE TABLE FAQ (
+  faq_ID INT NOT NULL AUTO_INCREMENT,
+  prashanje VARCHAR(500) NOT NULL,
+  odgovor TEXT NOT NULL,
+  kategorija VARCHAR(80) DEFAULT NULL,
+  klucni_zborovi TEXT DEFAULT NULL,
+  aktiven TINYINT(1) NOT NULL DEFAULT 1,
+  pati_iskoristen INT NOT NULL DEFAULT 0,
+  kreiran_na DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  azuriran_na DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (faq_ID),
+  KEY idx_faq_kategorija (kategorija),
+  KEY idx_faq_aktiven (aktiven),
+  FULLTEXT KEY ft_faq_search (prashanje, odgovor, klucni_zborovi)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------
