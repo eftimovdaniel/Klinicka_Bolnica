@@ -1,5 +1,6 @@
 import re
 from datetime import datetime, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
@@ -421,6 +422,28 @@ async def ai_agent_termini(request: Request):
                 "preparation_title": matched.get("title"),
             }
 
+        # FAQ - cesto postavuvani prashanja (rabotno vreme, lokacii, upati, kontakti)
+        # Logika: prvo vlechime relevantni zapisi od FAQ tabela, potoa go prakame
+        # prashanje + zapisite na Google AI (Gemini) za prirooden odgovor.
+        if intent == "patient_faq":
+            faq_result = answer_faq(prompt)
+            if faq_result is None:
+                return {
+                    "ok": True,
+                    "intent": intent,
+                    "message": build_faq_unmatched_message(),
+                    "state": state,
+                }
+            return {
+                "ok": True,
+                "intent": intent,
+                "message": faq_result.get("message", ""),
+                "state": state,
+                "source": faq_result.get("source"),
+                "matched_faq_ids": faq_result.get("matched_faq_ids", []),
+                "related_questions": faq_result.get("related_questions", []),
+            }
+
         if intent == "hospital_updates":
             try:
                 db_cursor.execute(
@@ -835,6 +858,85 @@ async def api_search_preparation(request: Request):
             "preparation_title": matched.get("title"),
             "preparation": matched,
             "message": format_preparation_message(matched),
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# FAQ ENDPOINTS - chesto postavuvani prashanja
+# ============================================================================
+# Pacientite mozat da prashuvaat preku AI chat (intent: patient_faq), no isto taka
+# mozhe da go prikazheme celokupniot FAQ kako lista vo posebna sekcija na frontend-ot.
+
+@router.get("/faq")
+def api_list_faq(kategorija: Optional[str] = Query(default=None)):
+    """Lista na site aktivni FAQ zapisi. Opcionalno filtrirano po kategorija."""
+    try:
+        rows = list_active_faqs(kategorija)
+        for r in rows:
+            for k in ("kreiran_na", "azuriran_na"):
+                if r.get(k) and hasattr(r[k], "isoformat"):
+                    r[k] = r[k].isoformat()
+        return {"ok": True, "count": len(rows), "faqs": rows}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/faq/categories")
+def api_list_faq_categories():
+    """Lista na kategorii so broj na zapisi vo sekoja."""
+    try:
+        cats = list_faq_categories()
+        return {"ok": True, "categories": cats}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/faq/{faq_id}")
+def api_get_faq(faq_id: int):
+    """Detalen prikaz na FAQ zapis."""
+    try:
+        row = get_faq_by_id(int(faq_id))
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Не е најден FAQ со id={faq_id}.")
+        for k in ("kreiran_na", "azuriran_na"):
+            if row.get(k) and hasattr(row[k], "isoformat"):
+                row[k] = row[k].isoformat()
+        return {"ok": True, "faq": row}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/faq/ask")
+async def api_ask_faq(request: Request):
+    """Direkten povik za FAQ - bez minuvanje preku intent detection.
+    Body: {"query": "Koe e rabotno vreme?"}
+    Korisno za frontend-ot ako saka da imame poseben FAQ widget pokraj chat-ot.
+    """
+    try:
+        data = await request.json()
+        query = (data or {}).get("query", "")
+        if not query or not str(query).strip():
+            raise HTTPException(status_code=400, detail="Недостасува параметар 'query'.")
+        result = answer_faq(str(query))
+        if result is None:
+            return {
+                "ok": True,
+                "matched": False,
+                "message": build_faq_unmatched_message(),
+            }
+        return {
+            "ok": True,
+            "matched": True,
+            "message": result.get("message", ""),
+            "source": result.get("source"),
+            "matched_faq_ids": result.get("matched_faq_ids", []),
+            "related_questions": result.get("related_questions", []),
         }
     except HTTPException:
         raise
