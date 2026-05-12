@@ -224,9 +224,8 @@ def odgovori_za_slobodni_termini(prashanje: str) -> str:
             'Не успеав да препознаам за кој лекар прашуваш. '
             'Те молам напиши го името и презимето на лекарот, '
             'на пример: „Кога е слободен д-р Марко Петров?"'
+            'Бараниот лекар не работи во нашата установа'
         )
-
-    # Барање во база за слободни термини
+# Барање во база за слободни термини
     slobodni = pronajdi_slobodni_termini(lekar["doctor_ID"])
-
     return formatiraj_odgovor(lekar, slobodni)

@@ -18,7 +18,6 @@
 import json
 import re
 from datetime import datetime, date, time
-
 from database import get_connection
 from ai.gemini_client import ask_gemini
 from ai.prompts import ZAKAZI_EXTRACT_PROMPT
@@ -26,8 +25,8 @@ from ai.slobodni_termini import zimi_site_lekari
 
 
 # Работно време - не дозволуваме закажување надвор
-RABOTNO_OD = time(8, 0)
-RABOTNO_DO = time(15, 30)
+RABOTNO_OD = time(8, 0)     # pocetok na rabotno vreme 
+RABOTNO_DO = time(15, 30)   # kraj na rabotno vreme 
 
 
 def izvlechi_podatoci_so_ai(prashanje: str) -> dict:
@@ -39,18 +38,16 @@ def izvlechi_podatoci_so_ai(prashanje: str) -> dict:
     """
     site_lekari = zimi_site_lekari()
 
-    # Листа на лекари за Gemini
+    # Lista na lekari koj ke gi koriste Gemini
     lista_text = ""
     for lekar in site_lekari:
-        spec = lekar.get("specialty") or "Општа пракса"
+        spec = lekar.get("specialty") or "Општа пракса" or "Општа медицина"
         lista_text += f"ID {lekar['doctor_ID']}: Д-р {lekar['name']} {lekar['surname']} - {spec}\n"
 
     denes = date.today().strftime("%Y-%m-%d")
     den_vo_nedela = ["понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"][date.today().weekday()]
 
-    full_prompt = f"""
-Денешен датум: {denes} ({den_vo_nedela})
-
+    full_prompt = f""" Денешен датум: {denes} ({den_vo_nedela})
 Листа на лекари:
 {lista_text}
 
