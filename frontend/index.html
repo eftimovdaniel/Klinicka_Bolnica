@@ -135,43 +135,6 @@
     </div>
   </section>
 
-  <section id="ai-agent-termini" class="ai-agent-widget" aria-label="AI агент за автоматски задачи">
-    <button type="button" id="ai-agent-toggle" class="ai-agent-toggle" aria-expanded="false" title="Отвори AI агент">
-      <span class="ai-agent-robot" aria-hidden="true">🤖</span>
-    </button>
-    <div id="ai-agent-panel" class="ai-agent-panel" style="display: none;">
-      <div class="ai-agent-panel-head">
-        <h2 class="ai-agent-title">AI асистент</h2>
-        <p class="ai-agent-tagline">Термини, проверки и брза помош во еден клик.</p>
-      </div>
-      <p class="ai-agent-intro">Напишете порака природно, како да зборувате со шалтер. Можете да почнете и со брза команда подолу.</p>
-      <div class="ai-agent-box">
-        <label class="ai-agent-field-label" for="ai-agent-prompt">Наредба</label>
-        <textarea id="ai-agent-prompt" rows="3" placeholder="Пример: Провери слободни термини кај д-р Хубрева за утре"></textarea>
-        <div class="ai-agent-quick-actions" aria-label="Брзи команди">
-          <button type="button" class="ai-agent-quick-btn" data-ai-prompt="Провери ми слободни термини кај д-р Хубрева за утре">Провери термини</button>
-          <button type="button" class="ai-agent-quick-btn" data-ai-prompt="Закажи ми во 11:00">Закажи во 11:00</button>
-          <button type="button" class="ai-agent-quick-btn" data-ai-prompt="Кои лекари од областа на кардиологија се достапни оваа недела?">Лекари оваа недела</button>
-          <button type="button" class="ai-agent-quick-btn" data-ai-prompt="Како да се подготвам за крвна слика?">Подготовка за крвна слика</button>
-          <button type="button" class="ai-agent-quick-btn" data-ai-prompt="Како да се подготвам за ултразвук на абдомен?">Подготовка за ехо</button>
-          <button type="button" class="ai-agent-quick-btn" data-ai-prompt="Како да се подготвам за MRI?">Подготовка за MRI</button>
-          <button type="button" class="ai-agent-quick-btn" data-ai-prompt="Кое е работното време на лабораторијата?">Работно време</button>
-          <button type="button" class="ai-agent-quick-btn" data-ai-prompt="Дали ми треба упат за рентген?">Дали ми треба упат?</button>
-          <button type="button" class="ai-agent-quick-btn" data-ai-prompt="Каде се наоѓа лабораторијата?">Локации</button>
-          <button type="button" class="ai-agent-quick-btn ai-agent-director-only" data-ai-prompt="Објави ја оваа вест на сајтот: https://example.com" style="display:none;">Објави вест (директор)</button>
-        </div>
-        <div class="ai-agent-actions-row">
-          <span class="ai-agent-hotkey">Ctrl/Cmd + Enter за извршување</span>
-          <button type="button" id="ai-agent-send" class="btn-primary ai-agent-exec-btn">Испрати</button>
-        </div>
-        <div id="ai-agent-result" class="ai-agent-result" role="region" aria-live="polite" aria-label="Резултат од агентот">
-          <div id="ai-agent-status-line" class="ai-agent-status-line"></div>
-          <div id="ai-agent-output" class="ai-agent-output"></div>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <section id="pacient-ocenki-section" class="section pacient-ocenki-section" style="display: none;" aria-label="Оцени завршени прегледи">
     <div class="container">
       <h2>Оцени ги завршените прегледи</h2>
@@ -584,22 +547,6 @@
       
       <span class="close" onclick="closeLekarDashboardModal()">&times;</span>
       <div id="lekar-info" class="doctor-info-modal"></div>
-
-      <!-- AI агент: дневен бриф за лекарот (се вчитува автоматски по најава) -->
-      <div id="lekar-ai-brief" class="lekar-ai-brief" style="display: none;" role="region" aria-label="Дневен бриф од AI агентот">
-        <div class="lekar-ai-brief__icon" aria-hidden="true">🌅</div>
-        <div class="lekar-ai-brief__body">
-          <div class="lekar-ai-brief__header">
-            <span class="lekar-ai-brief__badge">AI агент</span>
-            <span class="lekar-ai-brief__title">Вашиот дневен бриф</span>
-          </div>
-          <div id="lekar-ai-brief-message" class="lekar-ai-brief__message"></div>
-          <div class="lekar-ai-brief__actions">
-            <button type="button" id="lekar-ai-brief-read-btn" class="lekar-ai-brief__btn" onclick="markDoctorBriefAsRead()">Прочитав</button>
-            <button type="button" class="lekar-ai-brief__btn lekar-ai-brief__btn--ghost" onclick="hideDoctorBrief()">Скриј</button>
-          </div>
-        </div>
-      </div>
 
       <!-- Навигација во интерфејсот за лекари -->
       <div class="lekar-nav-tabs">

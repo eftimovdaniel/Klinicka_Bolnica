@@ -19,13 +19,6 @@ let currentLekar = null;  // Податоци за моментално наја
 let currentPacient = null;  // Податоци за моментално најавениот пациент (за закажување на прегледи)
 // Колку лекари да се исцртаат; се ажурира на бројот на вчитани/филтрирани за да се видат сите
 let displayedDoctorsCount = 8;
-let aiAgentState = {
-  doctor_id: null,
-  doctor_name: '',
-  date: '',
-  freeSlots: [],
-  rawState: {}
-};
 
 var KB_KEY_PACIENT = 'currentPacient';
 var KB_KEY_LEKAR = 'currentLekar';
@@ -53,39 +46,15 @@ function isLekarHospitalDirector(lekar) {
   return ADMIN_DIRECTOR_NAMES.indexOf(full) >= 0;
 }
 
-function isAiDirectorActive() {
-  // UI-guard: штом има најавен лекар, прикажи ја директорската AI акција.
-  // Реалната безбедност е на backend (check_admin_access), па нема ризик.
-  return !!(currentLekar && currentLekar.doctor_ID);
-}
-
-function ensureDirectorQuickActionButton() {
-  var wrap = document.querySelector('.ai-agent-quick-actions');
-  if (!wrap) return null;
-  var btn = document.getElementById('ai-agent-director-news-btn');
-  if (btn) return btn;
-  btn = document.createElement('button');
-  btn.type = 'button';
-  btn.id = 'ai-agent-director-news-btn';
-  btn.className = 'ai-agent-quick-btn ai-agent-director-only';
-  btn.setAttribute('data-ai-prompt', 'Објави ја оваа вест на сајтот: https://example.com');
-  btn.textContent = 'Објави вест (директор)';
-  btn.style.display = 'none';
-  wrap.appendChild(btn);
-  return btn;
-}
-
 /** Прикажи го табот „Администрација“ само за директорот (и по освежување на страницата со зачувана сесија). */
 function updateLekarAdminTabVisibility() {
   var btn = document.getElementById('admin-tab-btn');
   if (!btn) return;
   if (!currentLekar || !currentLekar.doctor_ID) {
     btn.style.display = 'none';
-    if (typeof updateAiAgentVisibility === 'function') updateAiAgentVisibility();
     return;
   }
   btn.style.display = isLekarHospitalDirector(currentLekar) ? 'inline-block' : 'none';
-  if (typeof updateAiAgentVisibility === 'function') updateAiAgentVisibility();
 }
 
 function persistPacientToStorage() {
@@ -595,7 +564,6 @@ function updateAuthHeader() {
   if (loL) loL.style.display = loggedLekar ? 'inline-block' : 'none';
   updateNavForPacient();
   updateLekarAdminTabVisibility();
-  updateAiAgentVisibility();
 }
 
 function logoutPacient() {
@@ -644,163 +612,6 @@ function closeAppointmentSuccess() {
     if (currentPacient) persistPacientToStorage();
   } catch (e) {}
   if (typeof updateAuthHeader === 'function') updateAuthHeader();
-}
-
-function setAiAgentResult(statusKind, statusText, bodyText) {
-  var line = document.getElementById('ai-agent-status-line');
-  var out = document.getElementById('ai-agent-output');
-  if (!line || !out) return;
-  line.className = 'ai-agent-status-line';
-  if (statusKind === 'running') line.classList.add('ai-agent-status-line--running');
-  else if (statusKind === 'ok') line.classList.add('ai-agent-status-line--ok');
-  else if (statusKind === 'fail') line.classList.add('ai-agent-status-line--fail');
-  else line.classList.add('ai-agent-status-line--idle');
-  line.textContent = statusText || '';
-  out.textContent = bodyText || '';
-}
-
-function updateAiAgentVisibility() {
-  var section = document.getElementById('ai-agent-termini');
-  var panel = document.getElementById('ai-agent-panel');
-  var toggle = document.getElementById('ai-agent-toggle');
-  var prompt = document.getElementById('ai-agent-prompt');
-  var sendBtn = document.getElementById('ai-agent-send');
-  var result = document.getElementById('ai-agent-result');
-  ensureDirectorQuickActionButton();
-  var directorOnly = document.querySelectorAll('.ai-agent-director-only');
-  if (!section || !panel || !toggle || !prompt || !sendBtn) return;
-  section.style.display = 'block';
-  var directorLogged = isAiDirectorActive();
-  directorOnly.forEach(function(el) { el.style.display = directorLogged ? 'inline-flex' : 'none'; });
-  if (currentPacient || directorLogged) {
-    prompt.disabled = false;
-    sendBtn.disabled = false;
-    toggle.disabled = false;
-    if (result && !result.dataset.hasRun) {
-      if (directorLogged && !currentPacient) {
-        setAiAgentResult('idle', 'Статус: подготвен', 'Најавени сте како директор. Можете да користите AI команди, вклучувајќи објавување новости.');
-      } else {
-        setAiAgentResult('idle', 'Статус: подготвен', 'Внесете наредба подолу. Агентот ќе провери термини или ќе закаже преглед со вашите податоци од профилот.');
-      }
-    }
-  } else {
-    prompt.disabled = true;
-    sendBtn.disabled = true;
-    toggle.disabled = false;
-    if (result) {
-      result.dataset.hasRun = '';
-      setAiAgentResult('idle', 'Статус: неактивен', 'Најавете се како пациент за да може агентот да извршува задачи во ваше име.');
-    }
-  }
-}
-
-function toggleAiAgentPanel() {
-  var panel = document.getElementById('ai-agent-panel');
-  var toggle = document.getElementById('ai-agent-toggle');
-  if (!panel || !toggle) return;
-  var isOpen = panel.style.display !== 'none';
-  panel.style.display = isOpen ? 'none' : 'block';
-  toggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
-}
-
-async function handleAiAgentPrompt() {
-  var promptEl = document.getElementById('ai-agent-prompt');
-  var result = document.getElementById('ai-agent-result');
-  var sendBtn = document.getElementById('ai-agent-send');
-  if (!promptEl) return;
-  var prompt = (promptEl.value || '').trim();
-  if (!prompt) {
-    setAiAgentResult('fail', 'Статус: неуспешно', 'Наредбата е празна. Опишете што треба да се направи.');
-    return;
-  }
-  var directorLogged = isAiDirectorActive();
-  if (!currentPacient && !directorLogged) {
-    setAiAgentResult('fail', 'Статус: неуспешно', 'Најавете се како пациент или директор за да работи агентот во ваше име.');
-    return;
-  }
-
-  if (result) result.dataset.hasRun = '1';
-  if (sendBtn) sendBtn.disabled = true;
-  setAiAgentResult('running', 'Статус: извршување…', 'Се повикува серверот и се обработува наредбата.');
-
-  try {
-    const res = await fetch(API_BASE + '/ai-agent/baranja', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        prompt: prompt,
-        pacient: currentPacient || currentLekar || {},
-        state: Object.assign({}, aiAgentState.rawState || {}, {
-          admin_doctor_id: (currentLekar && currentLekar.doctor_ID) ? currentLekar.doctor_ID : null,
-          doctor_id: aiAgentState.doctor_id,
-          doctor_name: aiAgentState.doctor_name,
-          date: aiAgentState.date,
-          free_slots: aiAgentState.freeSlots
-        })
-      })
-    });
-    const data = await res.json().catch(function() { return {}; });
-    if (!res.ok) {
-      throw new Error(data.detail || data.message || 'Грешка на серверот.');
-    }
-    if (data && data.state) {
-      aiAgentState.rawState = data.state || {};
-      aiAgentState.doctor_id = data.state.doctor_id || null;
-      aiAgentState.doctor_name = data.state.doctor_name || '';
-      aiAgentState.date = data.state.date || '';
-      aiAgentState.freeSlots = Array.isArray(data.state.free_slots) ? data.state.free_slots : [];
-    }
-    var msg = data.message || 'Нема извештај од агентот.';
-    var ok = !!data.ok;
-    if (data.intent === 'book' && ok) {
-      setAiAgentResult('ok', 'Статус: завршено', 'Задачата е извршена.\n\n' + msg);
-      promptEl.value = '';
-    } else if (data.intent === 'news_publish_confirm' && ok) {
-      setAiAgentResult('ok', 'Статус: завршено', 'Задачата е извршена.\n\n' + msg);
-      promptEl.value = '';
-      if (typeof loadNovostiAdmin === 'function') {
-        loadNovostiAdmin();
-      }
-      if (typeof loadNovosti === 'function') {
-        loadNovosti();
-      }
-    } else if (ok) {
-      setAiAgentResult('ok', 'Статус: завршено', msg);
-    } else {
-      setAiAgentResult('fail', 'Статус: неуспешно / нецелосно', msg);
-    }
-  } catch (err) {
-    setAiAgentResult('fail', 'Статус: грешка', err && err.message ? err.message : 'Неуспешна врска со серверот.');
-  } finally {
-    if (sendBtn) sendBtn.disabled = false;
-  }
-}
-
-function setupAiAgent() {
-  var toggle = document.getElementById('ai-agent-toggle');
-  var btn = document.getElementById('ai-agent-send');
-  var input = document.getElementById('ai-agent-prompt');
-  if (!toggle || !btn || !input) return;
-  ensureDirectorQuickActionButton();
-  var quickButtons = document.querySelectorAll('.ai-agent-quick-btn');
-  toggle.addEventListener('click', toggleAiAgentPanel);
-  btn.addEventListener('click', handleAiAgentPrompt);
-  quickButtons.forEach(function(el) {
-    if (el.dataset.aiBound === '1') return;
-    el.dataset.aiBound = '1';
-    el.addEventListener('click', function() {
-      var txt = (el.getAttribute('data-ai-prompt') || '').trim();
-      if (!txt) return;
-      input.value = txt;
-      input.focus();
-    });
-  });
-  input.addEventListener('keydown', function(e) {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      handleAiAgentPrompt();
-    }
-  });
-  updateAiAgentVisibility();
 }
 
 // Функција за отворање на модален прозорец за закажување на преглед
@@ -1623,7 +1434,6 @@ function initialize() {
   setupModal();
   setupAppointmentForm();
   setupAparatiForm();
-  setupAiAgent();
   setupSmoothScroll();
   setupLekarLogin();
   setupLekarPasswordForms();
@@ -1879,104 +1689,6 @@ function showLekarTab(tabName) {
 // Функција за прикажување на главниот dashboard за лекари
 // Параметри: data - податоци за лекарот и неговите термини од API-то
 // Прикажува информации за лекарот, неговите термини и проверува дали е администратор
-// ============================================================================
-// AI АГЕНТ: ДНЕВЕН БРИФ ЗА ЛЕКАР
-// ============================================================================
-// Backend-от секое утро во 08:00 автоматски генерира бриф за секој лекар
-// (закажани термини за денес, прв пациент, следно дежурство, заостанати termini).
-// Овие функции го вчитуваат и приказуваат брифот во dashboard-от по најава.
-
-// ID на моментално прикажаниот брифинг (потребно за маркирање како „прочитано")
-let currentDoctorBriefId = null;
-
-// Се повикува автоматски од displayLekarDashboard() — го бара брифот од backend-от.
-// Ако брифот не е најден (пр. сè уште не е генериран за денес) – банерот останува скриен.
-async function loadDoctorBriefForDashboard() {
-  const banner = document.getElementById('lekar-ai-brief');
-  const messageEl = document.getElementById('lekar-ai-brief-message');
-  const readBtn = document.getElementById('lekar-ai-brief-read-btn');
-  if (!banner || !messageEl) return;
-
-  if (!currentLekar || !currentLekar.doctor_ID) {
-    banner.style.display = 'none';
-    return;
-  }
-
-  banner.style.display = 'none';
-  currentDoctorBriefId = null;
-
-  try {
-    const res = await fetch(`${API_BASE}/ai-agent/doctor-brief/${currentLekar.doctor_ID}`);
-    if (!res.ok) {
-      // 404 = нема бриф за денес – тоа е во ред, банерот останува скриен
-      return;
-    }
-
-    // Backend враќа: { ok: true, has_brief: true, brief: { brief_ID, message, read_status, ... } }
-    // или { ok: true, has_brief: false, message: "..." } ако нема бриф за денес.
-    const data = await res.json();
-    if (!data || !data.has_brief || !data.brief) {
-      return;
-    }
-    const brief = data.brief;
-    if (!brief.message) {
-      return;
-    }
-
-    currentDoctorBriefId = brief.brief_ID || null;
-    messageEl.textContent = brief.message;
-
-    // Ако брифот е веќе прочитан – сменете го текстот на копчето
-    if (readBtn) {
-      if (brief.read_status) {
-        readBtn.textContent = 'Прочитано ✓';
-        readBtn.disabled = true;
-      } else {
-        readBtn.textContent = 'Прочитав';
-        readBtn.disabled = false;
-      }
-    }
-
-    banner.style.display = 'flex';
-  } catch (err) {
-    console.warn('[doctor-brief] Не успеа вчитување:', err);
-  }
-}
-
-// Кога лекарот ќе кликне „Прочитав" – го праќаме статусот во backend-от
-async function markDoctorBriefAsRead() {
-  if (!currentDoctorBriefId) {
-    hideDoctorBrief();
-    return;
-  }
-  const readBtn = document.getElementById('lekar-ai-brief-read-btn');
-  try {
-    const res = await fetch(`${API_BASE}/ai-agent/doctor-brief/${currentDoctorBriefId}/read`, {
-      method: 'POST'
-    });
-    if (res.ok) {
-      if (readBtn) {
-        readBtn.textContent = 'Прочитано ✓';
-        readBtn.disabled = true;
-      }
-      // По кратко време го скриваме банерот за да не пречи
-      setTimeout(hideDoctorBrief, 800);
-    }
-  } catch (err) {
-    console.warn('[doctor-brief] Не успеа маркирање:', err);
-  }
-}
-
-// Само го скрива банерот од DOM-от за тековната сесија
-function hideDoctorBrief() {
-  const banner = document.getElementById('lekar-ai-brief');
-  if (banner) banner.style.display = 'none';
-}
-
-// Експонирани во window за onclick атрибутите во HTML-от
-window.markDoctorBriefAsRead = markDoctorBriefAsRead;
-window.hideDoctorBrief = hideDoctorBrief;
-
 function displayLekarDashboard(data) {
   const doctorInfo = document.getElementById('lekar-info');
   const terminiList = document.getElementById('lekar-termini-list');
@@ -2013,10 +1725,6 @@ function displayLekarDashboard(data) {
     rds.value = today.toISOString().split('T')[0];
   }
   // НЕ повикувај loadMojRaspored при најава: тој прикажуваше само денешен датум и го бришеше целосниот список.
-
-  // AI агент: вчитај го дневниот бриф (генериран автоматски од backend-от во 08:00).
-  // Се повикува тука за да работи и за нова најава и за повторно отворање на dashboard-от.
-  loadDoctorBriefForDashboard();
 }
 
 // Функција за вчитување на распоред на дежурства

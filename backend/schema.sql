@@ -19,9 +19,6 @@ SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS password_reset_tokens;
 DROP TABLE IF EXISTS Aparati_termini;
 DROP TABLE IF EXISTS Pregled_feedback;
-DROP TABLE IF EXISTS Potsetnici;
-DROP TABLE IF EXISTS Doctor_briefs;
-DROP TABLE IF EXISTS FAQ;
 DROP TABLE IF EXISTS Termin_pregled;
 DROP TABLE IF EXISTS prijaveni_lekari;
 DROP TABLE IF EXISTS Dezurstva;
@@ -108,63 +105,6 @@ CREATE TABLE Termin_pregled (
   KEY idx_tp_status (status_pregled),
   CONSTRAINT fk_tp_doctor FOREIGN KEY (doctor_ID) REFERENCES Doctors (doctor_ID)
     ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ---------------------------------------------------------------------------
--- Potsetnici – закажани потсетници за термини (праќа се преку email/SMS)
--- ---------------------------------------------------------------------------
-CREATE TABLE Potsetnici (
-  potsetnik_ID INT NOT NULL AUTO_INCREMENT,
-  termin_ID INT NOT NULL,
-  email_pacient VARCHAR(255) NOT NULL,
-  telefon_pacient VARCHAR(32) DEFAULT NULL,
-  vreme_potsetuvanje DATETIME NOT NULL,
-  kanal VARCHAR(20) NOT NULL DEFAULT 'email',
-  status_potsetnik TINYINT(1) NOT NULL DEFAULT 0,
-  kreiran_na DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  prateno_na DATETIME DEFAULT NULL,
-  PRIMARY KEY (potsetnik_ID),
-  KEY idx_potsetnik_vreme_status (vreme_potsetuvanje, status_potsetnik),
-  KEY idx_potsetnik_termin (termin_ID),
-  CONSTRAINT fk_potsetnik_termin FOREIGN KEY (termin_ID) REFERENCES Termin_pregled (termin_ID)
-    ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ---------------------------------------------------------------------------
--- Doctor_briefs – дневен брифинг за лекари (генериран од scheduler секое утро)
--- ---------------------------------------------------------------------------
-CREATE TABLE Doctor_briefs (
-  brief_ID INT NOT NULL AUTO_INCREMENT,
-  doctor_ID INT NOT NULL,
-  brief_date DATE NOT NULL,
-  message TEXT NOT NULL,
-  read_status TINYINT(1) NOT NULL DEFAULT 0,
-  kreiran_na DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  procitan_na DATETIME DEFAULT NULL,
-  PRIMARY KEY (brief_ID),
-  UNIQUE KEY uq_brief_doctor_date (doctor_ID, brief_date),
-  KEY idx_brief_doctor (doctor_ID),
-  CONSTRAINT fk_brief_doctor FOREIGN KEY (doctor_ID) REFERENCES Doctors (doctor_ID)
-    ON DELETE CASCADE ON UPDATE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ---------------------------------------------------------------------------
--- FAQ – често поставувани прашања (база на знаење за AI агентот)
--- ---------------------------------------------------------------------------
-CREATE TABLE FAQ (
-  faq_ID INT NOT NULL AUTO_INCREMENT,
-  prashanje VARCHAR(500) NOT NULL,
-  odgovor TEXT NOT NULL,
-  kategorija VARCHAR(80) DEFAULT NULL,
-  klucni_zborovi TEXT DEFAULT NULL,
-  aktiven TINYINT(1) NOT NULL DEFAULT 1,
-  pati_iskoristen INT NOT NULL DEFAULT 0,
-  kreiran_na DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  azuriran_na DATETIME DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
-  PRIMARY KEY (faq_ID),
-  KEY idx_faq_kategorija (kategorija),
-  KEY idx_faq_aktiven (aktiven),
-  FULLTEXT KEY ft_faq_search (prashanje, odgovor, klucni_zborovi)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ---------------------------------------------------------------------------

@@ -2,39 +2,19 @@
 Главна точка за стартување на FastAPI апликацијата – Клиничка Болница Штип.
 Стартување: uvicorn main:app --reload --host 0.0.0.0 --port 8000
 """
-from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from routers import lekari, pacienti, termini, admin, aparati, uslugi, novosti, kariera, ai_agent
-from services.doctor_brief_service import start_scheduler, stop_scheduler
-
-
-# lifespan handler - startuva schedulerot pri start na app, stopiraj pri shutdown
-@asynccontextmanager
-async def lifespan(_app: FastAPI):
-    # ============== STARTUP ==============
-    try:
-        start_scheduler()
-    except Exception as e:
-        # ne sakame schedulerot da ja sruшi celata aplikacija
-        print(f"[main] greška pri startuvanje na scheduler: {e}")
-    yield
-    # ============== SHUTDOWN ==============
-    try:
-        stop_scheduler()
-    except Exception as e:
-        print(f"[main] greška pri stopiranje na scheduler: {e}")
+from routers import lekari, pacienti, termini, admin, aparati, uslugi, novosti, kariera
 
 
 app = FastAPI(
     title="Клиничка Болница Штип – API",
     description="API за системот за управување со прегледи, термини и администрација",
     version="1.0",
-    lifespan=lifespan,
 )
 
 #dozvola za povik na api od frontend delot 
@@ -61,7 +41,6 @@ app.include_router(uslugi.router)
 app.include_router(novosti.router)
 app.include_router(kariera.router)
 app.include_router(kariera.app_router)  # /aplikacija (пријава за оглас)
-app.include_router(ai_agent.router)
 
 
 @app.get("/")
