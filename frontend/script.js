@@ -57,65 +57,101 @@ function updateLekarAdminTabVisibility() {
   btn.style.display = isLekarHospitalDirector(currentLekar) ? 'inline-block' : 'none';
 }
 
+// Session management се користи преку window.KBSession (од session.js).
+// Овие функции се wrapper-и за компатибилност со постојниот код.
+
 function persistPacientToStorage() {
   if (!currentPacient) return;
-  try {
-    var s = JSON.stringify(currentPacient);
-    sessionStorage.setItem(KB_KEY_PACIENT, s);
-    localStorage.setItem(KB_KEY_PACIENT, s);
-  } catch (e) {}
+  if (window.KBSession && typeof window.KBSession.start === 'function') {
+    window.KBSession.start('pacient', currentPacient);
+  }
 }
 
 function persistLekarToStorage() {
   if (!currentLekar || !currentLekar.doctor_ID) return;
-  try {
-    var s = JSON.stringify(currentLekar);
-    sessionStorage.setItem(KB_KEY_LEKAR, s);
-    localStorage.setItem(KB_KEY_LEKAR, s);
-  } catch (e) {}
+  if (window.KBSession && typeof window.KBSession.start === 'function') {
+    window.KBSession.start('lekar', currentLekar);
+  }
 }
 
 function clearPacientFromStorage() {
-  try {
-    sessionStorage.removeItem(KB_KEY_PACIENT);
-    localStorage.removeItem(KB_KEY_PACIENT);
-  } catch (e) {}
+  if (window.KBSession && typeof window.KBSession.end === 'function') {
+    window.KBSession.end('pacient', 'manual');
+  } else {
+    try {
+      sessionStorage.removeItem(KB_KEY_PACIENT);
+      localStorage.removeItem(KB_KEY_PACIENT);
+    } catch (e) {}
+  }
 }
 
 function clearLekarFromStorage() {
-  try {
-    sessionStorage.removeItem(KB_KEY_LEKAR);
-    localStorage.removeItem(KB_KEY_LEKAR);
-  } catch (e) {}
+  if (window.KBSession && typeof window.KBSession.end === 'function') {
+    window.KBSession.end('lekar', 'manual');
+  } else {
+    try {
+      sessionStorage.removeItem(KB_KEY_LEKAR);
+      localStorage.removeItem(KB_KEY_LEKAR);
+    } catch (e) {}
+  }
 }
 
-// Врати го најавениот пациент од sessionStorage или localStorage (дупло складирање)
+// Врати го најавениот пациент - проверува дали сесијата е валидна (не експирирана)
 (function restorePacientSession() {
-  try {
-    var saved = sessionStorage.getItem(KB_KEY_PACIENT) || localStorage.getItem(KB_KEY_PACIENT);
-    if (saved) {
-      var parsed = JSON.parse(saved);
-      if (parsed && (parsed.pacient_ID || parsed.email)) {
-        currentPacient = parsed;
-        persistPacientToStorage();
-      }
-    }
-  } catch (e) {}
+  if (!window.KBSession) return;
+  var data = window.KBSession.get('pacient');
+  if (data && (data.pacient_ID || data.email)) {
+    currentPacient = data;
+  }
 })();
 
-// Врати го најавениот лекар од sessionStorage или localStorage
+// Врати го најавениот лекар - проверува дали сесијата е валидна
 (function restoreLekarSession() {
-  try {
-    var saved = sessionStorage.getItem(KB_KEY_LEKAR) || localStorage.getItem(KB_KEY_LEKAR);
-    if (saved) {
-      var parsed = JSON.parse(saved);
-      if (parsed && parsed.doctor_ID) {
-        currentLekar = parsed;
-        persistLekarToStorage();
-      }
-    }
-  } catch (e) {}
+  if (!window.KBSession) return;
+  var data = window.KBSession.get('lekar');
+  if (data && data.doctor_ID) {
+    currentLekar = data;
+  }
 })();
+
+// Реагирај на автоматска одјава (експирација) или промена во друг таб
+window.addEventListener('kbs:session-end', function (e) {
+  var role = e.detail && e.detail.role;
+  var reason = e.detail && e.detail.reason;
+  if (role === 'pacient') {
+    currentPacient = null;
+  } else if (role === 'lekar') {
+    currentLekar = null;
+    if (typeof closeLekarDashboardModal === 'function') closeLekarDashboardModal();
+  }
+  if (typeof updateAuthHeader === 'function') updateAuthHeader();
+  // Ако е поради expiry - sajtot веќе ја покажува нотификацијата од session.js
+  if (reason === 'expired') {
+    console.info('[KBSession] Автоматска одјава:', role);
+  }
+});
+
+// Кога друг таб ја смени сесијата (logout во друг таб итн.)
+window.addEventListener('kbs:session-sync', function (e) {
+  var role = e.detail && e.detail.role;
+  var exists = e.detail && e.detail.valueExists;
+  if (!exists) {
+    // одјавено во друг таб
+    if (role === 'pacient') currentPacient = null;
+    if (role === 'lekar') {
+      currentLekar = null;
+      if (typeof closeLekarDashboardModal === 'function') closeLekarDashboardModal();
+    }
+  } else if (window.KBSession) {
+    // најавено/освежено во друг таб - повлечи ги новите податоци
+    var data = window.KBSession.get(role);
+    if (data) {
+      if (role === 'pacient') currentPacient = data;
+      if (role === 'lekar') currentLekar = data;
+    }
+  }
+  if (typeof updateAuthHeader === 'function') updateAuthHeader();
+});
 
 // Константа за автоматско менување на годината во footer-от
 const yearSpan = document.getElementById('year');
@@ -550,21 +586,397 @@ function handleMainNavAuthClick() {
 window.openNavLoginChoice = openNavLoginChoice;
 window.closeNavLoginChoice = closeNavLoginChoice;
 
-/** Ажурирај го хедерот: „Најави се!“ само за гостин; одјавување за најавен лекар/пациент */
+/** Изведи иницијали од име/презиме (на пр. „Даниел Ефтимов" → „ДЕ") */
+function getUserInitials(ime, prezime) {
+  var i = (ime || '').trim();
+  var p = (prezime || '').trim();
+  var ini = '';
+  if (i) ini += i.charAt(0);
+  if (p) ini += p.charAt(0);
+  return (ini || '?').toUpperCase();
+}
+
+/** Ажурирај го хедерот: „Најави се!“ за гостин; за најавени → user menu со аватар */
 function updateAuthHeader() {
   var guest = document.getElementById('nav-auth-guest');
-  var loP = document.getElementById('nav-logout-pacient');
-  var loL = document.getElementById('nav-logout-lekar');
+  var menu = document.getElementById('nav-user-menu');
   var loggedLekar = !!(currentLekar && currentLekar.doctor_ID);
   var loggedPacient = !!currentPacient;
+  var anyLogged = loggedLekar || loggedPacient;
+
   if (guest) {
-    guest.style.display = loggedLekar || loggedPacient ? 'none' : 'inline-block';
+    guest.style.display = anyLogged ? 'none' : 'inline-block';
   }
-  if (loP) loP.style.display = currentPacient ? 'inline-block' : 'none';
-  if (loL) loL.style.display = loggedLekar ? 'inline-block' : 'none';
+  if (menu) {
+    menu.style.display = anyLogged ? 'inline-block' : 'none';
+  }
+
+  if (anyLogged) {
+    // Лекар има предност ако е најавен (poso obichno e samo eden)
+    var role = loggedLekar ? 'lekar' : 'pacient';
+    var data = loggedLekar ? currentLekar : currentPacient;
+    var ime = data.ime || data.name || '';
+    var prezime = data.prezime || data.surname || '';
+    var email = data.email || '';
+    var spec = data.specijalnost || '';
+
+    var initials = getUserInitials(ime, prezime);
+    var displayName = ((ime + ' ' + prezime).trim()) || email || '—';
+
+    // Avatar
+    var avatar = document.getElementById('nav-user-avatar');
+    var dot = document.getElementById('nav-user-active-dot');
+    var initEl = document.getElementById('nav-user-avatar-initials');
+    if (avatar) {
+      avatar.classList.toggle('nav-user-avatar--lekar', role === 'lekar');
+    }
+    if (initEl) initEl.textContent = initials;
+    if (dot) dot.style.display = role === 'lekar' ? 'inline-block' : 'none';
+
+    // Trigger info
+    var nameEl = document.getElementById('nav-user-name');
+    var roleEl = document.getElementById('nav-user-role');
+    if (nameEl) nameEl.textContent = displayName;
+    if (roleEl) roleEl.textContent = role === 'lekar' ? (spec || 'Лекар') : 'Пациент';
+
+    // Dropdown header
+    var ddAvatar = document.querySelector('.nav-user-dropdown-avatar');
+    var ddInit = document.getElementById('nav-user-dd-initials');
+    var ddName = document.getElementById('nav-user-dd-name');
+    var ddEmail = document.getElementById('nav-user-dd-email');
+    var ddBadge = document.getElementById('nav-user-dd-role-badge');
+    if (ddAvatar) ddAvatar.classList.toggle('nav-user-dropdown-avatar--lekar', role === 'lekar');
+    if (ddInit) ddInit.textContent = initials;
+    if (ddName) ddName.textContent = displayName;
+    if (ddEmail) ddEmail.textContent = email || '—';
+    if (ddBadge) {
+      ddBadge.textContent = role === 'lekar' ? 'Лекар' : 'Пациент';
+      ddBadge.classList.toggle('nav-user-dd-role-badge--lekar', role === 'lekar');
+    }
+
+    // Видливост на менe ставки
+    var dosieItem = document.getElementById('nav-user-dd-dosie');
+    var panelItem = document.getElementById('nav-user-dd-panel');
+    if (dosieItem) dosieItem.style.display = role === 'pacient' ? 'flex' : 'none';
+    if (panelItem) panelItem.style.display = role === 'lekar' ? 'flex' : 'none';
+  } else {
+    closeUserMenu();
+  }
+
   updateNavForPacient();
   updateLekarAdminTabVisibility();
 }
+
+/** Toggle dropdown */
+function toggleUserMenu() {
+  var dd = document.getElementById('nav-user-dropdown');
+  var trigger = document.getElementById('nav-user-trigger');
+  if (!dd || !trigger) return;
+  var isOpen = dd.style.display !== 'none';
+  if (isOpen) {
+    closeUserMenu();
+  } else {
+    dd.style.display = 'block';
+    trigger.setAttribute('aria-expanded', 'true');
+  }
+}
+
+function closeUserMenu() {
+  var dd = document.getElementById('nav-user-dropdown');
+  var trigger = document.getElementById('nav-user-trigger');
+  if (dd) dd.style.display = 'none';
+  if (trigger) trigger.setAttribute('aria-expanded', 'false');
+}
+
+/** Затвори dropdown кога се клика надвор */
+document.addEventListener('click', function (e) {
+  var menu = document.getElementById('nav-user-menu');
+  if (!menu) return;
+  if (!menu.contains(e.target)) closeUserMenu();
+});
+
+/** Одјава од dropdown - чисти и пациент и лекар */
+function userMenuLogout() {
+  closeUserMenu();
+  if (currentLekar && currentLekar.doctor_ID) logoutLekar();
+  if (currentPacient) logoutPacient();
+}
+
+window.toggleUserMenu = toggleUserMenu;
+window.closeUserMenu = closeUserMenu;
+window.userMenuLogout = userMenuLogout;
+
+/* ============================================================ */
+/* МОЈ ПРОФИЛ модал                                              */
+/* ============================================================ */
+function openMojProfil() {
+  closeUserMenu();
+  var loggedLekar = !!(currentLekar && currentLekar.doctor_ID);
+  var loggedPacient = !!currentPacient;
+  if (!loggedLekar && !loggedPacient) {
+    alert('Прво најавете се за да го видите профилот.');
+    return;
+  }
+  var role = loggedLekar ? 'lekar' : 'pacient';
+  var data = loggedLekar ? currentLekar : currentPacient;
+
+  var ime = data.ime || data.name || '';
+  var prezime = data.prezime || data.surname || '';
+  var email = data.email || '—';
+  var tel = data.telefon || data.phone_number || '—';
+  var spec = data.specijalnost || '';
+  var idVal = role === 'lekar' ? (data.doctor_ID || '—') : (data.pacient_ID || '—');
+
+  // Avatar
+  var avatar = document.querySelector('#moj-profil-modal .moj-profil-avatar');
+  if (avatar) avatar.classList.toggle('moj-profil-avatar--lekar', role === 'lekar');
+  var initEl = document.getElementById('moj-profil-initials');
+  if (initEl) initEl.textContent = getUserInitials(ime, prezime);
+
+  // Title + badge
+  var titleEl = document.getElementById('moj-profil-title');
+  if (titleEl) titleEl.textContent = role === 'lekar' ? 'Мојот лекарски профил' : 'Мојот профил';
+  var badge = document.getElementById('moj-profil-role-badge');
+  if (badge) {
+    badge.textContent = role === 'lekar' ? 'Лекар' : 'Пациент';
+    badge.classList.toggle('moj-profil-role-badge--lekar', role === 'lekar');
+  }
+
+  // Fields
+  document.getElementById('moj-profil-imeprezime').textContent = ((ime + ' ' + prezime).trim()) || '—';
+  document.getElementById('moj-profil-email').textContent = email;
+  document.getElementById('moj-profil-telefon').textContent = tel;
+  document.getElementById('moj-profil-id').textContent = '#' + idVal;
+
+  // Специјалност само за лекар
+  var specRow = document.getElementById('moj-profil-spec-row');
+  if (specRow) {
+    if (role === 'lekar' && spec) {
+      specRow.style.display = 'flex';
+      document.getElementById('moj-profil-spec').textContent = spec;
+    } else {
+      specRow.style.display = 'none';
+    }
+  }
+
+  // „Отвори досие" копче само за пациент
+  var dosieBtn = document.getElementById('moj-profil-dosie-btn');
+  if (dosieBtn) dosieBtn.style.display = role === 'pacient' ? 'inline-block' : 'none';
+
+  var modal = document.getElementById('moj-profil-modal');
+  if (modal) modal.style.display = 'flex';
+}
+
+function closeMojProfil() {
+  var modal = document.getElementById('moj-profil-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+window.openMojProfil = openMojProfil;
+window.closeMojProfil = closeMojProfil;
+
+/* ============================================================ */
+/* МОЕТО ДОСИЕ модал (само пациент)                              */
+/* ============================================================ */
+async function openMojeDosie() {
+  closeUserMenu();
+  if (!currentPacient || !currentPacient.pacient_ID) {
+    alert('Прво најавете се како пациент.');
+    return;
+  }
+
+  var ime = currentPacient.ime || '';
+  var prezime = currentPacient.prezime || '';
+
+  // Иницијализирај header
+  var initEl = document.getElementById('dosie-initials');
+  if (initEl) initEl.textContent = getUserInitials(ime, prezime);
+  var subEl = document.getElementById('dosie-subtitle');
+  if (subEl) subEl.textContent = ((ime + ' ' + prezime).trim()) || currentPacient.email || '';
+
+  // Reset панели на loading
+  document.getElementById('dosie-list-idni').innerHTML = '<div class="dosie-loading">Вчитувам...</div>';
+  document.getElementById('dosie-list-zaverseni').innerHTML = '<div class="dosie-loading">Вчитувам...</div>';
+  document.getElementById('dosie-list-oceni').innerHTML = '<div class="dosie-loading">Вчитувам...</div>';
+  document.getElementById('dosie-profil-list').innerHTML = '<div class="dosie-loading">Вчитувам...</div>';
+
+  // Reset табови - покажи „Идни термини"
+  switchDosieTab('idni');
+
+  var modal = document.getElementById('moje-dosie-modal');
+  if (modal) modal.style.display = 'flex';
+
+  // Повлечи од backend
+  try {
+    var res = await fetch(API_BASE + '/pacienti/dosie?pacient_ID=' + encodeURIComponent(currentPacient.pacient_ID));
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    var data = await res.json();
+    renderDosie(data);
+  } catch (err) {
+    var msg = (err && err.message) || 'Грешка при вчитување';
+    document.getElementById('dosie-list-idni').innerHTML =
+      '<div class="dosie-empty">Грешка: ' + msg + '</div>';
+    document.getElementById('dosie-list-zaverseni').innerHTML =
+      '<div class="dosie-empty">Грешка: ' + msg + '</div>';
+    document.getElementById('dosie-list-oceni').innerHTML =
+      '<div class="dosie-empty">Грешка: ' + msg + '</div>';
+    document.getElementById('dosie-profil-list').innerHTML =
+      '<div class="dosie-empty">Грешка: ' + msg + '</div>';
+  }
+}
+
+function closeMojeDosie() {
+  var modal = document.getElementById('moje-dosie-modal');
+  if (modal) modal.style.display = 'none';
+}
+
+function switchDosieTab(tab) {
+  var tabs = document.querySelectorAll('#moje-dosie-modal .dosie-tab');
+  var panes = document.querySelectorAll('#moje-dosie-modal .dosie-pane');
+  tabs.forEach(function (t) {
+    t.classList.toggle('active', t.getAttribute('data-tab') === tab);
+  });
+  panes.forEach(function (p) {
+    p.classList.toggle('active', p.id === 'dosie-pane-' + tab);
+  });
+}
+
+window.openMojeDosie = openMojeDosie;
+window.closeMojeDosie = closeMojeDosie;
+window.switchDosieTab = switchDosieTab;
+
+/** Форматирај датум (YYYY-MM-DD) и време (HH:MM:SS) во читлив текст */
+function _formatDosieDatumVreme(datumStr, vremeStr) {
+  if (!datumStr) return '—';
+  var d = new Date(datumStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return datumStr;
+  var DENOVI = ['Недела', 'Понеделник', 'Вторник', 'Среда', 'Четврток', 'Петок', 'Сабота'];
+  var den = DENOVI[d.getDay()];
+  var dd = String(d.getDate()).padStart(2, '0');
+  var mm = String(d.getMonth() + 1).padStart(2, '0');
+  var yyyy = d.getFullYear();
+  var dateText = den + ', ' + dd + '.' + mm + '.' + yyyy;
+  if (vremeStr) {
+    var hm = String(vremeStr).slice(0, 5);
+    return dateText + ' • ' + hm;
+  }
+  return dateText;
+}
+
+function _starsHtml(ocena) {
+  var n = parseInt(ocena || 0, 10);
+  if (!n || n < 1) return '<div class="dosie-card-stars dosie-card-stars--empty">☆☆☆☆☆</div>';
+  var s = '★'.repeat(n) + '☆'.repeat(5 - n);
+  return '<div class="dosie-card-stars">' + s + '</div>';
+}
+
+function _escapeHtml(s) {
+  return String(s || '').replace(/[&<>"']/g, function (m) {
+    return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m];
+  });
+}
+
+function renderDosie(data) {
+  if (!data) return;
+
+  // Stats
+  var st = data.statistika || {};
+  document.getElementById('dosie-stat-idni').textContent = st.vk_idni || 0;
+  document.getElementById('dosie-stat-zaverseni').textContent = st.vk_zaverseni || 0;
+  document.getElementById('dosie-stat-oceni').textContent = st.vk_oceni || 0;
+
+  // Идни термини
+  var idniEl = document.getElementById('dosie-list-idni');
+  var idni = data.idni_termini || [];
+  if (idni.length === 0) {
+    idniEl.innerHTML = '<div class="dosie-empty">Немате закажани идни прегледи.</div>';
+  } else {
+    idniEl.innerHTML = idni.map(function (t) {
+      return '<div class="dosie-card">' +
+        '<div class="dosie-card-row">' +
+          '<div class="dosie-card-main">' +
+            '<div class="dosie-card-title">Д-р ' + _escapeHtml(t.ime_lekar || '—') + '</div>' +
+            '<div class="dosie-card-meta">' +
+              _escapeHtml(t.specijalnost || '') + '<br>' +
+              _formatDosieDatumVreme(t.datum_pregled, t.vreme_pregled) +
+            '</div>' +
+          '</div>' +
+          '<span class="dosie-card-badge dosie-badge-upcoming">Закажан</span>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // Завршени
+  var zavEl = document.getElementById('dosie-list-zaverseni');
+  var zav = data.zaverseni || [];
+  if (zav.length === 0) {
+    zavEl.innerHTML = '<div class="dosie-empty">Сè уште немате завршени прегледи.</div>';
+  } else {
+    zavEl.innerHTML = zav.map(function (t) {
+      var imaOcena = t.ocena != null;
+      return '<div class="dosie-card">' +
+        '<div class="dosie-card-row">' +
+          '<div class="dosie-card-main">' +
+            '<div class="dosie-card-title">Д-р ' + _escapeHtml(t.ime_lekar || '—') + '</div>' +
+            '<div class="dosie-card-meta">' +
+              _escapeHtml(t.specijalnost || '') + '<br>' +
+              _formatDosieDatumVreme(t.datum_pregled, t.vreme_pregled) +
+            '</div>' +
+            (imaOcena ? _starsHtml(t.ocena) : '') +
+            (t.komentar ? '<div class="dosie-card-comment">' + _escapeHtml(t.komentar) + '</div>' : '') +
+          '</div>' +
+          '<span class="dosie-card-badge dosie-badge-completed">Завршен</span>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // Оцени
+  var ocEl = document.getElementById('dosie-list-oceni');
+  var oc = data.oceni || [];
+  if (oc.length === 0) {
+    ocEl.innerHTML = '<div class="dosie-empty">Сè уште немате дадено ниту една оцена.</div>';
+  } else {
+    ocEl.innerHTML = oc.map(function (o) {
+      return '<div class="dosie-card">' +
+        '<div class="dosie-card-row">' +
+          '<div class="dosie-card-main">' +
+            '<div class="dosie-card-title">Д-р ' + _escapeHtml(o.ime_lekar || '—') + '</div>' +
+            '<div class="dosie-card-meta">' +
+              _escapeHtml(o.specijalnost || '') + '<br>' +
+              'Преглед: ' + _formatDosieDatumVreme(o.datum_pregled, null) +
+            '</div>' +
+            _starsHtml(o.ocena) +
+            (o.komentar ? '<div class="dosie-card-comment">' + _escapeHtml(o.komentar) + '</div>' : '') +
+          '</div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // Профил таб
+  var profilEl = document.getElementById('dosie-profil-list');
+  var p = data.profil || {};
+  profilEl.innerHTML = '<div class="dosie-card">' +
+    '<div class="moj-profil-row"><span class="moj-profil-label">Име и презиме</span><span class="moj-profil-value">' +
+      _escapeHtml(((p.ime || '') + ' ' + (p.prezime || '')).trim() || '—') + '</span></div>' +
+    '<div class="moj-profil-row"><span class="moj-profil-label">Е-пошта</span><span class="moj-profil-value">' +
+      _escapeHtml(p.email || '—') + '</span></div>' +
+    '<div class="moj-profil-row"><span class="moj-profil-label">Телефон</span><span class="moj-profil-value">' +
+      _escapeHtml(p.telefon || '—') + '</span></div>' +
+    '<div class="moj-profil-row"><span class="moj-profil-label">ID</span><span class="moj-profil-value moj-profil-id">#' +
+      _escapeHtml(p.pacient_ID || '—') + '</span></div>' +
+  '</div>';
+}
+
+/** Затвори модали при клик надвор */
+window.addEventListener('click', function (e) {
+  var profilModal = document.getElementById('moj-profil-modal');
+  var dosieModal = document.getElementById('moje-dosie-modal');
+  if (profilModal && e.target === profilModal) closeMojProfil();
+  if (dosieModal && e.target === dosieModal) closeMojeDosie();
+});
 
 function logoutPacient() {
   currentPacient = null;
@@ -605,9 +1017,9 @@ function closeAppointmentSuccess() {
   var el = document.getElementById('appointment-success-overlay');
   if (el) el.style.display = 'none';
   try {
-    if (!currentPacient) {
-      var saved = sessionStorage.getItem(KB_KEY_PACIENT) || localStorage.getItem(KB_KEY_PACIENT);
-      if (saved) currentPacient = JSON.parse(saved);
+    if (!currentPacient && window.KBSession) {
+      var data = window.KBSession.get('pacient');
+      if (data) currentPacient = data;
     }
     if (currentPacient) persistPacientToStorage();
   } catch (e) {}
@@ -1437,7 +1849,7 @@ function initialize() {
   setupSmoothScroll();
   setupLekarLogin();
   setupLekarPasswordForms();
-  setupPacientAuth();
+  if (typeof setupPacientAuth === 'function') setupPacientAuth();
   if (typeof setupAuth === 'function') setupAuth();
   updateAuthHeader();
 

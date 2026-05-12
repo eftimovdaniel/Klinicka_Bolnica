@@ -33,7 +33,7 @@ header .container {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 1rem;
 }
 
@@ -60,8 +60,8 @@ header .container {
 
 nav {
   display: flex;
-  gap: 1.5rem;
-  flex-wrap: wrap;
+  gap: 1.2rem;
+  flex-wrap: nowrap;
   align-items: center;
 }
 
@@ -71,6 +71,7 @@ nav a {
   font-weight: 500;
   transition: opacity 0.3s;
   padding: 0.5rem 0;
+  white-space: nowrap;
 }
 
 nav a.nav-link:hover {
@@ -4677,3 +4678,715 @@ html {
   .kbs-ai-greeting { font-size: 20px; }
 }
 /* КРАЈ — дополнителни стилови за КБ Штип AI асистент */
+
+/* ============================================================ */
+/* USER MENU (avatar + dropdown во header - kompakten kruzen)    */
+/* ============================================================ */
+.nav-user-menu {
+  position: relative;
+  align-self: center;
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+.nav-user-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.15s;
+  font-family: inherit;
+}
+
+.nav-user-trigger:hover {
+  transform: scale(1.05);
+}
+
+.nav-user-trigger[aria-expanded="true"] {
+  transform: scale(1.05);
+}
+
+/* Скриј име и улога - само аватарот се гледа */
+.nav-user-trigger .nav-user-info,
+.nav-user-trigger .nav-user-caret {
+  display: none;
+}
+
+.nav-user-avatar {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c0392b, #922b21);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.5px;
+  flex-shrink: 0;
+  box-shadow: 0 3px 10px rgba(192, 57, 43, 0.35), 0 0 0 2px rgba(255, 255, 255, 0.9);
+  text-transform: uppercase;
+  transition: box-shadow 0.15s;
+}
+
+.nav-user-trigger:hover .nav-user-avatar {
+  box-shadow: 0 4px 14px rgba(192, 57, 43, 0.5), 0 0 0 2px rgba(255, 255, 255, 1);
+}
+
+.nav-user-avatar--lekar {
+  background: linear-gradient(135deg, #2c7a55, #1e5a3f);
+}
+
+.nav-user-avatar-initials {
+  line-height: 1;
+}
+
+.nav-user-active-dot {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 12px;
+  height: 12px;
+  background: #2ecc71;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.nav-user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+  min-width: 0;
+}
+
+.nav-user-name {
+  font-weight: 600;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+.nav-user-role {
+  font-size: 11px;
+  opacity: 0.8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.nav-user-caret {
+  font-size: 11px;
+  opacity: 0.7;
+  margin-left: 2px;
+  transition: transform 0.2s;
+}
+
+.nav-user-trigger[aria-expanded="true"] .nav-user-caret {
+  transform: rotate(180deg);
+}
+
+/* ---- Dropdown ---- */
+.nav-user-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  min-width: 280px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.08);
+  z-index: 1000;
+  overflow: hidden;
+  animation: navUserDropdownIn 0.18s ease-out;
+}
+
+@keyframes navUserDropdownIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.nav-user-dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(135deg, #fcf5f4, #fff);
+}
+
+.nav-user-dropdown-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c0392b, #922b21);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 18px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.nav-user-dropdown-avatar--lekar {
+  background: linear-gradient(135deg, #2c7a55, #1e5a3f);
+}
+
+.nav-user-dropdown-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.nav-user-dd-name {
+  font-weight: 700;
+  color: #222;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-user-dd-email {
+  font-size: 12px;
+  color: #777;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-user-dd-role-badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fde9e6;
+  color: #922b21;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.nav-user-dd-role-badge--lekar {
+  background: #e1f3ea;
+  color: #1e5a3f;
+}
+
+.nav-user-dropdown-divider {
+  height: 1px;
+  background: #f0f0f0;
+  margin: 0;
+}
+
+.nav-user-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 12px 18px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  color: #333;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.nav-user-dropdown-item:hover {
+  background: #fcf5f4;
+}
+
+.nav-user-dropdown-item--logout {
+  color: #c0392b;
+  font-weight: 600;
+}
+
+.nav-user-dropdown-item--logout:hover {
+  background: #fce7e5;
+}
+
+/* Responsive за хедер */
+@media (max-width: 600px) {
+  .nav-user-avatar {
+    width: 38px;
+    height: 38px;
+    font-size: 14px;
+  }
+  .nav-user-dropdown {
+    position: fixed;
+    top: 70px;
+    right: 10px;
+    left: 10px;
+    min-width: 0;
+  }
+}
+
+/* ============================================================ */
+/* МОЈ ПРОФИЛ модал                                              */
+/* ============================================================ */
+.moj-profil-content {
+  max-width: 500px;
+  padding: 0;
+  overflow: hidden;
+}
+
+.moj-profil-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 28px 28px 20px;
+  background: linear-gradient(135deg, #fcf5f4, #fff);
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.moj-profil-avatar {
+  width: 70px;
+  height: 70px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c0392b, #922b21);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 26px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  box-shadow: 0 4px 12px rgba(192, 57, 43, 0.3);
+}
+
+.moj-profil-avatar--lekar {
+  background: linear-gradient(135deg, #2c7a55, #1e5a3f);
+  box-shadow: 0 4px 12px rgba(44, 122, 85, 0.3);
+}
+
+.moj-profil-titles h2 {
+  margin: 0 0 6px;
+  color: #222;
+  font-size: 22px;
+}
+
+.moj-profil-role-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: #fde9e6;
+  color: #922b21;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.moj-profil-role-badge--lekar {
+  background: #e1f3ea;
+  color: #1e5a3f;
+}
+
+.moj-profil-body {
+  padding: 12px 28px;
+}
+
+.moj-profil-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #f4f4f4;
+}
+
+.moj-profil-row:last-child {
+  border-bottom: none;
+}
+
+.moj-profil-label {
+  color: #888;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.moj-profil-value {
+  color: #222;
+  font-weight: 500;
+  font-size: 15px;
+  text-align: right;
+  word-break: break-word;
+}
+
+.moj-profil-id {
+  font-family: monospace;
+  color: #777;
+  font-size: 13px;
+}
+
+.moj-profil-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding: 16px 28px 24px;
+  background: #fafafa;
+  border-top: 1px solid #f0f0f0;
+}
+
+/* ============================================================ */
+/* МОЕТО ДОСИЕ модал                                             */
+/* ============================================================ */
+.moje-dosie-content {
+  max-width: 760px;
+  padding: 0;
+  overflow: hidden;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.dosie-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 24px 28px 20px;
+  background: linear-gradient(135deg, #fcf5f4, #fff);
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.dosie-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #c0392b, #922b21);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 24px;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.dosie-titles h2 {
+  margin: 0;
+  color: #222;
+  font-size: 22px;
+}
+
+.dosie-subtitle {
+  margin: 4px 0 0;
+  color: #777;
+  font-size: 14px;
+}
+
+.dosie-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding: 16px 28px;
+  background: #fff;
+}
+
+.dosie-stat {
+  text-align: center;
+  padding: 14px;
+  background: #fcf5f4;
+  border-radius: 10px;
+  border: 1px solid #f1e3e0;
+}
+
+.dosie-stat-num {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  color: #922b21;
+  line-height: 1;
+}
+
+.dosie-stat-label {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: #777;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.dosie-tabs {
+  display: flex;
+  gap: 0;
+  padding: 0 28px;
+  border-bottom: 1px solid #e8e8e8;
+  background: #fff;
+  overflow-x: auto;
+}
+
+.dosie-tab {
+  flex-shrink: 0;
+  padding: 12px 18px;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -1px;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: #777;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.dosie-tab:hover {
+  color: #922b21;
+}
+
+.dosie-tab.active {
+  color: #922b21;
+  border-bottom-color: #c0392b;
+  font-weight: 600;
+}
+
+.dosie-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 28px 24px;
+  background: #fafafa;
+}
+
+.dosie-pane {
+  display: none;
+}
+
+.dosie-pane.active {
+  display: block;
+}
+
+.dosie-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dosie-loading {
+  text-align: center;
+  color: #999;
+  padding: 24px;
+  font-style: italic;
+}
+
+.dosie-empty {
+  text-align: center;
+  color: #999;
+  padding: 32px 16px;
+  background: #fff;
+  border-radius: 10px;
+  border: 1px dashed #e0e0e0;
+}
+
+.dosie-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 14px 16px;
+  border: 1px solid #eee;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.dosie-card-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dosie-card-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.dosie-card-title {
+  font-weight: 600;
+  color: #222;
+  font-size: 15px;
+  margin-bottom: 4px;
+}
+
+.dosie-card-meta {
+  font-size: 13px;
+  color: #777;
+  line-height: 1.5;
+}
+
+.dosie-card-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  white-space: nowrap;
+}
+
+.dosie-badge-upcoming {
+  background: #e8f0ff;
+  color: #1d4ed8;
+}
+
+.dosie-badge-completed {
+  background: #e1f3ea;
+  color: #1e5a3f;
+}
+
+.dosie-card-stars {
+  color: #f1c40f;
+  font-size: 18px;
+  letter-spacing: 2px;
+  margin-top: 6px;
+}
+
+.dosie-card-stars--empty {
+  color: #ddd;
+}
+
+.dosie-card-comment {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #eee;
+  font-size: 13px;
+  color: #555;
+  font-style: italic;
+}
+
+@media (max-width: 600px) {
+  .dosie-stats {
+    grid-template-columns: 1fr;
+  }
+  .dosie-tabs {
+    padding: 0 16px;
+  }
+  .dosie-body {
+    padding: 16px;
+  }
+  .moje-dosie-content,
+  .moj-profil-content {
+    max-height: 95vh;
+  }
+  .dosie-header,
+  .moj-profil-header {
+    padding: 20px 16px;
+  }
+}
+
+/* ============================================================ */
+/* SESSION EXPIRY TOAST (session.js)                             */
+/* ============================================================ */
+.kbs-session-toast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 320px;
+  max-width: 460px;
+  padding: 14px 18px;
+  background: #fff;
+  border-left: 5px solid #f39c12;
+  border-radius: 10px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
+  font-family: inherit;
+  color: #222;
+  animation: kbsSessionToastIn 0.25s ease-out;
+}
+
+.kbs-session-toast--expired {
+  border-left-color: #c0392b;
+}
+
+.kbs-session-toast__icon {
+  font-size: 28px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.kbs-session-toast__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.kbs-session-toast__title {
+  font-weight: 700;
+  font-size: 15px;
+  margin-bottom: 4px;
+  color: #b46a00;
+}
+
+.kbs-session-toast--expired .kbs-session-toast__title {
+  color: #c0392b;
+}
+
+.kbs-session-toast__msg {
+  font-size: 13px;
+  line-height: 1.45;
+  color: #555;
+}
+
+.kbs-session-toast__btn {
+  background: #c0392b;
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+
+.kbs-session-toast__btn:hover {
+  background: #a93226;
+}
+
+.kbs-session-toast--expired .kbs-session-toast__btn {
+  display: none;
+}
+
+.kbs-session-toast__close {
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  line-height: 1;
+  color: #999;
+  cursor: pointer;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.kbs-session-toast__close:hover {
+  color: #333;
+}
+
+@keyframes kbsSessionToastIn {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@media (max-width: 600px) {
+  .kbs-session-toast {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    min-width: 0;
+    max-width: none;
+  }
+}
+

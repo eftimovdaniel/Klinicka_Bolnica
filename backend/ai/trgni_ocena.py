@@ -199,11 +199,13 @@ def odgovori_za_trgni_ocena(prashanje: str, pacient: dict | None) -> str:
     vreme = format_vreme(t["vreme_pregled"])
     stara_ocena = t.get("ocena") or 0
 
+    ime_lekar = t['ime_lekar']
     return (
         f"Оцената е избришана!\n\n"
-        f"Лекар: Д-р {t['ime_lekar']}\n"
+        f"Лекар: Д-р {ime_lekar}\n"
         f"Специјалност: {t['specijalnost_termin']}\n"
         f"Датум: {den_ime}, {datum.strftime('%d.%m.%Y')} во {vreme}\n"
         f"Избришана оцена: {stara_ocena}/5\n\n"
-        f"Можеш повторно да оцениш ако сакаш: „Оцена [1-5] за прегледот кај д-р {t['ime_lekar']}"."
+        'Можеш повторно да оцениш ако сакаш: „Оцена [1-5] за прегледот кај д-р '
+        + str(ime_lekar) + '".'
     )

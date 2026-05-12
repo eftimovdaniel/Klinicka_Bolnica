@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes"/>
   <title>Клиничка Болница Штип</title>
-  <link rel="stylesheet" href="style.css?v=20260404-12" />
+  <link rel="stylesheet" href="style.css?v=20260512-8" />
 </head>
 <body>
   <script>
@@ -37,8 +37,54 @@
         <div id="nav-auth-guest" class="nav-auth-guest-wrap" aria-label="Најава">
           <button type="button" class="btn-lekar-login" onclick="openNavLoginChoice()">Најави се!</button>
         </div>
-        <button type="button" id="nav-logout-pacient" class="btn-nav-logout" style="display: none;" onclick="logoutPacient()" title="Одјавување од профилот на пациент">Одјави се (пациент)</button>
-        <button type="button" id="nav-logout-lekar" class="btn-nav-logout" style="display: none;" onclick="logoutLekar()" title="Одјавување од профилот на лекар">Одјави се (лекар)</button>
+
+        <!-- User menu: на самиот десен раб во истиот ред -->
+        <div id="nav-user-menu" class="nav-user-menu" style="display: none;" aria-label="Кориснички профил">
+          <button type="button" id="nav-user-trigger" class="nav-user-trigger" onclick="toggleUserMenu()" aria-haspopup="true" aria-expanded="false">
+            <span id="nav-user-avatar" class="nav-user-avatar" aria-hidden="true">
+              <span id="nav-user-avatar-initials" class="nav-user-avatar-initials">?</span>
+              <span id="nav-user-active-dot" class="nav-user-active-dot" style="display: none;" aria-label="Активно"></span>
+            </span>
+            <span class="nav-user-info">
+              <span id="nav-user-name" class="nav-user-name">—</span>
+              <span id="nav-user-role" class="nav-user-role">—</span>
+            </span>
+            <span class="nav-user-caret" aria-hidden="true">▾</span>
+          </button>
+
+          <div id="nav-user-dropdown" class="nav-user-dropdown" role="menu" style="display: none;">
+            <div class="nav-user-dropdown-header">
+              <div class="nav-user-dropdown-avatar">
+                <span id="nav-user-dd-initials">?</span>
+              </div>
+              <div class="nav-user-dropdown-info">
+                <div id="nav-user-dd-name" class="nav-user-dd-name">—</div>
+                <div id="nav-user-dd-email" class="nav-user-dd-email">—</div>
+                <div id="nav-user-dd-role-badge" class="nav-user-dd-role-badge">Пациент</div>
+              </div>
+            </div>
+
+            <div class="nav-user-dropdown-divider"></div>
+
+            <button type="button" class="nav-user-dropdown-item" id="nav-user-dd-profil" onclick="openMojProfil()" role="menuitem">
+              <span>Мој профил</span>
+            </button>
+
+            <button type="button" class="nav-user-dropdown-item" id="nav-user-dd-dosie" onclick="openMojeDosie()" role="menuitem" style="display: none;">
+              <span>Моето досие</span>
+            </button>
+
+            <button type="button" class="nav-user-dropdown-item" id="nav-user-dd-panel" onclick="openLekarDashboardModal(); closeUserMenu();" role="menuitem" style="display: none;">
+              <span>Мојот панел</span>
+            </button>
+
+            <div class="nav-user-dropdown-divider"></div>
+
+            <button type="button" class="nav-user-dropdown-item nav-user-dropdown-item--logout" onclick="userMenuLogout()" role="menuitem">
+              <span>Одјави се</span>
+            </button>
+          </div>
+        </div>
       </nav>
     </div>
   </header>
@@ -890,7 +936,106 @@
     </div>
   </div>
 
-  <script src="script.js?v=20260404-12"></script>
+  <!-- Модал: Мој профил (пациент или лекар) -->
+  <div id="moj-profil-modal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="moj-profil-title">
+    <div class="modal-content moj-profil-content">
+      <span class="close" onclick="closeMojProfil()" title="Затвори">&times;</span>
+      <div class="moj-profil-header">
+        <div class="moj-profil-avatar">
+          <span id="moj-profil-initials">?</span>
+        </div>
+        <div class="moj-profil-titles">
+          <h2 id="moj-profil-title">Мој профил</h2>
+          <span id="moj-profil-role-badge" class="moj-profil-role-badge">Пациент</span>
+        </div>
+      </div>
+
+      <div class="moj-profil-body">
+        <div class="moj-profil-row">
+          <span class="moj-profil-label">Име и презиме</span>
+          <span class="moj-profil-value" id="moj-profil-imeprezime">—</span>
+        </div>
+        <div class="moj-profil-row">
+          <span class="moj-profil-label">Е-пошта</span>
+          <span class="moj-profil-value" id="moj-profil-email">—</span>
+        </div>
+        <div class="moj-profil-row">
+          <span class="moj-profil-label">Телефон</span>
+          <span class="moj-profil-value" id="moj-profil-telefon">—</span>
+        </div>
+        <div class="moj-profil-row" id="moj-profil-spec-row" style="display: none;">
+          <span class="moj-profil-label">Специјалност</span>
+          <span class="moj-profil-value" id="moj-profil-spec">—</span>
+        </div>
+        <div class="moj-profil-row">
+          <span class="moj-profil-label">ID</span>
+          <span class="moj-profil-value moj-profil-id" id="moj-profil-id">—</span>
+        </div>
+      </div>
+
+      <div class="moj-profil-actions">
+        <button type="button" class="btn-secondary" onclick="closeMojProfil()">Затвори</button>
+        <button type="button" id="moj-profil-dosie-btn" class="btn-primary" onclick="closeMojProfil(); openMojeDosie();" style="display: none;">Отвори досие</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Модал: Моето досие (само пациент) -->
+  <div id="moje-dosie-modal" class="modal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="moje-dosie-title">
+    <div class="modal-content moje-dosie-content">
+      <span class="close" onclick="closeMojeDosie()" title="Затвори">&times;</span>
+
+      <div class="dosie-header">
+        <div class="dosie-avatar">
+          <span id="dosie-initials">?</span>
+        </div>
+        <div class="dosie-titles">
+          <h2 id="moje-dosie-title">Моето досие</h2>
+          <p id="dosie-subtitle" class="dosie-subtitle">—</p>
+        </div>
+      </div>
+
+      <div class="dosie-stats">
+        <div class="dosie-stat">
+          <span class="dosie-stat-num" id="dosie-stat-idni">0</span>
+          <span class="dosie-stat-label">Идни термини</span>
+        </div>
+        <div class="dosie-stat">
+          <span class="dosie-stat-num" id="dosie-stat-zaverseni">0</span>
+          <span class="dosie-stat-label">Завршени прегледи</span>
+        </div>
+        <div class="dosie-stat">
+          <span class="dosie-stat-num" id="dosie-stat-oceni">0</span>
+          <span class="dosie-stat-label">Дадени оцени</span>
+        </div>
+      </div>
+
+      <div class="dosie-tabs" role="tablist">
+        <button type="button" class="dosie-tab active" data-tab="idni" onclick="switchDosieTab('idni')">Идни термини</button>
+        <button type="button" class="dosie-tab" data-tab="zaverseni" onclick="switchDosieTab('zaverseni')">Завршени</button>
+        <button type="button" class="dosie-tab" data-tab="oceni" onclick="switchDosieTab('oceni')">Мои оцени</button>
+        <button type="button" class="dosie-tab" data-tab="profil" onclick="switchDosieTab('profil')">Лични податоци</button>
+      </div>
+
+      <div class="dosie-body">
+        <div class="dosie-pane active" id="dosie-pane-idni">
+          <div id="dosie-list-idni" class="dosie-list"><div class="dosie-loading">Вчитувам...</div></div>
+        </div>
+        <div class="dosie-pane" id="dosie-pane-zaverseni">
+          <div id="dosie-list-zaverseni" class="dosie-list"><div class="dosie-loading">Вчитувам...</div></div>
+        </div>
+        <div class="dosie-pane" id="dosie-pane-oceni">
+          <div id="dosie-list-oceni" class="dosie-list"><div class="dosie-loading">Вчитувам...</div></div>
+        </div>
+        <div class="dosie-pane" id="dosie-pane-profil">
+          <div id="dosie-profil-list" class="dosie-list"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="session.js?v=20260512-2"></script>
+  <script src="script.js?v=20260512-2"></script>
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       var toggle = document.getElementById('nav-toggle');

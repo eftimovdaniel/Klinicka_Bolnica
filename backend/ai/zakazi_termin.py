@@ -57,6 +57,19 @@ def izvlechi_podatoci_so_ai(prashanje: str) -> dict:
 """.strip()
 
     odgovor = ask_gemini(full_prompt, system_prompt=ZAKAZI_EXTRACT_PROMPT)
+    print(f"[zakazi_termin] Gemini raw: {odgovor!r}")
+
+    # Ако Gemini врати error-пораки (rate limit, timeout, итн.) - пропагирај
+    error_indicators = [
+        "Привремено сум преоптоварен",
+        "Привремена грешка",
+        "не одговори навреме",
+        "Не е поставен",
+        "Непозната грешка",
+        "неочекуван формат",
+    ]
+    if any(ind in odgovor for ind in error_indicators):
+        return {"doctor_id": None, "datum": None, "vreme": None, "_error": odgovor}
 
     # Gemini понекогаш враќа JSON во markdown ```json ... ``` - тргни го
     cist = odgovor.strip()
@@ -65,12 +78,15 @@ def izvlechi_podatoci_so_ai(prashanje: str) -> dict:
 
     try:
         podatoci = json.loads(cist)
-        return {
+        result = {
             "doctor_id": podatoci.get("doctor_id"),
             "datum": podatoci.get("datum"),
             "vreme": podatoci.get("vreme"),
         }
-    except json.JSONDecodeError:
+        print(f"[zakazi_termin] Parsed: {result}")
+        return result
+    except json.JSONDecodeError as e:
+        print(f"[zakazi_termin] JSON decode error: {e}, cleaned: {cist!r}")
         return {"doctor_id": None, "datum": None, "vreme": None}
 
 
@@ -194,25 +210,74 @@ def odgovori_za_zakazuvanje(prashanje: str, pacient: dict | None) -> str:
     # AI извлекува податоци
     izvleceno = izvlechi_podatoci_so_ai(prashanje)
 
+    # Ако имало AI грешка (rate limit, timeout) - врати ја директно на корисникот
+    if izvleceno.get("_error"):
+        return izvleceno["_error"]
+
     doctor_id = izvleceno.get("doctor_id")
     datum_str = izvleceno.get("datum")
     vreme_str = izvleceno.get("vreme")
 
-    # Што недостасува?
-    nedostiga = []
-    if not doctor_id:
-        nedostiga.append("лекарот")
-    if not datum_str:
-        nedostiga.append("датумот")
-    if not vreme_str:
-        nedostiga.append("времето")
+    # Што недостасува? Поспецифична порака според комбинацијата:
+    ima_lekar = bool(doctor_id)
+    ima_datum = bool(datum_str)
+    ima_vreme = bool(vreme_str)
 
-    if nedostiga:
+    # Земи име на лекар за персонализирана порака
+    ime_lekar_za_poraka = ""
+    if ima_lekar:
+        try:
+            for lekar in zimi_site_lekari():
+                if lekar.get("doctor_ID") == doctor_id:
+                    ime_lekar_za_poraka = f"Д-р {lekar.get('name', '')} {lekar.get('surname', '')}".strip()
+                    break
+        except Exception:
+            pass
+
+    # Сите три недостасуваат → најмалку информации
+    if not ima_lekar and not ima_datum and not ima_vreme:
         return (
-            f'Не успеав да го разберам {", ".join(nedostiga)}. '
-            f'Те молам напиши го прашањето поконкретно, на пример:\n'
-            f'„Сакам преглед кај д-р Петров среда во 10:00"'
+            'За да закажам термин, потребно ми е да знам: лекар, датум и време.\n\n'
+            'Пример: „Сакам преглед кај д-р Петров среда во 10:00"\n'
+            'или: „Закажи кај Серафимов утре во 12:30"'
         )
+
+    # Имаме само лекар - прашај за датум и време
+    if ima_lekar and not ima_datum and not ima_vreme:
+        lekar_text = ime_lekar_za_poraka or "избраниот лекар"
+        return (
+            f'Кога би сакал/а да закажеш термин кај {lekar_text}?\n\n'
+            f'Кажи ми датум и време. Пример:\n'
+            f'„утре во 10:00" или „среда во 14:30"'
+        )
+
+    # Имаме лекар + датум, нема време
+    if ima_lekar and ima_datum and not ima_vreme:
+        lekar_text = ime_lekar_za_poraka or "лекарот"
+        return (
+            f'Во кое време сакаш термин кај {lekar_text} на {datum_str}?\n\n'
+            f'Работно време: {RABOTNO_OD.strftime("%H:%M")} - {RABOTNO_DO.strftime("%H:%M")}\n'
+            f'Пример: „во 10:00" или „во 14:30"'
+        )
+
+    # Имаме лекар + време, нема датум
+    if ima_lekar and not ima_datum and ima_vreme:
+        lekar_text = ime_lekar_za_poraka or "лекарот"
+        return (
+            f'Кој датум сакаш термин кај {lekar_text} во {vreme_str}?\n\n'
+            f'Пример: „утре", „среда", „15.05" или „2026-05-15"'
+        )
+
+    # Имаме датум и/или време, нема лекар
+    if not ima_lekar:
+        return (
+            'Кај кој лекар сакаш да закажеш термин? Кажи го името и презимето.\n\n'
+            'Пример: „кај д-р Петров", „кај Александар Серафимов"\n\n'
+            'Ако не знаеш кој лекар, прашај ме: „Кои лекари имате?" или опиши го '
+            'проблемот (на пр. „боли ме грб") и ќе ти препорачам.'
+        )
+
+    # Сите 3 полиња се присутни - продолжи со валидација и INSERT
 
     # Валидација на датум
     try:

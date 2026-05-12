@@ -1,7 +1,14 @@
 """
-Детектор на интент - проверува што сака корисникот.
+Детектор на интент - хибриден пристап:
 
-Користи едноставни клучни зборови (брзо и бесплатно).
+1. ПРВО: проверка преку клучни зборови (брзо, бесплатно, локално)
+2. ФАЛБЕК: ако не најде совпаѓање → праша Gemini (AI)
+
+Зашто хибрид?
+- 80% од прашањата се на „стандардни" фрази → keyword се справува моментално
+- 20% природни варијации ("Dali možeš da mi...") → AI ги препознава
+
+Сите прашања прво се транслитираат латиница → кирилица.
 
 Поддржани интенти:
 - "zakazi_termin"     → закажување нов термин (INSERT во база)
@@ -65,11 +72,15 @@ KLUCNI_OTKAZI = [
 
 # 1. ЗАКАЖУВАЊЕ
 KLUCNI_ZAKAZI = [
-    "закажи", "закажете", "закажување", "закаж",
-    "сакам преглед", "сакам термин",
-    "резервирај", "резервација",
+    "закажи", "закажете", "закажување", "закажеш", "закаж",
+    "сакам преглед", "сакам термин", "сакам да закажам",
+    "би сакал", "би сакала", "би сакал/а",
+    "резервирај", "резервација", "резервирам",
     "запиши ме", "запиши го",
-    "земи термин", "ми треба термин",
+    "земи термин", "ми треба термин", "имам потреба од термин",
+    "ми треба преглед", "имам потреба од преглед",
+    "можеш да закажеш", "можеш ли да закажеш",
+    "дали можеш", "дали можете",
 ]
 
 # 2. ПРЕПОРАКА СПОРЕД СИМПТОМ
@@ -126,16 +137,25 @@ KLUCNI_SLOBODNI = [
 ]
 
 
+from ai.transliteracija import transliterijaj
+from ai.ai_intent_detector import detektiraj_intent_so_ai
+
+
 def _ima_zbor(prashanje: str, kluchni: list[str]) -> bool:
     """Помошна функција - проверка на клучни зборови."""
     return any(zbor in prashanje for zbor in kluchni)
 
 
-def detektiraj_intent(prashanje: str) -> str:
+def detektiraj_intent_keyword(prashanje: str) -> str | None:
     """
-    Анализира прашање и враќа интент.
+    Брза проверка преку клучни зборови.
+    Враќа: име на интент ИЛИ None ако нема јасно совпаѓање.
     """
-    p = (prashanje or "").lower().strip()
+    if not prashanje:
+        return None
+
+    # Автоматски преводи: латиница → кирилица
+    p = transliterijaj(prashanje).lower().strip()
 
     # Редот е важен - поспецифичните прво
     # ВАЖНО: "тргни оцена" мора пред "оцени" (има збор „оцена" во двете)
@@ -178,5 +198,32 @@ def detektiraj_intent(prashanje: str) -> str:
 
     if _ima_zbor(p, KLUCNI_SLOBODNI):
         return "slobodni_termini"
+
+    return None  # нема jasen keyword match
+
+
+def detektiraj_intent(prashanje: str) -> str:
+    """
+    Главна функција - хибриден пристап.
+
+    1. Проба со keyword detector (брзо, бесплатно).
+    2. Ако не најде → AI (Gemini) за природни варијации.
+    3. Ако и AI не успее → "general".
+    """
+    if not prashanje:
+        return "general"
+
+    # Чекор 1: keyword detector со транслитерација
+    intent = detektiraj_intent_keyword(prashanje)
+    if intent:
+        return intent
+
+    # Чекор 2: AI fallback - проба со Gemini
+    try:
+        ai_intent = detektiraj_intent_so_ai(prashanje)
+        if ai_intent:
+            return ai_intent
+    except Exception as e:
+        print(f"[intent_detector] AI fallback greshka: {e}")
 
     return "general"

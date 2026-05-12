@@ -207,5 +207,5 @@ def odgovori_za_otkazuvanje(prashanje: str, pacient: dict | None) -> str:
         f"Специјалност: {t['specijalnost_termin']}\n"
         f"Датум: {den_ime}, {datum.strftime('%d.%m.%Y')}\n"
         f"Време: {vreme}\n\n"
-        f"Можеш да закажеш нов термин со „Сакам преглед кај [презиме] [датум] [време]"."
+        'Можеш да закажеш нов термин со „Сакам преглед кај [презиме] [датум] [време]".'
     )

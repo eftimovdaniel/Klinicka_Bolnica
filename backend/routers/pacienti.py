@@ -355,3 +355,132 @@ async def oceni_pregled(request: Request):
     finally:
         if conn and conn.is_connected():
             conn.close()
+
+
+@router.get("/dosie")
+async def dosie_pacient(pacient_ID: int = Query(..., description="ID на најавениот пациент")):
+    """
+    Враќа комплетно досие на пациентот:
+    - profil: лични податоци (име, презиме, мејл, телефон, дата на регистрација)
+    - idni_termini: закажани идни прегледи
+    - zaverseni: завршени прегледи
+    - oceni: дадени оцени
+    - statistika: бројки за брз преглед
+    """
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+
+        # 1. Профил
+        cur.execute(
+            """
+            SELECT patient_ID, name_patient AS ime, surname_patient AS prezime,
+                   email, phone_number AS telefon
+            FROM patient
+            WHERE patient_ID = %s
+            """,
+            (pacient_ID,),
+        )
+        profil = cur.fetchone()
+        if not profil:
+            raise HTTPException(status_code=404, detail="Пациентот не е пронајден.")
+
+        email_pac = (profil.get("email") or "").strip().lower()
+
+        # 2. Идни закажани термини
+        idni_termini = []
+        if email_pac:
+            cur.execute(
+                """
+                SELECT t.termin_ID, t.datum_pregled, t.vreme_pregled,
+                       t.ime_lekar, t.specijalnost_termin, t.status_pregled,
+                       t.doctor_ID
+                FROM Termin_pregled t
+                WHERE LOWER(TRIM(COALESCE(t.email_pacient, ''))) = %s
+                  AND t.status_pregled = 'закажан'
+                  AND t.datum_pregled >= CURDATE()
+                ORDER BY t.datum_pregled, t.vreme_pregled
+                """,
+                (email_pac,),
+            )
+            for r in cur.fetchall() or []:
+                dp = r.get("datum_pregled")
+                vp = r.get("vreme_pregled")
+                idni_termini.append({
+                    "termin_ID": r.get("termin_ID"),
+                    "datum_pregled": dp.isoformat() if dp else None,
+                    "vreme_pregled": str(vp)[:8] if vp else None,
+                    "ime_lekar": (r.get("ime_lekar") or "").strip() or None,
+                    "specijalnost": (r.get("specijalnost_termin") or "").strip() or None,
+                    "doctor_ID": r.get("doctor_ID"),
+                    "status": r.get("status_pregled"),
+                })
+
+        # 3. Завршени прегледи + 4. Дадени оцени (во еден query)
+        zaverseni = []
+        oceni = []
+        if email_pac:
+            cur.execute(
+                """
+                SELECT t.termin_ID, t.datum_pregled, t.vreme_pregled,
+                       t.ime_lekar, t.specijalnost_termin,
+                       pf.feedback_ID, pf.ocena, pf.komentar, pf.datum_na_ocena
+                FROM Termin_pregled t
+                LEFT JOIN Pregled_feedback pf ON pf.termin_ID = t.termin_ID
+                WHERE LOWER(TRIM(COALESCE(t.email_pacient, ''))) = %s
+                  AND t.status_pregled = 'завршен'
+                ORDER BY t.datum_pregled DESC, t.vreme_pregled DESC
+                """,
+                (email_pac,),
+            )
+            for r in cur.fetchall() or []:
+                dp = r.get("datum_pregled")
+                vp = r.get("vreme_pregled")
+                row = {
+                    "termin_ID": r.get("termin_ID"),
+                    "datum_pregled": dp.isoformat() if dp else None,
+                    "vreme_pregled": str(vp)[:8] if vp else None,
+                    "ime_lekar": (r.get("ime_lekar") or "").strip() or None,
+                    "specijalnost": (r.get("specijalnost_termin") or "").strip() or None,
+                    "ocena": int(r["ocena"]) if r.get("ocena") is not None else None,
+                    "komentar": (r.get("komentar") or "").strip() or None,
+                }
+                zaverseni.append(row)
+                if r.get("feedback_ID"):
+                    dn = r.get("datum_na_ocena")
+                    oceni.append({
+                        "feedback_ID": r.get("feedback_ID"),
+                        "termin_ID": r.get("termin_ID"),
+                        "ime_lekar": (r.get("ime_lekar") or "").strip() or None,
+                        "specijalnost": (r.get("specijalnost_termin") or "").strip() or None,
+                        "datum_pregled": dp.isoformat() if dp else None,
+                        "ocena": int(r["ocena"]) if r.get("ocena") is not None else None,
+                        "komentar": (r.get("komentar") or "").strip() or None,
+                        "datum_na_ocena": dn.isoformat() if dn else None,
+                    })
+
+        return {
+            "profil": {
+                "pacient_ID": profil.get("patient_ID"),
+                "ime": profil.get("ime") or "",
+                "prezime": profil.get("prezime") or "",
+                "email": profil.get("email") or "",
+                "telefon": profil.get("telefon") or "",
+            },
+            "idni_termini": idni_termini,
+            "zaverseni": zaverseni,
+            "oceni": oceni,
+            "statistika": {
+                "vk_idni": len(idni_termini),
+                "vk_zaverseni": len(zaverseni),
+                "vk_oceni": len(oceni),
+            },
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Грешка при вчитување на досието.") from e
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
