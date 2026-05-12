@@ -4480,3 +4480,133 @@ window.showPacientRegister = showPacientRegister;
 window.showLekarRegister = showLekarRegister;
 window.showLekarLogin = showLekarLogin;
 window.closeLekarRegisterModal = closeLekarRegisterModal;
+
+/**
+ * КБ Штип AI асистент — логика (отворање/затворање, пораки, typing, нов разговор).
+ * Изглед (HTML + CSS): `index.html` (#kbs-ai-widget, коментари „ИЗГЛЕД (HTML)") и
+ * `style.css` (блок што почнува со „ИЗГЛЕД: КБ Штип AI асистент — ПОЧЕТОК").
+ *
+ * Бекенд: backend/routers/ai_chat.py (POST /ai-chat/ask).
+ */
+(function () {
+  // URL до backend ендпоинт-от
+  const AI_API_URL = "http://localhost:8000/ai-chat/ask";
+
+  // Функција за праќање на прашање кон backend и враќање одговор.
+  // Ако пациентот е логиран, ги праќа и неговите податоци (за закажување).
+  async function pitajGemini(prashanje) {
+    try {
+      // Земи логиран пациент (ако постои)
+      let pacientData = null;
+      if (typeof currentPacient !== "undefined" && currentPacient && currentPacient.email) {
+        pacientData = {
+          pacient_ID: currentPacient.pacient_ID || null,
+          ime: currentPacient.ime || currentPacient.name_patient || "",
+          prezime: currentPacient.prezime || currentPacient.surname_patient || "",
+          email: currentPacient.email || "",
+          telefon: currentPacient.telefon || currentPacient.phone_number || "",
+        };
+      }
+
+      const response = await fetch(AI_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prashanje: prashanje, pacient: pacientData }),
+      });
+
+      if (!response.ok) {
+        return "Серверот врати грешка (" + response.status + ").";
+      }
+
+      const data = await response.json();
+      return data.odgovor || "Не добив одговор.";
+    } catch (err) {
+      return "Не можам да се поврзам со серверот. Провери дали backend-от работи.";
+    }
+  }
+
+  function qs(sel, root) {
+    return (root || document).querySelector(sel);
+  }
+
+  function initKbsAgent() {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", function () { setupAgent(); }, { once: true });
+    } else {
+      setupAgent();
+    }
+  }
+
+  function setupAgent() {
+    const root = qs("#kbs-ai-widget");
+    if (!root) return;
+
+    const launcher = qs("#kbs-ai-launcher", root);
+    const panel = qs("#kbs-ai-panel", root);
+    const form = qs("#kbs-ai-form", root);
+    const input = qs("#kbs-ai-input", root);
+    const messagesEl = qs("#kbs-ai-messages", root);
+    const introEl = qs("#kbs-ai-intro", root);
+    const newChatBtn = qs("#kbs-ai-new-chat", root);
+
+    if (!launcher || !panel || !form || !input || !messagesEl) return;
+
+    const setOpen = function (open) {
+      root.dataset.open = open ? "true" : "false";
+      panel.classList.toggle("is-open", open);
+      panel.setAttribute("aria-hidden", open ? "false" : "true");
+      launcher.setAttribute("aria-expanded", open ? "true" : "false");
+      launcher.setAttribute("aria-label", open ? "Затвори AI асистент" : "Отвори AI асистент");
+      if (open) input.focus();
+    };
+
+    launcher.addEventListener("click", function () {
+      setOpen(root.dataset.open !== "true");
+    });
+
+    if (newChatBtn) {
+      newChatBtn.addEventListener("click", function () {
+        messagesEl.innerHTML = "";
+        if (introEl) introEl.hidden = false;
+      });
+    }
+
+    form.addEventListener("submit", function (e) {
+      e.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+
+      if (introEl) introEl.hidden = true;
+
+      const userEl = document.createElement("p");
+      userEl.className = "kbs-ai-msg kbs-ai-msg-user";
+      userEl.textContent = text;
+      messagesEl.appendChild(userEl);
+
+      input.value = "";
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+
+      const typingEl = document.createElement("div");
+      typingEl.className = "kbs-ai-typing";
+      typingEl.setAttribute("role", "status");
+      typingEl.setAttribute("aria-live", "polite");
+      typingEl.setAttribute("aria-label", "Асистентот пишува");
+      for (let i = 0; i < 3; i += 1) {
+        typingEl.appendChild(document.createElement("span"));
+      }
+      messagesEl.appendChild(typingEl);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+
+      pitajGemini(text).then(function (odgovor) {
+        typingEl.remove();
+        const botEl = document.createElement("p");
+        botEl.className = "kbs-ai-msg kbs-ai-msg-agent";
+        botEl.textContent = odgovor;
+        messagesEl.appendChild(botEl);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      });
+    });
+  }
+
+  initKbsAgent();
+})();

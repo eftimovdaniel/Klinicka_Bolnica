@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from routers import lekari, pacienti, termini, admin, aparati, uslugi, novosti, kariera
+from routers import lekari, pacienti, termini, admin, aparati, uslugi, novosti, kariera, ai_chat
 
 
 app = FastAPI(
@@ -41,6 +41,7 @@ app.include_router(uslugi.router)
 app.include_router(novosti.router)
 app.include_router(kariera.router)
 app.include_router(kariera.app_router)  # /aplikacija (пријава за оглас)
+app.include_router(ai_chat.router)  # AI чат со Gemini
 
 
 @app.get("/")

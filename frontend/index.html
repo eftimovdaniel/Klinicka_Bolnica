@@ -905,5 +905,57 @@
       }
     });
   </script>
+
+  <!-- ======================================================================
+       КБ ШТИП AI АСИСТЕНТ | ИЗГЛЕД (HTML): почеток
+       ====================================================================== -->
+  <div class="kbs-ai-widget" id="kbs-ai-widget" data-open="false">
+    <div class="kbs-ai-stack">
+      <section class="kbs-ai-panel" id="kbs-ai-panel" aria-hidden="true">
+        <header class="kbs-ai-panel-header">
+          <div class="kbs-ai-panel-header-brand" aria-hidden="true">
+            <svg class="kbs-ai-header-person" viewBox="0 0 24 24" width="36" height="36" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><path fill="currentColor" d="M12 11.5c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 1.5c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4z"/></svg>
+          </div>
+          <div class="kbs-ai-panel-header-text">
+            <div class="kbs-ai-panel-title">КБ Штип</div>
+            <div class="kbs-ai-panel-status">
+              <span class="kbs-ai-status-dot" aria-hidden="true"></span>
+              <span class="kbs-ai-panel-status-label"><b>Интелигентен Асистент на КБ – Штип</b></span>
+            </div>
+          </div>
+          <div class="kbs-ai-panel-header-actions">
+            <button type="button" class="kbs-ai-header-plus" id="kbs-ai-new-chat" aria-label="Нова разговор" title="Нова разговор">+</button>
+          </div>
+        </header>
+        <div class="kbs-ai-panel-body">
+          <div class="kbs-ai-intro" id="kbs-ai-intro">
+            <p class="kbs-ai-greeting">Здраво 👋 </p>
+            <p class="kbs-ai-desc">Прашајте ме било што за <br><b><i> „Клиничка Болница Штип“.</i></b></p>
+          </div>
+          <div class="kbs-ai-thread" id="kbs-ai-messages"></div>
+        </div>
+        <form class="kbs-ai-footer-form" id="kbs-ai-form">
+          <div class="kbs-ai-input-wrap">
+            <input id="kbs-ai-input" type="text" autocomplete="off" placeholder="Напишете прашање..."/>
+            <button type="submit" class="kbs-ai-send" aria-label="Испрати">
+              <svg class="kbs-ai-send-svg" viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" fill="none"><path d="M22 2 11 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M22 2 15 22 11 13 2 9 22 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>
+          </div>
+        </form>
+      </section>
+      <div class="kbs-ai-fabs">
+        <button type="button" class="kbs-ai-launcher" id="kbs-ai-launcher" aria-expanded="false" aria-controls="kbs-ai-panel" aria-label="Отвори AI асистент">
+          <span class="kbs-ai-launcher-open" aria-hidden="true">
+            <img class="kbs-ai-launcher-icon kbs-ai-icon-on-red" src="assets/kbs-ai-icon-web.png" width="38" height="38" alt="" aria-hidden="true"/>
+          </span>
+          <span class="kbs-ai-launcher-close" aria-hidden="true">✕</span>
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- ======================================================================
+       КБ ШТИП AI АСИСТЕНТ | ИЗГЛЕД (HTML): крај
+       ====================================================================== -->
+
 </body>
 </html>
