@@ -65,6 +65,9 @@ from ai import istorija_pacient
 from ai import karton_pacient
 from ai import moja_statistika
 from ai import moj_raspored
+from ai import navigacija
+from ai import lekari_oddel
+from ai import apliciraj_za_rabota
 
 
 router = APIRouter(prefix="/ai-chat", tags=["AI Chat"])
@@ -94,13 +97,16 @@ class PitanjeModel(BaseModel):
     {
       "prashanje": "Сакам преглед кај Петров утре во 10",
       "pacient": {"pacient_ID": 1, "ime": "Даниел", ..., "email": "..."},
-      "lekar":   {"doctor_ID": 5, "name": "Владко", "surname": "Захариев", ...}
+      "lekar":   {"doctor_ID": 5, "name": "Владко", "surname": "Захариев", ...},
+      "kontekst": {"intent": "apliciraj_za_rabota", "cekam": "licenca", "pozicija": "Кардиолог", ...}
     }
-    Само еден од нив треба да биде сетиран во даден момент (или ниту еден за гост).
+    `kontekst` е конверзациска состојба – фронтот го памти и го испраќа назад
+    при следно прашање, за да можеме да водиме повеќестепен дијалог.
     """
     prashanje: str
     pacient: PacientModel | None = None
     lekar: LekarModel | None = None
+    kontekst: dict | None = None
 
 
 @router.post("/ask")
@@ -141,13 +147,25 @@ def ask(data: PitanjeModel):
         }
 
     # 3. Детекција на интент
-    try:
-        intent = detektiraj_intent(pitanje_norm)
-    except Exception as e:
-        print(f"[ai_chat] greshka pri detekcija na intent: {e}")
-        intent = "general"
+    # Ако фронтот ни прати активен kontekst (повеќестепен flow),
+    # форсирај го интентот од контекстот за да го продолжиме разговорот.
+    aktiven_kontekst = None
+    if isinstance(data.kontekst, dict) and data.kontekst.get("intent"):
+        aktiven_kontekst = data.kontekst
+        intent = data.kontekst.get("intent")
+        print(f"[ai_chat] продолжуваме kontekst intent={intent}")
+    else:
+        try:
+            intent = detektiraj_intent(pitanje_norm)
+        except Exception as e:
+            print(f"[ai_chat] greshka pri detekcija na intent: {e}")
+            intent = "general"
 
     print(f"[ai_chat] pitanje={pitanje_norm!r} -> intent={intent}")
+
+    # Резервни променливи за дополнителни полиња во одговорот
+    nav_info: dict | None = None
+    nov_kontekst: dict | None = None
 
     # 4. Рутирање според интент
     try:
@@ -225,6 +243,21 @@ def ask(data: PitanjeModel):
         elif intent == "moj_raspored":
             odgovor = moj_raspored.odgovori_za_raspored(pitanje_norm, lekar_dict)
 
+        elif intent == "navigacija":
+            nav_rezultat = navigacija.odgovori_za_navigacija(pitanje_norm)
+            odgovor = nav_rezultat.get("odgovor", "")
+            nav_info = nav_rezultat.get("navigacija")
+
+        elif intent == "lekari_oddel":
+            odgovor = lekari_oddel.odgovori_za_lekari_oddel(pitanje_norm)
+
+        elif intent == "apliciraj_za_rabota":
+            rezultat_apl = apliciraj_za_rabota.odgovori_za_aplikacija(
+                pitanje_norm, pacient_dict, aktiven_kontekst
+            )
+            odgovor = rezultat_apl.get("odgovor", "")
+            nov_kontekst = rezultat_apl.get("kontekst")
+
         else:
             # general → директен повик до Groq AI
             odgovor = ask_ai(pitanje_norm)
@@ -236,4 +269,10 @@ def ask(data: PitanjeModel):
             "Те молам обиди се повторно или контактирај ја рецепцијата."
         )
 
-    return {"odgovor": odgovor}
+    rezultat: dict = {"odgovor": odgovor}
+    if nav_info:
+        rezultat["navigacija"] = nav_info
+    # Враќаме kontekst (може и null) за да фронтот експлицитно знае дали
+    # треба да го памти за следно прашање или да го избрише.
+    rezultat["kontekst"] = nov_kontekst
+    return rezultat

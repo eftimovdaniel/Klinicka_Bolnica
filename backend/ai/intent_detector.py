@@ -19,6 +19,7 @@
 - "trgni_ocena"       → бришење на оцена (DELETE од Pregled_feedback)
 - "slobodni_termini"  → преглед на слободни термини
 - "info_lekar"        → информации за конкретен лекар
+- "lekari_oddel"      → листа на лекари по оддел / специјалност
 - "preporaka_lekar"   → препорака според симптом
 - "rabotno_vreme"     → работно време
 - "lokacija"          → локации на оддели
@@ -35,6 +36,8 @@
 - "karton_pacient"    → медицински картон на пациент (лекар)
 - "moja_statistika"   → лични статистики на лекар (лекар)
 - "moj_raspored"      → распоред на закажани прегледи (лекар)
+- "navigacija"        → пренасочи на секција од сајтот
+- "apliciraj_za_rabota" → AI агент аплицира за работа за пациент (повеќестепен)
 - "general"           → одговор од AI за општо прашање
 
 ВАЖНО: Редот на проверки е важен (поспецифичните прво).
@@ -131,6 +134,28 @@ KLUCNI_MOJA_STATISTIKA = [
     "каква ми е оцената", "моите оцени",
     "моја статистика", "мој рејтинг",
     "moja statistika", "moi statistiki",
+]
+
+# 00l. НАВИГАЦИЈА (за сите – пренасочи на секција)
+KLUCNI_NAVIGACIJA = [
+    "однеси ме", "одведи ме", "однеси me", "однеси",
+    "покажи ми ги лекарите", "прикажи ми ги лекарите",
+    "дај ми ги сите лекари", "сите лекари во болницата",
+    "медицински тим", "тимот на болницата",
+    "покажи услуги", "прикажи услуги", "однеси на услуги",
+    "покажи новости", "прикажи новости", "однеси на новости",
+    "покажи кариера", "прикажи кариера", "однеси на кариера",
+    "сите кариери", "дај ми кариера", "види кариера",
+    "слободни позиции", "слободни работни места", "работни места",
+    "имате ли работа", "имате работа", "имате ли вработување",
+    "има ли работа", "има ли вработување", "дали има работа",
+    "ima li rabota", "dali ima rabota",
+    "сите огласи", "сите огласи за работа", "огласи за работа",
+    "сите вработувања", "вработување во болницата",
+    "сите вести", "сите новости",
+    "однеси на контакт", "прикажи контакт",
+    "почетна страна", "главна страна",
+    "navigacija",
 ]
 
 # 00k. МОЈ РАСПОРЕД (лекар) – мора пред „zakazi_termin"
@@ -247,6 +272,25 @@ KLUCNI_INFO_LEKAR = [
     "опис на лекар",
 ]
 
+# 8b. ЛЕКАРИ ПО ОДДЕЛ – „кои лекари се на одделот за Х"
+KLUCNI_LEKARI_ODDEL = [
+    "кои лекари се на",
+    "кои се лекарите од",
+    "кои се лекарите на",
+    "кои лекари се од",
+    "кои лекари работат на",
+    "кои доктори се на",
+    "кои се од",
+    "кои лекари има на",
+    "кои лекари има во",
+    "докторите од",
+    "докторите на",
+    "лекарите од",
+    "лекарите на",
+    "koi lekari se na",
+    "koi se lekarite od",
+]
+
 # 9. СЛОБОДНИ ТЕРМИНИ
 KLUCNI_SLOBODNI = [
     "слободен", "слободна", "слободни", "слободно",
@@ -300,12 +344,82 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
     if _ima_zbor(p, KLUCNI_ZATVORI_OGLAS):
         return "zatvori_oglas"
 
+    # Флексибилно: „затвори/затвор" + („оглас") во истиот текст
+    # (пр. „затвори активен оглас", „затвори го огласот")
+    if any(w in p for w in ("затвори", "затвор", "zatvori")) and (
+        "оглас" in p or "oglas" in p
+    ):
+        return "zatvori_oglas"
+
     # Статистика на оддели мора ПРЕД „uslugi" (зашто „специјалности" е во двете)
     # Флексибилно: „топ" + („оддел"/„специјал") во истиот текст
     if "топ" in p and any(w in p for w in ("оддел", "специјал")):
         return "statistika_oddeli"
     if _ima_zbor(p, KLUCNI_STATISTIKA):
         return "statistika_oddeli"
+
+    # Навигација кон „кариера" – мора ПРЕД KLUCNI_OGLAS, зашто
+    # „оглас за работа" е во двата (но „креирај/нов/објави/стави" е само за креирање)
+    KREIRAJ_RECI = (
+        "креирај", "создај", "напиши", "објави", "стави оглас", "нов оглас",
+        "нова позиција", "сакам да објавам", "сакам да креирам",
+        "kreiraj", "objavi", "stavi oglas", "novo oglas", "novo rabotno"
+    )
+    ima_kreiraj = any(w in p for w in KREIRAJ_RECI)
+
+    # Дирекно „кариер/вработувањ/слободни работни/слободни позиции" – секогаш навигација
+    if not ima_kreiraj and any(w in p for w in (
+        "кариер", "вработувањ", "вработување",
+        "слободни позиции", "слободни работни", "работни места",
+        "kariera", "vrabotuvanje", "vrabotuvanj"
+    )):
+        return "navigacija"
+
+    # „Аплицирам / пријавувам за работа за X" – AI агент води разговор
+    # и сам аплицира (бара логин како пациент).
+    if not ima_kreiraj and any(w in p for w in (
+        "аплицир", "апликаци",                # „аплицирам", „аплицирање", „апликација"
+        "сакам да работам", "сакам да се вработам",
+        "како да се вработам", "како да аплицирам",
+        "сакам да се пријавам за работа",
+        "пријавувам за работа", "пријавам за работа",
+        "apliciram", "apliciranj", "aplikacija",
+        "sakam da rabotam", "sakam da se vrabotam",
+    )):
+        return "apliciraj_za_rabota"
+
+    # „Сакам да работам кај вас" / „како да се пријавам" (без позиција) → navigacija
+    if not ima_kreiraj and any(w in p for w in (
+        "сакам да работам кај вас",
+        "како да се пријавам", "како да се пријавиме",
+        "sakam da rabotam kaj vas",
+    )):
+        return "navigacija"
+
+    # „види/покажи/сите/каде/имате/има ли/дали има + оглас" – без зборови за креирање
+    pregled_RECI = (
+        "сите ", "види ", "видете", "погледни", "погледај", "погледајте",
+        "покажи", "прикажи", "однеси", "одведи", "каде се", "каде ",
+        "имате", "имате ли", "има ли", "дали има", "има актив",
+        "кои се", "кои ", "колку ",
+        "листа", "листај", "даj ми", "дај ми", "дади ми",
+        "ima li", "dali ima", "pokazi", "prikazi", "vidi", "site ", "ima aktiv",
+    )
+    ima_glagol_pregled = any(w in p for w in pregled_RECI)
+    ima_oglas_zbor = ("оглас" in p or "oglas" in p)
+    if ima_oglas_zbor and ima_glagol_pregled and not ima_kreiraj:
+        return "navigacija"
+
+    # „активни/отворени/слободни огласи" – директно навигација (без други глаголи)
+    # ВАЖНО: исклучи „затвори/затвара" (тоа е друг intent)
+    ima_zatvori = any(w in p for w in ("затвори", "затвор", "zatvori", "deaktiviraj"))
+    if (
+        ima_oglas_zbor
+        and any(w in p for w in ("актив", "отвор", "слобод", "нови ", "достапн", "aktiv", "otvor"))
+        and not ima_kreiraj
+        and not ima_zatvori
+    ):
+        return "navigacija"
 
     if _ima_zbor(p, KLUCNI_OGLAS):
         return "kreiraj_oglas"
@@ -321,6 +435,10 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
     # B1 „мој распоред" / „закажаните прегледи" - мора пред zakazi_termin
     if _ima_zbor(p, KLUCNI_RASPORED):
         return "moj_raspored"
+
+    # Навигација – пред uslugi/info_lekar
+    if _ima_zbor(p, KLUCNI_NAVIGACIJA):
+        return "navigacija"
 
     # D3 „картон" има специфичен збор кој не се преклопува
     if _ima_zbor(p, KLUCNI_KARTON):
@@ -369,6 +487,17 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
 
     if _ima_zbor(p, KLUCNI_USLUGI):
         return "uslugi"
+
+    # „Кои лекари се на X оддел" мора ПРЕД info_lekar
+    # (за да не побара име на конкретен лекар, кога всушност прашува за оддел)
+    if _ima_zbor(p, KLUCNI_LEKARI_ODDEL):
+        return "lekari_oddel"
+
+    # Флексибилно: „лекар/доктор/специјалист" + („оддел/Y") во истиот текст
+    if any(w in p for w in ("лекари", "лекарите", "доктори", "докторите")) and any(
+        w in p for w in ("оддел", "одделот", "одделение", "специјалност", "од ")
+    ) and not any(w in p for w in ("каков", "каква", "како е", "опис")):
+        return "lekari_oddel"
 
     if _ima_zbor(p, KLUCNI_INFO_LEKAR):
         return "info_lekar"

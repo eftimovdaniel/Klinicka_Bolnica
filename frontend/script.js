@@ -4973,6 +4973,13 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
   // URL до backend ендпоинт-от
   const AI_API_URL = "http://localhost:8000/ai-chat/ask";
 
+  // Конверзациски контекст – се чува меѓу прашања за повеќестепен дијалог
+  // (пр. „Сакам да аплицирам за кардиолог" → AI бара лиценца → корисник
+  // го прати бројот → AI ја испрати апликацијата).
+  // Се чисти при нов чат, при logout/session-end и автоматски кога backend-от
+  // врати null.
+  let kbsAIKontekst = null;
+
   // Функција за праќање на прашање кон backend и враќање одговор.
   // Ако корисникот е логиран (пациент или лекар), ги праќа и неговите податоци.
   async function pitajAI(prashanje) {
@@ -5008,18 +5015,63 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
           prashanje: prashanje,
           pacient: pacientData,
           lekar: lekarData,
+          kontekst: kbsAIKontekst,
         }),
       });
 
       if (!response.ok) {
-        return "Серверот врати грешка (" + response.status + ").";
+        return { odgovor: "Серверот врати грешка (" + response.status + ")." };
       }
 
       const data = await response.json();
-      return data.odgovor || "Не добив одговор.";
+      // Ажурирај го контекстот според одговорот: ако backend-от врати null,
+      // флоу-от е завршен и треба да го заборавиме контекстот.
+      kbsAIKontekst = (data && Object.prototype.hasOwnProperty.call(data, "kontekst"))
+        ? (data.kontekst || null)
+        : null;
+
+      return {
+        odgovor: data.odgovor || "Не добив одговор.",
+        navigacija: data.navigacija || null,
+      };
     } catch (err) {
-      return "Не можам да се поврзам со серверот. Провери дали backend-от работи.";
+      return { odgovor: "Не можам да се поврзам со серверот. Провери дали backend-от работи." };
     }
+  }
+
+  // Помошна функција – ресет на конверзациски контекст (повикана од reset/logout)
+  function kbsResetKontekst() { kbsAIKontekst = null; }
+  window.kbsResetKontekst = kbsResetKontekst;
+
+  // Извршува „мека" навигација кон секција на сајтот.
+  // Ако сме на index.html и целта е секција на истата страна → smooth scroll.
+  // Инаку → window.location.href.
+  function kbsIzvrsiNavigacija(nav) {
+    if (!nav || !nav.target) return;
+    var target = String(nav.target);
+
+    var hashIdx = target.indexOf("#");
+    var fileChunk = hashIdx >= 0 ? target.substring(0, hashIdx) : target;
+    var hashChunk = hashIdx >= 0 ? target.substring(hashIdx + 1) : "";
+
+    var currentFile = (window.location.pathname.split("/").pop() || "index.html");
+    if (!currentFile) currentFile = "index.html";
+
+    var sameFile = (!fileChunk || fileChunk === "" || fileChunk === currentFile);
+
+    if (sameFile && hashChunk) {
+      var el = document.getElementById(hashChunk);
+      if (el) {
+        setTimeout(function () {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 350);
+        return;
+      }
+    }
+
+    setTimeout(function () {
+      window.location.href = target;
+    }, 600);
   }
 
   function qs(sel, root) {
@@ -5063,6 +5115,7 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       messagesEl.innerHTML = "";
       if (introEl) introEl.hidden = false;
       if (input) input.value = "";
+      kbsResetKontekst();
       if (closePanel) {
         setOpen(false);
       }
@@ -5120,13 +5173,18 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       messagesEl.appendChild(typingEl);
       messagesEl.scrollTop = messagesEl.scrollHeight;
 
-      pitajAI(text).then(function (odgovor) {
+      pitajAI(text).then(function (rezultat) {
         typingEl.remove();
+        var odgovor = (rezultat && typeof rezultat === "object") ? rezultat.odgovor : rezultat;
+        var nav = (rezultat && typeof rezultat === "object") ? rezultat.navigacija : null;
+
         const botEl = document.createElement("p");
         botEl.className = "kbs-ai-msg kbs-ai-msg-agent";
-        botEl.textContent = odgovor;
+        botEl.textContent = odgovor || "";
         messagesEl.appendChild(botEl);
         messagesEl.scrollTop = messagesEl.scrollHeight;
+
+        if (nav) kbsIzvrsiNavigacija(nav);
       });
     });
   }
