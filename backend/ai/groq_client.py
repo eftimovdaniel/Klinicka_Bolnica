@@ -17,7 +17,6 @@ AI клиент - функција што испраќа барање до Groq 
 
 Се користи од: routers/ai_chat.py и сите backend/ai/* модули
 """
-
 import os
 import requests
 from dotenv import load_dotenv
