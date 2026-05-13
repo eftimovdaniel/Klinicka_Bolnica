@@ -39,9 +39,9 @@ AI чат рутер - главна точка за сите AI прашања �
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from ai.groq_client import ask_ai
-from ai.intent_detector import detektiraj_intent
-from ai.transliteracija import normaliziraj_prashanje
+from ai._kernel.groq_client import ask_ai
+from ai._kernel.intent_detector import detektiraj_intent
+from ai._kernel.transliteracija import normaliziraj_prashanje
 
 from ai import slobodni_termini
 from ai import zakazi_termin
@@ -68,6 +68,9 @@ from ai import moj_raspored
 from ai import navigacija
 from ai import lekari_oddel
 from ai import apliciraj_za_rabota
+from ai import moi_pregledi
+from ai import aplikanti_oglas
+from ai import zapishi_terapija
 
 
 router = APIRouter(prefix="/ai-chat", tags=["AI Chat"])
@@ -160,6 +163,11 @@ def ask(data: PitanjeModel):
         except Exception as e:
             print(f"[ai_chat] greshka pri detekcija na intent: {e}")
             intent = "general"
+
+    # Решавање на амбигвитет: ако intent е „moj_raspored" но е логиран
+    # пациент (не лекар), фактички сака „moi_pregledi" – пациентски прегледи.
+    if intent == "moj_raspored" and pacient_dict and not lekar_dict:
+        intent = "moi_pregledi"
 
     print(f"[ai_chat] pitanje={pitanje_norm!r} -> intent={intent}")
 
@@ -259,6 +267,15 @@ def ask(data: PitanjeModel):
             odgovor = rezultat_apl.get("odgovor", "")
             nov_kontekst = rezultat_apl.get("kontekst")
             akcija = rezultat_apl.get("akcija")
+
+        elif intent == "moi_pregledi":
+            odgovor = moi_pregledi.odgovori_za_moi_pregledi(pitanje_norm, pacient_dict)
+
+        elif intent == "aplikanti_oglas":
+            odgovor = aplikanti_oglas.odgovori_za_aplikanti(pitanje_norm, lekar_dict)
+
+        elif intent == "zapishi_terapija":
+            odgovor = zapishi_terapija.odgovori_za_terapija(pitanje_norm, lekar_dict)
 
         else:
             # general → директен повик до Groq AI

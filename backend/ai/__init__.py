@@ -1,31 +1,38 @@
 """
-AI пакет - сè што е поврзано со вештачка интелигенција (Groq / Llama 3.3).
+AI пакет за Клиничка Болница Штип.
 
-Структура:
-- groq_client.py      - Функција за повикување на Groq API (ask_ai)
-- prompts.py          - Системски prompts (упатства за AI-то)
-- intent_detector.py  - Хибриден keyword + AI детектор на интент
-- ai_intent_detector.py - Само AI верзија на детекторот
-- transliteracija.py  - Латиница → кирилица конверзија
-- slobodni_termini.py - Барање слободни термини кај лекар
-- zakazi_termin.py    - Закажување нов термин
-- otkazi_termin.py    - Откажување на термин
-- prenesi_termin.py   - Префрлање на термин
-- postavi_potsetnik.py - Потсетник за термин
-- oceni_pregled.py    - Оцена за завршен преглед
-- trgni_ocena.py      - Бришење на оцена
-- info_lekar.py       - Информации за лекар
-- preporaka_lekar.py  - Препорака по симптом
-- bolnica_info.py     - Статички инфо за болницата (работно време, локации, итн.)
-- uslugi.py           - Список на услуги
-- objavi_vest.py      - Објави вест од YouTube (директор)
-- kreiraj_oglas.py    - Креирај оглас за работа (директор)
-- izbrisi_vest_oglas.py - Избриши вест или оглас (директор)
-- zatvori_oglas.py    - Затвори оглас како „истечен" (директор)
-- promeni_dezurstvo.py - Промени дежурство на лекар (директор)
-- statistika_oddeli.py - Анализа на најпопуларни оддели (директор)
-- zavrshi_pregled.py  - Заврши преглед (лекар)
-- istorija_pacient.py - Историја на пациент кај овој лекар (лекар)
-- karton_pacient.py   - Медицински картон на пациент (лекар)
-- moja_statistika.py  - Лични статистики на лекар (лекар)
+Структура (по улога на корисник):
+- _kernel/   - инфраструктура (Groq клиент, intent детектори, prompts)
+- pacient/   - AI функции за пациент
+- lekar/     - AI функции за лекар
+- direktor/  - AI функции за директор
+- opsto/     - AI функции достапни на сите
+
+Овој __init__.py ги re-експортира сите модули на ниво на пакетот,
+така што постојниот код може да продолжи да пишува:
+    from ai import zakazi_termin
+без да знае во која подпапка живее модулот.
 """
+
+# === KERNEL ===
+from ai._kernel import groq_client, intent_detector, ai_intent_detector  # noqa: F401
+from ai._kernel import transliteracija, prompts  # noqa: F401
+
+# === PACIENT ===
+from ai.pacient import slobodni_termini, zakazi_termin, otkazi_termin  # noqa: F401
+from ai.pacient import prenesi_termin, postavi_potsetnik  # noqa: F401
+from ai.pacient import oceni_pregled, trgni_ocena  # noqa: F401
+from ai.pacient import moi_pregledi, apliciraj_za_rabota  # noqa: F401
+
+# === LEKAR ===
+from ai.lekar import zavrshi_pregled, istorija_pacient, karton_pacient  # noqa: F401
+from ai.lekar import moj_raspored, moja_statistika, zapishi_terapija  # noqa: F401
+
+# === DIREKTOR ===
+from ai.direktor import kreiraj_oglas, zatvori_oglas, izbrisi_vest_oglas  # noqa: F401
+from ai.direktor import aplikanti_oglas, promeni_dezurstvo  # noqa: F401
+from ai.direktor import statistika_oddeli, objavi_vest  # noqa: F401
+
+# === OPSTO ===
+from ai.opsto import info_lekar, lekari_oddel, uslugi, navigacija  # noqa: F401
+from ai.opsto import bolnica_info, preporaka_lekar  # noqa: F401
