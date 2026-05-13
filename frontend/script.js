@@ -17,7 +17,7 @@ let selectedDate = null;  // Избраниот датум за преглед (
 let selectedTime = null;  // Избраното време за преглед (string формат "HH:MM")
 let currentLekar = null;  // Податоци за моментално најавениот лекар (за приказ на неговите термини)
 let currentPacient = null;  // Податоци за моментално најавениот пациент (за закажување на прегледи)
-// Колку лекари да се исцртаат; се ажурира на бројот на вчитани/филтрирани за да се видат сите
+// Колку лекари да се исцртаат; иницијално 8 (2 реда по 4), расте за 8 при „Прикажи повеќе"
 let displayedDoctorsCount = 8;
 
 var KB_KEY_PACIENT = 'currentPacient';
@@ -189,7 +189,7 @@ async function loadLekari() {
 
     allDoctors = data;
     filteredDoctors = data; // Иницијално, филтрираната листа е иста како сите лекари
-    displayedDoctorsCount = data.length;
+    displayedDoctorsCount = 8; // Прикажи само 2 реда (8 лекари) иницијално
 
     if (data.length === 0) {
       container.innerHTML = '<div class="loading">Нема достапни лекари.</div>';
@@ -236,11 +236,22 @@ function renderDoctors(doctors) {
   if (controlsDiv) {
     const showMoreBtn = document.getElementById('show-more-btn');
     const showLessBtn = document.getElementById('show-less-btn');
+    const showAllBtn = document.getElementById('show-all-btn');
     
     if (doctors.length > 8) {
       controlsDiv.style.display = 'block';
+      const ostanati = doctors.length - displayedDoctorsCount;
       if (showMoreBtn) {
-        showMoreBtn.style.display = doctors.length > displayedDoctorsCount ? 'inline-block' : 'none';
+        if (ostanati > 0) {
+          showMoreBtn.style.display = 'inline-block';
+          showMoreBtn.textContent = 'Прикажи повеќе';
+        } else {
+          showMoreBtn.style.display = 'none';
+        }
+      }
+      // Копчето „Прикажи сите" е отстрането – остануваат само „Прикажи повеќе" и „Прикажи помалку"
+      if (showAllBtn) {
+        showAllBtn.style.display = 'none';
       }
       if (showLessBtn) {
         showLessBtn.style.display = displayedDoctorsCount > 8 ? 'inline-block' : 'none';
@@ -279,7 +290,7 @@ function filterDoctors() {
     return matchesName && matchesSpecialty;
   });
 
-  displayedDoctorsCount = filteredDoctors.length;
+  displayedDoctorsCount = 8; // По филтрирање, повторно прикажи само 2 реда (8 лекари)
   renderDoctors(filteredDoctors);
 }
 
@@ -3109,15 +3120,27 @@ async function saveTerminChanges(terminId) {
 }
 // ФУНКЦИИ ЗА ПРИКАЗУВАЊЕ НА ПОВЕЌЕ/ПОМАЛКУ ЛЕКАРИ
 
-// Функција за прикажување на повеќе лекари (додава 8 нови лекари во приказот)
+// Функција за прикажување на повеќе лекари (додава 8 нови лекари = 2 реда)
 function showMoreDoctors() {
-  displayedDoctorsCount += 8; // Додади уште 8 лекари (2 реда)
-  renderDoctors(filteredDoctors); // Ре-рендерирај со новиот број без ресетирање
+  displayedDoctorsCount += 8;
+  if (displayedDoctorsCount > filteredDoctors.length) {
+    displayedDoctorsCount = filteredDoctors.length;
+  }
+  renderDoctors(filteredDoctors);
+}
+
+// Функција за прикажување на сите лекари наеднаш
+function showAllDoctors() {
+  displayedDoctorsCount = filteredDoctors.length;
+  renderDoctors(filteredDoctors);
 }
 
 function showLessDoctors() {
-  displayedDoctorsCount = Math.max(8, displayedDoctorsCount - 8); // Намали за 8, но не помалку од 8
-  renderDoctors(filteredDoctors); // Ре-рендерирај со новиот број без ресетирање
+  displayedDoctorsCount = 8; // Врати на иницијалните 8 (2 реда)
+  renderDoctors(filteredDoctors);
+  // Скролај нагоре до секцијата за лекари
+  const sek = document.getElementById('lekari');
+  if (sek) sek.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 // Make functions available globally if needed
@@ -3147,6 +3170,7 @@ window.showLekarToast = showLekarToast;
 window.showLekarTab = showLekarTab;
 window.saveTerminChanges = saveTerminChanges;
 window.showMoreDoctors = showMoreDoctors;
+window.showAllDoctors = showAllDoctors;
 
 // АДМИНИСТРАЦИЈА - УПРАВУВАЊЕ СО ДЕЖУРСТВА И ОГЛАСИ
 // Овој дел содржи функции за управување со дежурства и огласи за работа.

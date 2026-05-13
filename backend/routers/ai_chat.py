@@ -21,6 +21,11 @@ AI чат рутер - главна точка за сите AI прашања �
        - kontakti           → "На кој број за итна?"
        - uslugi             → "Кои услуги имате?"
        - objavi_vest        → "Објави вест: https://youtube.com/..." (само директор)
+       - kreiraj_oglas      → "Креирај оглас за кардиолог" (само директор)
+       - izbrisi_vest_oglas → "Избриши го најновиот оглас" (само директор)
+       - zatvori_oglas      → "Затвори го огласот за кардиолог" (само директор)
+       - promeni_dezurstvo  → "Префрли го д-р Петров за петок" (само директор)
+       - statistika_oddeli  → "Кои се најпопуларни оддели?" (само директор)
        - general            → општ одговор од Groq AI
 5. Враќа {"odgovor": "..."} назад на frontend-от.
 
@@ -46,6 +51,11 @@ from ai import preporaka_lekar
 from ai import bolnica_info
 from ai import uslugi as uslugi_modul
 from ai import objavi_vest
+from ai import kreiraj_oglas
+from ai import izbrisi_vest_oglas
+from ai import zatvori_oglas
+from ai import promeni_dezurstvo
+from ai import statistika_oddeli
 
 
 router = APIRouter(prefix="/ai-chat", tags=["AI Chat"])
@@ -175,6 +185,21 @@ def ask(data: PitanjeModel):
             # ВАЖНО: за објавување вест ни треба ОРИГИНАЛНИОТ pitanje (не норм.),
             # зашто транслитерацијата може да го расипе URL-от со кирилица.
             odgovor = objavi_vest.odgovori_za_objava_vest(pitanje, lekar_dict)
+
+        elif intent == "kreiraj_oglas":
+            odgovor = kreiraj_oglas.odgovori_za_kreiranje_oglas(pitanje_norm, lekar_dict)
+
+        elif intent == "izbrisi_vest_oglas":
+            odgovor = izbrisi_vest_oglas.odgovori_za_brisenje(pitanje_norm, lekar_dict)
+
+        elif intent == "zatvori_oglas":
+            odgovor = zatvori_oglas.odgovori_za_zatvoranje_oglas(pitanje_norm, lekar_dict)
+
+        elif intent == "promeni_dezurstvo":
+            odgovor = promeni_dezurstvo.odgovori_za_dezurstvo(pitanje_norm, lekar_dict)
+
+        elif intent == "statistika_oddeli":
+            odgovor = statistika_oddeli.odgovori_za_statistika(pitanje_norm, lekar_dict)
 
         else:
             # general → директен повик до Groq AI

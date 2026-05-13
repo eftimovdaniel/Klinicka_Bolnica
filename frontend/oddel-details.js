@@ -1,7 +1,12 @@
-// API базен URL – автоматски се прилагодува
-var API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-  ? 'http://localhost:8000'
-  : (window.location.protocol + '//' + window.location.host);
+// API базен URL – автоматски се прилагодува (вклучително и за file:// протокол при локален развој)
+var API_BASE = (function() {
+  var h = window.location.hostname;
+  var p = window.location.protocol;
+  if (p === 'file:' || !h || h === 'localhost' || h === '127.0.0.1') {
+    return 'http://localhost:8000';
+  }
+  return p + '//' + window.location.host;
+})();
 
 // Функција за добивање на параметри од URL
 function getURLParameter(name) {
@@ -142,52 +147,112 @@ async function loadLekariForOddel(oddelNaziv) {
       return;
     }
     
-    // Прикажи лекари со специјално форматирање
-    lekari.forEach((lekar, index) => {
-      const card = document.createElement('div');
-      card.className = 'lekar-card';
-      
-      card.innerHTML = `
-        <h3>${lekar.name} ${lekar.surname}</h3>
-        <p class="specialty"><strong>Специјалност:</strong> ${lekar.specijalnost || 'Н / П'}</p>
-        <a href="mailto:${lekar.email || '#'}" class="email">${lekar.email || 'Нема е-пошта'}</a>
-        <button class="btn-appointment-card" onclick="openAppointmentModal(${lekar.doctor_ID})">
-          Закажи преглед
-        </button>
-      `;
-      container.appendChild(card);
-    });
+    // Зачувај ги сите лекари за прогресивно прикажување (по 8 одеднаш = 2 реда)
+    window._sviLekari = lekari;
+    window._prikazaniLekari = 0;
+    window._chekorLekari = 8;
     
-    // Примени специјално форматирање според бројот на лекари
-    console.log(`[DEBUG] Број на лекари: ${lekari.length}`);
-    if (lekari.length === 1) {
-      container.classList.add('lekari-single');
-      console.log('[DEBUG] Додадена класа: lekari-single');
-      // Додади и inline стилови за сигурност
-      container.style.maxWidth = '400px';
-      container.style.marginLeft = 'auto';
-      container.style.marginRight = 'auto';
-      container.style.justifyItems = 'center';
-    } else if (lekari.length === 2) {
-      container.classList.add('lekari-double');
-      console.log('[DEBUG] Додадена класа: lekari-double');
-      container.style.maxWidth = '800px';
-      container.style.marginLeft = 'auto';
-      container.style.marginRight = 'auto';
-    } else if (lekari.length === 3) {
-      container.classList.add('lekari-triple');
-      console.log('[DEBUG] Додадена класа: lekari-triple');
-      container.style.maxWidth = '1000px';
-      container.style.marginLeft = 'auto';
-      container.style.marginRight = 'auto';
-    } else {
-      container.classList.add('lekari-multiple');
-      console.log('[DEBUG] Додадена класа: lekari-multiple');
-    }
+    prikazi_lekari();
     
   } catch (err) {
     console.error('Грешка при вчитување на лекари:', err);
     container.innerHTML = `<div class="loading" style="color: red;">Грешка при вчитување на лекари: ${err.message}</div>`;
+  }
+}
+
+// Прикажува уште `chekorLekari` лекари (или сите ако се притисне Прикажи сите)
+function prikazi_lekari(prikaziSite = false) {
+  const container = document.getElementById('lekari-list-details');
+  const lekari = window._sviLekari || [];
+  const chekor = window._chekorLekari || 2;
+  
+  let novoBrojKe = prikaziSite ? lekari.length : (window._prikazaniLekari + chekor);
+  if (novoBrojKe > lekari.length) novoBrojKe = lekari.length;
+  
+  container.innerHTML = '';
+  container.classList.remove('lekari-single', 'lekari-double', 'lekari-triple', 'lekari-multiple');
+  container.style.maxWidth = '';
+  container.style.marginLeft = '';
+  container.style.marginRight = '';
+  container.style.justifyItems = '';
+  
+  const lekariZaPrikaz = lekari.slice(0, novoBrojKe);
+  lekariZaPrikaz.forEach((lekar) => {
+    const card = document.createElement('div');
+    card.className = 'lekar-card';
+    card.innerHTML = `
+      <h3>${lekar.name} ${lekar.surname}</h3>
+      <p class="specialty"><strong>Специјалност:</strong> ${lekar.specijalnost || 'Н / П'}</p>
+      <a href="mailto:${lekar.email || '#'}" class="email">${lekar.email || 'Нема е-пошта'}</a>
+      <button class="btn-appointment-card" onclick="openAppointmentModal(${lekar.doctor_ID})">
+        Закажи преглед
+      </button>
+    `;
+    container.appendChild(card);
+  });
+  
+  // Примени специјално форматирање според бројот на ПРИКАЖАНИ лекари
+  if (lekariZaPrikaz.length === 1) {
+    container.classList.add('lekari-single');
+    container.style.maxWidth = '400px';
+    container.style.marginLeft = 'auto';
+    container.style.marginRight = 'auto';
+    container.style.justifyItems = 'center';
+  } else if (lekariZaPrikaz.length === 2) {
+    container.classList.add('lekari-double');
+    container.style.maxWidth = '800px';
+    container.style.marginLeft = 'auto';
+    container.style.marginRight = 'auto';
+  } else if (lekariZaPrikaz.length === 3) {
+    container.classList.add('lekari-triple');
+    container.style.maxWidth = '1000px';
+    container.style.marginLeft = 'auto';
+    container.style.marginRight = 'auto';
+  } else {
+    container.classList.add('lekari-multiple');
+  }
+  
+  window._prikazaniLekari = novoBrojKe;
+  
+  postavi_kopinja_za_prikaz();
+}
+
+// Креира / ажурира копчиња „Прикажи повеќе", „Прикажи сите" и „Прикажи помалку"
+function postavi_kopinja_za_prikaz() {
+  const lekari = window._sviLekari || [];
+  const prikazani = window._prikazaniLekari || 0;
+  const section = document.querySelector('.lekari-section');
+  if (!section) return;
+  
+  let controls = document.getElementById('lekari-controls');
+  if (!controls) {
+    controls = document.createElement('div');
+    controls.id = 'lekari-controls';
+    controls.className = 'lekari-controls';
+    section.appendChild(controls);
+  }
+  controls.innerHTML = '';
+  
+  if (prikazani < lekari.length) {
+    const btnMore = document.createElement('button');
+    btnMore.className = 'btn-show-more';
+    btnMore.textContent = 'Прикажи повеќе';
+    btnMore.onclick = () => prikazi_lekari(false);
+    controls.appendChild(btnMore);
+  }
+  
+  if (prikazani > 8) {
+    const btnLess = document.createElement('button');
+    btnLess.className = 'btn-show-less';
+    btnLess.textContent = 'Прикажи помалку';
+    btnLess.onclick = () => {
+      window._prikazaniLekari = 0;
+      prikazi_lekari(false);
+      // Скролај до врвот на секцијата за лекари
+      const section = document.querySelector('.lekari-section');
+      if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    controls.appendChild(btnLess);
   }
 }
 
