@@ -20,6 +20,7 @@ AI чат рутер - главна точка за сите AI прашања �
        - lokacija           → "Каде е оддел за гинекологија?"
        - kontakti           → "На кој број за итна?"
        - uslugi             → "Кои услуги имате?"
+       - objavi_vest        → "Објави вест: https://youtube.com/..." (само директор)
        - general            → општ одговор од Groq AI
 5. Враќа {"odgovor": "..."} назад на frontend-от.
 
@@ -44,6 +45,7 @@ from ai import info_lekar
 from ai import preporaka_lekar
 from ai import bolnica_info
 from ai import uslugi as uslugi_modul
+from ai import objavi_vest
 
 
 router = APIRouter(prefix="/ai-chat", tags=["AI Chat"])
@@ -58,16 +60,28 @@ class PacientModel(BaseModel):
     telefon: str | None = None
 
 
+class LekarModel(BaseModel):
+    """Податоци за логиран лекар/директор (опционално)."""
+    doctor_ID: int | None = None
+    name: str | None = None
+    surname: str | None = None
+    email: str | None = None
+    specialty: str | None = None
+
+
 class PitanjeModel(BaseModel):
     """
     Тело на барањето од frontend.
     {
       "prashanje": "Сакам преглед кај Петров утре во 10",
-      "pacient": {"pacient_ID": 1, "ime": "Даниел", ..., "email": "..."}
+      "pacient": {"pacient_ID": 1, "ime": "Даниел", ..., "email": "..."},
+      "lekar":   {"doctor_ID": 5, "name": "Владко", "surname": "Захариев", ...}
     }
+    Само еден од нив треба да биде сетиран во даден момент (или ниту еден за гост).
     """
     prashanje: str
     pacient: PacientModel | None = None
+    lekar: LekarModel | None = None
 
 
 @router.post("/ask")
@@ -94,6 +108,17 @@ def ask(data: PitanjeModel):
             "prezime": data.pacient.prezime or "",
             "email": data.pacient.email,
             "telefon": data.pacient.telefon or "",
+        }
+
+    # 2b. Lekar како dict (за функциите што имаат лекарска улога, нпр. објави вест)
+    lekar_dict = None
+    if data.lekar and data.lekar.doctor_ID:
+        lekar_dict = {
+            "doctor_ID": data.lekar.doctor_ID,
+            "name": data.lekar.name or "",
+            "surname": data.lekar.surname or "",
+            "email": data.lekar.email or "",
+            "specialty": data.lekar.specialty or "",
         }
 
     # 3. Детекција на интент
@@ -145,6 +170,11 @@ def ask(data: PitanjeModel):
 
         elif intent == "uslugi":
             odgovor = uslugi_modul.odgovori_za_uslugi(pitanje_norm)
+
+        elif intent == "objavi_vest":
+            # ВАЖНО: за објавување вест ни треба ОРИГИНАЛНИОТ pitanje (не норм.),
+            # зашто транслитерацијата може да го расипе URL-от со кирилица.
+            odgovor = objavi_vest.odgovori_za_objava_vest(pitanje, lekar_dict)
 
         else:
             # general → директен повик до Groq AI

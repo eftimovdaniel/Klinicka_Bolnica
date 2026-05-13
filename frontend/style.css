@@ -3095,8 +3095,31 @@ html {
   resize: vertical;
 }
 .novost-current-image label { margin-left: 0.5rem; font-weight: normal; }
-.novosti-full-sodrzina { white-space: normal; line-height: 1.6; font-size: 1.02rem; }
+.novosti-full-sodrzina { white-space: normal; line-height: 1.7; font-size: 1.02rem; color: #2c3e50; }
 .novosti-full-sodrzina br { display: block; content: ''; margin-bottom: 0.25em; }
+.novosti-full-sodrzina p { margin: 0 0 1rem 0; line-height: 1.7; }
+.novosti-full-sodrzina p:last-child { margin-bottom: 0; }
+.novosti-full-sodrzina h1,
+.novosti-full-sodrzina h2,
+.novosti-full-sodrzina h3,
+.novosti-full-sodrzina h4 { margin: 1.5rem 0 0.6rem 0; color: #1a1a2e; font-weight: 700; }
+.novosti-full-sodrzina h3 { font-size: 1.18rem; }
+.novosti-full-sodrzina h4 { font-size: 1.06rem; }
+.novosti-full-sodrzina strong { color: #1a1a2e; font-weight: 700; }
+.novosti-full-sodrzina em { font-style: italic; }
+.novosti-full-sodrzina ul,
+.novosti-full-sodrzina ol { margin: 0.5rem 0 1rem 1.4rem; padding-left: 0.5rem; }
+.novosti-full-sodrzina li { margin-bottom: 0.4rem; line-height: 1.6; }
+.novosti-full-sodrzina blockquote {
+  border-left: 4px solid #e74c3c;
+  margin: 1rem 0;
+  padding: 0.4rem 0 0.4rem 1rem;
+  color: #555;
+  font-style: italic;
+  background: #fafafa;
+}
+.novosti-full-sodrzina a { color: #e74c3c; text-decoration: underline; }
+.novosti-full-sodrzina a:hover { color: #c0392b; }
 
 .novost-main-img {
   display: block;

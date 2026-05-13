@@ -31,6 +31,12 @@ STATIC_DIR = Path(__file__).resolve().parent / "static"
 if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
+# Frontend фајлови (за развој) - сервирани од http://localhost:8000/
+# Тоа решава Error 153 на YouTube embed-и кои не работат преку file:// протокол.
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
+if FRONTEND_DIR.exists():
+    app.mount("/app", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+
 # site ruti gi povikuvam da ne mi e se vo main
 app.include_router(lekari.router)
 app.include_router(pacienti.router)

@@ -982,6 +982,7 @@ function logoutPacient() {
   currentPacient = null;
   clearPacientFromStorage();
   updateAuthHeader();
+  if (typeof window.kbsChatReset === 'function') window.kbsChatReset(true);
 }
 
 function logoutLekar() {
@@ -989,6 +990,7 @@ function logoutLekar() {
   clearLekarFromStorage();
   closeLekarDashboardModal();
   updateAuthHeader();
+  if (typeof window.kbsChatReset === 'function') window.kbsChatReset(true);
 }
 
 /** Порака во лекарскиот панел без alert() – alert го ресетира скролот на почеток на многу прелистувачи */
@@ -2884,6 +2886,7 @@ async function loginLekar() {
     const data = await res.json();
     currentLekar = data.doctor;
     persistLekarToStorage();
+    if (typeof window.kbsChatReset === 'function') window.kbsChatReset(true);
 
     // Прикажи персонализирана порака за најавениот лекар
     const lekarIme = `${data.doctor.name} ${data.doctor.surname}`;
@@ -3811,7 +3814,45 @@ function resolveNovostSlikaUrl(p) {
 
 function formatSodrzinaForDisplay(text) {
   if (!text) return '';
+  // Ако содржината веќе е HTML (од AI или директор), рендерирај го безбедно
+  var hasHtml = /<\/?(p|br|strong|em|b|i|u|h[1-6]|ul|ol|li|a|div|span|blockquote)[\s>\/]/i.test(text);
+  if (hasHtml) {
+    return sanitizeNovostHtml(text);
+  }
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
+}
+
+// Whitelist HTML sanitizer за вестите (отстранува script, on*, javascript:)
+function sanitizeNovostHtml(html) {
+  if (!html || typeof html !== 'string') return '';
+  var template = document.createElement('template');
+  template.innerHTML = html;
+  var unsafe = template.content.querySelectorAll('script, style, iframe, object, embed, form, input, button, link, meta');
+  unsafe.forEach(function(el) { el.remove(); });
+  var all = template.content.querySelectorAll('*');
+  all.forEach(function(el) {
+    var attrs = Array.prototype.slice.call(el.attributes);
+    attrs.forEach(function(attr) {
+      var name = attr.name.toLowerCase();
+      var value = (attr.value || '').toLowerCase().trim();
+      if (name.indexOf('on') === 0) {
+        el.removeAttribute(attr.name);
+        return;
+      }
+      if ((name === 'href' || name === 'src') && value.indexOf('javascript:') === 0) {
+        el.removeAttribute(attr.name);
+      }
+    });
+  });
+  return template.innerHTML;
+}
+
+// Извлекува чист текст без HTML тагови (за excerpt)
+function stripHtmlForExcerpt(html) {
+  if (!html || typeof html !== 'string') return '';
+  var tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();
 }
 
 function getVideoInfo(url) {
@@ -3866,8 +3907,9 @@ function renderNovosti(items) {
   listEl.innerHTML = '';
   items.forEach(function(n) {
     var raw = n.sodrzina || '';
-    var excerpt = raw.substring(0, 150).replace(/\n/g, ' ');
-    if (raw.length > 150) excerpt += '...';
+    var cleanText = stripHtmlForExcerpt(raw);
+    var excerpt = cleanText.substring(0, 150);
+    if (cleanText.length > 150) excerpt += '...';
     var dateStr = n.created_at ? (n.created_at.split('T')[0] || n.created_at) : '';
     var author = [n.author_name, n.author_surname].filter(Boolean).join(' ') || 'Болница';
     var imgUrl = resolveNovostSlikaUrl(n.slika_path);
@@ -3878,7 +3920,7 @@ function renderNovosti(items) {
       '<div class="novosti-card-body">' +
       '<h3 class="novosti-card-title">' + (n.naslov || '').replace(/</g, '&lt;') + '</h3>' +
       '<p class="novosti-card-meta">' + dateStr + ' &middot; ' + author + '</p>' +
-      '<p class="novosti-card-excerpt">' + (excerpt || '').replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>' +
+      '<p class="novosti-card-excerpt">' + excerpt.replace(/</g, '&lt;').replace(/>/g, '&gt;') + '</p>' +
       '<button type="button" class="btn-primary btn-sm" onclick="openNovostViewModal(' + n.id + ')">Прочитај повеќе</button>' +
       '</div>';
     listEl.appendChild(card);
@@ -3929,9 +3971,10 @@ function openNovostViewModal(id) {
         } else {
           var eUrl = videoInfo.url.replace(/"/g, '&quot;');
           var allowAttr = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+          // referrerpolicy="origin" - спречува YouTube Error 153 кога страната е отворена преку file://.
           videoHtml =
             '<div class="novost-video-wrap" style="margin-top:1.5rem; text-align:center;">' +
-            '<iframe src="' + eUrl + '" allow="' + allowAttr + '" allowfullscreen style="max-width:100%; width:560px; height:315px; border:0; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.25);"></iframe>' +
+            '<iframe src="' + eUrl + '" referrerpolicy="origin" allow="' + allowAttr + '" allowfullscreen loading="lazy" style="max-width:100%; width:560px; height:315px; border:0; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.25);"></iframe>' +
             '</div>';
         }
       }
@@ -4545,6 +4588,7 @@ async function handleLogin(e) {
     if (currentRole === 'lekar') {
       currentLekar = data.doctor;
       persistLekarToStorage();
+      if (typeof window.kbsChatReset === 'function') window.kbsChatReset(true);
       closeAuthModal();
       displayLekarDashboard(data);
       openLekarDashboardModal();
@@ -4555,6 +4599,7 @@ async function handleLogin(e) {
     } else {
       currentPacient = data.pacient;
       persistPacientToStorage();
+      if (typeof window.kbsChatReset === 'function') window.kbsChatReset(true);
       closeAuthModal();
       updateAuthHeader();
 
@@ -4905,7 +4950,7 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
   const AI_API_URL = "http://localhost:8000/ai-chat/ask";
 
   // Функција за праќање на прашање кон backend и враќање одговор.
-  // Ако пациентот е логиран, ги праќа и неговите податоци (за закажување).
+  // Ако корисникот е логиран (пациент или лекар), ги праќа и неговите податоци.
   async function pitajAI(prashanje) {
     try {
       // Земи логиран пациент (ако постои)
@@ -4920,10 +4965,26 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
         };
       }
 
+      // Земи логиран лекар (ако постои)
+      let lekarData = null;
+      if (typeof currentLekar !== "undefined" && currentLekar && currentLekar.doctor_ID) {
+        lekarData = {
+          doctor_ID: currentLekar.doctor_ID,
+          name: currentLekar.name || "",
+          surname: currentLekar.surname || "",
+          email: currentLekar.email || "",
+          specialty: currentLekar.specialty || "",
+        };
+      }
+
       const response = await fetch(AI_API_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prashanje: prashanje, pacient: pacientData }),
+        body: JSON.stringify({
+          prashanje: prashanje,
+          pacient: pacientData,
+          lekar: lekarData,
+        }),
       });
 
       if (!response.ok) {
@@ -4972,16 +5033,42 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       if (open) input.focus();
     };
 
+    // Чистење на разговорот (нова сесија).
+    // Може и да го затвори прозорецот за да не остане отворен со стари пораки.
+    function resetChat(closePanel) {
+      messagesEl.innerHTML = "";
+      if (introEl) introEl.hidden = false;
+      if (input) input.value = "";
+      if (closePanel) {
+        setOpen(false);
+      }
+    }
+
+    // Излагај глобална функција за ресет од било кој дел на script.js
+    // (login, logout, session-expiry, итн.)
+    window.kbsChatReset = function (closePanel) {
+      resetChat(closePanel === true);
+    };
+
     launcher.addEventListener("click", function () {
       setOpen(root.dataset.open !== "true");
     });
 
     if (newChatBtn) {
       newChatBtn.addEventListener("click", function () {
-        messagesEl.innerHTML = "";
-        if (introEl) introEl.hidden = false;
+        resetChat(false);
       });
     }
+
+    // Авто-ресет кога ќе истече сесијата (session.js испраќа kbs:session-end на window)
+    window.addEventListener("kbs:session-end", function () {
+      resetChat(true);
+    });
+
+    // Авто-ресет кога друг таб ќе ја промени сесијата
+    window.addEventListener("kbs:session-sync", function () {
+      resetChat(true);
+    });
 
     form.addEventListener("submit", function (e) {
       e.preventDefault();

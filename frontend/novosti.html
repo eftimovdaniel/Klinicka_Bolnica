@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Новости поврзани со Клиничка Болница Штип</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=20260513-novosti-html" />
   <!--Stilot da ne go pravam vo css-->
   <style>
     body { padding-bottom: 2rem; }
@@ -65,17 +65,60 @@
     </div>
   </div>
 
-  <script src="session.js?v=20260512-1"></script>
+  <script src="session.js?v=20260513-ytfix"></script>
   <script>
-    var API_BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-      ? 'http://localhost:8000'
-      : (window.location.protocol + '//' + window.location.host);
+    var API_BASE = (function() {
+      var proto = window.location.protocol;
+      var host = window.location.hostname;
+      // Кога страната е отворена директно од file:// или localhost,
+      // backend-от е секогаш на http://localhost:8000.
+      if (proto === 'file:' || host === 'localhost' || host === '127.0.0.1' || host === '') {
+        return 'http://localhost:8000';
+      }
+      // Доколку е продакшн (HTTPS, домен) — користи ист host:
+      return proto + '//' + window.location.host;
+    })();
 
     function resolveNovostSlikaUrl(p) {
       if (!p || typeof p !== 'string') return '';
       var s = p.trim();
       if (s.indexOf('http://') === 0 || s.indexOf('https://') === 0) return s;
       return API_BASE + '/static/' + s;
+    }
+
+    // Дозволени тагови за вестите (AI или директор пишува HTML)
+    // Стандарт за content: p, br, strong, em, h1-h6, ul/ol/li, a, blockquote
+    // Опасни: script, iframe (освен YouTube), style, object, embed, form, on*
+    function sanitizeHtml(html) {
+      if (!html || typeof html !== 'string') return '';
+      var template = document.createElement('template');
+      template.innerHTML = html;
+      var unsafe = template.content.querySelectorAll('script, style, iframe, object, embed, form, input, button, link, meta');
+      unsafe.forEach(function(el) { el.remove(); });
+      var all = template.content.querySelectorAll('*');
+      all.forEach(function(el) {
+        var attrs = Array.prototype.slice.call(el.attributes);
+        attrs.forEach(function(attr) {
+          var name = attr.name.toLowerCase();
+          var value = (attr.value || '').toLowerCase().trim();
+          if (name.indexOf('on') === 0) {
+            el.removeAttribute(attr.name);
+            return;
+          }
+          if ((name === 'href' || name === 'src') && value.indexOf('javascript:') === 0) {
+            el.removeAttribute(attr.name);
+          }
+        });
+      });
+      return template.innerHTML;
+    }
+
+    // Извлекува чист текст (без HTML тагови) за excerpt на картичка
+    function stripHtmlForExcerpt(html) {
+      if (!html || typeof html !== 'string') return '';
+      var tmp = document.createElement('div');
+      tmp.innerHTML = html;
+      return (tmp.textContent || tmp.innerText || '').replace(/\s+/g, ' ').trim();
     }
 
     function closeNovostViewModal() {
@@ -90,6 +133,12 @@
       modal.style.display = 'block';
       function formatSodrzina(t) {
         if (!t) return '';
+        // Дали содржината веќе содржи HTML тагови (од AI објава или ручно)
+        var hasHtml = /<\/?(p|br|strong|em|b|i|u|h[1-6]|ul|ol|li|a|div|span|blockquote)[\s>\/]/i.test(t);
+        if (hasHtml) {
+          return sanitizeHtml(t);
+        }
+        // Обичен текст - escape и нов ред → <br/>
         return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br/>');
       }
       function getVideoInfo(url) {
@@ -145,9 +194,11 @@
                 '</div>';
             } else {
               var eUrl = videoInfo.url.replace(/"/g, '&quot;');
+              // referrerpolicy="origin" - праќа само домен (без полна патека).
+              // Тоа спречува YouTube Error 153 кога страната е отворена преку file://.
               videoHtml =
                 '<div class="novost-video-wrap" style="margin-top:1.5rem; text-align:center;">' +
-                '<iframe src="' + eUrl + '" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen style="max-width:100%; width:560px; height:315px; border:0; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.25);"></iframe>' +
+                '<iframe src="' + eUrl + '" referrerpolicy="origin" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen loading="lazy" style="max-width:100%; width:560px; height:315px; border:0; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.25);"></iframe>' +
                 '</div>';
             }
           }
@@ -234,8 +285,9 @@
       listEl.innerHTML = '';
       items.forEach(function(n) {
         var raw = n.sodrzina || '';
-        var excerpt = raw.substring(0, 150).replace(/\n/g, ' ');
-        if (raw.length > 150) excerpt += '...';
+        var cleanText = stripHtmlForExcerpt(raw);
+        var excerpt = cleanText.substring(0, 150);
+        if (cleanText.length > 150) excerpt += '...';
         var dateStr = n.created_at ? (n.created_at.split('T')[0] || n.created_at) : '';
         var author = [n.author_name, n.author_surname].filter(Boolean).join(' ') || 'Болница';
         var imgUrl = resolveNovostSlikaUrl(n.slika_path);
@@ -246,7 +298,7 @@
           '<div class="novosti-card-body">' +
           '<h3 class="novosti-card-title">' + (n.naslov || '').replace(/</g, '&lt;') + '</h3>' +
           '<p class="novosti-card-meta">' + dateStr + ' &middot; ' + author + '</p>' +
-          '<p class="novosti-card-excerpt">' + (excerpt || '').replace(/</g, '&lt;') + '</p>' +
+          '<p class="novosti-card-excerpt">' + excerpt.replace(/</g, '&lt;') + '</p>' +
           '<button type="button" class="btn-primary btn-sm" onclick="openNovostViewModal(' + n.id + ')">Прочитај повеќе</button>' +
           '</div>';
         listEl.appendChild(card);

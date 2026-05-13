@@ -6,3 +6,4 @@ bcrypt
 python-multipart
 reportlab
 requests
+youtube-transcript-api

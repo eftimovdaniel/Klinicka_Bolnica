@@ -1,13 +1,8 @@
 import os
 import requests
 from dotenv import load_dotenv
-
 from ai.prompts import CHAT_SYSTEM_PROMPT
-
-
 load_dotenv()
-
-
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 # Стандарден модел - llama-3.3-70b-versatile е најмоќен од бесплатните на Groq.
@@ -18,28 +13,13 @@ GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 #   - mixtral-8x7b-32768     (поголем контекст)
 #   - gemma2-9b-it           (Google open модел)
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
-
-
 def ask_ai(prashanje: str, system_prompt: str = CHAT_SYSTEM_PROMPT) -> str:
-    """
-    Праќа прашање до AI (Groq) и враќа одговор како string.
-
-    Параметри:
-        prashanje      - текст од корисникот
-        system_prompt  - упатство за AI-то (default = chat prompt)
-
-    Враќа:
-        Текстуален одговор од AI, или порака за грешка.
-    """
-
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         return "Не е поставен GROQ_API_KEY во backend/.env фајлот."
-
     prashanje = (prashanje or "").strip()
     if not prashanje:
         return "Те молам внеси прашање."
-
     # Groq користи OpenAI-compatible API
     payload = {
         "model": GROQ_MODEL,
@@ -50,12 +30,10 @@ def ask_ai(prashanje: str, system_prompt: str = CHAT_SYSTEM_PROMPT) -> str:
         "temperature": 0.5,
         "max_tokens": 800,
     }
-
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
-
     try:
         response = requests.post(
             GROQ_URL,

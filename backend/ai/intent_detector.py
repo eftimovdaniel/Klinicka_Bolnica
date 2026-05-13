@@ -24,11 +24,23 @@
 - "lokacija"          → локации на оддели
 - "kontakti"          → контакти на болницата
 - "uslugi"            → список на услуги
+- "objavi_vest"       → објави вест од YouTube линк (само директор)
 - "general"           → одговор од AI за општо прашање
 
 ВАЖНО: Редот на проверки е важен (поспецифичните прво).
 """
 
+
+# 00. ОБЈАВИ ВЕСТ (мора први - има YouTube линк или зборови за публикување)
+KLUCNI_OBJAVI_VEST = [
+    "објави вест", "објави новост", "публикувај",
+    "креирај вест", "создади вест", "напиши вест",
+    "новост од видео", "вест од видео", "вест од youtube",
+    "youtube линк", "ютуб линк",
+    "ставете на сајт", "стави на сајт",
+    # Англиски и латиница за директорот
+    "objavi vest", "publish news", "post news",
+]
 
 # 0a. ТРГНИ / ИЗБРИШИ ОЦЕНА (мора пред "оцени" и пред "откажи")
 KLUCNI_TRGNI_OCENA = [
@@ -154,8 +166,17 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
     if not prashanje:
         return None
 
+    # ВРВ (пред транслитерација): провери за YouTube линк во оригинален текст
+    # (трансли. би ги претворила www.youtube.com → ввв.јоутубе.цом)
+    orig_low = prashanje.lower().strip()
+    if "youtube.com" in orig_low or "youtu.be" in orig_low:
+        return "objavi_vest"
+
     # Автоматски преводи: латиница → кирилица
     p = transliterijaj(prashanje).lower().strip()
+
+    if _ima_zbor(p, KLUCNI_OBJAVI_VEST):
+        return "objavi_vest"
 
     # Редот е важен - поспецифичните прво
     # ВАЖНО: "тргни оцена" мора пред "оцени" (има збор „оцена" во двете)
