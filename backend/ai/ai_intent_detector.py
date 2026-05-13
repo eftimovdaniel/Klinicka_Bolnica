@@ -1,26 +1,26 @@
 """
-AI-driven intent detector со Gemini.
+AI-driven intent detector со Groq (Llama 3.3 70B).
 
 Зашто:
 - Keyword detector-от пропушта природни варијации:
     "Dali možeš da mi zakažeš pregled?" - има „закажеш" не „закажи"
     "Бих сакал да одам кај лекар" - нема јасен keyword
     "Што имам утре?" - не е во ниту еден keyword list
-- Gemini го разбира значењето, не само зборовите.
+- AI го разбира значењето, не само зборовите.
 
 Стратегија:
 - Главна функција: detektiraj_intent_so_ai(prashanje)
 - Прима природен текст, враќа intent string
-- Ако Gemini не одговори јасно → "general" (па одговара со општ AI)
+- Ако AI не одговори јасно → "general" (па одговара со општ AI)
 
 Се користи КАКО fallback или замена за keyword detektorot во intent_detector.py.
 """
 
 import re
-from ai.gemini_client import ask_gemini
+from ai.groq_client import ask_ai
 
 
-# Опис на поддржани интенти за Gemini
+# Опис на поддржани интенти за AI
 INTENT_SYSTEM_PROMPT = """
 Ти си систем што класифицира корисничко прашање во еден од следните интенти.
 Корисниците пишуваат на македонски јазик (кирилица или латиница).
@@ -88,7 +88,7 @@ VALIDNI_INTENTI = {
 
 def detektiraj_intent_so_ai(prashanje: str) -> str:
     """
-    Праша Gemini да го класифицира прашањето во еден од поддржаните интенти.
+    Праша AI (Groq) да го класифицира прашањето во еден од поддржаните интенти.
 
     Враќа: име на интент (string). При било каква грешка → "general".
     """
@@ -96,9 +96,9 @@ def detektiraj_intent_so_ai(prashanje: str) -> str:
         return "general"
 
     try:
-        odgovor = ask_gemini(prashanje.strip(), system_prompt=INTENT_SYSTEM_PROMPT)
+        odgovor = ask_ai(prashanje.strip(), system_prompt=INTENT_SYSTEM_PROMPT)
     except Exception as e:
-        print(f"[ai_intent] greshka pri Gemini: {e}")
+        print(f"[ai_intent] greshka pri AI: {e}")
         return "general"
 
     # Исчисти го одговорот
@@ -114,7 +114,7 @@ def detektiraj_intent_so_ai(prashanje: str) -> str:
     if prv_zbor in VALIDNI_INTENTI:
         return prv_zbor
 
-    # Ако Gemini врати нешто слично - barаj подниз
+    # Ако AI врати нешто слично - barаj подниз
     for v in VALIDNI_INTENTI:
         if v in cist:
             return v

@@ -16,7 +16,7 @@ import json
 import re
 from datetime import datetime, date, timedelta
 from database import get_connection
-from ai.gemini_client import ask_gemini
+from ai.groq_client import ask_ai
 
 
 POTSETNIK_EXTRACT_PROMPT = """
@@ -43,11 +43,11 @@ POTSETNIK_EXTRACT_PROMPT = """
 
 
 def izvlechi_potsetnik(prashanje: str) -> dict:
-    """Користи Gemini за извлекување."""
+    """Користи AI (Groq) за извлекување."""
     denes = date.today().strftime("%Y-%m-%d")
     full_prompt = f'Денес: {denes}\n\nКорисник: „{prashanje}"\n\nИзвлечи податоци.'
 
-    odgovor = ask_gemini(full_prompt, system_prompt=POTSETNIK_EXTRACT_PROMPT)
+    odgovor = ask_ai(full_prompt, system_prompt=POTSETNIK_EXTRACT_PROMPT)
     cist = re.sub(r"^```(?:json)?\s*", "", odgovor.strip())
     cist = re.sub(r"\s*```$", "", cist)
 

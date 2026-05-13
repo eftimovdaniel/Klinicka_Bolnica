@@ -41,7 +41,7 @@ app.include_router(uslugi.router)
 app.include_router(novosti.router)
 app.include_router(kariera.router)
 app.include_router(kariera.app_router)  # /aplikacija (пријава за оглас)
-app.include_router(ai_chat.router)  # AI чат со Gemini
+app.include_router(ai_chat.router)  # AI чат со Groq (Llama 3.3)
 
 
 @app.get("/")

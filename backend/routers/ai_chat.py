@@ -1,105 +1,160 @@
 """
-HTTP endpoint за AI чат.
+AI чат рутер - главна точка за сите AI прашања од frontend.
 
-Прима прашање + (опционално) пациент податоци од frontend.
-Според интент, рутира до соодветната функција.
+Како работи:
+1. Frontend (script.js → pitajAI) праќа POST /ai-chat/ask со {prashanje, pacient}.
+2. Овој рутер прави transliteracija (латиница → кирилица).
+3. Детектира интент (што сака корисникот) преку intent_detector
+   (keyword прво, AI fallback).
+4. Според интентот, повикува соодветен AI модул:
+       - slobodni_termini   → "Кога е слободен д-р Петров?"
+       - zakazi_termin      → "Сакам преглед кај Петров среда 10:00"
+       - otkazi_termin      → "Откажи го утрешниот преглед"
+       - prenesi_termin     → "Префрли го за петок"
+       - postavi_potsetnik  → "Потсети ме 1 ден претходно"
+       - oceni_pregled      → "Оцена 5 за д-р Петров"
+       - trgni_ocena        → "Избриши ја оцената за вчерашниот преглед"
+       - info_lekar         → "Каков е д-р Петров?"
+       - preporaka_lekar    → "Имам болка во колено - кому?"
+       - rabotno_vreme      → "Кога е отворена лабораторијата?"
+       - lokacija           → "Каде е оддел за гинекологија?"
+       - kontakti           → "На кој број за итна?"
+       - uslugi             → "Кои услуги имате?"
+       - general            → општ одговор од Groq AI
+5. Враќа {"odgovor": "..."} назад на frontend-от.
 
-Целата AI логика е во: backend/ai/
+ВАЖНО: AI операциите одат преку Groq (Llama 3.3 70B), не Gemini.
 """
 
-from typing import Optional
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from ai.gemini_client import ask_gemini
+from ai.groq_client import ask_ai
 from ai.intent_detector import detektiraj_intent
-from ai.slobodni_termini import odgovori_za_slobodni_termini
-from ai.zakazi_termin import odgovori_za_zakazuvanje
-from ai.otkazi_termin import odgovori_za_otkazuvanje
-from ai.prenesi_termin import odgovori_za_prenesuvanje
-from ai.postavi_potsetnik import odgovori_za_potsetnik
-from ai.oceni_pregled import odgovori_za_ocenuvanje
-from ai.trgni_ocena import odgovori_za_trgni_ocena
-from ai.preporaka_lekar import odgovori_za_preporaka
-from ai.info_lekar import odgovori_za_info_lekar
-from ai.bolnica_info import (
-    odgovori_za_rabotno_vreme,
-    odgovori_za_lokacija,
-    odgovori_za_kontakti,
-)
-from ai.uslugi import odgovori_za_uslugi
+from ai.transliteracija import normaliziraj_prashanje
+
+from ai import slobodni_termini
+from ai import zakazi_termin
+from ai import otkazi_termin
+from ai import prenesi_termin
+from ai import postavi_potsetnik
+from ai import oceni_pregled
+from ai import trgni_ocena
+from ai import info_lekar
+from ai import preporaka_lekar
+from ai import bolnica_info
+from ai import uslugi as uslugi_modul
 
 
 router = APIRouter(prefix="/ai-chat", tags=["AI Chat"])
 
 
 class PacientModel(BaseModel):
-    """Податоци за логиран пациент (од frontend localStorage)."""
-    pacient_ID: Optional[int] = None
-    ime: Optional[str] = None
-    prezime: Optional[str] = None
-    email: Optional[str] = None
-    telefon: Optional[str] = None
+    """Податоци за логиран пациент (опционално - frontend ги испраќа ако е логиран)."""
+    pacient_ID: int | None = None
+    ime: str | None = None
+    prezime: str | None = None
+    email: str | None = None
+    telefon: str | None = None
 
 
 class PitanjeModel(BaseModel):
+    """
+    Тело на барањето од frontend.
+    {
+      "prashanje": "Сакам преглед кај Петров утре во 10",
+      "pacient": {"pacient_ID": 1, "ime": "Даниел", ..., "email": "..."}
+    }
+    """
     prashanje: str
-    pacient: Optional[PacientModel] = None
+    pacient: PacientModel | None = None
 
 
 @router.post("/ask")
-def ask_ai(data: PitanjeModel):
+def ask(data: PitanjeModel):
     """
-    Прима: {"prashanje": "...", "pacient": {...}}
+    Главниот ендпоинт.
+    Прима: {"prashanje": "...", "pacient": {...}|null}
     Враќа: {"odgovor": "..."}
     """
 
-    prashanje = (data.prashanje or "").strip()
-    if not prashanje:
+    pitanje = (data.prashanje or "").strip()
+    if not pitanje:
         return {"odgovor": "Те молам внеси прашање."}
 
-    intent = detektiraj_intent(prashanje)
-    pacient_dict = data.pacient.model_dump() if data.pacient else None
+    # 1. Транслитерација (латиница → кирилица), ако треба
+    pitanje_norm = normaliziraj_prashanje(pitanje)
 
-    # Рутирање според интент
-    if intent == "zakazi_termin":
-        return {"odgovor": odgovori_za_zakazuvanje(prashanje, pacient_dict)}
+    # 2. Pacient како dict (за модулите што го очекуваат)
+    pacient_dict = None
+    if data.pacient and data.pacient.email:
+        pacient_dict = {
+            "pacient_ID": data.pacient.pacient_ID,
+            "ime": data.pacient.ime or "",
+            "prezime": data.pacient.prezime or "",
+            "email": data.pacient.email,
+            "telefon": data.pacient.telefon or "",
+        }
 
-    if intent == "otkazi_termin":
-        return {"odgovor": odgovori_za_otkazuvanje(prashanje, pacient_dict)}
+    # 3. Детекција на интент
+    try:
+        intent = detektiraj_intent(pitanje_norm)
+    except Exception as e:
+        print(f"[ai_chat] greshka pri detekcija na intent: {e}")
+        intent = "general"
 
-    if intent == "prenesi_termin":
-        return {"odgovor": odgovori_za_prenesuvanje(prashanje, pacient_dict)}
+    print(f"[ai_chat] pitanje={pitanje_norm!r} -> intent={intent}")
 
-    if intent == "postavi_potsetnik":
-        return {"odgovor": odgovori_za_potsetnik(prashanje, pacient_dict)}
+    # 4. Рутирање според интент
+    try:
+        if intent == "slobodni_termini":
+            odgovor = slobodni_termini.odgovori_za_slobodni_termini(pitanje_norm)
 
-    if intent == "oceni_pregled":
-        return {"odgovor": odgovori_za_ocenuvanje(prashanje, pacient_dict)}
+        elif intent == "zakazi_termin":
+            odgovor = zakazi_termin.odgovori_za_zakazuvanje(pitanje_norm, pacient_dict)
 
-    if intent == "trgni_ocena":
-        return {"odgovor": odgovori_za_trgni_ocena(prashanje, pacient_dict)}
+        elif intent == "otkazi_termin":
+            odgovor = otkazi_termin.odgovori_za_otkazuvanje(pitanje_norm, pacient_dict)
 
-    if intent == "slobodni_termini":
-        return {"odgovor": odgovori_za_slobodni_termini(prashanje)}
+        elif intent == "prenesi_termin":
+            odgovor = prenesi_termin.odgovori_za_prenesuvanje(pitanje_norm, pacient_dict)
 
-    if intent == "preporaka_lekar":
-        return {"odgovor": odgovori_za_preporaka(prashanje)}
+        elif intent == "postavi_potsetnik":
+            odgovor = postavi_potsetnik.odgovori_za_potsetnik(pitanje_norm, pacient_dict)
 
-    if intent == "info_lekar":
-        return {"odgovor": odgovori_za_info_lekar(prashanje)}
+        elif intent == "oceni_pregled":
+            odgovor = oceni_pregled.odgovori_za_ocenuvanje(pitanje_norm, pacient_dict)
 
-    if intent == "rabotno_vreme":
-        return {"odgovor": odgovori_za_rabotno_vreme(prashanje)}
+        elif intent == "trgni_ocena":
+            odgovor = trgni_ocena.odgovori_za_trgni_ocena(pitanje_norm, pacient_dict)
 
-    if intent == "lokacija":
-        return {"odgovor": odgovori_za_lokacija(prashanje)}
+        elif intent == "info_lekar":
+            odgovor = info_lekar.odgovori_za_info_lekar(pitanje_norm)
 
-    if intent == "kontakti":
-        return {"odgovor": odgovori_za_kontakti(prashanje)}
+        elif intent == "preporaka_lekar":
+            odgovor = preporaka_lekar.odgovori_za_preporaka(pitanje_norm)
 
-    if intent == "uslugi":
-        return {"odgovor": odgovori_za_uslugi(prashanje)}
+        elif intent == "rabotno_vreme":
+            odgovor = bolnica_info.odgovori_za_rabotno_vreme(pitanje_norm)
 
-    # Општо прашање → Gemini
-    return {"odgovor": ask_gemini(prashanje)}
+        elif intent == "lokacija":
+            odgovor = bolnica_info.odgovori_za_lokacija(pitanje_norm)
+
+        elif intent == "kontakti":
+            odgovor = bolnica_info.odgovori_za_kontakti(pitanje_norm)
+
+        elif intent == "uslugi":
+            odgovor = uslugi_modul.odgovori_za_uslugi(pitanje_norm)
+
+        else:
+            # general → директен повик до Groq AI
+            odgovor = ask_ai(pitanje_norm)
+
+    except Exception as e:
+        print(f"[ai_chat] greshka pri obrabotka na intent {intent}: {e}")
+        odgovor = (
+            "Се случи неочекувана грешка при обработката на прашањето. "
+            "Те молам обиди се повторно или контактирај ја рецепцијата."
+        )
+
+    return {"odgovor": odgovor}

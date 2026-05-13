@@ -13,7 +13,7 @@ import json
 import re
 from datetime import datetime, date, time
 from database import get_connection
-from ai.gemini_client import ask_gemini
+from ai.groq_client import ask_ai
 
 
 PRENESI_EXTRACT_PROMPT = """
@@ -39,13 +39,13 @@ PRENESI_EXTRACT_PROMPT = """
 
 
 def izvlechi_prenesi(prashanje: str) -> dict:
-    """Користи Gemini за извлекување на старо/ново."""
+    """Користи AI (Groq) за извлекување на старо/ново."""
     denes = date.today().strftime("%Y-%m-%d")
     denes_den = ["понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"][date.today().weekday()]
 
     full_prompt = f'Денес: {denes} ({denes_den})\n\nКорисник: „{prashanje}"\n\nИзвлечи податоци.'
 
-    odgovor = ask_gemini(full_prompt, system_prompt=PRENESI_EXTRACT_PROMPT)
+    odgovor = ask_ai(full_prompt, system_prompt=PRENESI_EXTRACT_PROMPT)
     cist = re.sub(r"^```(?:json)?\s*", "", odgovor.strip())
     cist = re.sub(r"\s*```$", "", cist)
 

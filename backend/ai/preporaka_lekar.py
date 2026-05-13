@@ -3,7 +3,7 @@
 
 Како работи:
 1. Пациент опишува болка/симптом ("Имам болка во колено").
-2. Gemini одредува која специјалност е најсоодветна.
+2. AI (Groq) одредува која специјалност е најсоодветна.
 3. Барање во Doctors табелата за лекари од таа специјалност.
 4. Враќа листа на лекари за пациентот да избере.
 
@@ -11,7 +11,7 @@
 """
 
 from database import get_connection
-from ai.gemini_client import ask_gemini
+from ai.groq_client import ask_ai
 from ai.prompts import SIMPTOM_PROMPT
 
 
@@ -74,7 +74,7 @@ def odgovori_za_preporaka(prashanje: str) -> str:
     if not specialnosti:
         return "Не успеав да најдам специјалности во базата."
 
-    # Прашај Gemini за препорака на специјалност
+    # Прашај AI за препорака на специјалност
     lista_text = "\n".join([f"- {s}" for s in specialnosti])
     full_prompt = f"""
 Достапни специјалности во болницата:
@@ -85,7 +85,7 @@ def odgovori_za_preporaka(prashanje: str) -> str:
 Која специјалност препорачуваш?
 """.strip()
 
-    odgovor = ask_gemini(full_prompt, system_prompt=SIMPTOM_PROMPT)
+    odgovor = ask_ai(full_prompt, system_prompt=SIMPTOM_PROMPT)
     odgovor_cist = odgovor.strip().upper()
 
     # Итна помош

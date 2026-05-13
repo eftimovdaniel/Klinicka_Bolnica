@@ -4906,7 +4906,7 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
 
   // Функција за праќање на прашање кон backend и враќање одговор.
   // Ако пациентот е логиран, ги праќа и неговите податоци (за закажување).
-  async function pitajGemini(prashanje) {
+  async function pitajAI(prashanje) {
     try {
       // Земи логиран пациент (ако постои)
       let pacientData = null;
@@ -5009,7 +5009,7 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       messagesEl.appendChild(typingEl);
       messagesEl.scrollTop = messagesEl.scrollHeight;
 
-      pitajGemini(text).then(function (odgovor) {
+      pitajAI(text).then(function (odgovor) {
         typingEl.remove();
         const botEl = document.createElement("p");
         botEl.className = "kbs-ai-msg kbs-ai-msg-agent";

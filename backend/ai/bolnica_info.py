@@ -12,7 +12,7 @@
 
 import json
 import os
-from ai.gemini_client import ask_gemini
+from ai.groq_client import ask_ai
 from ai.prompts import ODDEL_EXTRACT_PROMPT
 
 
@@ -33,7 +33,7 @@ def _zimi_info() -> dict:
 
 def _najdi_oddel_so_ai(prashanje: str, oddeli: list[str]) -> str | None:
     """
-    Прашува Gemini кој оддел е во прашањето.
+    Прашува AI (Groq) кој оддел е во прашањето.
     Враќа точно име на оддел или None.
     """
     lista_text = "\n".join([f"- {o}" for o in oddeli])
@@ -46,7 +46,7 @@ def _najdi_oddel_so_ai(prashanje: str, oddeli: list[str]) -> str | None:
 Кој оддел е во прашањето? Врати точно име од листата или NONE.
 """.strip()
 
-    odgovor = ask_gemini(full_prompt, system_prompt=ODDEL_EXTRACT_PROMPT)
+    odgovor = ask_ai(full_prompt, system_prompt=ODDEL_EXTRACT_PROMPT)
     odgovor_cist = odgovor.strip().replace('"', '').replace("'", "").strip()
 
     if "NONE" in odgovor_cist.upper():

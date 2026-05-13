@@ -2,17 +2,17 @@
 Барање за слободни термини кај лекар - со помош на AI.
 Како работи:
 1. Зимаме сите лекари од базата (Doctors табелата).
-2. Прашуваме Gemini: „Од прашањето кој лекар е во прашање?"
+2. Прашуваме AI (Groq): „Од прашањето кој лекар е во прашање?"
    - Му даваме листа на сите лекари + прашањето од корисникот
-   - Gemini враќа ID број на лекар или NONE
-3. Ако Gemini најде лекар, генерираме слотови (08:00-16:00, 30 мин) за 7 дена.
+   - AI враќа ID број на лекар или NONE
+3. Ако AI најде лекар, генерираме слотови (08:00-16:00, 30 мин) за 7 дена.
 4. Проверуваме кои слотови се веќе закажани во Termin_pregled.
 5. Формираме убав одговор на македонски.
 Се вика од: routers/ai_chat.py
 """
 from datetime import date, time, datetime, timedelta
 from database import get_connection
-from ai.gemini_client import ask_gemini
+from ai.groq_client import ask_ai
 from ai.prompts import LEKAR_EXTRACT_PROMPT
 
 
@@ -47,24 +47,24 @@ def zimi_site_lekari() -> list[dict]:
         if conn:
             conn.close()
 #funkcija koja so pomos na ai gi zima lekarite
-# koristam gemini i on g gleda lekarite od bazata
+# koristam Groq AI i on g gleda lekarite od bazata
 def najdi_lekar_so_ai(prashanje: str) -> dict | None:
     site_lekari = zimi_site_lekari()    # vo site_lekari se smesteni lekarite od the database
     if not site_lekari: 
         return None
 
-    # Формираме listа на лекари како текст за Gemini
+    # Формираме listа на лекари како текст за AI
     lista_text = ""
     for lekar in site_lekari:
         spec = lekar.get("specialty") or "Општа пракса"
         lista_text += f"ID {lekar['doctor_ID']}: Д-р {lekar['name']} {lekar['surname']} - {spec}\n"
 
-    # Прашање за Gemini
+    # Прашање за AI
     full_prompt = f""" Листа на лекари во болницата: {lista_text}
 Прашање од корисник: „{prashanje}" За кој лекар прашува корисникот? Врати само ID број или NONE.""".strip()
 
-    # Повикај Gemini со специјален системски prompt (само број или NONE)
-    odgovor = ask_gemini(full_prompt, system_prompt=LEKAR_EXTRACT_PROMPT)
+    # Повикај AI со специјален системски prompt (само број или NONE)
+    odgovor = ask_ai(full_prompt, system_prompt=LEKAR_EXTRACT_PROMPT)
 
     # Парсирај го одговорот - очекуваме само број или NONE
     odgovor_cist = odgovor.strip().upper().replace(".", "").replace(",", "")
@@ -212,7 +212,7 @@ def odgovori_za_slobodni_termini(prashanje: str) -> str:
     Главна точка - повикана од router-от.
 
     Параметри:
-        prashanje - целото прашање од корисникот (Gemini сам ќе извлече кој лекар)
+        prashanje - целото прашање од корисникот (AI сам ќе извлече кој лекар)
 
     Враќа: текстуален одговор за пациентот.
     """

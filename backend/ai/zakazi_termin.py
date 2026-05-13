@@ -3,7 +3,7 @@
 
 Како работи:
 1. Пациентот пишува: „Сакам преглед кај д-р Петров среда 10:00"
-2. AI (Gemini) ги извлекува: doctor_id, datum, vreme
+2. AI (Groq) ги извлекува: doctor_id, datum, vreme
 3. Проверуваме во база дали:
    - Лекарот постои
    - Терминот е во иднина
@@ -19,7 +19,7 @@ import json
 import re
 from datetime import datetime, date, time
 from database import get_connection
-from ai.gemini_client import ask_gemini
+from ai.groq_client import ask_ai
 from ai.prompts import ZAKAZI_EXTRACT_PROMPT
 from ai.slobodni_termini import zimi_site_lekari
 
@@ -31,14 +31,14 @@ RABOTNO_DO = time(15, 30)   # kraj na rabotno vreme
 
 def izvlechi_podatoci_so_ai(prashanje: str) -> dict:
     """
-    Прашува Gemini да ги извлече: лекар, датум, време од прашањето.
+    Прашува AI (Groq) да ги извлече: лекар, датум, време од прашањето.
 
     Враќа dict со 3 полиња:
     {"doctor_id": int|None, "datum": str|None, "vreme": str|None}
     """
     site_lekari = zimi_site_lekari()
 
-    # Lista na lekari koj ke gi koriste Gemini
+    # Lista na lekari koj ke gi koriste AI
     lista_text = ""
     for lekar in site_lekari:
         spec = lekar.get("specialty") or "Општа пракса" or "Општа медицина"
@@ -56,10 +56,10 @@ def izvlechi_podatoci_so_ai(prashanje: str) -> dict:
 Извлечи doctor_id, datum, vreme и врати JSON.
 """.strip()
 
-    odgovor = ask_gemini(full_prompt, system_prompt=ZAKAZI_EXTRACT_PROMPT)
-    print(f"[zakazi_termin] Gemini raw: {odgovor!r}")
+    odgovor = ask_ai(full_prompt, system_prompt=ZAKAZI_EXTRACT_PROMPT)
+    print(f"[zakazi_termin] AI raw: {odgovor!r}")
 
-    # Ако Gemini врати error-пораки (rate limit, timeout, итн.) - пропагирај
+    # Ако AI врати error-пораки (rate limit, timeout, итн.) - пропагирај
     error_indicators = [
         "Привремено сум преоптоварен",
         "Привремена грешка",
@@ -71,7 +71,7 @@ def izvlechi_podatoci_so_ai(prashanje: str) -> dict:
     if any(ind in odgovor for ind in error_indicators):
         return {"doctor_id": None, "datum": None, "vreme": None, "_error": odgovor}
 
-    # Gemini понекогаш враќа JSON во markdown ```json ... ``` - тргни го
+    # AI понекогаш враќа JSON во markdown ```json ... ``` - тргни го
     cist = odgovor.strip()
     cist = re.sub(r"^```(?:json)?\s*", "", cist)
     cist = re.sub(r"\s*```$", "", cist)

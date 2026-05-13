@@ -2,7 +2,7 @@
 Информации за конкретен лекар.
 
 Како работи:
-1. AI (Gemini) препознава за кој лекар прашува корисникот (од листа во DB).
+1. AI (Groq) препознава за кој лекар прашува корисникот (од листа во DB).
 2. Враќа: име, специјалност, email, оддел, дежурства.
 """
 
@@ -10,11 +10,8 @@ from datetime import date, timedelta
 from database import get_connection
 from ai.slobodni_termini import najdi_lekar_so_ai
 
-
+# vraka dezurstvo za daden lekar, koga toj lekar e dezuren
 def zimi_dezurstva_za_lekar(doctor_id: int, denovi_napred: int = 7) -> list[dict]:
-    """
-    Враќа дежурства за лекарот во следните N дена.
-    """
     conn = None
     try:
         conn = get_connection()
@@ -36,9 +33,8 @@ def zimi_dezurstva_za_lekar(doctor_id: int, denovi_napred: int = 7) -> list[dict
         if conn:
             conn.close()
 
-
+# Broi kolku pregledi ima zakazano daden lekar vo daden vremenski interval (denovi)
 def prebroj_zakazani_termini(doctor_id: int, denovi_napred: int = 7) -> int:
-    """Колку прегледи има закажано лекарот во следните N дена."""
     conn = None
     try:
         conn = get_connection()

@@ -17,7 +17,7 @@ import json
 import re
 from datetime import date
 from database import get_connection
-from ai.gemini_client import ask_gemini
+from ai.groq_client import ask_ai
 from ai.slobodni_termini import zimi_site_lekari
 
 
@@ -39,7 +39,7 @@ TRGNI_EXTRACT_PROMPT = """
 
 
 def izvlechi_trgni_podatoci(prashanje: str) -> dict:
-    """Користи Gemini да извлече лекар + датум за бришење оцена."""
+    """Користи AI (Groq) да извлече лекар + датум за бришење оцена."""
     site_lekari = zimi_site_lekari()
 
     lista_text = ""
@@ -61,7 +61,7 @@ def izvlechi_trgni_podatoci(prashanje: str) -> dict:
 Извлечи doctor_id и datum.
 """.strip()
 
-    odgovor = ask_gemini(full_prompt, system_prompt=TRGNI_EXTRACT_PROMPT)
+    odgovor = ask_ai(full_prompt, system_prompt=TRGNI_EXTRACT_PROMPT)
 
     cist = re.sub(r"^```(?:json)?\s*", "", odgovor.strip())
     cist = re.sub(r"\s*```$", "", cist)
