@@ -5033,9 +5033,55 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       return {
         odgovor: data.odgovor || "Не добив одговор.",
         navigacija: data.navigacija || null,
+        akcija: data.akcija || null,
       };
     } catch (err) {
       return { odgovor: "Не можам да се поврзам со серверот. Провери дали backend-от работи." };
+    }
+  }
+
+  // Извршува UI-акција побарана од backend-от (пр. отворање login форма).
+  function kbsIzvrsiAkcija(akcija) {
+    if (!akcija) return;
+    console.log("[kbs-ai] изврши акција:", akcija);
+
+    if (akcija === "otvori_pacient_login") {
+      setTimeout(function () {
+        try {
+          if (typeof window.openPacientLoginModal === "function") {
+            window.openPacientLoginModal();
+            return;
+          }
+          if (typeof window.showPacientLogin === "function") {
+            window.showPacientLogin();
+            return;
+          }
+          // Фолбек: директно отвори го модалот ако функциите ги нема
+          var modal = document.getElementById("auth-modal");
+          if (modal) {
+            modal.style.display = "block";
+            var sub = document.getElementById("auth-subtitle");
+            if (sub) sub.textContent = "Најавете се на вашиот профил";
+            var login = document.getElementById("login-form-container");
+            if (login) login.style.display = "block";
+            var reg = document.getElementById("register-form-container");
+            if (reg) reg.style.display = "none";
+            return;
+          }
+          // Последен фолбек: ако сме на страна без auth модалот, оди на index.html
+          if (!document.getElementById("auth-modal")) {
+            window.location.href = "index.html";
+          }
+        } catch (err) {
+          console.error("[kbs-ai] грешка при отворање login:", err);
+        }
+      }, 500);
+    } else if (akcija === "otvori_pacient_register") {
+      setTimeout(function () {
+        if (typeof window.showPacientRegister === "function") {
+          window.showPacientRegister();
+        }
+      }, 500);
     }
   }
 
@@ -5177,6 +5223,7 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
         typingEl.remove();
         var odgovor = (rezultat && typeof rezultat === "object") ? rezultat.odgovor : rezultat;
         var nav = (rezultat && typeof rezultat === "object") ? rezultat.navigacija : null;
+        var akc = (rezultat && typeof rezultat === "object") ? rezultat.akcija : null;
 
         const botEl = document.createElement("p");
         botEl.className = "kbs-ai-msg kbs-ai-msg-agent";
@@ -5185,6 +5232,7 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
         messagesEl.scrollTop = messagesEl.scrollHeight;
 
         if (nav) kbsIzvrsiNavigacija(nav);
+        if (akc) kbsIzvrsiAkcija(akc);
       });
     });
   }

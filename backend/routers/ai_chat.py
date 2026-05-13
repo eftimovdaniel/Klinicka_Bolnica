@@ -166,6 +166,7 @@ def ask(data: PitanjeModel):
     # Резервни променливи за дополнителни полиња во одговорот
     nav_info: dict | None = None
     nov_kontekst: dict | None = None
+    akcija: str | None = None
 
     # 4. Рутирање според интент
     try:
@@ -257,6 +258,7 @@ def ask(data: PitanjeModel):
             )
             odgovor = rezultat_apl.get("odgovor", "")
             nov_kontekst = rezultat_apl.get("kontekst")
+            akcija = rezultat_apl.get("akcija")
 
         else:
             # general → директен повик до Groq AI
@@ -272,6 +274,8 @@ def ask(data: PitanjeModel):
     rezultat: dict = {"odgovor": odgovor}
     if nav_info:
         rezultat["navigacija"] = nav_info
+    if akcija:
+        rezultat["akcija"] = akcija
     # Враќаме kontekst (може и null) за да фронтот експлицитно знае дали
     # треба да го памти за следно прашање или да го избрише.
     rezultat["kontekst"] = nov_kontekst

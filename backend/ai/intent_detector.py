@@ -367,12 +367,21 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
     )
     ima_kreiraj = any(w in p for w in KREIRAJ_RECI)
 
-    # Дирекно „кариер/вработувањ/слободни работни/слободни позиции" – секогаш навигација
+    # Дирекно „кариер/вработувањ/слободни работни/работни позиции" – секогаш навигација
     if not ima_kreiraj and any(w in p for w in (
         "кариер", "вработувањ", "вработување",
         "слободни позиции", "слободни работни", "работни места",
-        "kariera", "vrabotuvanje", "vrabotuvanj"
+        "работни позиции", "работна позиција",
+        "kariera", "vrabotuvanje", "vrabotuvanj",
+        "rabotni pozicii", "rabotna pozicija",
     )):
+        return "navigacija"
+
+    # Флексибилно: „позиц" + („отворен/слобод/актив/работн/нови")
+    # (пр. „има ли отворени позиции", „кои позиции се отворени")
+    if not ima_kreiraj and "позиц" in p and any(
+        w in p for w in ("отвор", "слобод", "актив", "работн", "нови ", "достапн")
+    ):
         return "navigacija"
 
     # „Аплицирам / пријавувам за работа за X" – AI агент води разговор
