@@ -26,6 +26,10 @@ AI чат рутер - главна точка за сите AI прашања �
        - zatvori_oglas      → "Затвори го огласот за кардиолог" (само директор)
        - promeni_dezurstvo  → "Префрли го д-р Петров за петок" (само директор)
        - statistika_oddeli  → "Кои се најпопуларни оддели?" (само директор)
+       - zavrshi_pregled    → "Заврши го прегледот на Иванов" (лекар)
+       - istorija_pacient   → "Колку пати беше Иванов кај мене?" (лекар)
+       - karton_pacient     → "Дај ми картон на Иванов" (лекар)
+       - moja_statistika    → "Колку прегледи имам?" (лекар)
        - general            → општ одговор од Groq AI
 5. Враќа {"odgovor": "..."} назад на frontend-от.
 
@@ -56,6 +60,11 @@ from ai import izbrisi_vest_oglas
 from ai import zatvori_oglas
 from ai import promeni_dezurstvo
 from ai import statistika_oddeli
+from ai import zavrshi_pregled
+from ai import istorija_pacient
+from ai import karton_pacient
+from ai import moja_statistika
+from ai import moj_raspored
 
 
 router = APIRouter(prefix="/ai-chat", tags=["AI Chat"])
@@ -200,6 +209,21 @@ def ask(data: PitanjeModel):
 
         elif intent == "statistika_oddeli":
             odgovor = statistika_oddeli.odgovori_za_statistika(pitanje_norm, lekar_dict)
+
+        elif intent == "zavrshi_pregled":
+            odgovor = zavrshi_pregled.odgovori_za_zavrshi(pitanje_norm, lekar_dict)
+
+        elif intent == "istorija_pacient":
+            odgovor = istorija_pacient.odgovori_za_istorija(pitanje_norm, lekar_dict)
+
+        elif intent == "karton_pacient":
+            odgovor = karton_pacient.odgovori_za_karton(pitanje_norm, lekar_dict)
+
+        elif intent == "moja_statistika":
+            odgovor = moja_statistika.odgovori_za_moja_statistika(pitanje_norm, lekar_dict)
+
+        elif intent == "moj_raspored":
+            odgovor = moj_raspored.odgovori_za_raspored(pitanje_norm, lekar_dict)
 
         else:
             # general → директен повик до Groq AI
