@@ -3,7 +3,7 @@ import re
 from datetime import date, datetime, timedelta
 from typing import Optional
 from database import get_connection
-from ai.groq_client import ask_ai
+from ai._kernel.groq_client import ask_ai
 
 
 # Системски prompt за извлекување оглас податоци
