@@ -36,6 +36,8 @@ AI чат рутер - главна точка за сите AI прашања �
 ВАЖНО: AI операциите одат преку Groq (Llama 3.3 70B), не Gemini.
 """
 
+import re
+
 from fastapi import APIRouter
 from pydantic import BaseModel
 
@@ -150,13 +152,14 @@ def ask(data: PitanjeModel):
         }
 
     # 3. Детекција на интент
-    # Ако фронтот ни прати активен kontekst (повеќестепен flow),
-    # форсирај го интентот од контекстот за да го продолжиме разговорот.
-    aktiven_kontekst = None
-    if isinstance(data.kontekst, dict) and data.kontekst.get("intent"):
-        aktiven_kontekst = data.kontekst
-        intent = data.kontekst.get("intent")
-        print(f"[ai_chat] продолжуваме kontekst intent={intent}")
+    # Контекст од фронтот: целосно преземање на интент САМО за апликација за работа
+    # (повеќестепен дијалог). За „слободни → закажи“ се чува zakazi_od_slobodni без да се
+    # прескокне детекцијата — zakazi_termin го спојува со пораката.
+    aktiven_kontekst = data.kontekst if isinstance(data.kontekst, dict) else None
+
+    if aktiven_kontekst and aktiven_kontekst.get("intent") == "apliciraj_za_rabota":
+        intent = "apliciraj_za_rabota"
+        print(f"[ai_chat] продолжуваме kontekst intent=apliciraj_za_rabota")
     else:
         try:
             intent = detektiraj_intent(pitanje_norm)
@@ -169,6 +172,17 @@ def ask(data: PitanjeModel):
     if intent == "moj_raspored" and pacient_dict and not lekar_dict:
         intent = "moi_pregledi"
 
+    # По листа со слободни термини: кратка порака („во 10:30“, „закажи…“) → закажување
+    if (
+        aktiven_kontekst
+        and aktiven_kontekst.get("zakazi_od_slobodni")
+        and intent == "general"
+    ):
+        q = pitanje_norm.lower()
+        if re.search(r"\b\d{1,2}\s*[:.]\s*\d{2}\b", q) or re.search(r"\bво\s+\d{1,2}\b", q) or "закаж" in q:
+            intent = "zakazi_termin"
+            print("[ai_chat] general -> zakazi_termin (контекст од слободни термини)")
+
     print(f"[ai_chat] pitanje={pitanje_norm!r} -> intent={intent}")
 
     # Резервни променливи за дополнителни полиња во одговорот
@@ -179,10 +193,27 @@ def ask(data: PitanjeModel):
     # 4. Рутирање според интент
     try:
         if intent == "slobodni_termini":
-            odgovor = slobodni_termini.odgovori_za_slobodni_termini(pitanje_norm)
+            raw_s = slobodni_termini.odgovori_za_slobodni_termini(pitanje_norm)
+            if isinstance(raw_s, dict):
+                odgovor = raw_s.get("odgovor", "")
+                nov_kontekst = raw_s.get("kontekst")
+            else:
+                odgovor = raw_s
 
         elif intent == "zakazi_termin":
-            odgovor = zakazi_termin.odgovori_za_zakazuvanje(pitanje_norm, pacient_dict)
+            raw_z = zakazi_termin.odgovori_za_zakazuvanje(
+                pitanje_norm, pacient_dict, aktiven_kontekst
+            )
+            if isinstance(raw_z, dict):
+                odgovor = raw_z.get("odgovor", "")
+                if raw_z.get("akcija"):
+                    akcija = raw_z["akcija"]
+                if "kontekst" in raw_z:
+                    nov_kontekst = raw_z["kontekst"]
+            else:
+                odgovor = raw_z
+                if aktiven_kontekst and aktiven_kontekst.get("zakazi_od_slobodni"):
+                    nov_kontekst = aktiven_kontekst
 
         elif intent == "otkazi_termin":
             odgovor = otkazi_termin.odgovori_za_otkazuvanje(pitanje_norm, pacient_dict)

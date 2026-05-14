@@ -29,6 +29,48 @@ RABOTNO_OD = time(8, 0)     # pocetok na rabotno vreme
 RABOTNO_DO = time(15, 30)   # kraj na rabotno vreme 
 
 
+def _normalize_doctor_id(v) -> int | None:
+    if v is None:
+        return None
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return None
+
+
+def _spoi_zakazi_so_slobodni_kontekst(
+    prashanje: str,
+    izvleceno: dict,
+    kontekst: dict | None,
+) -> None:
+    """Дополнува doctor_id/datum од конверзација по слободни термини (in-place)."""
+    if not kontekst:
+        return
+    zos = kontekst.get("zakazi_od_slobodni")
+    if not isinstance(zos, dict):
+        return
+    p = (prashanje or "").lower()
+    izbran = any(
+        x in p
+        for x in (
+            "избраниот",
+            "избраниов",
+            "истиот",
+            "истиов",
+            "погоре",
+            "од листата",
+            "од горе",
+        )
+    )
+    nid = _normalize_doctor_id(zos.get("doctor_id"))
+    if nid is not None and (not izvleceno.get("doctor_id") or izbran):
+        izvleceno["doctor_id"] = nid
+    if not izvleceno.get("datum") and zos.get("datum"):
+        d = str(zos["datum"]).strip()[:10]
+        if d:
+            izvleceno["datum"] = d
+
+
 def izvlechi_podatoci_so_ai(prashanje: str) -> dict:
     """
     Прашува AI (Groq) да ги извлече: лекар, датум, време од прашањето.
@@ -173,50 +215,68 @@ def vmetni_termin_vo_baza(
 
 
 def formatiraj_potvrda(ime_pacient: str, ime_lekar: str, specialty: str, datum_str: str, vreme_str: str) -> str:
-    """Текст за чет потврда."""
+    """Текст потврда за корисникот — повеќе реченици, јасна сумаризација."""
     DENOVI = ["Понеделник", "Вторник", "Среда", "Четврток", "Петок", "Сабота", "Недела"]
     dt = datetime.strptime(datum_str, "%Y-%m-%d").date()
     den_ime = DENOVI[dt.weekday()]
     datum_lep = dt.strftime("%d.%m.%Y")
 
     return (
-        f"Терминот е успешно закажан!\n\n"
+        "Задачата за закажување е успешно завршена. Еве што е направено во системот.\n\n"
         f"Пациент: {ime_pacient}\n"
         f"Лекар: Д-р {ime_lekar}\n"
         f"Специјалност: {specialty}\n"
         f"Датум: {den_ime}, {datum_lep}\n"
         f"Време: {vreme_str}\n\n"
-        f"Потврда е испратена на е-пошта."
+        "Потврда е испратена на твојата е-пошта ако е поставен SMTP на серверот. "
+        "Ако сакаш промена (откажување или преместување), напиши со свои зборови — "
+        "агентот ги препознава формулациите „откажи термин“, „префрли на друг ден“ и слично."
     )
 
 
-def odgovori_za_zakazuvanje(prashanje: str, pacient: dict | None) -> str:
+def odgovori_za_zakazuvanje(
+    prashanje: str,
+    pacient: dict | None,
+    kontekst: dict | None = None,
+) -> str | dict:
     """
     Главна точка - повикана од router-от.
 
     Параметри:
         prashanje - целото прашање
         pacient   - dict со пациент податоци од frontend, или None ако не е логиран
+        kontekst  - опционално од претходен одговор (на пр. zakazi_od_slobodni по листа слободни)
 
-    Враќа: текстуален одговор за пациентот.
+    Враќа: текст (str) или dict со „odgovor“, опционално „akcija“, опционално „kontekst“ (None = избриши го на фронтот).
     """
-    # Проверка дали пациентот е логиран
+    # Проверка дали пациентот е логиран — фронтот ја отвора формата за најава како пациент
     if not pacient or not pacient.get("email"):
-        return (
-            'За да закажеш термин преку AI асистентот, мораш прво да се најавиш '
-            'како пациент. Кликни на копчето „Најави се!" горе десно.'
-        )
+        return {
+            "odgovor": (
+                "За да закажам термин во твое име, треба да се најавиш како пациент "
+                "(системот ги користи твоето име, е-пошта и телефон од профилот).\n\n"
+                "Ти ја отворам формата за најава — по најавата повтори ја истата наредба; "
+                "можеш и поинаку, на пример „закажи ми преглед“ или „сакам термин кај…“."
+            ),
+            "akcija": "otvori_pacient_login",
+            "kontekst": None,
+        }
 
     # AI извлекува податоци
     izvleceno = izvlechi_podatoci_so_ai(prashanje)
+    _spoi_zakazi_so_slobodni_kontekst(prashanje, izvleceno, kontekst)
 
     # Ако имало AI грешка (rate limit, timeout) - врати ја директно на корисникот
     if izvleceno.get("_error"):
         return izvleceno["_error"]
 
-    doctor_id = izvleceno.get("doctor_id")
+    doctor_id = _normalize_doctor_id(izvleceno.get("doctor_id"))
     datum_str = izvleceno.get("datum")
     vreme_str = izvleceno.get("vreme")
+    if datum_str is not None:
+        datum_str = str(datum_str).strip()[:10] if str(datum_str).strip() else None
+    if vreme_str is not None:
+        vreme_str = str(vreme_str).strip()[:5] if str(vreme_str).strip() else None
 
     # Што недостасува? Поспецифична порака според комбинацијата:
     ima_lekar = bool(doctor_id)
@@ -237,9 +297,11 @@ def odgovori_za_zakazuvanje(prashanje: str, pacient: dict | None) -> str:
     # Сите три недостасуваат → најмалку информации
     if not ima_lekar and not ima_datum and not ima_vreme:
         return (
-            'За да закажам термин, потребно ми е да знам: лекар, датум и време.\n\n'
+            "Го разбирам барањето како закажување на преглед, но недостасуваат клучни податоци.\n\n"
+            "Потребни се: лекар (име или презиме), датум и време. "
+            "Можеш да ги кажеш во една реченица или во повеќе пораки — агентот ги собира.\n\n"
             'Пример: „Сакам преглед кај д-р Петров среда во 10:00"\n'
-            'или: „Закажи кај Серафимов утре во 12:30"'
+            'или: „Закажи кај Серафимов утре во 12:30".'
         )
 
     # Имаме само лекар - прашај за датум и време
@@ -270,6 +332,11 @@ def odgovori_za_zakazuvanje(prashanje: str, pacient: dict | None) -> str:
 
     # Имаме датум и/или време, нема лекар
     if not ima_lekar:
+        if kontekst and isinstance(kontekst.get("zakazi_od_slobodni"), dict):
+            return (
+                'Не го препознавам лекарот од пораката. Кажи го презимето или избери од листата '
+                'со слободни термини погоре, на пример „кај Захариев во 10:30".'
+            )
         return (
             'Кај кој лекар сакаш да закажеш термин? Кажи го името и презимето.\n\n'
             'Пример: „кај д-р Петров", „кај Александар Серафимов"\n\n'
@@ -286,10 +353,16 @@ def odgovori_za_zakazuvanje(prashanje: str, pacient: dict | None) -> str:
         return "Неважечки формат на датум."
 
     if datum_obj < date.today():
-        return "Не може да закажеш термин во минатото. Избери иден датум."
+        return {
+            "odgovor": "Не може да закажеш термин во минатото. Избери иден датум.",
+            "kontekst": kontekst,
+        }
 
     if datum_obj.weekday() >= 5:
-        return "Не се закажуваат прегледи во сабота и недела. Избери друг ден."
+        return {
+            "odgovor": "Не се закажуваат прегледи во сабота и недела. Избери друг ден.",
+            "kontekst": kontekst,
+        }
 
     # Валидација на време
     try:
@@ -298,14 +371,22 @@ def odgovori_za_zakazuvanje(prashanje: str, pacient: dict | None) -> str:
         return "Неважечки формат на време."
 
     if vreme_obj < RABOTNO_OD or vreme_obj > RABOTNO_DO:
-        return f"Работно време е од {RABOTNO_OD.strftime('%H:%M')} до {RABOTNO_DO.strftime('%H:%M')}."
+        return {
+            "odgovor": (
+                f"Работно време е од {RABOTNO_OD.strftime('%H:%M')} до {RABOTNO_DO.strftime('%H:%M')}."
+            ),
+            "kontekst": kontekst,
+        }
 
     # Проверка дали е слободен
     if not proveri_dali_e_slobodno(doctor_id, datum_str, vreme_str):
-        return (
-            'Тој термин е веќе зафатен. Те молам прашај за слободни термини '
-            'со „Кога е слободен д-р [презиме]?" и обиди се повторно.'
-        )
+        return {
+            "odgovor": (
+                'Тој термин е веќе зафатен. Те молам прашај за слободни термини '
+                'со „Кога е слободен д-р [презиме]?" и обиди се повторно.'
+            ),
+            "kontekst": kontekst,
+        }
 
     # Состави име на пациент
     ime_pacient = (
@@ -329,7 +410,10 @@ def odgovori_za_zakazuvanje(prashanje: str, pacient: dict | None) -> str:
     )
 
     if not uspesh:
-        return f"Не успеа закажувањето: {greshka}"
+        return {
+            "odgovor": f"Не успеа закажувањето: {greshka}",
+            "kontekst": kontekst,
+        }
 
     # Прати email потврда (го користиме постоечкиот SMTP код)
     try:
@@ -344,10 +428,13 @@ def odgovori_za_zakazuvanje(prashanje: str, pacient: dict | None) -> str:
     except Exception as e:
         print(f"[zakazi_termin] email greshka: {e}")
 
-    return formatiraj_potvrda(
-        ime_pacient=ime_pacient,
-        ime_lekar=info["ime_lekar"],
-        specialty=info["specialty"],
-        datum_str=datum_str,
-        vreme_str=vreme_str,
-    )
+    return {
+        "odgovor": formatiraj_potvrda(
+            ime_pacient=ime_pacient,
+            ime_lekar=info["ime_lekar"],
+            specialty=info["specialty"],
+            datum_str=datum_str,
+            vreme_str=vreme_str,
+        ),
+        "kontekst": None,
+    }

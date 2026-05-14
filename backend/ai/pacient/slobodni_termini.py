@@ -5,15 +5,20 @@
 2. Прашуваме AI (Groq): „Од прашањето кој лекар е во прашање?"
    - Му даваме листа на сите лекари + прашањето од корисникот
    - AI враќа ID број на лекар или NONE
-3. Ако AI најде лекар, генерираме слотови (08:00-16:00, 30 мин) за 7 дена.
-4. Проверуваме кои слотови се веќе закажани во Termin_pregled.
-5. Формираме убав одговор на македонски.
+3. Од прашањето се извлекува опционален датум (на пр. „следниот понеделник“, „слободен понеделник“,
+   ден на крај од реченицата, „утре“) — локално. Ако има датум, се прикажуваат слотови само за тој ден.
+4. Инаку: генерираме слотови (08:00-16:00, 30 мин) за 7 дена од денес.
+5. Проверуваме кои слотови се веќе закажани во Termin_pregled.
+6. Формираме убав одговор на македонски.
 Се вика од: routers/ai_chat.py
 """
+import re
 from datetime import date, time, datetime, timedelta
+
 from database import get_connection
 from ai._kernel.groq_client import ask_ai
 from ai._kernel.prompts import LEKAR_EXTRACT_PROMPT
+from ai._kernel.transliteracija import transliterijaj
 
 
 # Работно време (може да го менуваш)
@@ -22,6 +27,165 @@ RABOTNO_VREME_DO = time(16, 0)   # kraj na rabotno vreme do 16:00
 TRAENJE_TERMIN_MINUTI = 30       # sekoj termin trae 30 minuti
 DENOVI_NAPRED = 7
 MAX_TERMINI = 8                  # MAX broj na termini vo eden den
+
+# Име на ден (кирилица, после транслит.) → weekday 0=пон … 6=нед
+_DEN_WD = {
+    "понеделник": 0,
+    "вторник": 1,
+    "среда": 2,
+    "четврток": 3,
+    "петок": 4,
+    "сабота": 5,
+    "недела": 6,
+}
+# Подолги имиња први за алтернација (на пр. „четврток“ пред „петок“).
+_DEN_ALT = "|".join(sorted(_DEN_WD.keys(), key=len, reverse=True))
+
+_SLEDEN_DEN_RE = re.compile(
+    rf"(?:следниот|наредниот|следен|нареден|за|во)\s+({_DEN_ALT})",
+    re.IGNORECASE,
+)
+_OVAA_DEN_RE = re.compile(
+    rf"(?:оваа|овиот|овој)\s+({_DEN_ALT})",
+    re.IGNORECASE,
+)
+# „слободен понеделник“, „има ли термин во петок“ — без „следниот“
+_KONTEXT_I_DEN_RE = re.compile(
+    rf"(?:(?:слободен|слободна|слободни|слободно)\w*\s+(?:во\s+)?"
+    rf"|(?:термин(?:и)?)\s+(?:во\s+)?"
+    rf"|(?:има\s+ли)\s+термин\s+(?:во\s+)?)"
+    rf"({_DEN_ALT})\b",
+    re.IGNORECASE,
+)
+_DATUM_BROJ_RE = re.compile(
+    r"(?:на|за)\s+(\d{1,2})[\./\-](\d{1,2})(?:[\./\-](\d{2,4}))?",
+    re.IGNORECASE,
+)
+_ISO_DATUM_RE = re.compile(r"\b(20\d{2})-(\d{1,2})-(\d{1,2})\b")
+
+
+def _den_od_match(m: re.Match) -> str | None:
+    g = (m.group(1) or "").lower()
+    return g if g in _DEN_WD else None
+
+
+def _den_na_kraj_od_prashanje(p: str) -> str | None:
+    """
+    Ден во неделата на крај од прашањето („… Захариев понеделник?“),
+    само ако има јасен контекст за термини/слободно време.
+    """
+    p2 = p.strip().rstrip("?!. ")
+    _kontekst_den = re.compile(
+        r"\b(кога|слободен|слободна|слободни|слободно|термин|има\s+ли|"
+        r"нареден|наредниот|наредна|следен|следниот|следна)\b",
+        re.IGNORECASE,
+    )
+    for ime in sorted(_DEN_WD.keys(), key=len, reverse=True):
+        if not p2.endswith(ime):
+            continue
+        pred = p2[: len(p2) - len(ime)]
+        if _kontekst_den.search(pred):
+            return ime
+    return None
+
+
+def _sleden_takov_kalendarski_den(denes: date, ime_den: str) -> date:
+    """
+    Нареден календарски ден со тоа име (0=пон … 6=нед).
+
+    Примери: ако денес е недела и бараат понеделник → утре (+1).
+    Ако денес е вторник и бараат понеделник → наредниот понеделник (+6), не вчерашниот.
+    Ако денес е истиот ден (на пр. понеделник → понеделник) → следната недела (+7).
+    """
+    twd = _DEN_WD[ime_den]
+    dwd = denes.weekday()
+    days = (twd - dwd) % 7
+    if days == 0:
+        days = 7
+    return denes + timedelta(days=days)
+
+
+def _ovaa_nedela_den(denes: date, ime_den: str) -> date:
+    """„Оваа среда“ = среда од тековната недела; ако е минато, следната недела."""
+    twd = _DEN_WD[ime_den]
+    pocetok = denes - timedelta(days=denes.weekday())
+    cand = pocetok + timedelta(days=twd)
+    if cand < denes:
+        cand += timedelta(days=7)
+    return cand
+
+
+def _parsiraj_dd_mm_gggg(denes: date, d: int, m: int, g: int | None) -> date | None:
+    god = g if g is not None else denes.year
+    if god < 100:
+        god += 2000
+    try:
+        out = date(god, m, d)
+    except ValueError:
+        return None
+    if out < denes:
+        if g is None and m >= denes.month:
+            try:
+                out = date(denes.year + 1, m, d)
+            except ValueError:
+                return None
+        elif out < denes:
+            return None
+    return out
+
+
+def cilj_datum_lokalno(prashanje: str) -> date | None:
+    """Брзо препознавање на датум во прашање (кирилица по транслит.)."""
+    p = transliterijaj(prashanje).lower()
+    denes = date.today()
+
+    if "задутре" in p or "задутра" in p:
+        return denes + timedelta(days=2)
+    if re.search(r"\bутре\b", p):
+        return denes + timedelta(days=1)
+
+    m = _OVAA_DEN_RE.search(p)
+    if m:
+        ime = _den_od_match(m)
+        if ime:
+            return _ovaa_nedela_den(denes, ime)
+
+    m = _SLEDEN_DEN_RE.search(p)
+    if m:
+        ime = _den_od_match(m)
+        if ime:
+            return _sleden_takov_kalendarski_den(denes, ime)
+
+    m = _KONTEXT_I_DEN_RE.search(p)
+    if m:
+        ime = _den_od_match(m)
+        if ime:
+            return _sleden_takov_kalendarski_den(denes, ime)
+
+    ime_kraj = _den_na_kraj_od_prashanje(p)
+    if ime_kraj:
+        return _sleden_takov_kalendarski_den(denes, ime_kraj)
+
+    m = _ISO_DATUM_RE.search(prashanje)
+    if m:
+        try:
+            out = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+            return out if out >= denes else None
+        except ValueError:
+            pass
+
+    m = _DATUM_BROJ_RE.search(p)
+    if m:
+        d, mo = int(m.group(1)), int(m.group(2))
+        g = int(m.group(3)) if m.group(3) else None
+        return _parsiraj_dd_mm_gggg(denes, d, mo, g)
+
+    return None
+
+
+def izvleci_cilj_datum_za_slobodni(prashanje: str) -> date | None:
+    """Датум наведен во прашањето (локално); без датум → првите слотови од денес."""
+    return cilj_datum_lokalno(prashanje)
 
 
 # gi zemame site lekari od the database
@@ -60,8 +224,14 @@ def najdi_lekar_so_ai(prashanje: str) -> dict | None:
         lista_text += f"ID {lekar['doctor_ID']}: Д-р {lekar['name']} {lekar['surname']} - {spec}\n"
 
     # Прашање за AI
-    full_prompt = f""" Листа на лекари во болницата: {lista_text}
-Прашање од корисник: „{prashanje}" За кој лекар прашува корисникот? Врати само ID број или NONE.""".strip()
+    full_prompt = f""" Листа на лекари во болницата:
+{lista_text}
+
+Прашање од корисникот: „{prashanje}"
+
+За кој лекар се однесува прашањето (слободни термини, закажување, преглед кај лекар)?
+Име може да биде нецелосно или на латиница. Ако се спомнуваат повеќе лекари, земи го најрелевантниот.
+Врати само ID број или NONE.""".strip()
 
     # Повикај AI со специјален системски prompt (само број или NONE)
     odgovor = ask_ai(full_prompt, system_prompt=LEKAR_EXTRACT_PROMPT)
@@ -73,7 +243,6 @@ def najdi_lekar_so_ai(prashanje: str) -> dict | None:
         return None
 
     # Извлечи го првиот број од одговорот
-    import re
     match = re.search(r"\d+", odgovor_cist)
     if not match:
         return None
@@ -147,13 +316,33 @@ def najdi_zafateni_slotovi(doctor_id: int, od_datum: date, do_datum: date) -> se
             conn.close()
 
 
-def pronajdi_slobodni_termini(doctor_id: int) -> list[datetime]:
+def pronajdi_slobodni_termini(doctor_id: int, na_datum: date | None = None) -> list[datetime]:
     """
-    Главна функција - наоѓа слободни слотови за лекар во следните 7 дена.
+    Слободни слотови за лекар.
+    - Ако na_datum е зададен: само за тој календарски ден (работен ден).
+    - Инаку: првите MAX_TERMINI слотови во следните DENOVI_NAPRED дена од денес.
     """
     denes = date.today()
-    do_datum = denes + timedelta(days=DENOVI_NAPRED)
+    if na_datum is not None and na_datum < denes:
+        na_datum = None
 
+    if na_datum is not None:
+        if na_datum.weekday() >= 5:
+            return []
+
+        zafateni = najdi_zafateni_slotovi(doctor_id, na_datum, na_datum)
+        slobodni: list[datetime] = []
+        for slot_datetime in generiraj_slotovi_za_den(na_datum):
+            if slot_datetime < datetime.now():
+                continue
+            slot_vreme = slot_datetime.time()
+            if (na_datum, slot_vreme) not in zafateni:
+                slobodni.append(slot_datetime)
+                if len(slobodni) >= MAX_TERMINI:
+                    break
+        return slobodni
+
+    do_datum = denes + timedelta(days=DENOVI_NAPRED)
     zafateni = najdi_zafateni_slotovi(doctor_id, denes, do_datum)
 
     slobodni = []
@@ -175,9 +364,14 @@ def pronajdi_slobodni_termini(doctor_id: int) -> list[datetime]:
     return slobodni
 
 
-def formatiraj_odgovor(lekar: dict, slobodni: list[datetime]) -> str:
+def formatiraj_odgovor(
+    lekar: dict,
+    slobodni: list[datetime],
+    na_datum: date | None = None,
+) -> str:
     """
-    Формира убава порака на македонски, групирано по ден.
+    Формира порака на македонски, групирано по ден.
+    Листа по ден + следен чекор (без долг вовед).
     """
     DENOVI = [
         "Понеделник", "Вторник", "Среда", "Четврток",
@@ -186,10 +380,29 @@ def formatiraj_odgovor(lekar: dict, slobodni: list[datetime]) -> str:
 
     ime = f"Д-р {lekar['name']} {lekar['surname']}"
     specialnost = lekar.get("specialty") or "Општа пракса"
-    zaglavie = f"{ime} - {specialnost}"
+    uvod = f"{ime} — {specialnost}\n"
 
     if not slobodni:
-        return f"{zaglavie}\n\nНема слободни термини во следните 7 дена."
+        if na_datum is not None and na_datum.weekday() >= 5:
+            return (
+                uvod
+                + f"\n{na_datum.strftime('%d.%m.%Y')} е викенд — прегледи се само во работни денови.\n\n"
+                + "Прашај за конкретен работен ден (на пр. „следниот понеделник“) или без датум за првите слободни термини."
+            )
+        if na_datum is not None:
+            return (
+                uvod
+                + f"\nЗа {DENOVI[na_datum.weekday()]}, {na_datum.strftime('%d.%m.%Y')} "
+                + "немам пронајдено слободни термини.\n\n"
+                + "Пробај друг ден или прашај без конкретен датум за првите слободни места во наредните денови."
+            )
+        return (
+            uvod
+            + "\nЗа избраниот период немам пронајдено слободни термини.\n\n"
+            + "Можеш да пробаш со друг лекар или да ме прашаш повторно со појасно име. "
+            + "Ако сакаш веднаш да закажеш конкретен датум и време, кажи на пример: "
+            + "„Сакам преглед кај [презиме на лекар] на 2026-05-15 во 10:00“."
+        )
 
     # Групирај термини по датум
     po_den = {}
@@ -197,35 +410,59 @@ def formatiraj_odgovor(lekar: dict, slobodni: list[datetime]) -> str:
         kluc = (dt.date(), dt.weekday())
         po_den.setdefault(kluc, []).append(dt.strftime("%H:%M"))
 
-    delovi = [zaglavie, "", "Слободни термини:"]
+    if na_datum is not None:
+        zaglavie = f"Слободни термини за {DENOVI[na_datum.weekday()]}, {na_datum.strftime('%d.%m.%Y')}:"
+    else:
+        zaglavie = "Слободни термини (приказ по ден):"
+
+    delovi = [uvod, "", zaglavie]
     for (datum, weekday), casovi in po_den.items():
         den_ime = DENOVI[weekday]
         datum_str = datum.strftime("%d.%m.%Y")
         casovi_str = ", ".join(casovi)
-        delovi.append(f"{den_ime}, {datum_str}: {casovi_str}")
+        delovi.append(f"• {den_ime}, {datum_str}: {casovi_str}")
 
+    delovi.append(
+        "\nСледен чекор: одбери датум и време од листата и напиши, на пример: "
+        f"„Закажи ми кај {lekar['surname']} на {list(po_den.keys())[0][0].strftime('%Y-%m-%d')} во {list(po_den.values())[0][0]}“. "
+        "Можеш и со други зборови со иста смисла — агентот ги разбира како закажување."
+    )
     return "\n".join(delovi)
 
 
-def odgovori_za_slobodni_termini(prashanje: str) -> str:
+def odgovori_za_slobodni_termini(prashanje: str) -> str | dict:
     """
     Главна точка - повикана од router-от.
 
     Параметри:
         prashanje - целото прашање од корисникот (AI сам ќе извлече кој лекар)
 
-    Враќа: текстуален одговор за пациентот.
+    Враќа: текст или dict со „odgovor“ и „kontekst“ (за продолжување на закажување без повторно име).
     """
     # AI наоѓа кој лекар е во прашањето
     lekar = najdi_lekar_so_ai(prashanje)
 
     if not lekar:
         return (
-            'Не успеав да препознаам за кој лекар прашуваш. '
-            'Те молам напиши го името и презимето на лекарот, '
-            'на пример: „Кога е слободен д-р Марко Петров?"'
-            'Бараниот лекар не работи во нашата установа'
+            "Го разбирам барањето како прашање за слободни термини кај лекар, "
+            "но не успеав да препознаам точно за кој лекар се работи.\n\n"
+            "Напиши го името и презимето на лекарот како што стои во нашата листа "
+            "(на пример: „Кога е слободен д-р Марко Петров?“ или „има ли термин кај Петров?“).\n\n"
+            "Ако лекарот не работи кај нас, ќе треба да одбереш друг од секцијата „Лекари“ на сајтот."
         )
-# Барање во база за слободни термини
-    slobodni = pronajdi_slobodni_termini(lekar["doctor_ID"])
-    return formatiraj_odgovor(lekar, slobodni)
+    cilj = izvleci_cilj_datum_za_slobodni(prashanje)
+    slobodni = pronajdi_slobodni_termini(lekar["doctor_ID"], na_datum=cilj)
+    text = formatiraj_odgovor(lekar, slobodni, na_datum=cilj)
+    text += (
+        "\n\nМожеш после да напишеш кратко, на пример „закажи во 10:30“ или "
+        "„дали може да закажам во 10:00“ — го паметам избраниот лекар"
+        + (" и датумот од листата погоре." if cilj else "; ако листата е за повеќе денови, кажи го и датумот во следната порака.")
+    )
+
+    ctx = {
+        "zakazi_od_slobodni": {
+            "doctor_id": int(lekar["doctor_ID"]),
+            "datum": cilj.strftime("%Y-%m-%d") if cilj else None,
+        }
+    }
+    return {"odgovor": text, "kontekst": ctx}
