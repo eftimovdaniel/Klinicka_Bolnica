@@ -38,11 +38,13 @@ CREATE TABLE patient (
   patient_ID INT NOT NULL AUTO_INCREMENT,
   name_patient VARCHAR(120) NOT NULL,
   surname_patient VARCHAR(120) NOT NULL,
+  embg VARCHAR(13) DEFAULT NULL COMMENT '13-цифрен матичен број',
   email VARCHAR(255) NOT NULL,
   phone_number VARCHAR(32) DEFAULT NULL,
   password VARCHAR(255) NOT NULL,
   PRIMARY KEY (patient_ID),
-  UNIQUE KEY uq_patient_email (email)
+  UNIQUE KEY uq_patient_email (email),
+  UNIQUE KEY uq_patient_embg (embg)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- password_reset_tokens – заборавена лозинка

@@ -4718,6 +4718,11 @@ async function handleRegister(e) {
     } else {
       const telefon = document.getElementById('register-telefon').value.trim();
       const embg = document.getElementById('register-embg').value.trim();
+      const embgDigits = embg.replace(/\D/g, '');
+      if (embgDigits.length !== 13) {
+        showAuthError('register-error', 'Внесете валиден ЕМБГ од точно 13 цифри.');
+        return;
+      }
       
       endpoint = API_BASE + '/pacienti/register';
       body = {
@@ -4725,7 +4730,7 @@ async function handleRegister(e) {
         prezime,
         email,
         telefon,
-        embg,
+        embg: embgDigits,
         password
       };
     }
@@ -4993,6 +4998,7 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
           prezime: currentPacient.prezime || currentPacient.surname_patient || "",
           email: currentPacient.email || "",
           telefon: currentPacient.telefon || currentPacient.phone_number || "",
+          embg: currentPacient.embg || "",
         };
       }
 

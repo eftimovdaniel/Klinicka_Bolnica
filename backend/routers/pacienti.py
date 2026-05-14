@@ -28,7 +28,8 @@ async def login_pacienti(request: Request):
         db_cursor = conn.cursor(dictionary=True)
 
         db_cursor.execute("""
-            SELECT patient_ID, name_patient AS ime, surname_patient AS prezime, email, phone_number AS telefon, password
+            SELECT patient_ID, name_patient AS ime, surname_patient AS prezime, email,
+                   phone_number AS telefon, embg, password
             FROM patient
             WHERE LOWER(email) = %s
         """, (email,))
@@ -46,7 +47,8 @@ async def login_pacienti(request: Request):
                 "ime": patient.get("ime") or "",
                 "prezime": patient.get("prezime") or "",
                 "email": patient.get("email") or "",
-                "telefon": patient.get("telefon") or ""
+                "telefon": patient.get("telefon") or "",
+                "embg": patient.get("embg") or "",
             }
         }
     except HTTPException as e:
@@ -151,6 +153,8 @@ async def register_pacienti(request: Request):
           email = (data.get("email") or "").strip()
           password = data.get("password") or ""
           telefon = (data.get("telefon") or "").strip()
+          embg_raw = data.get("embg") or ""
+          embg = "".join(c for c in str(embg_raw) if c.isdigit())
           # Нормализирај телефон: остави само цифри и +, макс. 20 знаци (за да не се прекине во колона phone_number)
           if telefon:
               telefon = "".join(c for c in telefon if c.isdigit() or c == "+")[:20]
@@ -163,19 +167,27 @@ async def register_pacienti(request: Request):
                raise HTTPException(status_code=400, detail="Внесете валидна електронска пошта за да продолжите.")
           if not password or len(password) < 8:
                raise HTTPException(status_code=400, detail="За да продолжите, ве молиме внесете лозинка од минимум 8 карактери.")
+          if len(embg) != 13:
+               raise HTTPException(
+                   status_code=400,
+                   detail="Внесете валиден ЕМБГ од точно 13 цифри.",
+               )
           
           conn = get_connection()
           db_cursor = conn.cursor(dictionary=True)
           db_cursor.execute("SELECT patient_ID FROM patient WHERE LOWER(email) = %s", (email.lower(),))
           if db_cursor.fetchone():
                 raise HTTPException(status_code=400, detail="За жал оваа електронска пошта е веќе користена. Обидете се со друга.")
+          db_cursor.execute("SELECT patient_ID FROM patient WHERE embg = %s", (embg,))
+          if db_cursor.fetchone():
+                raise HTTPException(status_code=400, detail="Овој ЕМБГ е веќе регистриран. Најавете се или контактирајте поддршка.")
           
           password_hash = hash_password(password)
 
           db_cursor.execute("""
-               INSERT INTO patient (name_patient, surname_patient, email, phone_number, password)
-               VALUES (%s, %s, %s, %s, %s)
-          """, (ime, prezime, email.lower(), (telefon or None) if telefon else None, password_hash))
+               INSERT INTO patient (name_patient, surname_patient, embg, email, phone_number, password)
+               VALUES (%s, %s, %s, %s, %s, %s)
+          """, (ime, prezime, embg, email.lower(), (telefon or None) if telefon else None, password_hash))
           conn.commit()
           pacient_id = db_cursor.lastrowid
 
@@ -187,6 +199,18 @@ async def register_pacienti(request: Request):
           raise
      except Exception as e:
         err_msg = str(e)
+        if "Duplicate" in err_msg and (
+            "embg" in err_msg.lower() or "uq_patient_embg" in err_msg.lower()
+        ):
+            raise HTTPException(
+                status_code=400,
+                detail="Овој ЕМБГ е веќе регистриран. Најавете се или контактирајте поддршка.",
+            )
+        if "Unknown column 'embg'" in err_msg or 'Unknown column `embg`' in err_msg:
+            raise HTTPException(
+                status_code=500,
+                detail="Во базата недостасува колона embg. Изврши го SQL од backend/migrations/001_patient_embg.sql (еднократно).",
+            )
         # Врати ја вистинската грешка за полесно отстранување (на пр. bcrypt не инсталиран или колона password преку кратка)
         raise HTTPException(status_code=500, detail=f"Грешка при регистрација: {err_msg}")
                         
@@ -376,7 +400,7 @@ async def dosie_pacient(pacient_ID: int = Query(..., description="ID на нај
         cur.execute(
             """
             SELECT patient_ID, name_patient AS ime, surname_patient AS prezime,
-                   email, phone_number AS telefon
+                   email, phone_number AS telefon, embg
             FROM patient
             WHERE patient_ID = %s
             """,
@@ -467,6 +491,7 @@ async def dosie_pacient(pacient_ID: int = Query(..., description="ID на нај
                 "prezime": profil.get("prezime") or "",
                 "email": profil.get("email") or "",
                 "telefon": profil.get("telefon") or "",
+                "embg": profil.get("embg") or "",
             },
             "idni_termini": idni_termini,
             "zaverseni": zaverseni,

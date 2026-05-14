@@ -85,6 +85,7 @@ class PacientModel(BaseModel):
     prezime: str | None = None
     email: str | None = None
     telefon: str | None = None
+    embg: str | None = None
 
 
 class LekarModel(BaseModel):
@@ -138,6 +139,7 @@ def ask(data: PitanjeModel):
             "prezime": data.pacient.prezime or "",
             "email": data.pacient.email,
             "telefon": data.pacient.telefon or "",
+            "embg": data.pacient.embg or "",
         }
 
     # 2b. Lekar како dict (за функциите што имаат лекарска улога, нпр. објави вест)

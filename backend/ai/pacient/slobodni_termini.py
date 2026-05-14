@@ -279,31 +279,75 @@ def generiraj_slotovi_za_den(datum: date) -> list[datetime]:
 def najdi_zafateni_slotovi(doctor_id: int, od_datum: date, do_datum: date) -> set:
     """
     Враќа множество (set) со зафатени слотови за лекар во даден интервал.
+    Клучевите се (date, time) со минути без секунди.
+
+    ВАЖНО: DATE/TIME од конекторот доаѓаат како date, datetime, str, timedelta, bytes...
+    Затоа во SQL ги нормализираме во низа 'YYYY-MM-DD' и 'HH:MM' за сигурно парсирање.
     """
     conn = None
     try:
         conn = get_connection()
         cur = conn.cursor(dictionary=True)
-        cur.execute("""
-            SELECT datum_pregled, vreme_pregled
+        cur.execute(
+            """
+            SELECT
+                DATE(datum_pregled) AS dp,
+                TIME_FORMAT(TIME(vreme_pregled), '%H:%i') AS vp
             FROM Termin_pregled
             WHERE doctor_ID = %s
-              AND datum_pregled BETWEEN %s AND %s
+              AND DATE(datum_pregled) BETWEEN %s AND %s
               AND status_pregled NOT IN ('откажан', 'отказан')
-        """, (doctor_id, od_datum, do_datum))
+            """,
+            (doctor_id, od_datum, do_datum),
+        )
         rezultati = cur.fetchall()
         cur.close()
 
-        zafateni = set()
+        zafateni: set[tuple[date, time]] = set()
         for r in rezultati:
-            datum = r["datum_pregled"]
-            vreme = r["vreme_pregled"]
-            # vreme може да дојде како timedelta - нормализирај
-            if isinstance(vreme, timedelta):
-                vkupno_sekundi = int(vreme.total_seconds())
-                casovi = vkupno_sekundi // 3600
-                minuti = (vkupno_sekundi % 3600) // 60
-                vreme = time(casovi, minuti)
+            d_raw = r.get("dp")
+            t_raw = r.get("vp")
+
+            if d_raw is None or t_raw is None:
+                continue
+
+            if isinstance(d_raw, datetime):
+                datum = d_raw.date()
+            elif isinstance(d_raw, date):
+                datum = d_raw
+            elif isinstance(d_raw, (bytes, bytearray)):
+                try:
+                    datum = datetime.strptime(d_raw.decode("utf-8", errors="ignore")[:10], "%Y-%m-%d").date()
+                except ValueError:
+                    continue
+            elif isinstance(d_raw, str):
+                try:
+                    datum = datetime.strptime(d_raw.strip()[:10], "%Y-%m-%d").date()
+                except ValueError:
+                    continue
+            else:
+                continue
+
+            vreme: time | None = None
+            if isinstance(t_raw, time):
+                vreme = time(t_raw.hour, t_raw.minute)
+            elif isinstance(t_raw, timedelta):
+                vkupno = int(t_raw.total_seconds())
+                vreme = time((vkupno // 3600) % 24, (vkupno % 3600) // 60)
+            elif isinstance(t_raw, (bytes, bytearray)):
+                t_raw = t_raw.decode("utf-8", errors="ignore").strip()
+
+            if vreme is None:
+                if isinstance(t_raw, str):
+                    parts = t_raw.replace(".", ":").split(":")
+                    try:
+                        h, m = int(parts[0]), int(parts[1])
+                        vreme = time(h, m)
+                    except (ValueError, IndexError):
+                        continue
+                else:
+                    continue
+
             zafateni.add((datum, vreme))
 
         return zafateni
@@ -336,6 +380,7 @@ def pronajdi_slobodni_termini(doctor_id: int, na_datum: date | None = None) -> l
             if slot_datetime < datetime.now():
                 continue
             slot_vreme = slot_datetime.time()
+            slot_vreme = time(slot_vreme.hour, slot_vreme.minute)
             if (na_datum, slot_vreme) not in zafateni:
                 slobodni.append(slot_datetime)
                 if len(slobodni) >= MAX_TERMINI:
@@ -355,6 +400,7 @@ def pronajdi_slobodni_termini(doctor_id: int, na_datum: date | None = None) -> l
                 continue
 
             slot_vreme = slot_datetime.time()
+            slot_vreme = time(slot_vreme.hour, slot_vreme.minute)
             if (datum, slot_vreme) not in zafateni:
                 slobodni.append(slot_datetime)
 
@@ -371,7 +417,7 @@ def formatiraj_odgovor(
 ) -> str:
     """
     Формира порака на македонски, групирано по ден.
-    Листа по ден + следен чекор (без долг вовед).
+    Листа по ден + формална упатство за закажување.
     """
     DENOVI = [
         "Понеделник", "Вторник", "Среда", "Четврток",
@@ -423,9 +469,9 @@ def formatiraj_odgovor(
         delovi.append(f"• {den_ime}, {datum_str}: {casovi_str}")
 
     delovi.append(
-        "\nСледен чекор: одбери датум и време од листата и напиши, на пример: "
-        f"„Закажи ми кај {lekar['surname']} на {list(po_den.keys())[0][0].strftime('%Y-%m-%d')} во {list(po_den.values())[0][0]}“. "
-        "Можеш и со други зборови со иста смисла — агентот ги разбира како закажување."
+        "\nДоколку сакате да закажете преглед кај избраниот лекар, одберете датум и час од листата погоре и во следната порака наведете го бараниот термин "
+        f"(на пример: „Закажи преглед кај д-р {lekar['surname']} на {list(po_den.keys())[0][0].strftime('%Y-%m-%d')} во {list(po_den.values())[0][0]}“). "
+        "Можете да употребите и сопствена формулација со иста смисла."
     )
     return "\n".join(delovi)
 
@@ -454,9 +500,12 @@ def odgovori_za_slobodni_termini(prashanje: str) -> str | dict:
     slobodni = pronajdi_slobodni_termini(lekar["doctor_ID"], na_datum=cilj)
     text = formatiraj_odgovor(lekar, slobodni, na_datum=cilj)
     text += (
-        "\n\nМожеш после да напишеш кратко, на пример „закажи во 10:30“ или "
-        "„дали може да закажам во 10:00“ — го паметам избраниот лекар"
-        + (" и датумот од листата погоре." if cilj else "; ако листата е за повеќе денови, кажи го и датумот во следната порака.")
+        "\n\nДоколку листата се однесува на еден датум, во следната порака доволно е да го наведете часот "
+        "(на пример: „закажи во 10:30“). Ако се работи за повеќе денови, наведете го и датумот. "
+        "Избраниот лекар од листата погоре останува запаметен за следното барање."
+        if cilj
+        else "\n\nДоколку листата обухвати повеќе денови, во следната порака наведете го датумот и часот. "
+        "Избраниот лекар од листата погоре останува запаметен за следното барање."
     )
 
     ctx = {
