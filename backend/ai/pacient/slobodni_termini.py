@@ -197,7 +197,7 @@ def zimi_site_lekari() -> list[dict]:
         cur = conn.cursor(dictionary=True)
         # se izvlekuvat site lekari od bazata so ime i prezime
         cur.execute("""
-            SELECT doctor_ID, name, surname, specialty
+            SELECT doctor_ID, name, surname, specialty, email
             FROM Doctors
             ORDER BY surname, name
         """)

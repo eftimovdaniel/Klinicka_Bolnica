@@ -1,24 +1,23 @@
 """
-Лекари по оддел / специјалност.
+Лекари по оддел / специјалност, или цел лекарски тим во болницата.
 
 Примери:
 - „Кои лекари се на одделот за Урологија?"
 - „Кои се лекарите од Кардиологија?"
-- „Прикажи ги докторите од хирургија"
-- „Кои се на гинекологија?"
+- „Кои лекари работат во болницата?" → сите лекари од база + навигација #lekari
 
 Логика:
-1. Со AI (Groq) се извлекува името на одделот од прашањето.
-2. Се прави fuzzy-match со постоечките оддели (Doctors.specialty + Oddeli.ime_na_oddel),
-   за да се толерираат разлики во правопис / падежи / латиница.
-3. Се враќаат лекарите од тој оддел.
+1. Ако прашањето е за цела установа/болница (без оддел) → листа од Doctors + скрол кон #lekari.
+2. Инаку: AI извлекува оддел; fuzzy-match со Oddeli/Doctors.specialty; листа по оддел.
 """
 
 import json
 import re
+from typing import Any
 
 from database import get_connection
 from ai._kernel.groq_client import ask_ai
+from ai._kernel.transliteracija import transliterijaj
 
 
 PROMPT = """
@@ -39,6 +38,10 @@ PROMPT = """
   Кардиологија, Урологија, Хирургија, Гинекологија, Педијатрија,
   Неврологија, Ортопедија, Психијатрија, Радиологија, Анестезиологија,
   Интерна медицина, Општа медицина, ОРЛ, Дерматологија, Офталмологија.
+- ВАЖНО: „хирургија", „општа хирургија", „генерална хирургија" → „Хирургија", НЕ „Неврохирургија".
+  Само ако експлицитно пишува „неврохирургија" / „neurohirurgija" → „Неврохирургија".
+- Ако прашањето е за СИТЕ лекари во болницата/установата/кај вас (без конкретен оддел) → {"oddel": null}
+  (на пр. „кои лекари работат во болницата?", „кој доктори имате?").
 - ако одделот не е јасен → null
 
 БЕЗ markdown, БЕЗ објаснувања. Само JSON.
@@ -63,6 +66,71 @@ def _izvlechi(prashanje: str) -> str | None:
     return str(val).strip()
 
 
+def _site_lekari_vo_ustanova(prashanje: str) -> bool:
+    """
+    Прашање за целиот лекарски тим (без конкретен оддел), на пр. „кои лекари работат во болницата?".
+    """
+    p = transliterijaj(prashanje).lower()
+    if not any(w in p for w in ("лекар", "доктор", "специјалист")):
+        return False
+    if re.search(r"на\s+оддел", p) or re.search(r"од\s+оддел", p) or re.search(r"оддел(?:от|о)?\s+за", p):
+        return False
+    if re.search(r"во\s+болниц", p):
+        return True
+    if re.search(r"во\s+установ", p) or "установа" in p or "установата" in p:
+        return True
+    if re.search(r"во\s+клиник", p) or "клиниката" in p:
+        return True
+    if "кај вас" in p:
+        return True
+    if any(
+        s in p
+        for s in (
+            "сите лекари",
+            "сите доктори",
+            "листа на лекари",
+            "листа на доктори",
+            "медицински тим",
+            "тимот на лекари",
+        )
+    ):
+        return True
+    return False
+
+
+def _odgovor_site_lekari_so_navigacija() -> dict[str, Any]:
+    """Листа на сите лекари + навигација кон секцијата „Лекари" на сајтот."""
+    from ai.pacient.slobodni_termini import zimi_site_lekari
+
+    lekari = zimi_site_lekari()
+    if not lekari:
+        return {
+            "odgovor": "Моментално нема регистрирани лекари во системот.",
+            "navigacija": {"target": "index.html#lekari", "label": "Лекари"},
+        }
+
+    redovi = [
+        "Лекари во Клиничка Болница Штип:",
+        "",
+    ]
+    for l in lekari:
+        spec = (l.get("specialty") or "—").strip() or "—"
+        polno = f"Д-р {l['name']} {l['surname']}"
+        em = (l.get("email") or "").strip()
+        if em:
+            redovi.append(f"- {polno} — {spec} ({em})")
+        else:
+            redovi.append(f"- {polno} — {spec}")
+    redovi.append("")
+    redovi.append(
+        "Секцијата „Лекари" на почетната страница се отвора автоматски за целосен преглед и филтрирање."
+    )
+    return {
+        "odgovor": "\n".join(redovi),
+        "navigacija": {"target": "index.html#lekari", "label": "Лекари"},
+    }
+
+
 def _normaliziraj(s: str) -> str:
     s = s.lower().strip()
     s = re.sub(r"\s+", " ", s)
@@ -71,12 +139,13 @@ def _normaliziraj(s: str) -> str:
 
 def _najdi_oddel(baran_oddel: str) -> tuple[str, list[str]] | None:
     """
-    Прави fuzzy-match. Враќа (нормализирано_име_за_query, [сите_варијанти_во_DB])
-    или None ако нема никакво совпаѓање.
+    Прави fuzzy-match. Враќа (име од база за query, [сите варијанти]) или None.
 
     Стратегија:
     - Точна (case-insensitive) еднаквост во Doctors.specialty или Oddeli.ime_na_oddel
-    - Substring совпаѓање (баран_оддел во DB име ИЛИ DB име во баран_оддел)
+    - Ако бараното е потниза на повеќе имиња (пр. „хирургија" во „Неврохирургија" и „Хирургија"),
+      се бира најкраткото име — така „Хирургија" победува над „Неврохирургија".
+    - Инаку: DB име како потниза во побараното → најдолго совпаѓање (поспецифично).
     """
     conn = None
     try:
@@ -97,7 +166,7 @@ def _najdi_oddel(baran_oddel: str) -> tuple[str, list[str]] | None:
         if conn:
             conn.close()
 
-    site = list({*speci, *oddeli})
+    site = sorted({*speci, *oddeli}, key=lambda x: (len(x), x))
     if not site:
         return None
 
@@ -107,10 +176,26 @@ def _najdi_oddel(baran_oddel: str) -> tuple[str, list[str]] | None:
         if _normaliziraj(kandidat) == barano_n:
             return kandidat, site
 
-    for kandidat in site:
-        k_n = _normaliziraj(kandidat)
-        if barano_n in k_n or k_n in barano_n:
-            return kandidat, site
+    # бараното е потниза во името од база (пр. „хирургија" во „Неврохирургија"):
+    # најкратко совпаѓање за да не се меша општа хирургија со неврохирургија.
+    vnatre = [
+        k
+        for k in site
+        if barano_n and barano_n in _normaliziraj(k) and _normaliziraj(k) != barano_n
+    ]
+    if vnatre:
+        best = min(vnatre, key=len)
+        return best, site
+
+    # името од база е потниза во побараното (подолго извлечување од AI)
+    nadvor = [
+        k
+        for k in site
+        if _normaliziraj(k) and _normaliziraj(k) in barano_n and _normaliziraj(k) != barano_n
+    ]
+    if nadvor:
+        best = max(nadvor, key=len)
+        return best, site
 
     return None
 
@@ -137,7 +222,10 @@ def _zimi_lekari_od_oddel(oddel: str) -> list[dict]:
             conn.close()
 
 
-def odgovori_za_lekari_oddel(prashanje: str) -> str:
+def odgovori_za_lekari_oddel(prashanje: str) -> str | dict[str, Any]:
+    if _site_lekari_vo_ustanova(prashanje):
+        return _odgovor_site_lekari_so_navigacija()
+
     baran = _izvlechi(prashanje)
     if baran == "_error":
         return (
@@ -145,8 +233,9 @@ def odgovori_za_lekari_oddel(prashanje: str) -> str:
         )
     if not baran:
         return (
-            'Не разбрав за кој оддел прашуваш. Те молам пишувај, на пр.: '
-            '„Кои лекари се на Урологија?" или „Кои се од Кардиологија?"'
+            'Ако прашувате за конкретен оддел, наведете го (на пр.: „Кои лекари се на Кардиологија?"). '
+            "За целиот лекарски тим прашајте на пример: „Кои лекари работат во болницата?" "
+            'или „Сите лекари кај вас".'
         )
 
     rezultat = _najdi_oddel(baran)
@@ -174,7 +263,7 @@ def odgovori_za_lekari_oddel(prashanje: str) -> str:
 
     redovi.append("")
     redovi.append(
-        'За детали или закажување напиши: „Каков е д-р [презиме]?" '
-        'или „Кога е слободен д-р [презиме]?"'
+        "За повеќе информации за лекар или за закажување на термин, во следната порака наведете го "
+        'презимето (на пример: „Каков е д-р [презиме]?" или „Кога е слободен д-р [презиме]?").'
     )
     return "\n".join(redovi)

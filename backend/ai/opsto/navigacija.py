@@ -97,7 +97,26 @@ def odgovori_za_navigacija(prashanje: str) -> dict:
         }
 
     cel = DESTINACII[dest]
+    odgovor = f'Те носам кон „{cel["label"]}"...'
+
+    if dest == "lekari":
+        try:
+            from ai.pacient.slobodni_termini import zimi_site_lekari
+
+            lek = zimi_site_lekari()
+            if lek:
+                delovi = [odgovor, "", "Краток преглед на лекарскиот тим:", ""]
+                for l in lek[:24]:
+                    spec = (l.get("specialty") or "—").strip() or "—"
+                    delovi.append(f"- Д-р {l['name']} {l['surname']} — {spec}")
+                if len(lek) > 24:
+                    delovi.append("")
+                    delovi.append(f"(Уште {len(lek) - 24} лекари во секцијата „Лекари".)")
+                odgovor = "\n".join(delovi)
+        except Exception as e:
+            print(f"[navigacija] greshka pri lista lekari: {e}")
+
     return {
-        "odgovor": f'Те носам кон „{cel["label"]}"...',
+        "odgovor": odgovor,
         "navigacija": {"target": cel["target"], "label": cel["label"]},
     }

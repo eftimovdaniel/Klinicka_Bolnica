@@ -291,7 +291,13 @@ def ask(data: PitanjeModel):
             nav_info = nav_rezultat.get("navigacija")
 
         elif intent == "lekari_oddel":
-            odgovor = lekari_oddel.odgovori_za_lekari_oddel(pitanje_norm)
+            raw_l = lekari_oddel.odgovori_za_lekari_oddel(pitanje_norm)
+            if isinstance(raw_l, dict):
+                odgovor = raw_l.get("odgovor", "")
+                if raw_l.get("navigacija"):
+                    nav_info = raw_l["navigacija"]
+            else:
+                odgovor = raw_l
 
         elif intent == "apliciraj_za_rabota":
             rezultat_apl = apliciraj_za_rabota.odgovori_za_aplikacija(

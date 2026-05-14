@@ -11,14 +11,13 @@
 """
 
 import json
-import os
+from pathlib import Path
+
 from ai._kernel.groq_client import ask_ai
 from ai._kernel.prompts import ODDEL_EXTRACT_PROMPT
 
-
-# Патека до JSON со информации
-_BAZA_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_JSON_PATH = os.path.join(_BAZA_DIR, "data", "bolnica_info.json")
+# backend/ai/opsto/bolnica_info.py → три нивоа нагоре = backend/, па data/bolnica_info.json
+_JSON_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "bolnica_info.json"
 
 
 def _zimi_info() -> dict:
