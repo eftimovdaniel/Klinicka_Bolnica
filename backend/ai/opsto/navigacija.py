@@ -12,6 +12,7 @@
 import json
 import re
 
+from database import get_connection
 from ai._kernel.groq_client import ask_ai
 
 
@@ -44,9 +45,9 @@ PROMPT = """
 - „лекари", „сите лекари", „медицински тим", „доктори" → "lekari"
 - „услуги", „оддели", „специјалности", „што нудите" → "uslugi"
 - „контакт", „телефон", „каде сте", „адреса" → "kontakt"
-- „кариера", „кариери", „работа", „вработување", „вработувања",
-  „огласи за работа", „сите огласи", „слободни позиции",
-  „слободни работни места", „имате ли работа",
+- „кариера", „кариери", „работа", „вработување", „вработувања", „вработување во болницата",
+  „огласи за работа", „сите огласи", „слободни позиции", „работни места", „работна позиција",
+  „слободни работни места", „имате ли работа", „листа на огласи",
   „сакам да аплицирам", „како да аплицирам", „сакам да работам кај вас",
   „дали може да аплицирам за X", „сакам да се вработам" → "kariera"
 - „новости", „вести", „сите вести" → "novosti"
@@ -57,6 +58,66 @@ PROMPT = """
 
 БЕЗ markdown, БЕЗ објаснувања. Само JSON.
 """.strip()
+
+
+def _aktivni_oglasi_za_kariera() -> list[dict]:
+    '''Ист филтер како GET /kariera — активни огласи (не „завршен").'''
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            """
+            SELECT id_oglas, pozicija, oddel, datum_na_prijavuvanje
+            FROM Vrabotuvanje
+            WHERE (status_oglas IS NULL OR status_oglas = '' OR status_oglas != 'завршен')
+            ORDER BY datum_na_prijavuvanje ASC
+            """
+        )
+        rows = cur.fetchall() or []
+        cur.close()
+        out: list[dict] = []
+        for r in rows:
+            d = r.get("datum_na_prijavuvanje")
+            rok_str = d.strftime("%d.%m.%Y") if d and hasattr(d, "strftime") else (str(d)[:10] if d else "")
+            out.append(
+                {
+                    "id_oglas": r.get("id_oglas"),
+                    "pozicija": (r.get("pozicija") or "").strip(),
+                    "oddel": (r.get("oddel") or "").strip(),
+                    "rok": rok_str,
+                }
+            )
+        return out
+    except Exception as e:
+        print(f"[navigacija] greshka pri citanje oglasi: {e}")
+        return []
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
+
+
+def _tekst_za_kariera(oglasi: list[dict]) -> str:
+    """Текст за чат: листа на позиции или порака дека нема отворени."""
+    uvod = (
+        'Ве пренасочувам кон делот „Кариера" (работни позиции и пријавување) на почетната страница.\n\n'
+    )
+    if not oglasi:
+        return (
+            uvod
+            + "Моментално нема отворени работни позиции за пријавување. "
+            "Погледнете ја секцијата повторно подоцна или контактирајте ја централата за информации."
+        )
+
+    linii = [uvod + "Активни огласи (можете да се пријавите преку формата во секцијата):", ""]
+    for o in oglasi:
+        poz = o.get("pozicija") or "—"
+        odd = o.get("oddel") or "—"
+        rok = o.get("rok") or "—"
+        linii.append(f"• {poz} — оддел: {odd}. Рок за пријава: {rok}.")
+    linii.append("")
+    linii.append('За апликација отворете ја секцијата „Кариера" и пополнете ја формата подолу на страницата.')
+    return "\n".join(linii)
 
 
 def _izvlechi(prashanje: str) -> dict:
@@ -104,17 +165,37 @@ def odgovori_za_navigacija(prashanje: str) -> dict:
             from ai.pacient.slobodni_termini import zimi_site_lekari
 
             lek = zimi_site_lekari()
-            if lek:
-                delovi = [odgovor, "", "Краток преглед на лекарскиот тим:", ""]
-                for l in lek[:24]:
+            if not lek:
+                odgovor = (
+                    'Ве пренасочувам кон делот „Лекари". '
+                    "Моментално нема регистрирани лекари во системот."
+                )
+            else:
+                delovi = [
+                    'Ве пренасочувам кон делот „Лекари" на почетната страница. '
+                    "Подолу е целосната листа од системот:",
+                    "",
+                    f"Лекарски тим ({len(lek)}):",
+                    "",
+                ]
+                for l in lek:
                     spec = (l.get("specialty") or "—").strip() or "—"
-                    delovi.append(f"- Д-р {l['name']} {l['surname']} — {spec}")
-                if len(lek) > 24:
-                    delovi.append("")
-                    delovi.append(f"(Уште {len(lek) - 24} лекари во секцијата „Лекари".)")
+                    em = (l.get("email") or "").strip()
+                    red = f"- Д-р {l['name']} {l['surname']} — {spec}"
+                    if em:
+                        red += f" ({em})"
+                    delovi.append(red)
+                delovi.append("")
+                delovi.append(
+                    'Страницата автоматски се лизга кон секцијата „Лекари" за преглед на картичките и закажување.'
+                )
                 odgovor = "\n".join(delovi)
         except Exception as e:
             print(f"[navigacija] greshka pri lista lekari: {e}")
+
+    if dest == "kariera":
+        oglasi = _aktivni_oglasi_za_kariera()
+        odgovor = _tekst_za_kariera(oglasi)
 
     return {
         "odgovor": odgovor,

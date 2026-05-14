@@ -99,7 +99,7 @@ def _site_lekari_vo_ustanova(prashanje: str) -> bool:
 
 
 def _odgovor_site_lekari_so_navigacija() -> dict[str, Any]:
-    """Листа на сите лекари + навигација кон секцијата „Лекари" на сајтот."""
+    '''Листа на сите лекари + навигација кон секцијата „Лекари" на сајтот.'''
     from ai.pacient.slobodni_termini import zimi_site_lekari
 
     lekari = zimi_site_lekari()
@@ -123,7 +123,7 @@ def _odgovor_site_lekari_so_navigacija() -> dict[str, Any]:
             redovi.append(f"- {polno} — {spec}")
     redovi.append("")
     redovi.append(
-        "Секцијата „Лекари" на почетната страница се отвора автоматски за целосен преглед и филтрирање."
+        'Страницата автоматски се лизга кон секцијата „Лекари" за целосен преглед и закажување.'
     )
     return {
         "odgovor": "\n".join(redovi),
@@ -234,7 +234,7 @@ def odgovori_za_lekari_oddel(prashanje: str) -> str | dict[str, Any]:
     if not baran:
         return (
             'Ако прашувате за конкретен оддел, наведете го (на пр.: „Кои лекари се на Кардиологија?"). '
-            "За целиот лекарски тим прашајте на пример: „Кои лекари работат во болницата?" "
+            'За целиот лекарски тим прашајте на пример: „Кои лекари работат во болницата?" '
             'или „Сите лекари кај вас".'
         )
 
