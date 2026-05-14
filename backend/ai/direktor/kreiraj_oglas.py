@@ -172,7 +172,6 @@ def odgovori_za_kreiranje_oglas(prashanje: str, lekar: dict | None) -> str:
         (pozicija, oddel, denes, rok),
     )
     conn.commit()
-    new_id = cur.lastrowid
     cur.close()
     conn.close()
 
@@ -180,6 +179,5 @@ def odgovori_za_kreiranje_oglas(prashanje: str, lekar: dict | None) -> str:
         f"Огласот е креиран!\n\n"
         f"Позиција: {pozicija}\n"
         f"Оддел: {oddel}\n"
-        f"Рок: {rok.strftime('%d.%m.%Y')}\n"
-        f"ID: {new_id}"
+        f"Рок: {rok.strftime('%d.%m.%Y')}"
     )

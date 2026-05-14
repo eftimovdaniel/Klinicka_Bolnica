@@ -319,6 +319,5 @@ def odgovori_za_kreiranje_oglas(prashanje: str, lekar: Optional[dict]) -> str:
         f'Датум на објава: {format_datum(datum_na_objava)}\n'
         f'Рок за пријавување: {format_datum(datum_na_prijavuvanje)}\n'
         f'Статус: валентен\n\n'
-        'Може да го видиш на страната „Кариера" на сајтот.\n'
-        f'ID: {new_id}'
+        'Може да го видиш на страната „Кариера" на сајтот.'
     )
