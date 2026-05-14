@@ -41,6 +41,9 @@
 - "moi_pregledi"      → пациент: историја и идни прегледи
 - "aplikanti_oglas"   → директор: листа на апликанти за оглас
 - "zapishi_terapija"  → лекар: запиши терапија/дијагноза на пациент
+- "novosti_rezime"    → краток преглед на последните новости (наслови + линк)
+- "faq_pregled"       → подготовка за преглед (гладно, што да понесам — од JSON)
+- "izvestaj_den_nedela" → дневен/неделен извештај за термини и апликации (само директор)
 - "general"           → одговор од AI за општо прашање
 
 ВАЖНО: Редот на проверки е важен (поспецифичните прво).
@@ -294,6 +297,31 @@ KLUCNI_MOI_PREGLEDI = [
     "moite pregledi", "moi pregledi", "istorija na pregledi",
 ]
 
+# 8c2. РЕЗИМЕ НА НОВОСТИ (краток текст од база, не навигација)
+KLUCNI_REZIME_NOVOSTI = [
+    "резиме на новости", "резиме на вести", "наслови на новости", "последни наслови",
+    "најнови наслови", "сумирај ги новостите", "новости накратко", "вести накратко",
+    "што има ново", "што е ново", "najnovi naslovi", "rezime na novosti",
+    "последни новости", "најнови вести", "краток преглед на новости",
+]
+
+# 8c3. FAQ подготовка за преглед (од JSON; не симптоми)
+KLUCNI_FAQ_PREGLED = [
+    "гладно", "на гладно", "на пост", "постот", "јадење пред", "јаденje пред",
+    "што да понесам", "што да донесам", "подготовка за преглед", "пред преглед",
+    "лична карта", "здравствена книшка", "лекови пред", "дали да пијам лекови",
+    "доцнење на термин", "што ако доцнам", "gladno", "ponesam", "donesam",
+]
+
+# 8c4. ДНЕВЕН/НЕДЕЛЕН ИЗВЕШТАЈ (директор) — пред „апликаци" за apliciraj
+KLUCNI_DNEVEN_IZVESTAJ = [
+    "извештај за денес", "извештај денес", "дневен извештај", "дневен преглед",
+    "извештај за оваа недела", "неделен извештај", "извештај за неделата",
+    "колку термини денес", "термини денес", "статистика за денес",
+    "статистика за недела", "преглед на термини",
+    "dneven izveshtaj", "izveshtaj denes", "nedelen izveshtaj",
+]
+
 # 8d. АПЛИКАНТИ ЗА ОГЛАС (директор)
 KLUCNI_APLIKANTI = [
     "апликанти", "апликантите", "кандидати за оглас", "кандидатите",
@@ -441,6 +469,13 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
     )):
         return "aplikanti_oglas"
 
+    # Дневен/неделен извештај (директор) — ПРЕД apliciraj („апликаци" е подниз)
+    if _ima_zbor(p, KLUCNI_DNEVEN_IZVESTAJ) or (
+        "извештај" in p
+        and any(w in p for w in ("денес", "denes", "недела", "nedela", "термини", "termini"))
+    ):
+        return "izvestaj_den_nedela"
+
     # „Аплицирам / пријавувам за работа за X" – AI агент води разговор
     # и сам аплицира (бара логин како пациент).
     if not ima_kreiraj and any(w in p for w in (
@@ -517,6 +552,10 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
     if _ima_zbor(p, KLUCNI_RASPORED):
         return "moj_raspored"
 
+    # Резиме на новости од база — пред навигација („покажи новости" останува navigacija)
+    if _ima_zbor(p, KLUCNI_REZIME_NOVOSTI):
+        return "novosti_rezime"
+
     # Навигација – пред uslugi/info_lekar
     if _ima_zbor(p, KLUCNI_NAVIGACIJA):
         return "navigacija"
@@ -553,6 +592,9 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
 
     if _ima_zbor(p, KLUCNI_ZAKAZI):
         return "zakazi_termin"
+
+    if _ima_zbor(p, KLUCNI_FAQ_PREGLED):
+        return "faq_pregled"
 
     if _ima_zbor(p, KLUCNI_PREPORAKA):
         return "preporaka_lekar"

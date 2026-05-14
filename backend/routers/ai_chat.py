@@ -30,6 +30,9 @@ AI чат рутер - главна точка за сите AI прашања �
        - istorija_pacient   → "Колку пати беше Иванов кај мене?" (лекар)
        - karton_pacient     → "Дај ми картон на Иванов" (лекар)
        - moja_statistika    → "Колку прегледи имам?" (лекар)
+       - novosti_rezime     → "Што има ново?" — последни новости (наслови + линк)
+       - faq_pregled        → подготовка за преглед (гладно, што да понесам — од JSON)
+       - izvestaj_den_nedela → извештај денес/недела: термини и апликации (само директор)
        - general            → општ одговор од Groq AI
 5. Враќа {"odgovor": "..."} назад на frontend-от.
 
@@ -73,6 +76,9 @@ from ai import apliciraj_za_rabota
 from ai import moi_pregledi
 from ai import aplikanti_oglas
 from ai import zapishi_terapija
+from ai import novosti_rezime
+from ai import faq_pregled
+from ai import izvestaj_den_nedela
 
 
 router = APIRouter(prefix="/ai-chat", tags=["AI Chat"])
@@ -315,6 +321,15 @@ def ask(data: PitanjeModel):
 
         elif intent == "zapishi_terapija":
             odgovor = zapishi_terapija.odgovori_za_terapija(pitanje_norm, lekar_dict)
+
+        elif intent == "novosti_rezime":
+            odgovor = novosti_rezime.odgovori_za_novosti_rezime()
+
+        elif intent == "faq_pregled":
+            odgovor = faq_pregled.odgovori_za_faq_pregled(pitanje_norm)
+
+        elif intent == "izvestaj_den_nedela":
+            odgovor = izvestaj_den_nedela.odgovori_za_izvestaj(pitanje_norm, lekar_dict)
 
         else:
             # general → директен повик до Groq AI
