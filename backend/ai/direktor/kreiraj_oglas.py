@@ -11,6 +11,8 @@ from datetime import date, datetime, timedelta
 
 from database import get_connection
 from ai._kernel.groq_client import ask_ai
+from ai._kernel.transliteracija import transliterijaj
+from ai.pacient.slobodni_termini import _DEN_WD, _DEN_ALT, _den_od_match, _sleden_takov_kalendarski_den
 
 
 PROMPT = """
@@ -22,10 +24,58 @@ PROMPT = """
 Правила:
 - pozicija: наслов (пр. „Кардиолог", „Медицинска сестра"). Ако нема → null.
 - oddel: мора од листата подолу. „кардиолог"→„Кардиологија", „гинеколог"→„Акушерство и геникологија".
-- rok: датум во формат YYYY-MM-DD. Ако нема → null.
+- rok: краен датум за пријавување во формат YYYY-MM-DD. Ако нема → null.
+
+ВАЖНО за rok (релативни датуми — пресметај точно од денешниот датум што ти го давам во пораката):
+- „наредната среда" / „наредна среда" / „следната среда" = наредната календарска среда (не оваа ако е уште истата недела).
+- „наредната недела до среда" / „до наредната среда" / „следната недела до петок" = соодветниот ден во НАРЕДНАТА календарска недела (понеделник–недела после оваа недела), не месец подоцна.
+- „1 јуни", „15.05.2026" → точен датум.
 
 БЕЗ markdown, БЕЗ објаснувања. Само JSON.
 """.strip()
+
+
+# „наредната недела до среда", „до наредната недела до среда"
+_RE_NAR_NEDELA_DO = re.compile(
+    rf"(?:до\s+)?(?:наредн\w*|следн\w*)\s+недел\w*.{{0,48}}?до\s+({_DEN_ALT})\b",
+    re.IGNORECASE | re.DOTALL,
+)
+# „наредната среда", „до наредната среда" (еден ден, наредно појавување)
+_RE_NAR_DEN = re.compile(
+    rf"(?:до\s+)?(?:наредната|наредниот|нареден|наредна|следната|следниот|следен|следна)\s+({_DEN_ALT})\b",
+    re.IGNORECASE,
+)
+
+
+def _den_naredna_nedela(denes: date, ime_den: str) -> date:
+    """Дадениот ден (0=пон … 6=нед) од календарската недела веднаш по оваа."""
+    twd = _DEN_WD[ime_den]
+    dwd = denes.weekday()
+    pocetok_nedela = denes - timedelta(days=dwd)
+    pocetok_naredna = pocetok_nedela + timedelta(days=7)
+    return pocetok_naredna + timedelta(days=twd)
+
+
+def _rok_lokalno_od_prashanje(prashanje: str, denes: date) -> date | None:
+    """
+    Рок за пријава од релативни фрази на македонски (прецизнија од само-AI).
+    Враќа None ако нема препознатлив шаблон.
+    """
+    p = transliterijaj(prashanje).lower()
+
+    m = _RE_NAR_NEDELA_DO.search(p)
+    if m:
+        ime = _den_od_match(m)
+        if ime:
+            return _den_naredna_nedela(denes, ime)
+
+    m2 = _RE_NAR_DEN.search(p)
+    if m2:
+        ime = _den_od_match(m2)
+        if ime:
+            return _sleden_takov_kalendarski_den(denes, ime)
+
+    return None
 
 
 def _zimi_oddeli() -> list[str]:
@@ -50,10 +100,13 @@ def _najdi_oddel(oddel: str, site_oddeli: list[str]) -> str | None:
     return None
 
 
-def _izvlechi(prashanje: str) -> dict:
+def _izvlechi(prashanje: str, denes: date) -> dict:
     """AI враќа dict со pozicija/oddel/rok."""
     oddeli = _zimi_oddeli()
-    prompt = f"Оддели: {', '.join(oddeli)}\n\nПрашање: „{prashanje}\"\nВрати JSON."
+    prompt = (
+        f"Денес е {denes.isoformat()} ({denes.strftime('%d.%m.%Y')}).\n\n"
+        f"Оддели: {', '.join(oddeli)}\n\nПрашање: „{prashanje}\"\nВрати JSON."
+    )
     odgovor = ask_ai(prompt, system_prompt=PROMPT)
     print(f"[kreiraj_oglas] AI: {odgovor!r}")
 
@@ -76,7 +129,8 @@ def odgovori_za_kreiranje_oglas(prashanje: str, lekar: dict | None) -> str:
     if not check_admin_access(lekar["doctor_ID"]):
         return "Само директорот може да креира огласи."
 
-    podatoci = _izvlechi(prashanje)
+    denes = date.today()
+    podatoci = _izvlechi(prashanje, denes)
     if podatoci.get("_error"):
         return podatoci["_error"]
 
@@ -90,12 +144,22 @@ def odgovori_za_kreiranje_oglas(prashanje: str, lekar: dict | None) -> str:
             'Пример: „Креирај оглас за кардиолог" или „Оглас за гинеколог со рок 1 јуни"'
         )
 
-    # Рок: ако нема → 30 дена; ако е во минатото → +30 дена
-    denes = date.today()
-    try:
-        rok = datetime.strptime(rok_str, "%Y-%m-%d").date() if rok_str else denes + timedelta(days=30)
-    except Exception:
+    rok_lokal = _rok_lokalno_od_prashanje(prashanje, denes)
+    rok_ai: date | None = None
+    if rok_str:
+        try:
+            rs = str(rok_str).strip()[:10]
+            rok_ai = datetime.strptime(rs, "%Y-%m-%d").date()
+        except Exception:
+            rok_ai = None
+
+    if rok_lokal is not None:
+        rok = rok_lokal
+    elif rok_ai is not None:
+        rok = rok_ai
+    else:
         rok = denes + timedelta(days=30)
+
     if rok < denes:
         rok = denes + timedelta(days=30)
 
