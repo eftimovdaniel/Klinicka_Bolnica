@@ -83,7 +83,7 @@ def _zimi_oddeli() -> list[str]:
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("SELECT DISTINCT ime_na_oddel FROM Oddeli ORDER BY ime_na_oddel")
-    oddeli = [r[0] for r in cur.fetchall()]
+    oddeli = [str(r[0]) for r in cur.fetchall() if r[0] is not None]
     cur.close()
     conn.close()
     return oddeli

@@ -1,4 +1,6 @@
 from pathlib import Path
+from typing import Any, cast
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -77,9 +79,10 @@ def debug_kariera():
         rows = cur.fetchall()
         out = []
         for r in rows:
-            d = r.get("datum_na_prijavuvanje")
+            row = cast(dict[str, Any], r)
+            d = row.get("datum_na_prijavuvanje")
             rok = d.strftime("%d.%m.%Y") if d and hasattr(d, "strftime") else (str(d)[:10] if d else "")
-            out.append({**r, "rok_str": rok})
+            out.append({**row, "rok_str": rok})
         cur.close()
         conn.close()
         return {"count": len(out), "oglasi": out}
@@ -107,7 +110,11 @@ def debug_db():
             try:
                 cur.execute(sql)
                 rows = cur.fetchall()
-                cnt = rows[0].get("c", len(rows)) if rows else 0
+                cnt = (
+                    cast(dict[str, Any], rows[0]).get("c", len(rows))
+                    if rows
+                    else 0
+                )
                 results[name] = {"ok": True, "count": cnt}
             except Exception as e:
                 results[name] = {"ok": False, "error": str(e)}
