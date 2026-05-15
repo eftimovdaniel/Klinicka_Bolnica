@@ -257,6 +257,21 @@ def najdi_lekar_so_ai(prashanje: str) -> dict | None:
     return None
 
 
+def lekar_od_zakazi_kontekst(kontekst: dict | None) -> dict | None:
+    """Лекар од претходна листа слободни термини (zakazi_od_slobodni)."""
+    if not kontekst or not isinstance(kontekst.get("zakazi_od_slobodni"), dict):
+        return None
+    zos = kontekst["zakazi_od_slobodni"]
+    try:
+        doctor_id = int(zos.get("doctor_id"))
+    except (TypeError, ValueError):
+        return None
+    for lekar in zimi_site_lekari():
+        if int(lekar["doctor_ID"]) == doctor_id:
+            return lekar
+    return None
+
+
 def generiraj_slotovi_za_den(datum: date) -> list[datetime]:
     """
     Генерира сите можни слотови за еден ден (08:00, 08:30, ... 15:30).
@@ -476,17 +491,23 @@ def formatiraj_odgovor(
     return "\n".join(delovi)
 
 
-def odgovori_za_slobodni_termini(prashanje: str) -> str | dict:
+def odgovori_za_slobodni_termini(
+    prashanje: str, kontekst: dict | None = None
+) -> str | dict:
     """
     Главна точка - повикана од router-от.
 
     Параметри:
         prashanje - целото прашање од корисникот (AI сам ќе извлече кој лекар)
+        kontekst  - опционално: лекар од претходна порака (zakazi_od_slobodni)
 
     Враќа: текст или dict со „odgovor“ и „kontekst“ (за продолжување на закажување без повторно име).
     """
-    # AI наоѓа кој лекар е во прашањето
     lekar = najdi_lekar_so_ai(prashanje)
+    od_kontekst = False
+    if not lekar:
+        lekar = lekar_od_zakazi_kontekst(kontekst)
+        od_kontekst = lekar is not None
 
     if not lekar:
         return (
@@ -499,6 +520,11 @@ def odgovori_za_slobodni_termini(prashanje: str) -> str | dict:
     cilj = izvleci_cilj_datum_za_slobodni(prashanje)
     slobodni = pronajdi_slobodni_termini(lekar["doctor_ID"], na_datum=cilj)
     text = formatiraj_odgovor(lekar, slobodni, na_datum=cilj)
+    if od_kontekst:
+        text = (
+            f"(Продолжуваме кај д-р {lekar['name']} {lekar['surname']} од претходната порака.)\n\n"
+            + text
+        )
     text += (
         "\n\nДоколку листата се однесува на еден датум, во следната порака доволно е да го наведете часот "
         "(на пример: „закажи во 10:30“). Ако се работи за повеќе денови, наведете го и датумот. "

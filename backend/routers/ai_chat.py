@@ -123,14 +123,61 @@ def _resolve_intent(
     if intent == "moj_raspored" and pacient_dict and not lekar_dict:
         intent = "moi_pregledi"
 
-    if (
-        aktiven_kontekst
-        and aktiven_kontekst.get("zakazi_od_slobodni")
-        and intent == "general"
-    ):
+    if aktiven_kontekst and aktiven_kontekst.get("zakazi_od_slobodni"):
         q = pitanje_norm.lower()
-        if re.search(r"\b\d{1,2}\s*[:.]\s*\d{2}\b", q) or re.search(r"\bво\s+\d{1,2}\b", q) or "закаж" in q:
+        # Закажување со време / „закажи во 10:30“
+        if re.search(r"\b\d{1,2}\s*[:.]\s*\d{2}\b", q) or re.search(
+            r"\bво\s+\d{1,2}\b", q
+        ):
             intent = "zakazi_termin"
+        elif "закаж" in q and not any(
+            w in q
+            for w in (
+                "провери",
+                "провер",
+                "слобод",
+                "наредн",
+                "следн",
+                "утре",
+                "задутре",
+                "понеделник",
+                "вторник",
+                "среда",
+                "четврток",
+                "петок",
+                "сабота",
+                "недела",
+            )
+        ):
+            intent = "zakazi_termin"
+        # Следна порака: друг ден / „наредниот петок“ кај истиот лекар
+        elif intent in ("general", "zakazi_termin"):
+            from ai.pacient.slobodni_termini import cilj_datum_lokalno
+
+            if cilj_datum_lokalno(pitanje_norm) or any(
+                w in q
+                for w in (
+                    "провери",
+                    "провер",
+                    "слобод",
+                    "термин",
+                    "има ли",
+                    "кога",
+                    "може",
+                    "наредн",
+                    "следн",
+                    "утре",
+                    "задутре",
+                    "понеделник",
+                    "вторник",
+                    "среда",
+                    "четврток",
+                    "петок",
+                    "сабота",
+                    "недела",
+                )
+            ):
+                intent = "slobodni_termini"
 
     return intent
 

@@ -121,6 +121,8 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
 
     if spec.kind == "none":
         raw = spec.fn()
+    elif intent == "slobodni_termini":
+        raw = spec.fn(q, ctx.kontekst)
     elif intent in (
         "zakazi_termin",
         "apliciraj_za_rabota",
