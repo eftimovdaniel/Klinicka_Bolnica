@@ -42,6 +42,8 @@ PROMPT_POZICIJA = """
 - Ако позицијата НЕ е јасна → null.
 - „сакам да аплицирам за работа", „да работам кај вас", „вработување" БЕЗ
   конкретна специјалност/оддел → null (не „работа" како позиција).
+- Ако корисникот залепи цел **оглас за работа** (на пр. „Се вработува медицинска сестра…"),
+  извлечи ја позицијата од текстот (на пр. „Медицинска сестра").
 
 БЕЗ markdown, БЕЗ објаснувања.
 """.strip()
@@ -61,6 +63,94 @@ PROMPT_LICENCA = """
 
 БЕЗ markdown.
 """.strip()
+
+
+def _tekst_e_zalepen_oglas(prashanje: str) -> bool:
+    """Цел текст на оглас (копиран од сајт/FB), не само „сакам да аплицирам“."""
+    p = transliterijaj(prashanje).lower()
+    ima_oglas = any(
+        x in p
+        for x in (
+            "оглас за работа",
+            "oglas za rabota",
+            "се вработува",
+            "se vrabotuva",
+            "можност за аплицирање",
+            "moznost za apliciranje",
+            "рок за пријавување",
+        )
+    )
+    ima_pozicija = any(
+        x in p
+        for x in (
+            "медицинск",
+            "сестр",
+            "лекар",
+            "доктор",
+            "гинекол",
+            "гиникол",
+            "акауш",
+            "кардиол",
+            "хирург",
+            "одделот",
+        )
+    )
+    return ima_oglas and ima_pozicija
+
+
+def _izvlechi_pozicija_od_oglas_pravila(prashanje: str) -> str | None:
+    """Брзо извлекување од типичен текст на оглас (без Groq)."""
+    p = transliterijaj(prashanje).lower()
+    if "медицинск" in p and "сестр" in p:
+        return "Медицинска сестра"
+    if "гинекол" in p or "гиникол" in p:
+        if "сестр" in p:
+            return "Медицинска сестра"
+        return "Гинеколог"
+    if "акауш" in p:
+        return "Акушер"
+    if "кардиол" in p:
+        return "Кардиолог"
+    if "хирург" in p:
+        return "Хирург"
+    if "урол" in p:
+        return "Уролог"
+    if "анестез" in p:
+        return "Анестезиолог"
+    m = re.search(r"\(([^)]+)\)", prashanje)
+    if m:
+        inner = m.group(1).strip()
+        if len(inner) > 3 and len(inner) < 80:
+            return inner[0].upper() + inner[1:] if inner else None
+    return None
+
+
+def _baraj_pozicija_za_aplikacija(prashanje: str) -> str | None:
+    """Позиција од оглас (правила) или преку AI."""
+    if _tekst_e_zalepen_oglas(prashanje):
+        poz = _izvlechi_pozicija_od_oglas_pravila(prashanje)
+        if poz:
+            return poz
+    return _izvlechi_pozicija(prashanje)
+
+
+def _odgovor_bara_pacient_login(kontekst_za_po_login: dict | None, prikaz_pozicija: str) -> dict:
+    out: dict = {
+        "odgovor": (
+            f"Го препознав огласот за работа: {prikaz_pozicija}.\n\n"
+            "За да ја испратам апликацијата преку AI, прво треба да се "
+            "најавиш како пациент (не како лекар). "
+            "Ти ја отворам формата за најава — по најавата напиши «да» "
+            "или «сакам да аплицирам» за да продолжиме."
+        ),
+        "akcija": "otvori_pacient_login",
+        "navigacija": NAV_KARIERA,
+    }
+    if kontekst_za_po_login:
+        out["kontekst"] = kontekst_za_po_login
+    else:
+        out["kontekst"] = None
+    return out
 
 
 def _prasanje_e_opsto_za_rabota(prashanje: str) -> bool:
@@ -411,18 +501,48 @@ def odgovori_za_aplikacija(
     - Ако има активен kontekst со cekam='potvrduvanje' → потврди и испрати.
     """
 
-    if not pacient or not pacient.get("email"):
-        return {
-            "odgovor": (
-                'За да аплицираш за работа преку AI асистентот, прво треба да се '
-                'најавиш како пациент. Ти ја отворам формата за најава – '
-                'по најавата веднаш ќе ти ја испратам апликацијата.'
-            ),
-            "kontekst": None,
-            "akcija": "otvori_pacient_login",
-        }
-
     cekam = (kontekst or {}).get("cekam")
+
+    # По најава: продолжи од зачуваниот оглас
+    if cekam == "login" and pacient and pacient.get("email"):
+        oglas = _oglas_od_kontekst(kontekst or {})
+        if oglas.get("id_oglas") and oglas.get("pozicija"):
+            return _pocni_potvrda_flow(
+                {
+                    "id_oglas": oglas["id_oglas"],
+                    "pozicija": oglas["pozicija"],
+                    "oddel": oglas.get("oddel") or "",
+                    "rok": oglas.get("rok") or "",
+                }
+            )
+
+    if not pacient or not pacient.get("email"):
+        if not cekam and (_tekst_e_zalepen_oglas(prashanje) or "аплиц" in transliterijaj(prashanje).lower()):
+            baran = _baraj_pozicija_za_aplikacija(prashanje)
+            if baran:
+                oglas = _najdi_aktiven_oglas(baran)
+                if oglas:
+                    prikaz = _format_pozicija_oglas(oglas)
+                    return _odgovor_bara_pacient_login(
+                        {
+                            "intent": "apliciraj_za_rabota",
+                            "cekam": "login",
+                            "pozicija": oglas["pozicija"],
+                            "id_oglas": oglas["id_oglas"],
+                            "oddel": oglas.get("oddel") or "",
+                            "rok": oglas.get("rok") or "",
+                        },
+                        prikaz,
+                    )
+                return _odgovor_bara_pacient_login(
+                    None,
+                    f'„{baran}" (во моментов нема точен активен оглас во системот — провери Кариера)',
+                )
+        return _odgovor_bara_pacient_login(
+            None,
+            "аплицирање за работа",
+        )
+
     pozicija = (kontekst or {}).get("pozicija")
     id_oglas = (kontekst or {}).get("id_oglas")
 
@@ -431,7 +551,7 @@ def odgovori_za_aplikacija(
         if _prasanje_e_opsto_za_rabota(prashanje):
             return _odgovor_izberi_pozicija(pacient)
 
-        baran = _izvlechi_pozicija(prashanje)
+        baran = _baraj_pozicija_za_aplikacija(prashanje)
         if not baran:
             return _odgovor_izberi_pozicija(pacient)
 

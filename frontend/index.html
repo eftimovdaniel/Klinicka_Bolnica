@@ -1079,7 +1079,7 @@
             <button type="button" class="kbs-ai-history-close" id="kbs-ai-history-close" aria-label="Затвори листа">✕</button>
           </div>
           <ul class="kbs-ai-history-list" id="kbs-ai-history-list"></ul>
-          <p class="kbs-ai-history-empty" id="kbs-ai-history-empty" hidden>Немате зачувани разговори.</p>
+          <p class="kbs-ai-history-empty" id="kbs-ai-history-empty" hidden>Немате зачувани разговори. Разговорите се зачувуваат додека сте најавени.</p>
         </div>
         <div class="kbs-ai-panel-body">
           <div class="kbs-ai-intro" id="kbs-ai-intro">
@@ -1110,6 +1110,19 @@
   <!-- ======================================================================
        КБ ШТИП AI АСИСТЕНТ | ИЗГЛЕД (HTML): крај
        ====================================================================== -->
+
+  <div class="kbs-ai-confirm-overlay" id="kbs-ai-delete-confirm" hidden aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="kbs-ai-delete-confirm-title">
+    <div class="kbs-ai-confirm-dialog">
+      <h3 class="kbs-ai-confirm-title" id="kbs-ai-delete-confirm-title">Избриши разговор?</h3>
+      <p class="kbs-ai-confirm-text">Разговорот ќе биде трајно избришан. Ова не може да се врати.</p>
+      <p class="kbs-ai-confirm-name" id="kbs-ai-delete-confirm-name" hidden></p>
+      <p class="kbs-ai-confirm-error" id="kbs-ai-delete-confirm-error" hidden></p>
+      <div class="kbs-ai-confirm-actions">
+        <button type="button" class="kbs-ai-confirm-btn kbs-ai-confirm-cancel" id="kbs-ai-delete-cancel">Откажи</button>
+        <button type="button" class="kbs-ai-confirm-btn kbs-ai-confirm-danger" id="kbs-ai-delete-ok">Избриши</button>
+      </div>
+    </div>
+  </div>
 
 </body>
 </html>

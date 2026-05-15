@@ -19,6 +19,7 @@ from ai._kernel.intent_detector import detektiraj_intent
 from ai._kernel.transliteracija import normaliziraj_prashanje
 from ai_chat_store import (
     create_session,
+    delete_session,
     get_session_messages,
     list_sessions,
     save_exchange,
@@ -113,6 +114,53 @@ def _resolve_intent(
 ) -> str:
     if aktiven_kontekst and aktiven_kontekst.get("intent") == "apliciraj_za_rabota":
         return "apliciraj_za_rabota"
+
+    dk = (
+        aktiven_kontekst.get("dezurstvo_kontekst")
+        if isinstance(aktiven_kontekst, dict)
+        else None
+    )
+    if dk:
+        q = pitanje_norm.lower()
+        if any(
+            w in q
+            for w in (
+                "промени",
+                "промениш",
+                "премести",
+                "префрли",
+                "смени",
+                "додади",
+                "dodadi",
+                "иста дата",
+                "истиот датум",
+                "до ",
+                "do ",
+            )
+        ) or re.search(r"\b\d{1,2}\s*[:.]\s*\d{2}\b", q):
+            return "promeni_dezurstvo"
+        if any(
+            w in q
+            for w in (
+                "админ",
+                "административ",
+                "admin",
+                "панел",
+            )
+        ) and any(
+            w in q
+            for w in (
+                "прикажи",
+                "prikazi",
+                "отвори",
+                "otvori",
+                "однеси",
+                "види",
+                "го ",
+                " го",
+            )
+        ):
+            return "otvori_admin_panel"
     try:
         intent = detektiraj_intent(pitanje_norm)
     except Exception as e:
@@ -233,6 +281,20 @@ def get_chat_messages(
         "kontekst": data.get("kontekst"),
         "messages": msgs,
     }
+
+
+@router.delete("/sessions/{session_id}")
+def delete_chat_session(
+    session_id: int,
+    pacient_id: int | None = Query(None),
+    doctor_id: int | None = Query(None),
+):
+    """Опционално бришење на зачуван разговор (само сопственик)."""
+    if not pacient_id and not doctor_id:
+        raise HTTPException(status_code=400, detail="Потребен е pacient_id или doctor_id.")
+    if not delete_session(session_id, pacient_id=pacient_id, doctor_id=doctor_id):
+        raise HTTPException(status_code=404, detail="Разговорот не е пронајден.")
+    return {"ok": True, "session_id": session_id}
 
 
 @router.post("/ask")

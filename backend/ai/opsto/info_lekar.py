@@ -9,7 +9,7 @@
 from datetime import date, datetime, time, timedelta
 
 from database import get_connection
-from ai.pacient.slobodni_termini import najdi_lekar_so_ai
+from ai._kernel.lekar_lookup import najdi_lekar_od_prashanje
 
 
 def zimi_dezurstva_za_lekar(doctor_id: int, denovi_napred: int = 7) -> list[dict]:
@@ -129,7 +129,7 @@ def _dezuren_status(dezurstva: list[dict]) -> str:
 
 
 def odgovori_za_info_lekar(prashanje: str) -> str:
-    lekar = najdi_lekar_so_ai(prashanje)
+    lekar = najdi_lekar_od_prashanje(prashanje)
 
     if not lekar:
         return (

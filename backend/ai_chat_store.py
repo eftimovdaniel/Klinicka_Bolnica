@@ -191,6 +191,41 @@ def create_session(
             conn.close()
 
 
+def delete_session(
+    session_id: int,
+    *,
+    pacient_id: int | None = None,
+    doctor_id: int | None = None,
+) -> bool:
+    """Брише сесија и сите пораки (CASCADE). Само сопственик."""
+    if not pacient_id and not doctor_id:
+        return False
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        if not _session_owned(cur, session_id, pacient_id, doctor_id):
+            return False
+        cur.execute(
+            "DELETE FROM Ai_chat_session WHERE session_id = %s",
+            (session_id,),
+        )
+        conn.commit()
+        cur.close()
+        return True
+    except Exception as e:
+        print(f"[ai_chat_store] delete_session: {e}")
+        if conn:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        return False
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
+
+
 def save_exchange(
     session_id: int,
     *,

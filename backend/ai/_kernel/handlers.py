@@ -49,7 +49,9 @@ def _build_handlers() -> dict[str, HandlerSpec]:
         postavi_potsetnik,
         prenesi_termin,
         preporaka_lekar,
+        pregled_dezurstvo,
         promeni_dezurstvo,
+        otvori_admin_panel,
         slobodni_termini,
         statistika_oddeli,
         trgni_ocena,
@@ -78,7 +80,15 @@ def _build_handlers() -> dict[str, HandlerSpec]:
         "kreiraj_oglas": HandlerSpec(kreiraj_oglas.odgovori_za_kreiranje_oglas),
         "izbrisi_vest_oglas": HandlerSpec(izbrisi_vest_oglas.odgovori_za_brisenje),
         "zatvori_oglas": HandlerSpec(zatvori_oglas.odgovori_za_zatvoranje_oglas),
-        "promeni_dezurstvo": HandlerSpec(promeni_dezurstvo.odgovori_za_dezurstvo),
+        "pregled_dezurstvo": HandlerSpec(
+            pregled_dezurstvo.odgovori_za_pregled_dezurstvo, kind="dict"
+        ),
+        "promeni_dezurstvo": HandlerSpec(
+            promeni_dezurstvo.odgovori_za_dezurstvo, kind="dict"
+        ),
+        "otvori_admin_panel": HandlerSpec(
+            otvori_admin_panel.odgovori_za_otvori_admin, kind="dict_full"
+        ),
         "statistika_oddeli": HandlerSpec(statistika_oddeli.odgovori_za_statistika),
         "zavrshi_pregled": HandlerSpec(zavrshi_pregled.odgovori_za_zavrshi),
         "istorija_pacient": HandlerSpec(istorija_pacient.odgovori_za_istorija),
@@ -123,6 +133,8 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
         raw = spec.fn()
     elif intent == "slobodni_termini":
         raw = spec.fn(q, ctx.kontekst)
+    elif intent == "otvori_admin_panel":
+        raw = spec.fn(q, ctx.lekar, ctx.kontekst)
     elif intent in (
         "zakazi_termin",
         "apliciraj_za_rabota",
@@ -137,12 +149,13 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
         "moi_pregledi",
     ):
         raw = spec.fn(q, ctx.pacient)
+    elif intent in ("pregled_dezurstvo", "promeni_dezurstvo"):
+        raw = spec.fn(q, ctx.lekar, ctx.kontekst)
     elif intent in (
         "objavi_vest",
         "kreiraj_oglas",
         "izbrisi_vest_oglas",
         "zatvori_oglas",
-        "promeni_dezurstvo",
         "statistika_oddeli",
         "zavrshi_pregled",
         "istorija_pacient",
@@ -163,6 +176,8 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
         if isinstance(raw, dict):
             out["odgovor"] = raw.get("odgovor", "")
             out["kontekst"] = raw.get("kontekst")
+            if raw.get("akcija"):
+                out["akcija"] = raw["akcija"]
         else:
             out["odgovor"] = raw or ""
 

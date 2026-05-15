@@ -34,8 +34,9 @@ from ai.direktor import kreiraj_oglas, zatvori_oglas, izbrisi_vest_oglas  # noqa
 from ai.direktor import aplikanti_oglas, promeni_dezurstvo  # noqa: F401
 from ai.direktor import statistika_oddeli, objavi_vest  # noqa: F401
 from ai.direktor import izvestaj_den_nedela  # noqa: F401
+from ai.direktor import otvori_admin_panel  # noqa: F401
 
 # === OPSTO ===
 from ai.opsto import info_lekar, lekari_oddel, uslugi, navigacija  # noqa: F401
 from ai.opsto import bolnica_info, preporaka_lekar  # noqa: F401
-from ai.opsto import novosti_rezime, faq_pregled  # noqa: F401
+from ai.opsto import novosti_rezime, faq_pregled, pregled_dezurstvo  # noqa: F401

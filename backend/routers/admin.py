@@ -90,7 +90,7 @@ def get_all_dezurstva(doctor_id: Optional[int] = None, datum: Optional[str] = No
             query += " AND d.oddel = %s"
             params.append(oddel)
         
-        query += " ORDER BY d.datum ASC, d.vreme_od ASC"
+        query += " ORDER BY d.datum DESC, d.vreme_od DESC"
         
         db_cursor.execute(query, params)
         rows = db_cursor.fetchall()

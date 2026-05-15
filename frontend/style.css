@@ -2922,6 +2922,12 @@ html {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
+.admin-item-highlight {
+  border-color: #1a5fb4;
+  background: #e8f2fc;
+  box-shadow: 0 0 0 2px rgba(26, 95, 180, 0.25);
+}
+
 /* Содржина на административната ставка (податоци) */
 .admin-item-content {
   flex: 1;
@@ -4603,8 +4609,15 @@ html {
   overflow-y: auto;
   flex: 1;
 }
+.kbs-ai-history-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  margin-bottom: 2px;
+}
 .kbs-ai-history-item {
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   text-align: left;
   border: none;
   background: transparent;
@@ -4617,6 +4630,24 @@ html {
 .kbs-ai-history-item:hover,
 .kbs-ai-history-item.is-active {
   background: #f1f5f9;
+}
+.kbs-ai-history-delete {
+  flex-shrink: 0;
+  align-self: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.kbs-ai-history-delete:hover {
+  background: #fee2e2;
+  color: #b91c1c;
 }
 .kbs-ai-history-item-title {
   display: block;
@@ -4639,6 +4670,113 @@ html {
   font-size: 13px;
   color: #64748b;
   text-align: center;
+}
+
+.kbs-ai-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 130000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.5);
+  backdrop-filter: blur(6px);
+  animation: kbs-ai-confirm-fade 0.2s ease-out;
+  --kbs-asst-red: #d11820;
+  --kbs-asst-red-deep: #850f15;
+}
+.kbs-ai-confirm-overlay[hidden] {
+  display: none !important;
+}
+@keyframes kbs-ai-confirm-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.kbs-ai-confirm-dialog {
+  width: 100%;
+  max-width: 300px;
+  background: #fff;
+  border-radius: 14px;
+  padding: 20px 18px 16px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  text-align: center;
+  animation: kbs-ai-confirm-slide 0.22s ease-out;
+}
+@keyframes kbs-ai-confirm-slide {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.kbs-ai-confirm-title {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.kbs-ai-confirm-text {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: #64748b;
+}
+.kbs-ai-confirm-name {
+  margin: 0 0 14px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kbs-ai-confirm-name[hidden],
+.kbs-ai-confirm-error[hidden] {
+  display: none !important;
+}
+.kbs-ai-confirm-error {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #b91c1c;
+}
+.kbs-ai-confirm-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+.kbs-ai-confirm-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.kbs-ai-confirm-cancel {
+  background: #f1f5f9;
+  color: #334155;
+  border-color: #e2e8f0;
+}
+.kbs-ai-confirm-cancel:hover {
+  background: #e2e8f0;
+}
+.kbs-ai-confirm-danger {
+  background: linear-gradient(145deg, var(--kbs-asst-red), var(--kbs-asst-red-deep));
+  color: #fff;
+}
+.kbs-ai-confirm-danger:hover {
+  filter: brightness(1.05);
+}
+.kbs-ai-confirm-danger:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 /* ---------- BODY ---------- */

@@ -3179,7 +3179,7 @@ window.showAllDoctors = showAllDoctors;
 
 // Функција за прикажување на под-табови во администрација
 // Параметри: subTabName - име на под-табот ('dezurstva-admin' или 'oglasi-admin')
-function showAdminSubTab(subTabName) {
+function showAdminSubTab(subTabName, adminLoadOpts) {
   // Сокриј сите под-табови
   document.querySelectorAll('.admin-sub-tab-content').forEach(tab => {
     tab.classList.remove('active');
@@ -3201,7 +3201,7 @@ function showAdminSubTab(subTabName) {
 
   // Вчитај ги податоците според под-табот
   if (subTabName === 'dezurstva-admin') {
-    loadAdminDezurstva();
+    loadAdminDezurstva(adminLoadOpts || null);
   } else if (subTabName === 'oglasi-admin') {
     loadAdminOglasi();
   } else if (subTabName === 'novosti-admin') {
@@ -3216,30 +3216,52 @@ function showAdminSubTab(subTabName) {
 // Вчитување на дежурства за администрација
 // Ги вчитува сите дежурства од базата и ги прикажува во административниот панел
 // Задолжително треба да се најавен лекар (currentLekar) и да е директорот
-async function loadAdminDezurstva() {
+async function loadAdminDezurstva(filterOpts) {
   const container = document.getElementById('dezurstva-admin-list');
   if (!container || !currentLekar) return;
-  
+  if (typeof isLekarHospitalDirector === 'function' && !isLekarHospitalDirector(currentLekar)) {
+    container.innerHTML = '<div class="loading" style="color: red;">Само директорот има пристап до администрацијата.</div>';
+    return;
+  }
+
   try {
     container.innerHTML = '<div class="loading">Вчитувам дежурства...</div>';
-    
-    const res = await fetch(`${API_BASE}/admin/dezurstva?admin_doctor_id=${currentLekar.doctor_ID}`);
+
+    var url = API_BASE + '/admin/dezurstva?admin_doctor_id=' + encodeURIComponent(currentLekar.doctor_ID);
+    if (filterOpts && filterOpts.doctor_id) {
+      url += '&doctor_id=' + encodeURIComponent(filterOpts.doctor_id);
+    }
+    if (filterOpts && filterOpts.datum) {
+      url += '&datum=' + encodeURIComponent(filterOpts.datum);
+    }
+    const res = await fetch(url);
     if (!res.ok) {
       const error = await res.json();
       throw new Error(error.detail || `HTTP грешка! Статус: ${res.status}`);
     }
-    
+
     const dezurstva = await res.json();
-    
+    var highlightId = filterOpts && filterOpts.highlight_id
+      ? parseInt(filterOpts.highlight_id, 10)
+      : null;
+
     if (dezurstva.length === 0) {
-      container.innerHTML = '<div class="loading">Нема дежурства.</div>';
+      var prazno = filterOpts && (filterOpts.doctor_id || filterOpts.datum)
+        ? 'Нема дежурства за избраниот филтер.'
+        : 'Нема дежурства.';
+      container.innerHTML = '<div class="loading">' + prazno + '</div>';
       return;
     }
-    
+
     container.innerHTML = '';
+    var highlightEl = null;
     dezurstva.forEach(d => {
       const div = document.createElement('div');
       div.className = 'admin-item';
+      if (highlightId && d.dezurstvo_ID === highlightId) {
+        div.classList.add('admin-item-highlight');
+        highlightEl = div;
+      }
       div.innerHTML = `
         <div class="admin-item-content">
           <h4>${d.doctor_name} - ${d.oddel}</h4>
@@ -3254,10 +3276,16 @@ async function loadAdminDezurstva() {
       `;
       container.appendChild(div);
     });
+    if (highlightEl) {
+      setTimeout(function () {
+        highlightEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 150);
+    }
   } catch (err) {
-    container.innerHTML = `<div class="loading" style="color: red;">Грешка: ${err.message}</div>`;
+    container.innerHTML = '<div class="loading" style="color: red;">Грешка: ' + err.message + '</div>';
   }
 }
+window.loadAdminDezurstva = loadAdminDezurstva;
 
 // Вчитување на огласи за администрација
 // Ги вчитува сите огласи за работа од базата и ги прикажува во административниот панел
@@ -5101,6 +5129,20 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
     }
   }
 
+  async function kbsDeleteChatSession(sessionId) {
+    var q = kbsAIHistoryQuery();
+    if (!q || !sessionId) return false;
+    try {
+      var res = await fetch(
+        AI_CHAT_BASE + "/sessions/" + encodeURIComponent(String(sessionId)) + "?" + q,
+        { method: "DELETE" }
+      );
+      return res.ok;
+    } catch (e) {
+      return false;
+    }
+  }
+
   async function kbsFetchChatMessages(sessionId) {
     var q = kbsAIHistoryQuery();
     if (!q || !sessionId) return null;
@@ -5157,8 +5199,57 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
           window.showPacientRegister();
         }
       }, 500);
+    } else if (akcija === "osvezi_admin_dezurstva") {
+      if (typeof window.loadAdminDezurstva === "function") {
+        window.loadAdminDezurstva();
+      }
+    } else if (akcija === "otvori_admin_panel") {
+      /* навигацијата го отвора панелот со филтер; не повикувај повторно */
+    } else if (akcija === "otvori_lekar_login") {
+      setTimeout(function () {
+        if (typeof window.openLekarLoginModal === "function") {
+          window.openLekarLoginModal();
+        }
+      }, 500);
     }
   }
+
+  function kbsOtvoriAdminPanel(nav) {
+    setTimeout(function () {
+      if (!currentLekar) {
+        if (typeof window.openLekarLoginModal === "function") {
+          window.openLekarLoginModal();
+        }
+        return;
+      }
+      if (typeof isLekarHospitalDirector === "function" && !isLekarHospitalDirector(currentLekar)) {
+        if (typeof showLekarToast === "function") {
+          showLekarToast("Административниот панел е достапен само за директорот.", true);
+        }
+        return;
+      }
+      if (typeof window.openLekarDashboardModal === "function") {
+        window.openLekarDashboardModal();
+      }
+      if (typeof window.showLekarTab === "function") {
+        window.showLekarTab("admin");
+      }
+      var navObj = nav && typeof nav === "object" ? nav : null;
+      var st = (navObj && navObj.subtab) || (typeof nav === "string" ? nav : null) || "dezurstva-admin";
+      var filterOpts = null;
+      if (navObj && (navObj.doctor_id || navObj.datum || navObj.dezurstvo_id)) {
+        filterOpts = {
+          doctor_id: navObj.doctor_id,
+          datum: navObj.datum,
+          highlight_id: navObj.dezurstvo_id,
+        };
+      }
+      if (typeof window.showAdminSubTab === "function") {
+        window.showAdminSubTab(st, filterOpts);
+      }
+    }, 500);
+  }
+  window.kbsOtvoriAdminPanel = kbsOtvoriAdminPanel;
 
   // Помошна функција – ресет на конверзациски контекст (повикана од reset/logout)
   function kbsResetKontekst() {
@@ -5219,6 +5310,11 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
     if (!nav || !nav.target) return;
     var target = String(nav.target);
 
+    if (target === "lekar:admin" || target.indexOf("lekar:admin") === 0) {
+      kbsOtvoriAdminPanel(nav);
+      return;
+    }
+
     var hashIdx = target.indexOf("#");
     var fileChunk = hashIdx >= 0 ? target.substring(0, hashIdx) : target;
     var hashChunk = hashIdx >= 0 ? target.substring(hashIdx + 1) : "";
@@ -5270,8 +5366,75 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
     const historyList = qs("#kbs-ai-history-list", root);
     const historyEmpty = qs("#kbs-ai-history-empty", root);
     const historyCloseBtn = qs("#kbs-ai-history-close", root);
+    const deleteConfirmEl = qs("#kbs-ai-delete-confirm");
+    const deleteConfirmName = qs("#kbs-ai-delete-confirm-name");
+    const deleteConfirmError = qs("#kbs-ai-delete-confirm-error");
+    const deleteCancelBtn = qs("#kbs-ai-delete-cancel");
+    const deleteOkBtn = qs("#kbs-ai-delete-ok");
+
+    var pendingDeleteSessionId = null;
 
     if (!launcher || !panel || !form || !input || !messagesEl || !panelBodyEl) return;
+
+    function kbsCloseDeleteConfirm() {
+      if (!deleteConfirmEl) return;
+      pendingDeleteSessionId = null;
+      document.body.style.overflow = "";
+      deleteConfirmEl.hidden = true;
+      deleteConfirmEl.setAttribute("aria-hidden", "true");
+      if (deleteConfirmError) {
+        deleteConfirmError.hidden = true;
+        deleteConfirmError.textContent = "";
+      }
+      if (deleteOkBtn) deleteOkBtn.disabled = false;
+    }
+
+    function kbsOpenDeleteConfirm(sessionId, naslov) {
+      if (!deleteConfirmEl) return;
+      pendingDeleteSessionId = sessionId;
+      if (deleteConfirmName) {
+        var n = (naslov || "").trim();
+        if (n) {
+          deleteConfirmName.textContent = n;
+          deleteConfirmName.hidden = false;
+        } else {
+          deleteConfirmName.textContent = "";
+          deleteConfirmName.hidden = true;
+        }
+      }
+      if (deleteConfirmError) {
+        deleteConfirmError.hidden = true;
+        deleteConfirmError.textContent = "";
+      }
+      if (deleteOkBtn) deleteOkBtn.disabled = false;
+      document.body.style.overflow = "hidden";
+      deleteConfirmEl.hidden = false;
+      deleteConfirmEl.setAttribute("aria-hidden", "false");
+      if (deleteCancelBtn) deleteCancelBtn.focus();
+    }
+
+    async function kbsConfirmDeleteSession() {
+      var sid = pendingDeleteSessionId;
+      if (!sid) return;
+      if (deleteOkBtn) deleteOkBtn.disabled = true;
+      var ok = await kbsDeleteChatSession(sid);
+      if (!ok) {
+        if (deleteConfirmError) {
+          deleteConfirmError.textContent = "Не успеав да го избришам. Обидете се повторно.";
+          deleteConfirmError.hidden = false;
+        }
+        if (deleteOkBtn) deleteOkBtn.disabled = false;
+        return;
+      }
+      kbsCloseDeleteConfirm();
+      if (kbsAISessionId === sid) {
+        messagesEl.innerHTML = "";
+        if (introEl) introEl.hidden = false;
+        if (input) input.value = "";
+        kbsResetKontekst();
+      }
+      kbsRenderHistoryList(kbsAISessionId);
+    }
 
     /** Скрол на конецот на чатот (листата е во .kbs-ai-panel-body, не во #kbs-ai-messages). */
     function kbsScrollChatToBottom(force, smooth) {
@@ -5341,6 +5504,8 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       }
       sessions.forEach(function (s) {
         var li = document.createElement("li");
+        li.className = "kbs-ai-history-row";
+
         var btn = document.createElement("button");
         btn.type = "button";
         btn.className = "kbs-ai-history-item";
@@ -5359,7 +5524,20 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
         btn.addEventListener("click", function () {
           kbsLoadChatSession(s.session_id);
         });
+
+        var delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "kbs-ai-history-delete";
+        delBtn.setAttribute("aria-label", "Избриши разговор");
+        delBtn.title = "Избриши";
+        delBtn.textContent = "✕";
+        delBtn.addEventListener("click", function (ev) {
+          ev.stopPropagation();
+          kbsOpenDeleteConfirm(s.session_id, s.naslov || "");
+        });
+
         li.appendChild(btn);
+        li.appendChild(delBtn);
         historyList.appendChild(li);
       });
     }
@@ -5455,6 +5633,20 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       historyCloseBtn.addEventListener("click", kbsCloseHistoryPanel);
     }
 
+    if (deleteCancelBtn) {
+      deleteCancelBtn.addEventListener("click", kbsCloseDeleteConfirm);
+    }
+    if (deleteOkBtn) {
+      deleteOkBtn.addEventListener("click", function () {
+        kbsConfirmDeleteSession();
+      });
+    }
+    if (deleteConfirmEl) {
+      deleteConfirmEl.addEventListener("click", function (ev) {
+        if (ev.target === deleteConfirmEl) kbsCloseDeleteConfirm();
+      });
+    }
+
     kbsSyncHistoryButton();
     window.addEventListener("kbs:session-sync", function () {
       kbsSyncHistoryButton();
@@ -5512,7 +5704,15 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
         kbsAppendAgentMsg(odgovor || "");
 
         if (nav) kbsIzvrsiNavigacija(nav);
-        if (akc) kbsIzvrsiAkcija(akc);
+        if (akc) {
+          kbsIzvrsiAkcija(akc);
+        } else if (
+          odgovor &&
+          /е додадено|е променето/i.test(odgovor) &&
+          typeof window.loadAdminDezurstva === "function"
+        ) {
+          window.loadAdminDezurstva();
+        }
 
         if (typeof window.kbsChatRefreshHistory === "function") {
           window.kbsChatRefreshHistory();

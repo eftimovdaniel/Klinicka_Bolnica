@@ -29,6 +29,7 @@
 - "kreiraj_oglas"     → креирај оглас за работа (само директор)
 - "izbrisi_vest_oglas"→ избриши вест или оглас (само директор)
 - "zatvori_oglas"     → затвори оглас (status=истечен) (само директор)
+- "pregled_dezurstvo" → кога е дежурен лекар (листа идни дежурства)
 - "promeni_dezurstvo" → промени дежурство на лекар (само директор)
 - "statistika_oddeli" → анализа на најпопуларни оддели (само директор)
 - "zavrshi_pregled"   → заврши преглед како „завршен" (лекар)
@@ -44,6 +45,7 @@
 - "novosti_rezime"    → краток преглед на последните новости (наслови + линк)
 - "faq_pregled"       → подготовка за преглед (гладно, што да понесам — од JSON)
 - "izvestaj_den_nedela" → дневен/неделен извештај за термини и апликации (само директор)
+- "otvori_admin_panel" → отвори административен панел на сајтот (само директор)
 - "general"           → одговор од AI за општо прашање
 
 ВАЖНО: Редот на проверки е важен (поспецифичните прво).
@@ -88,13 +90,46 @@ KLUCNI_ZATVORI_OGLAS = [
     "deaktiviraj oglas", "deaktiviraj go oglasot",
 ]
 
+# 00d2. ПРЕГЛЕД ДЕЖУРСТВА (кога е дежурен лекар — пред промена)
+KLUCNI_PREGLED_DEZURSTVO = [
+    "кога е дежур", "кога е на дежур", "кога дежур",
+    "кога има дежур", "дали е дежур", "дали е на дежур",
+    "дали има дежур", "има дежурства", "има дежурство",
+    "кој ден е дежур", "кога работи на дежур",
+    "распоред на дежур", "идни дежурства", "наредниот период",
+    "koga e dezur", "koga e na dezur", "dali e dezurna", "dali ima dezur",
+]
+
 # 00e. ПРОМЕНИ ДЕЖУРСТВО (за директор)
 KLUCNI_DEZURSTVO = [
     "дежурство", "дежурствата", "дежурствата на",
+    "додади дежурство", "додадете дежурство", "внеси дежурство",
+    "дежурна на", "да биде дежурна",
     "префрли дежурство", "премести дежурство", "промени дежурство",
     "пренеси дежурство", "одложи дежурство",
     "промени го дежурството", "префрли го дежурството",
+    "промени", "промениш", "може да го промениш", "смени",
     "deziurstvo", "promeni dezurstvo",
+]
+
+# 00e2. ОТВОРИ АДМИН ПАНЕЛ (директор)
+KLUCNI_OTVORI_ADMIN = [
+    "административен панел",
+    "административниот панел",
+    "административниот",
+    "админ панел",
+    "admin panel",
+    "отвори администрација",
+    "отвори ја администрацијата",
+    "прикажи администрација",
+    "прикажи ја администрацијата",
+    "прикажи го административниот",
+    "однеси ме на администрација",
+    "однеси на админ",
+    "во административниот панел",
+    "во админ панел",
+    "otvori admin",
+    "prikazi admin",
 ]
 
 # 00f. СТАТИСТИКА НА ОДДЕЛИ (за директор)
@@ -390,6 +425,71 @@ def _ima_zbor(prashanje: str, kluchni: list[str]) -> bool:
     return any(zbor in prashanje for zbor in kluchni)
 
 
+def _baranje_e_promena_dezurstvo(p: str) -> bool:
+    """Додади / премести / промени — не е само прашање „кога е дежурна"."""
+    return any(
+        w in p
+        for w in (
+            "додади",
+            "dodadi",
+            "додадете",
+            "внеси",
+            "закажи дежур",
+            "премести",
+            "префрли",
+            "промени дежур",
+            "промени",
+            "промениш",
+            "пренеси дежур",
+            "одложи дежур",
+            "смени",
+            "може да го промениш",
+            "да биде дежурна на",
+            "дежурна на",
+            "promeni dezur",
+        )
+    )
+
+
+def _prasanje_e_pregled_dezurstvo(p: str) -> bool:
+    if _baranje_e_promena_dezurstvo(p):
+        return False
+    if _ima_zbor(p, KLUCNI_PREGLED_DEZURSTVO):
+        return True
+    if "дежур" in p and any(
+        w in p for w in ("кога", "koga", "дали", "dali", "кој ден", "koj den")
+    ):
+        return True
+    return False
+
+
+def _tekst_e_oglas_za_objava(p: str) -> bool:
+    """
+    Текст на оглас што директорот објавува (не барање „сакам да аплицирам").
+    „можност за аплицирање до …" = рок за кандидати, не intent за apliciraj.
+    """
+    if any(x in p for x in ("оглас за работа", "oglas za rabota")):
+        return True
+    if any(x in p for x in ("се вработува", "se vrabotuva", "ќе се вработи")):
+        return True
+    if "можност за аплицирање" in p or "moznost za apliciranje" in p:
+        if any(
+            x in p
+            for x in (
+                "персонал",
+                "медицинск",
+                "сестр",
+                "одделот",
+                "оддел",
+                "гинекол",
+                "гиникол",
+                "акауш",
+            )
+        ):
+            return True
+    return False
+
+
 def detektiraj_intent_keyword(prashanje: str) -> str | None:
     """
     Брза проверка преку клучни зборови.
@@ -406,6 +506,29 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
 
     # Автоматски преводи: латиница → кирилица
     p = transliterijaj(prashanje).lower().strip()
+
+    # Директор: креирај / објави оглас (пред navigacija и apliciraj)
+    if any(
+        w in p
+        for w in (
+            "креирај оглас",
+            "kreiraj oglas",
+            "објави оглас",
+            "objavi oglas",
+            "направи оглас",
+            "napravi oglas",
+            "стави оглас",
+            "nov oglas",
+            "нов оглас",
+        )
+    ):
+        return "kreiraj_oglas"
+    if p in ("оглас за работа", "oglas za rabota", "оглас за rabota"):
+        return "kreiraj_oglas"
+
+    # Залепен текст на оглас → директор го објавува (kreiraj_oglas), не аплицирање
+    if _tekst_e_oglas_za_objava(p):
+        return "kreiraj_oglas"
 
     if _ima_zbor(p, KLUCNI_OBJAVI_VEST):
         return "objavi_vest"
@@ -481,17 +604,20 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
     ):
         return "izvestaj_den_nedela"
 
-    # „Аплицирам / пријавувам за работа за X" – AI агент води разговор
-    # и сам аплицира (бара логин како пациент).
-    if not ima_kreiraj and any(w in p for w in (
-        "аплицир", "апликаци",                # „аплицирам", „аплицирање", „апликација"
+    # „Аплицирам / пријавувам за работа за X" – пациент аплицира (не текст на оглас)
+    if not ima_kreiraj and not _tekst_e_oglas_za_objava(p) and any(w in p for w in (
+        "аплицир",
         "сакам да работам", "сакам да се вработам",
         "како да се вработам", "како да аплицирам",
         "сакам да се пријавам за работа",
         "пријавувам за работа", "пријавам за работа",
-        "apliciram", "apliciranj", "aplikacija",
+        "apliciram", "apliciranj",
         "sakam da rabotam", "sakam da se vrabotam",
     )):
+        return "apliciraj_za_rabota"
+    if not ima_kreiraj and not _tekst_e_oglas_za_objava(p) and any(
+        w in p for w in ("апликација", "aplikacija")
+    ) and any(w in p for w in ("сакам", "sakam", "како", "kako", "да аплицирам", "da apliciram")):
         return "apliciraj_za_rabota"
 
     # „Сакам да работам кај вас" / „како да се пријавам" (без позиција) → navigacija
@@ -534,7 +660,18 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
     if _ima_zbor(p, KLUCNI_OGLAS):
         return "kreiraj_oglas"
 
-    # Дежурства на оддели (за директор)
+    # Преглед: „кога е дежурна д-р X" (пред промена)
+    if _prasanje_e_pregled_dezurstvo(p):
+        return "pregled_dezurstvo"
+
+    if _ima_zbor(p, KLUCNI_OTVORI_ADMIN):
+        return "otvori_admin_panel"
+    if "администрација" in p and any(
+        w in p for w in ("прикажи", "отвори", "однеси", "види", "панел", "prikazi", "otvori")
+    ):
+        return "otvori_admin_panel"
+
+    # Дежурства: додади / премести (за директор)
     if _ima_zbor(p, KLUCNI_DEZURSTVO):
         return "promeni_dezurstvo"
 
