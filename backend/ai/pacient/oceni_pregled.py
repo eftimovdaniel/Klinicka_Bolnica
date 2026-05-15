@@ -16,6 +16,7 @@ import json
 import re
 from datetime import date
 from database import get_connection
+from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 from ai.pacient.slobodni_termini import zimi_site_lekari
 
@@ -79,26 +80,18 @@ def izvlechi_ocena_podatoci(prashanje: str) -> dict:
 """.strip()
 
     odgovor = ask_ai(full_prompt, system_prompt=OCENI_EXTRACT_PROMPT)
-
-    cist = re.sub(r"^```(?:json)?\s*", "", odgovor.strip())
-    cist = re.sub(r"\s*```$", "", cist)
-
+    podatoci = parse_ai_json(odgovor, log_tag="oceni_pregled")
+    ocena_raw = podatoci.get("ocena")
     try:
-        podatoci = json.loads(cist)
-        ocena_raw = podatoci.get("ocena")
-        try:
-            ocena = int(ocena_raw) if ocena_raw is not None else None
-        except (TypeError, ValueError):
-            ocena = None
-
-        return {
-            "ocena": ocena,
-            "komentar": (podatoci.get("komentar") or None),
-            "doctor_id": podatoci.get("doctor_id"),
-            "datum": podatoci.get("datum"),
-        }
-    except json.JSONDecodeError:
-        return {"ocena": None, "komentar": None, "doctor_id": None, "datum": None}
+        ocena = int(ocena_raw) if ocena_raw is not None else None
+    except (TypeError, ValueError):
+        ocena = None
+    return {
+        "ocena": ocena,
+        "komentar": (podatoci.get("komentar") or None),
+        "doctor_id": podatoci.get("doctor_id"),
+        "datum": podatoci.get("datum"),
+    }
 
 
 def najdi_zaversen_termin(pacient_email: str, doctor_id: int | None, datum: str | None) -> list[dict]:

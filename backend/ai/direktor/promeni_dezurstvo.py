@@ -12,11 +12,12 @@
 3. UPDATE на тоа дежурство со новиот датум (и евентуално време).
 """
 
-import json
 import re
 from datetime import date, datetime
 
 from database import get_connection
+from ai._kernel.auth import require_direktor
+from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 
 
@@ -52,15 +53,7 @@ def _izvlechi(prashanje: str) -> dict:
     full = f'Денес: {denes} ({denes_den})\n\nПрашање: „{prashanje}"\nВрати JSON.'
     odgovor = ask_ai(full, system_prompt=PROMPT)
     print(f"[promeni_dezurstvo] AI: {odgovor!r}")
-
-    if "Привремено сум" in odgovor or "Привремена грешка" in odgovor:
-        return {"_error": odgovor}
-
-    cist = re.sub(r"^```(?:json)?|```$", "", odgovor.strip()).strip()
-    try:
-        return json.loads(cist)
-    except Exception:
-        return {}
+    return parse_ai_json(odgovor, log_tag="promeni_dezurstvo")
 
 
 def _najdi_lekar(ime_prezime: str) -> dict | None:
@@ -132,12 +125,8 @@ def _format_vreme(t) -> str:
 
 def odgovori_za_dezurstvo(prashanje: str, lekar: dict | None) -> str:
     """Главна точка - повикана од router-от."""
-    if not lekar or not lekar.get("doctor_ID"):
-        return "Мораш прво да се најавиш како директор."
-
-    from routers.admin import check_admin_access
-    if not check_admin_access(lekar["doctor_ID"]):
-        return "Само директорот може да менува дежурства."
+    if err := require_direktor(lekar):
+        return err
 
     podatoci = _izvlechi(prashanje)
     if podatoci.get("_error"):

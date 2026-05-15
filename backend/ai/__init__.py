@@ -17,6 +17,7 @@ AI пакет за Клиничка Болница Штип.
 # === KERNEL ===
 from ai._kernel import groq_client, intent_detector, ai_intent_detector  # noqa: F401
 from ai._kernel import transliteracija, prompts  # noqa: F401
+from ai._kernel import ai_json, auth, db_helpers, prompt_helpers, handlers  # noqa: F401
 
 # === PACIENT ===
 from ai.pacient import slobodni_termini, zakazi_termin, otkazi_termin  # noqa: F401

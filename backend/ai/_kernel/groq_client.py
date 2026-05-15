@@ -13,6 +13,9 @@ GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 #   - mixtral-8x7b-32768     (поголем контекст)
 #   - gemma2-9b-it           (Google open модел)
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+MAX_USER_CHARS = 8000
+
+
 def ask_ai(prashanje: str, system_prompt: str = CHAT_SYSTEM_PROMPT) -> str:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
@@ -20,6 +23,8 @@ def ask_ai(prashanje: str, system_prompt: str = CHAT_SYSTEM_PROMPT) -> str:
     prashanje = (prashanje or "").strip()
     if not prashanje:
         return "Те молам внеси прашање."
+    if len(prashanje) > MAX_USER_CHARS:
+        prashanje = prashanje[:MAX_USER_CHARS]
     # Groq користи OpenAI-compatible API
     payload = {
         "model": GROQ_MODEL,

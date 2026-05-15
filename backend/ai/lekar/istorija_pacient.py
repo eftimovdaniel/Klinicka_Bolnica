@@ -9,10 +9,11 @@
 - „Кога беше последен пат пациентот Петар Иванов?"
 """
 
-import json
 import re
 
 from database import get_connection
+from ai._kernel.auth import require_lekar
+from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 
 
@@ -34,15 +35,7 @@ PROMPT = """
 def _izvlechi(prashanje: str) -> dict:
     odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=PROMPT)
     print(f"[istorija] AI: {odgovor!r}")
-
-    if "Привремено сум" in odgovor or "Привремена грешка" in odgovor:
-        return {"_error": odgovor}
-
-    cist = re.sub(r"^```(?:json)?|```$", "", odgovor.strip()).strip()
-    try:
-        return json.loads(cist)
-    except Exception:
-        return {}
+    return parse_ai_json(odgovor, log_tag="istorija_pacient")
 
 
 def _fmt_datum(d) -> str:
@@ -59,8 +52,8 @@ def _fmt_vreme(t) -> str:
 
 def odgovori_za_istorija(prashanje: str, lekar: dict | None) -> str:
     """Главна точка - повикана од router-от."""
-    if not lekar or not lekar.get("doctor_ID"):
-        return "Мораш прво да се најавиш како лекар."
+    if err := require_lekar(lekar):
+        return err
 
     doctor_id = lekar["doctor_ID"]
 

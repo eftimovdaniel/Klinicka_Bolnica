@@ -16,6 +16,7 @@ import re
 from typing import Any
 
 from database import get_connection
+from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 from ai._kernel.transliteracija import transliterijaj
 
@@ -52,14 +53,9 @@ def _izvlechi(prashanje: str) -> str | None:
     odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=PROMPT)
     print(f"[lekari_oddel] AI: {odgovor!r}")
 
-    if "Привремено сум" in odgovor or "Привремена грешка" in odgovor:
+    data = parse_ai_json(odgovor, log_tag="lekari_oddel")
+    if data.get("_error"):
         return "_error"
-
-    cist = re.sub(r"^```(?:json)?|```$", "", odgovor.strip()).strip()
-    try:
-        data = json.loads(cist)
-    except Exception:
-        return None
     val = data.get("oddel")
     if not val:
         return None

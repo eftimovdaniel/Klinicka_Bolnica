@@ -11,6 +11,8 @@ import requests
 from urllib.parse import urlparse, parse_qs
 
 from database import get_connection
+from ai._kernel.auth import require_direktor
+from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 
 
@@ -69,27 +71,18 @@ def _generiraj_vest(transcript: str, naslov_yt: str | None) -> dict:
     kontekst = (f"Оригинален наслов: „{naslov_yt}\"\n\n" if naslov_yt else "") + f"Transcript:\n{transcript}"
     odgovor = ask_ai(kontekst, system_prompt=PROMPT)
 
-    if "Привремено сум" in odgovor or "Привремена грешка" in odgovor:
-        return {"_error": odgovor}
-
-    cist = re.sub(r"^```(?:json)?|```$", "", odgovor.strip()).strip()
-    try:
-        data = json.loads(cist)
-        if data.get("naslov") and data.get("sodrzina"):
-            return data
-    except Exception:
-        pass
+    data = parse_ai_json(odgovor, log_tag="objavi_vest")
+    if data.get("_error"):
+        return data
+    if data.get("naslov") and data.get("sodrzina"):
+        return data
     return {"_error": "AI врати неочекуван формат."}
 
 
 def odgovori_za_objava_vest(prashanje: str, lekar: dict | None) -> str:
     """Главна точка - повикана од router-от."""
-    if not lekar or not lekar.get("doctor_ID"):
-        return "Мораш прво да се најавиш како директор."
-
-    from routers.admin import check_admin_access
-    if not check_admin_access(lekar["doctor_ID"]):
-        return "Само директорот може да објавува вести."
+    if err := require_direktor(lekar):
+        return err
 
     vid = _video_id(prashanje)
     if not vid:

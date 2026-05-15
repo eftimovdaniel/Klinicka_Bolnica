@@ -19,6 +19,7 @@ import json
 import re
 from datetime import datetime, date, time
 from database import get_connection
+from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 from ai._kernel.prompts import ZAKAZI_EXTRACT_PROMPT
 from ai.pacient.slobodni_termini import zimi_site_lekari
@@ -101,35 +102,21 @@ def izvlechi_podatoci_so_ai(prashanje: str) -> dict:
     odgovor = ask_ai(full_prompt, system_prompt=ZAKAZI_EXTRACT_PROMPT)
     print(f"[zakazi_termin] AI raw: {odgovor!r}")
 
-    # Ако AI врати error-пораки (rate limit, timeout, итн.) - пропагирај
-    error_indicators = [
-        "Привремено сум преоптоварен",
-        "Привремена грешка",
-        "не одговори навреме",
-        "Не е поставен",
-        "Непозната грешка",
-        "неочекуван формат",
-    ]
-    if any(ind in odgovor for ind in error_indicators):
-        return {"doctor_id": None, "datum": None, "vreme": None, "_error": odgovor}
-
-    # AI понекогаш враќа JSON во markdown ```json ... ``` - тргни го
-    cist = odgovor.strip()
-    cist = re.sub(r"^```(?:json)?\s*", "", cist)
-    cist = re.sub(r"\s*```$", "", cist)
-
-    try:
-        podatoci = json.loads(cist)
-        result = {
-            "doctor_id": podatoci.get("doctor_id"),
-            "datum": podatoci.get("datum"),
-            "vreme": podatoci.get("vreme"),
+    podatoci = parse_ai_json(odgovor, log_tag="zakazi_termin")
+    if podatoci.get("_error"):
+        return {
+            "doctor_id": None,
+            "datum": None,
+            "vreme": None,
+            "_error": podatoci["_error"],
         }
-        print(f"[zakazi_termin] Parsed: {result}")
-        return result
-    except json.JSONDecodeError as e:
-        print(f"[zakazi_termin] JSON decode error: {e}, cleaned: {cist!r}")
-        return {"doctor_id": None, "datum": None, "vreme": None}
+    result = {
+        "doctor_id": podatoci.get("doctor_id"),
+        "datum": podatoci.get("datum"),
+        "vreme": podatoci.get("vreme"),
+    }
+    print(f"[zakazi_termin] Parsed: {result}")
+    return result
 
 
 def proveri_dali_e_slobodno(doctor_id: int, datum_str: str, vreme_str: str) -> bool:

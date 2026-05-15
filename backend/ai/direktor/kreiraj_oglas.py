@@ -5,12 +5,14 @@ Tek: Корисник пишува „Креирај оглас за карди�
 → AI извлекува pozicija, oddel, рок → INSERT во Vrabotuvanje.
 """
 
-import json
 import re
 from datetime import date, datetime, timedelta
 
 from database import get_connection
+from ai._kernel.ai_json import parse_ai_json
+from ai._kernel.auth import require_direktor
 from ai._kernel.groq_client import ask_ai
+from ai._kernel.prompt_helpers import today_prompt_line
 from ai._kernel.transliteracija import transliterijaj
 from ai.pacient.slobodni_termini import _DEN_WD, _DEN_ALT, _den_od_match, _sleden_takov_kalendarski_den
 
@@ -104,30 +106,18 @@ def _izvlechi(prashanje: str, denes: date) -> dict:
     """AI враќа dict со pozicija/oddel/rok."""
     oddeli = _zimi_oddeli()
     prompt = (
-        f"Денес е {denes.isoformat()} ({denes.strftime('%d.%m.%Y')}).\n\n"
+        f"{today_prompt_line()} ({denes.strftime('%d.%m.%Y')}).\n\n"
         f"Оддели: {', '.join(oddeli)}\n\nПрашање: „{prashanje}\"\nВрати JSON."
     )
     odgovor = ask_ai(prompt, system_prompt=PROMPT)
     print(f"[kreiraj_oglas] AI: {odgovor!r}")
-
-    if "Привремено сум" in odgovor or "Привремена грешка" in odgovor:
-        return {"_error": odgovor}
-
-    cist = re.sub(r"^```(?:json)?|```$", "", odgovor.strip()).strip()
-    try:
-        return json.loads(cist)
-    except Exception:
-        return {}
+    return parse_ai_json(odgovor, log_tag="kreiraj_oglas")
 
 
 def odgovori_za_kreiranje_oglas(prashanje: str, lekar: dict | None) -> str:
     """Главна точка - повикана од router-от."""
-    if not lekar or not lekar.get("doctor_ID"):
-        return "Мораш прво да се најавиш како директор."
-
-    from routers.admin import check_admin_access
-    if not check_admin_access(lekar["doctor_ID"]):
-        return "Само директорот може да креира огласи."
+    if err := require_direktor(lekar):
+        return err
 
     denes = date.today()
     podatoci = _izvlechi(prashanje, denes)

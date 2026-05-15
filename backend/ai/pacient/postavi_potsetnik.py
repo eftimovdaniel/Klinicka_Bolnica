@@ -16,6 +16,7 @@ import json
 import re
 from datetime import datetime, date, timedelta
 from database import get_connection
+from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 
 
@@ -48,17 +49,12 @@ def izvlechi_potsetnik(prashanje: str) -> dict:
     full_prompt = f'Денес: {denes}\n\nКорисник: „{prashanje}"\n\nИзвлечи податоци.'
 
     odgovor = ask_ai(full_prompt, system_prompt=POTSETNIK_EXTRACT_PROMPT)
-    cist = re.sub(r"^```(?:json)?\s*", "", odgovor.strip())
-    cist = re.sub(r"\s*```$", "", cist)
-
+    podatoci = parse_ai_json(odgovor, log_tag="postavi_potsetnik")
     try:
-        podatoci = json.loads(cist)
-        return {
-            "offset_minuti": int(podatoci.get("offset_minuti", 60) or 60),
-            "datum": podatoci.get("datum"),
-        }
-    except (json.JSONDecodeError, ValueError, TypeError):
-        return {"offset_minuti": 60, "datum": None}
+        offset = int(podatoci.get("offset_minuti", 60) or 60)
+    except (ValueError, TypeError):
+        offset = 60
+    return {"offset_minuti": offset, "datum": podatoci.get("datum")}
 
 
 def najdi_termin_za_potsetnik(pacient_email: str, datum: str | None) -> dict | None:

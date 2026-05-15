@@ -13,6 +13,7 @@ import json
 import re
 from datetime import datetime, date, time
 from database import get_connection
+from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 
 
@@ -46,18 +47,12 @@ def izvlechi_prenesi(prashanje: str) -> dict:
     full_prompt = f'Денес: {denes} ({denes_den})\n\nКорисник: „{prashanje}"\n\nИзвлечи податоци.'
 
     odgovor = ask_ai(full_prompt, system_prompt=PRENESI_EXTRACT_PROMPT)
-    cist = re.sub(r"^```(?:json)?\s*", "", odgovor.strip())
-    cist = re.sub(r"\s*```$", "", cist)
-
-    try:
-        podatoci = json.loads(cist)
-        return {
-            "star_datum": podatoci.get("star_datum"),
-            "nov_datum": podatoci.get("nov_datum"),
-            "novo_vreme": podatoci.get("novo_vreme"),
-        }
-    except json.JSONDecodeError:
-        return {"star_datum": None, "nov_datum": None, "novo_vreme": None}
+    podatoci = parse_ai_json(odgovor, log_tag="prenesi_termin")
+    return {
+        "star_datum": podatoci.get("star_datum"),
+        "nov_datum": podatoci.get("nov_datum"),
+        "novo_vreme": podatoci.get("novo_vreme"),
+    }
 
 
 def najdi_aktivni_termini(pacient_email: str, datum: str | None) -> list[dict]:

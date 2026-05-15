@@ -6,38 +6,30 @@
 - „Резиме на последните новости“
 """
 
-from typing import Any, cast
-
-from database import get_connection
+from ai._kernel.db_helpers import as_dict, db_cursor
 
 # Иста релативна патека како во navigacija.py (frontend со static сервер)
 NOVOSTI_STRANICA = "novosti.html"
 
 
 def odgovori_za_novosti_rezime() -> str:
-    conn = None
     try:
-        conn = get_connection()
-        cur = conn.cursor(dictionary=True)
-        cur.execute(
-            """
-            SELECT id, naslov, created_at
-            FROM Novosti
-            ORDER BY created_at DESC
-            LIMIT 3
-            """
-        )
-        rows = cur.fetchall() or []
-        cur.close()
+        with db_cursor() as (_, cur):
+            cur.execute(
+                """
+                SELECT id, naslov, created_at
+                FROM Novosti
+                ORDER BY created_at DESC
+                LIMIT 3
+                """
+            )
+            rows = cur.fetchall() or []
     except Exception as e:
         print(f"[novosti_rezime] DB: {e}")
         return (
             "Моментално не можам да ги вчитам новостите. "
             f"Отвори ја страницата **{NOVOSTI_STRANICA}** на сајтот или пробај подоцна."
         )
-    finally:
-        if conn:
-            conn.close()
 
     if not rows:
         return (
@@ -46,7 +38,7 @@ def odgovori_za_novosti_rezime() -> str:
 
     linii = ["Последни објави на сајтот:\n"]
     for r in rows:
-        row = cast(dict[str, Any], r)
+        row = as_dict(r)
         naslov = (row.get("naslov") or "Без наслов").strip()
         rid = row.get("id")
         linii.append(f"• **{naslov}** (ID {rid})")

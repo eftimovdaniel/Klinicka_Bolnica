@@ -17,6 +17,7 @@ import json
 import re
 from datetime import date
 from database import get_connection
+from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 from ai.pacient.slobodni_termini import zimi_site_lekari
 
@@ -63,17 +64,11 @@ def izvlechi_trgni_podatoci(prashanje: str) -> dict:
 
     odgovor = ask_ai(full_prompt, system_prompt=TRGNI_EXTRACT_PROMPT)
 
-    cist = re.sub(r"^```(?:json)?\s*", "", odgovor.strip())
-    cist = re.sub(r"\s*```$", "", cist)
-
-    try:
-        podatoci = json.loads(cist)
-        return {
-            "doctor_id": podatoci.get("doctor_id"),
-            "datum": podatoci.get("datum"),
-        }
-    except json.JSONDecodeError:
-        return {"doctor_id": None, "datum": None}
+    podatoci = parse_ai_json(odgovor, log_tag="trgni_ocena")
+    return {
+        "doctor_id": podatoci.get("doctor_id"),
+        "datum": podatoci.get("datum"),
+    }
 
 
 def najdi_oceneti_termini(pacient_email: str, doctor_id: int | None, datum: str | None) -> list[dict]:

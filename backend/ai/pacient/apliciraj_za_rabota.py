@@ -16,6 +16,7 @@ import re
 from datetime import datetime
 
 from database import get_connection
+from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 
 
@@ -58,12 +59,8 @@ PROMPT_LICENCA = """
 def _izvlechi_pozicija(prashanje: str) -> str | None:
     odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=PROMPT_POZICIJA)
     print(f"[apliciraj] pozicija AI: {odgovor!r}")
-    if "Привремено сум" in odgovor or "Привремена грешка" in odgovor:
-        return None
-    cist = re.sub(r"^```(?:json)?|```$", "", odgovor.strip()).strip()
-    try:
-        data = json.loads(cist)
-    except Exception:
+    data = parse_ai_json(odgovor, log_tag="apliciraj_pozicija")
+    if data.get("_error"):
         return None
     val = data.get("pozicija")
     return str(val).strip() if val else None
@@ -73,12 +70,8 @@ def _izvlechi_licenca(prashanje: str) -> tuple[str | None, bool]:
     """Враќа (licenca, preskoki)."""
     odgovor = ask_ai(f"Одговор: „{prashanje}\"", system_prompt=PROMPT_LICENCA)
     print(f"[apliciraj] licenca AI: {odgovor!r}")
-    if "Привремено сум" in odgovor or "Привремена грешка" in odgovor:
-        return None, False
-    cist = re.sub(r"^```(?:json)?|```$", "", odgovor.strip()).strip()
-    try:
-        data = json.loads(cist)
-    except Exception:
+    data = parse_ai_json(odgovor, log_tag="apliciraj_licenca")
+    if data.get("_error"):
         return None, False
     licenca = data.get("licenca")
     preskoki = bool(data.get("preskoki"))

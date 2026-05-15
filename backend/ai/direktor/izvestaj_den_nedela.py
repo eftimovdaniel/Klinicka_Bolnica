@@ -6,10 +6,9 @@
 """
 
 from datetime import date, timedelta
-from typing import Any, cast
 
-from database import get_connection
-from routers.admin import check_admin_access
+from ai._kernel.auth import require_direktor
+from ai._kernel.db_helpers import as_dict, db_cursor
 
 
 def _period_od_prashanje(prashanje: str) -> tuple[date, date, str]:
@@ -40,58 +39,46 @@ def _period_od_prashanje(prashanje: str) -> tuple[date, date, str]:
 
 
 def odgovori_za_izvestaj(prashanje: str, lekar: dict | None) -> str:
-    if not lekar or not lekar.get("doctor_ID"):
-        return "За извештај мора да си најавен како овластено лице (администратор на болницата)."
-
-    if not check_admin_access(int(lekar["doctor_ID"])):
-        return "Овој извештај е достапен само за администраторот на болницата."
+    if err := require_direktor(lekar):
+        return err
 
     d0, d1, label = _period_od_prashanje(prashanje)
 
-    conn = None
     try:
-        conn = get_connection()
-        cur = conn.cursor(dictionary=True)
+        with db_cursor() as (_, cur):
+            cur.execute(
+                """
+                SELECT status_pregled, COUNT(*) AS c
+                FROM Termin_pregled
+                WHERE datum_pregled BETWEEN %s AND %s
+                GROUP BY status_pregled
+                """,
+                (d0, d1),
+            )
+            status_rows = cur.fetchall() or []
 
-        cur.execute(
-            """
-            SELECT status_pregled, COUNT(*) AS c
-            FROM Termin_pregled
-            WHERE datum_pregled BETWEEN %s AND %s
-            GROUP BY status_pregled
-            """,
-            (d0, d1),
-        )
-        status_rows = cur.fetchall() or []
-
-        cur.execute(
-            """
-            SELECT COUNT(*) AS c
-            FROM prijaveni_lekari
-            WHERE DATE(datum_prijava) BETWEEN %s AND %s
-            """,
-            (d0, d1),
-        )
-        apl_row = cur.fetchone()
-        cur.close()
+            cur.execute(
+                """
+                SELECT COUNT(*) AS c
+                FROM prijaveni_lekari
+                WHERE DATE(datum_prijava) BETWEEN %s AND %s
+                """,
+                (d0, d1),
+            )
+            apl_row = cur.fetchone()
     except Exception as e:
         print(f"[izvestaj_den_nedela] DB: {e}")
         return f"Не успеав да го извадам извештајот: {e}"
-    finally:
-        if conn:
-            conn.close()
 
     br: dict[str, int] = {"закажан": 0, "откажан": 0, "завршен": 0}
     for r in status_rows:
-        row = cast(dict[str, Any], r)
+        row = as_dict(r)
         st = (row.get("status_pregled") or "").strip().lower()
         c = int(row.get("c") or 0)
         if st in br:
             br[st] = c
 
-    apl = 0
-    if apl_row:
-        apl = int(cast(dict[str, Any], apl_row).get("c") or 0)
+    apl = int(as_dict(apl_row).get("c") or 0) if apl_row else 0
 
     return (
         f"**Извештај за {label}**\n\n"

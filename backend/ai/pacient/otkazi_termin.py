@@ -16,6 +16,7 @@ import json
 import re
 from datetime import datetime, date
 from database import get_connection
+from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 from ai.pacient.slobodni_termini import zimi_site_lekari
 
@@ -63,19 +64,11 @@ def izvlechi_otkazi_podatoci(prashanje: str) -> dict:
 """.strip()
 
     odgovor = ask_ai(full_prompt, system_prompt=OTKAZI_EXTRACT_PROMPT)
-
-    # Тргни markdown ```json
-    cist = re.sub(r"^```(?:json)?\s*", "", odgovor.strip())
-    cist = re.sub(r"\s*```$", "", cist)
-
-    try:
-        podatoci = json.loads(cist)
-        return {
+    podatoci = parse_ai_json(odgovor, log_tag="otkazi_termin")
+    return {
             "doctor_id": podatoci.get("doctor_id"),
             "datum": podatoci.get("datum"),
         }
-    except json.JSONDecodeError:
-        return {"doctor_id": None, "datum": None}
 
 
 def najdi_termini_za_otkazuvanje(pacient_email: str, doctor_id: int | None, datum: str | None) -> list[dict]:
