@@ -1069,9 +1069,18 @@
             </div>
           </div>
           <div class="kbs-ai-panel-header-actions">
+            <button type="button" class="kbs-ai-header-history" id="kbs-ai-history" aria-label="Претходни разговори" title="Претходни разговори" hidden>☰</button>
             <button type="button" class="kbs-ai-header-plus" id="kbs-ai-new-chat" aria-label="Нова разговор" title="Нова разговор">+</button>
           </div>
         </header>
+        <div class="kbs-ai-history-panel" id="kbs-ai-history-panel" hidden aria-hidden="true">
+          <div class="kbs-ai-history-head">
+            <span class="kbs-ai-history-title">Претходни разговори</span>
+            <button type="button" class="kbs-ai-history-close" id="kbs-ai-history-close" aria-label="Затвори листа">✕</button>
+          </div>
+          <ul class="kbs-ai-history-list" id="kbs-ai-history-list"></ul>
+          <p class="kbs-ai-history-empty" id="kbs-ai-history-empty" hidden>Немате зачувани разговори.</p>
+        </div>
         <div class="kbs-ai-panel-body">
           <div class="kbs-ai-intro" id="kbs-ai-intro">
             <p class="kbs-ai-greeting">Здраво 👋 </p>

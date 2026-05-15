@@ -42,7 +42,7 @@ PROMPT = """
 - ВАЖНО: „хирургија", „општа хирургија", „генерална хирургија" → „Хирургија", НЕ „Неврохирургија".
   Само ако експлицитно пишува „неврохирургија" / „neurohirurgija" → „Неврохирургија".
 - Ако прашањето е за СИТЕ лекари во болницата/установата/кај вас (без конкретен оддел) → {"oddel": null}
-  (на пр. „кои лекари работат во болницата?", „кој доктори имате?").
+  (на пр. „кои лекари работат во болницата?", „кој доктори имате?", „каде се лекарите?").
 - ако одделот не е јасен → null
 
 БЕЗ markdown, БЕЗ објаснувања. Само JSON.
@@ -79,6 +79,10 @@ def _site_lekari_vo_ustanova(prashanje: str) -> bool:
         return True
     if "кај вас" in p:
         return True
+    if re.search(r"каде\s+(?:се\s+)?(?:наоѓа|сме|се)?\s*(?:лекар|доктор)", p):
+        return True
+    if re.search(r"kade\s+(?:se\s+)?(?:naogja|naodga|sme|se)?\s*(?:lekar|lekari|doktor)", p):
+        return True
     if any(
         s in p
         for s in (
@@ -94,37 +98,31 @@ def _site_lekari_vo_ustanova(prashanje: str) -> bool:
     return False
 
 
-def _odgovor_site_lekari_so_navigacija() -> dict[str, Any]:
-    '''Листа на сите лекари + навигација кон секцијата „Лекари" на сајтот.'''
+def odgovor_navigacija_lekari() -> dict[str, Any]:
+    """Кратка порака + скрол кон #lekari (листата е на страницата, не во чатот)."""
     from ai.pacient.slobodni_termini import zimi_site_lekari
 
     lekari = zimi_site_lekari()
-    if not lekari:
-        return {
-            "odgovor": "Моментално нема регистрирани лекари во системот.",
-            "navigacija": {"target": "index.html#lekari", "label": "Лекари"},
-        }
-
-    redovi = [
-        "Лекари во Клиничка Болница Штип:",
-        "",
-    ]
-    for l in lekari:
-        spec = (l.get("specialty") or "—").strip() or "—"
-        polno = f"Д-р {l['name']} {l['surname']}"
-        em = (l.get("email") or "").strip()
-        if em:
-            redovi.append(f"- {polno} — {spec} ({em})")
-        else:
-            redovi.append(f"- {polno} — {spec}")
-    redovi.append("")
-    redovi.append(
-        'Страницата автоматски се лизга кон секцијата „Лекари" за целосен преглед и закажување.'
-    )
+    n = len(lekari) if lekari else 0
+    if n == 0:
+        odgovor = (
+            'Ве пренасочувам кон делот „Лекари" на почетната страница. '
+            "Моментално нема регистрирани лекари во системот."
+        )
+    else:
+        odgovor = (
+            'Ве пренасочувам кон делот „Лекари" на почетната страница. '
+            f"На екранот ќе ја видите листата со {n} лекари — "
+            "можете да пребарувате по име или специјалност и да закажете преглед."
+        )
     return {
-        "odgovor": "\n".join(redovi),
+        "odgovor": odgovor,
         "navigacija": {"target": "index.html#lekari", "label": "Лекари"},
     }
+
+
+def _odgovor_site_lekari_so_navigacija() -> dict[str, Any]:
+    return odgovor_navigacija_lekari()
 
 
 def _normaliziraj(s: str) -> str:
@@ -228,10 +226,12 @@ def odgovori_za_lekari_oddel(prashanje: str) -> str | dict[str, Any]:
             "Привремено сум зафатен. Те молам обиди се повторно за неколку секунди."
         )
     if not baran:
+        if _site_lekari_vo_ustanova(prashanje):
+            return _odgovor_site_lekari_so_navigacija()
         return (
             'Ако прашувате за конкретен оддел, наведете го (на пр.: „Кои лекари се на Кардиологија?"). '
-            'За целиот лекарски тим прашајте на пример: „Кои лекари работат во болницата?" '
-            'или „Сите лекари кај вас".'
+            'За целиот лекарски тим прашајте на пример: „Кои лекари работат во болницата?", '
+            '„Каде се лекарите?" или „Сите лекари кај вас".'
         )
 
     rezultat = _najdi_oddel(baran)

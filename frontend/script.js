@@ -2898,6 +2898,7 @@ async function loginLekar() {
     currentLekar = data.doctor;
     persistLekarToStorage();
     if (typeof window.kbsChatReset === 'function') window.kbsChatReset(true);
+    if (typeof window.kbsChatRefreshHistory === 'function') window.kbsChatRefreshHistory();
 
     // Прикажи персонализирана порака за најавениот лекар
     const lekarIme = `${data.doctor.name} ${data.doctor.surname}`;
@@ -4613,6 +4614,7 @@ async function handleLogin(e) {
       currentLekar = data.doctor;
       persistLekarToStorage();
       if (typeof window.kbsChatReset === 'function') window.kbsChatReset(true);
+      if (typeof window.kbsChatRefreshHistory === 'function') window.kbsChatRefreshHistory();
       closeAuthModal();
       displayLekarDashboard(data);
       openLekarDashboardModal();
@@ -4624,6 +4626,7 @@ async function handleLogin(e) {
       currentPacient = data.pacient;
       persistPacientToStorage();
       if (typeof window.kbsChatReset === 'function') window.kbsChatReset(true);
+      if (typeof window.kbsChatRefreshHistory === 'function') window.kbsChatRefreshHistory();
       closeAuthModal();
       updateAuthHeader();
 
@@ -4975,54 +4978,90 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
  * Бекенд: backend/routers/ai_chat.py (POST /ai-chat/ask).
  */
 (function () {
-  // URL до backend ендпоинт-от
-  const AI_API_URL = "http://localhost:8000/ai-chat/ask";
+  const AI_CHAT_BASE = API_BASE + "/ai-chat";
 
   // Конверзациски контекст – се чува меѓу прашања за повеќестепен дијалог
   // (пр. „Сакам да аплицирам за кардиолог" → AI бара лиценца → корисник
   // го прати бројот → AI ја испрати апликацијата).
   // Се чисти при нов чат, при logout/session-end и автоматски кога backend-от
-  // врати null.
+  // врати null. За најавени корисници се зачувува и во база (session_id).
   let kbsAIKontekst = null;
+  let kbsAISessionId = null;
+
+  function kbsAIAuthPayload() {
+    var pacientData = null;
+    var lekarData = null;
+    if (typeof currentPacient !== "undefined" && currentPacient && currentPacient.email) {
+      pacientData = {
+        pacient_ID: currentPacient.pacient_ID || null,
+        ime: currentPacient.ime || currentPacient.name_patient || "",
+        prezime: currentPacient.prezime || currentPacient.surname_patient || "",
+        email: currentPacient.email || "",
+        telefon: currentPacient.telefon || currentPacient.phone_number || "",
+        embg: currentPacient.embg || "",
+      };
+    }
+    if (typeof currentLekar !== "undefined" && currentLekar && currentLekar.doctor_ID) {
+      lekarData = {
+        doctor_ID: currentLekar.doctor_ID,
+        name: currentLekar.name || "",
+        surname: currentLekar.surname || "",
+        email: currentLekar.email || "",
+        specialty: currentLekar.specialty || "",
+      };
+    }
+    return { pacientData: pacientData, lekarData: lekarData };
+  }
+
+  function kbsAIHistoryEnabled() {
+    var auth = kbsAIAuthPayload();
+    return !!(
+      (auth.pacientData && auth.pacientData.pacient_ID) ||
+      (auth.lekarData && auth.lekarData.doctor_ID)
+    );
+  }
+
+  function kbsAIHistoryQuery() {
+    var auth = kbsAIAuthPayload();
+    if (auth.pacientData && auth.pacientData.pacient_ID) {
+      return "pacient_id=" + encodeURIComponent(String(auth.pacientData.pacient_ID));
+    }
+    if (auth.lekarData && auth.lekarData.doctor_ID) {
+      return "doctor_id=" + encodeURIComponent(String(auth.lekarData.doctor_ID));
+    }
+    return "";
+  }
+
+  function kbsFormatHistoryDate(isoStr) {
+    if (!isoStr) return "";
+    var d = new Date(isoStr);
+    if (isNaN(d.getTime())) return String(isoStr);
+    return d.toLocaleString("mk-MK", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
 
   // Функција за праќање на прашање кон backend и враќање одговор.
   // Ако корисникот е логиран (пациент или лекар), ги праќа и неговите податоци.
   async function pitajAI(prashanje) {
     try {
-      // Земи логиран пациент (ако постои)
-      let pacientData = null;
-      if (typeof currentPacient !== "undefined" && currentPacient && currentPacient.email) {
-        pacientData = {
-          pacient_ID: currentPacient.pacient_ID || null,
-          ime: currentPacient.ime || currentPacient.name_patient || "",
-          prezime: currentPacient.prezime || currentPacient.surname_patient || "",
-          email: currentPacient.email || "",
-          telefon: currentPacient.telefon || currentPacient.phone_number || "",
-          embg: currentPacient.embg || "",
-        };
-      }
+      var auth = kbsAIAuthPayload();
+      var body = {
+        prashanje: prashanje,
+        pacient: auth.pacientData,
+        lekar: auth.lekarData,
+        kontekst: kbsAIKontekst,
+      };
+      if (kbsAISessionId) body.session_id = kbsAISessionId;
 
-      // Земи логиран лекар (ако постои)
-      let lekarData = null;
-      if (typeof currentLekar !== "undefined" && currentLekar && currentLekar.doctor_ID) {
-        lekarData = {
-          doctor_ID: currentLekar.doctor_ID,
-          name: currentLekar.name || "",
-          surname: currentLekar.surname || "",
-          email: currentLekar.email || "",
-          specialty: currentLekar.specialty || "",
-        };
-      }
-
-      const response = await fetch(AI_API_URL, {
+      const response = await fetch(AI_CHAT_BASE + "/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prashanje: prashanje,
-          pacient: pacientData,
-          lekar: lekarData,
-          kontekst: kbsAIKontekst,
-        }),
+        body: JSON.stringify(body),
       });
 
       if (!response.ok) {
@@ -5030,19 +5069,48 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       }
 
       const data = await response.json();
-      // Ажурирај го контекстот според одговорот: ако backend-от врати null,
-      // флоу-от е завршен и треба да го заборавиме контекстот.
       kbsAIKontekst = (data && Object.prototype.hasOwnProperty.call(data, "kontekst"))
         ? (data.kontekst || null)
         : null;
+      if (data && data.session_id) {
+        kbsAISessionId = data.session_id;
+      }
 
       return {
         odgovor: data.odgovor || "Не добив одговор.",
         navigacija: data.navigacija || null,
         akcija: data.akcija || null,
+        session_id: data.session_id || null,
       };
     } catch (err) {
       return { odgovor: "Не можам да се поврзам со серверот. Провери дали backend-от работи." };
+    }
+  }
+
+  async function kbsFetchChatSessions() {
+    var q = kbsAIHistoryQuery();
+    if (!q) return [];
+    try {
+      var res = await fetch(AI_CHAT_BASE + "/sessions?" + q);
+      if (!res.ok) return [];
+      var data = await res.json();
+      return (data && data.sessions) ? data.sessions : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  async function kbsFetchChatMessages(sessionId) {
+    var q = kbsAIHistoryQuery();
+    if (!q || !sessionId) return null;
+    try {
+      var res = await fetch(
+        AI_CHAT_BASE + "/sessions/" + encodeURIComponent(String(sessionId)) + "/messages?" + q
+      );
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      return null;
     }
   }
 
@@ -5092,8 +5160,56 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
   }
 
   // Помошна функција – ресет на конверзациски контекст (повикана од reset/logout)
-  function kbsResetKontekst() { kbsAIKontekst = null; }
+  function kbsResetKontekst() {
+    kbsAIKontekst = null;
+    kbsAISessionId = null;
+  }
   window.kbsResetKontekst = kbsResetKontekst;
+
+  function kbsEscapeHtml(text) {
+    return String(text)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  // [[надпис|novosti.html]] → линк; [[center]]...[[/center]] → центриран потпис
+  function kbsFormatAiAgentHtml(text) {
+    if (!text) return "";
+    var raw = String(text);
+    var out = [];
+    var re = /\[\[center\]\]([\s\S]*?)\[\[\/center\]\]|\[\[([^\]|]+)\|([^\]]+)\]\]/g;
+    var last = 0;
+    var match;
+    while ((match = re.exec(raw)) !== null) {
+      out.push(kbsEscapeHtml(raw.slice(last, match.index)));
+      if (match[1] !== undefined) {
+        var lines = String(match[1]).trim().split("\n");
+        out.push('<div class="kbs-ai-signature">');
+        lines.forEach(function (line) {
+          var t = line.trim();
+          if (!t) return;
+          out.push('<span class="kbs-ai-signature-line">' + kbsEscapeHtml(t) + "</span>");
+        });
+        out.push("</div>");
+      } else {
+        var target = String(match[3] || "").trim();
+        out.push(
+          '<a href="' +
+            kbsEscapeHtml(target) +
+            '" class="kbs-ai-nav-link" data-nav-target="' +
+            kbsEscapeHtml(target) +
+            '">' +
+            kbsEscapeHtml(match[2]) +
+            "</a>"
+        );
+      }
+      last = re.lastIndex;
+    }
+    out.push(kbsEscapeHtml(raw.slice(last)));
+    return out.join("");
+  }
 
   // Извршува „мека" навигација кон секција на сајтот.
   // Ако сме на index.html и целта е секција на истата страна → smooth scroll.
@@ -5121,9 +5237,7 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       }
     }
 
-    setTimeout(function () {
-      window.location.href = target;
-    }, 600);
+    window.location.href = target;
   }
 
   function qs(sel, root) {
@@ -5149,8 +5263,108 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
     const messagesEl = qs("#kbs-ai-messages", root);
     const introEl = qs("#kbs-ai-intro", root);
     const newChatBtn = qs("#kbs-ai-new-chat", root);
+    const historyBtn = qs("#kbs-ai-history", root);
+    const historyPanel = qs("#kbs-ai-history-panel", root);
+    const historyList = qs("#kbs-ai-history-list", root);
+    const historyEmpty = qs("#kbs-ai-history-empty", root);
+    const historyCloseBtn = qs("#kbs-ai-history-close", root);
 
     if (!launcher || !panel || !form || !input || !messagesEl) return;
+
+    function kbsAppendUserMsg(text) {
+      const userEl = document.createElement("p");
+      userEl.className = "kbs-ai-msg kbs-ai-msg-user";
+      userEl.textContent = text;
+      messagesEl.appendChild(userEl);
+    }
+
+    function kbsAppendAgentMsg(text) {
+      const botEl = document.createElement("p");
+      botEl.className = "kbs-ai-msg kbs-ai-msg-agent";
+      botEl.innerHTML = kbsFormatAiAgentHtml(text || "");
+      messagesEl.appendChild(botEl);
+      return botEl;
+    }
+
+    function kbsSyncHistoryButton() {
+      if (!historyBtn) return;
+      var show = kbsAIHistoryEnabled();
+      historyBtn.hidden = !show;
+      if (!show && historyPanel) {
+        historyPanel.hidden = true;
+        historyPanel.setAttribute("aria-hidden", "true");
+      }
+    }
+
+    function kbsCloseHistoryPanel() {
+      if (!historyPanel) return;
+      historyPanel.hidden = true;
+      historyPanel.setAttribute("aria-hidden", "true");
+    }
+
+    function kbsOpenHistoryPanel() {
+      if (!historyPanel) return;
+      historyPanel.hidden = false;
+      historyPanel.setAttribute("aria-hidden", "false");
+    }
+
+    async function kbsRenderHistoryList(activeId) {
+      if (!historyList) return;
+      historyList.innerHTML = "";
+      var sessions = await kbsFetchChatSessions();
+      if (historyEmpty) {
+        historyEmpty.hidden = sessions.length > 0;
+      }
+      sessions.forEach(function (s) {
+        var li = document.createElement("li");
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "kbs-ai-history-item";
+        if (activeId && s.session_id === activeId) {
+          btn.classList.add("is-active");
+        }
+        btn.dataset.sessionId = String(s.session_id);
+        var title = document.createElement("span");
+        title.className = "kbs-ai-history-item-title";
+        title.textContent = s.naslov || "Разговор";
+        var date = document.createElement("span");
+        date.className = "kbs-ai-history-item-date";
+        date.textContent = kbsFormatHistoryDate(s.updated_at || s.created_at);
+        btn.appendChild(title);
+        btn.appendChild(date);
+        btn.addEventListener("click", function () {
+          kbsLoadChatSession(s.session_id);
+        });
+        li.appendChild(btn);
+        historyList.appendChild(li);
+      });
+    }
+
+    async function kbsLoadChatSession(sessionId) {
+      var data = await kbsFetchChatMessages(sessionId);
+      if (!data) return;
+      kbsAISessionId = data.session_id;
+      kbsAIKontekst = data.kontekst || null;
+      messagesEl.innerHTML = "";
+      if (introEl) introEl.hidden = true;
+      (data.messages || []).forEach(function (m) {
+        if (m.uloga === "user") {
+          kbsAppendUserMsg(m.sodrzina || "");
+        } else {
+          kbsAppendAgentMsg(m.sodrzina || "");
+        }
+      });
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      kbsCloseHistoryPanel();
+      await kbsRenderHistoryList(sessionId);
+    }
+
+    window.kbsChatRefreshHistory = function () {
+      kbsSyncHistoryButton();
+      if (kbsAIHistoryEnabled()) {
+        kbsRenderHistoryList(kbsAISessionId);
+      }
+    };
 
     const setOpen = function (open) {
       root.dataset.open = open ? "true" : "false";
@@ -5168,6 +5382,10 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       if (introEl) introEl.hidden = false;
       if (input) input.value = "";
       kbsResetKontekst();
+      kbsCloseHistoryPanel();
+      if (historyList) historyList.innerHTML = "";
+      if (historyEmpty) historyEmpty.hidden = true;
+      kbsSyncHistoryButton();
       if (closePanel) {
         setOpen(false);
       }
@@ -5180,7 +5398,11 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
     };
 
     launcher.addEventListener("click", function () {
-      setOpen(root.dataset.open !== "true");
+      var opening = root.dataset.open !== "true";
+      setOpen(opening);
+      if (opening && typeof window.kbsChatRefreshHistory === "function") {
+        window.kbsChatRefreshHistory();
+      }
     });
 
     if (newChatBtn) {
@@ -5188,6 +5410,26 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
         resetChat(false);
       });
     }
+
+    if (historyBtn) {
+      historyBtn.addEventListener("click", function () {
+        if (historyPanel && historyPanel.hidden) {
+          kbsOpenHistoryPanel();
+          kbsRenderHistoryList(kbsAISessionId);
+        } else {
+          kbsCloseHistoryPanel();
+        }
+      });
+    }
+
+    if (historyCloseBtn) {
+      historyCloseBtn.addEventListener("click", kbsCloseHistoryPanel);
+    }
+
+    kbsSyncHistoryButton();
+    window.addEventListener("kbs:session-sync", function () {
+      kbsSyncHistoryButton();
+    });
 
     // Авто-ресет кога ќе истече сесијата (session.js испраќа kbs:session-end на window)
     window.addEventListener("kbs:session-end", function () {
@@ -5199,6 +5441,16 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       resetChat(true);
     });
 
+    messagesEl.addEventListener("click", function (e) {
+      var link = e.target.closest(".kbs-ai-nav-link");
+      if (!link) return;
+      e.preventDefault();
+      var target = link.getAttribute("data-nav-target");
+      if (target) {
+        kbsIzvrsiNavigacija({ target: target, label: link.textContent || "" });
+      }
+    });
+
     form.addEventListener("submit", function (e) {
       e.preventDefault();
       const text = input.value.trim();
@@ -5206,10 +5458,8 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
 
       if (introEl) introEl.hidden = true;
 
-      const userEl = document.createElement("p");
-      userEl.className = "kbs-ai-msg kbs-ai-msg-user";
-      userEl.textContent = text;
-      messagesEl.appendChild(userEl);
+      kbsAppendUserMsg(text);
+      kbsCloseHistoryPanel();
 
       input.value = "";
       messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -5231,14 +5481,15 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
         var nav = (rezultat && typeof rezultat === "object") ? rezultat.navigacija : null;
         var akc = (rezultat && typeof rezultat === "object") ? rezultat.akcija : null;
 
-        const botEl = document.createElement("p");
-        botEl.className = "kbs-ai-msg kbs-ai-msg-agent";
-        botEl.textContent = odgovor || "";
-        messagesEl.appendChild(botEl);
+        kbsAppendAgentMsg(odgovor || "");
         messagesEl.scrollTop = messagesEl.scrollHeight;
 
         if (nav) kbsIzvrsiNavigacija(nav);
         if (akc) kbsIzvrsiAkcija(akc);
+
+        if (typeof window.kbsChatRefreshHistory === "function") {
+          window.kbsChatRefreshHistory();
+        }
       });
     });
   }

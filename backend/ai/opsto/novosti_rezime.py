@@ -10,6 +10,9 @@ from ai._kernel.db_helpers import as_dict, db_cursor
 
 # Иста релативна патека како во navigacija.py (frontend со static сервер)
 NOVOSTI_STRANICA = "novosti.html"
+# Frontend го претвора [[Новости|novosti.html]] во кликабилен линк
+NOVOSTI_LINK = f"[[Новости|{NOVOSTI_STRANICA}]]"
+POTPIS = "[[center]]Ви благодариме\nКлиничка Болница Штип[[/center]]"
 
 
 def odgovori_za_novosti_rezime() -> str:
@@ -17,7 +20,7 @@ def odgovori_za_novosti_rezime() -> str:
         with db_cursor() as (_, cur):
             cur.execute(
                 """
-                SELECT id, naslov, created_at
+                SELECT naslov
                 FROM Novosti
                 ORDER BY created_at DESC
                 LIMIT 3
@@ -28,21 +31,25 @@ def odgovori_za_novosti_rezime() -> str:
         print(f"[novosti_rezime] DB: {e}")
         return (
             "Моментално не можам да ги вчитам новостите. "
-            f"Отвори ја страницата **{NOVOSTI_STRANICA}** на сајтот или пробај подоцна."
+            f"Отворете ја страницата {NOVOSTI_LINK} или пробајте подоцна.\n\n"
+            f"{POTPIS}"
         )
 
     if not rows:
         return (
-            f"Нема објавени новости во моментов. Следи на **{NOVOSTI_STRANICA}** кога ќе има објави."
+            f"Нема објавени новости во моментов. Следете ги на {NOVOSTI_LINK} кога ќе има нови објави.\n\n"
+            f"{POTPIS}"
         )
 
     linii = ["Последни објави на сајтот:\n"]
     for r in rows:
         row = as_dict(r)
         naslov = (row.get("naslov") or "Без наслов").strip()
-        rid = row.get("id")
-        linii.append(f"• **{naslov}** (ID {rid})")
+        linii.append(f"•{naslov}")
+
     linii.append(
-        f"\nЦелосна листа и содржина: отвори **{NOVOSTI_STRANICA}** (копче „Прочитај повеќе“ кај секоја вест)."
+        "\nЦелата содржина на овие вести, но и на останатите може да ја погледнете на "
+        f"{NOVOSTI_LINK}.\n\n"
+        f"{POTPIS}"
     )
     return "\n".join(linii)

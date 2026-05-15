@@ -13,7 +13,9 @@ import re
 
 from database import get_connection
 from ai._kernel.ai_json import parse_ai_json
+from ai._kernel.db_helpers import as_dict
 from ai._kernel.groq_client import ask_ai
+from vrabotuvanje_helpers import fetch_aktivni_oglasi_rows, format_rok_datum
 
 
 # Сите достапни „дестинации". Frontend ги мапира на href/scroll.
@@ -43,6 +45,7 @@ PROMPT = """
 
 Правила:
 - „лекари", „сите лекари", „медицински тим", „доктори" → "lekari"
+- „каде се лекарите", „каде се докторите", „каде се наоѓаат лекарите" → "lekari"
 - „услуги", „оддели", „специјалности", „што нудите" → "uslugi"
 - „контакт", „телефон", „каде сте", „адреса" → "kontakt"
 - „кариера", „кариери", „работа", „вработување", „вработувања", „вработување во болницата",
@@ -61,31 +64,22 @@ PROMPT = """
 
 
 def _aktivni_oglasi_za_kariera() -> list[dict]:
-    '''Ист филтер како GET /kariera — активни огласи (не „завршен").'''
+    """Ист филтер како GET /kariera — само важечки активни (рок >= денес)."""
     conn = None
     try:
         conn = get_connection()
         cur = conn.cursor(dictionary=True)
-        cur.execute(
-            """
-            SELECT id_oglas, pozicija, oddel, datum_na_prijavuvanje
-            FROM Vrabotuvanje
-            WHERE (status_oglas IS NULL OR status_oglas = '' OR status_oglas != 'завршен')
-            ORDER BY datum_na_prijavuvanje ASC
-            """
-        )
-        rows = cur.fetchall() or []
+        rows = fetch_aktivni_oglasi_rows(cur)
         cur.close()
         out: list[dict] = []
-        for r in rows:
-            d = r.get("datum_na_prijavuvanje")
-            rok_str = d.strftime("%d.%m.%Y") if d and hasattr(d, "strftime") else (str(d)[:10] if d else "")
+        for raw in rows:
+            r = as_dict(raw)
             out.append(
                 {
                     "id_oglas": r.get("id_oglas"),
                     "pozicija": (r.get("pozicija") or "").strip(),
                     "oddel": (r.get("oddel") or "").strip(),
-                    "rok": rok_str,
+                    "rok": format_rok_datum(r.get("datum_na_prijavuvanje")),
                 }
             )
         return out
@@ -154,36 +148,15 @@ def odgovori_za_navigacija(prashanje: str) -> dict:
 
     if dest == "lekari":
         try:
-            from ai.pacient.slobodni_termini import zimi_site_lekari
+            from ai.opsto.lekari_oddel import odgovor_navigacija_lekari
 
-            lek = zimi_site_lekari()
-            if not lek:
-                odgovor = (
-                    'Ве пренасочувам кон делот „Лекари". '
-                    "Моментално нема регистрирани лекари во системот."
-                )
-            else:
-                delovi = [
-                    'Ве пренасочувам кон делот „Лекари" на почетната страница. '
-                    "Подолу е целосната листа од системот:",
-                    "",
-                    f"Лекарски тим ({len(lek)}):",
-                    "",
-                ]
-                for l in lek:
-                    spec = (l.get("specialty") or "—").strip() or "—"
-                    em = (l.get("email") or "").strip()
-                    red = f"- Д-р {l['name']} {l['surname']} — {spec}"
-                    if em:
-                        red += f" ({em})"
-                    delovi.append(red)
-                delovi.append("")
-                delovi.append(
-                    'Страницата автоматски се лизга кон секцијата „Лекари" за преглед на картичките и закажување.'
-                )
-                odgovor = "\n".join(delovi)
+            return odgovor_navigacija_lekari()
         except Exception as e:
-            print(f"[navigacija] greshka pri lista lekari: {e}")
+            print(f"[navigacija] greshka pri navigacija lekari: {e}")
+            odgovor = (
+                'Ве пренасочувам кон делот „Лекари" на почетната страница. '
+                "Листата со лекари ќе ја видите на екранот."
+            )
 
     if dest == "kariera":
         oglasi = _aktivni_oglasi_za_kariera()

@@ -18,6 +18,7 @@ from datetime import datetime
 from database import get_connection
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
+from vrabotuvanje_helpers import fetch_aktivni_oglasi_rows
 
 
 PROMPT_POZICIJA = """
@@ -90,14 +91,7 @@ def _najdi_aktiven_oglas(pozicija_baranо: str) -> dict | None:
     try:
         conn = get_connection()
         cur = conn.cursor(dictionary=True)
-        cur.execute("""
-            SELECT id_oglas, pozicija, oddel, datum_na_prijavuvanje, status_oglas
-            FROM Vrabotuvanje
-            WHERE (status_oglas IS NULL OR LOWER(status_oglas) IN ('активен', 'aktiven', ''))
-              AND (datum_na_prijavuvanje IS NULL OR datum_na_prijavuvanje >= CURDATE())
-            ORDER BY datum_na_prijavuvanje DESC
-        """)
-        site = cur.fetchall() or []
+        site = fetch_aktivni_oglasi_rows(cur)
         cur.close()
     except Exception as e:
         print(f"[apliciraj] DB greshka: {e}")

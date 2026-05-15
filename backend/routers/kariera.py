@@ -1,11 +1,27 @@
 import traceback
+from collections.abc import Mapping
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Request
+from starlette.datastructures import UploadFile
 from datetime import datetime
 from database import get_connection
+from vrabotuvanje_helpers import fetch_aktivni_oglasi_rows, row_to_oglas_public
 
 router = APIRouter(prefix="/kariera", tags=["kariera"])
 
-def _parse_int_or_none(val):
+
+def _form_str(form: Mapping[str, Any], key: str) -> str:
+    """Текст од multipart/form — Pylance: form.get() може да врати UploadFile."""
+    raw = form.get(key)
+    if raw is None or isinstance(raw, UploadFile):
+        return ""
+    return str(raw).strip()
+
+
+def _parse_int_or_none(val: Any) -> int | None:
+    if val is None or isinstance(val, UploadFile):
+        return None
     if not val:
         return None
     try:
@@ -23,28 +39,8 @@ def get_kariera():          # funkcija koja e nameneta za kariera
         # se selektira id na oglas, pozicija i oddel, datum na prijavuvanje
         # podatocite se zemeni og tabela Vraboteni kade statusot na oglas ne ne null vrednost ili e uste aktiven, != 'завршен'
         # se podreduvaat spored datum na prijava, prednost e na posleniot oglas
-        db_cursor.execute("""
-            SELECT id_oglas, pozicija AS naslov, oddel AS opis,
-                   datum_na_prijavuvanje AS rok_datum
-            FROM Vrabotuvanje
-            WHERE (status_oglas IS NULL OR status_oglas = '' OR status_oglas != 'завршен')
-            ORDER BY datum_na_prijavuvanje ASC
-        """)
-        rows = db_cursor.fetchall()            # se zemaat site oglasi koi se podneseni
-        out = []        # lista za finalnite recenici
-        for r in rows:          # r red vo bazata, r minuva niz site oglasi od tabelata 
-            d = r.get("rok_datum")      # d- datum, od redicata se zema datumot i se smestuva vo d
-            # se formatira vo oblik den, mesec, godina, dokolku d ime strftime se koriste, no vo sprotivno se zemaat prvite 10 karakteri
-            rok_str = d.strftime("%d.%m.%Y") if d and hasattr(d, "strftime") else (str(d)[:10] if d else "")
-            # dodavanje na oglasot vo finalnata lista so formatirani podatoci
-            out.append({
-                "id_oglas": r.get("id_oglas"),
-                "naslov": (r.get("naslov") or "").strip(),
-                "opis": (r.get("opis") or "").strip(),
-                "rok": rok_str
-            })
-            # ja dava listata
-        return out
+        rows = fetch_aktivni_oglasi_rows(db_cursor)
+        return [row_to_oglas_public(r) for r in rows]
     except HTTPException:
         raise
     except Exception as e:                      # pojava na greska so soodveten kod i poraka do lekar ili korisnik 
@@ -63,14 +59,14 @@ app_router = APIRouter(tags=["kariera"])
 async def create_aplikacija(request: Request):          # site prijaveni kandidati na oglasi
     conn = None
     try:
-        form_data = await request.form()            # se zemaat podatocite od fronend delot
-        pozicija = (form_data.get("pozicija") or "").strip()  # se zema izbranata pozicija od lista (selektirana so klik)
-        id_oglas = form_data.get("id_oglas")        # se zema id na oglasot (opcionalno)
-        ime = (form_data.get("ime") or "").strip()  # se zima imeto na kandidatot
-        prezime = (form_data.get("prezime") or "").strip()  # se zima prezimetot na kandidatot
-        email = (form_data.get("email") or "").strip()          # mail adresara
-        telefon = _parse_int_or_none(form_data.get("telefon"))      # telefonskiot broj
-        broj_med_lic = _parse_int_or_none(form_data.get("broj_med_licenca"))    # broj na medicinska licena
+        form_data = await request.form()
+        pozicija = _form_str(form_data, "pozicija")
+        id_oglas_value = _parse_int_or_none(form_data.get("id_oglas"))
+        ime = _form_str(form_data, "ime")
+        prezime = _form_str(form_data, "prezime")
+        email = _form_str(form_data, "email")
+        telefon = _parse_int_or_none(form_data.get("telefon"))
+        broj_med_lic = _parse_int_or_none(form_data.get("broj_med_licenca"))
 
         if not pozicija:        # proverka dali e izbrana pozicija
             raise HTTPException(status_code=400, detail="Изберете позиција од листата.")
@@ -85,8 +81,6 @@ async def create_aplikacija(request: Request):          # site prijaveni kandida
         # datum na prijava
         datum_prijava = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # vnes na podatocite vo tabelata prijaveni_lekari
-        id_oglas_value = int(id_oglas) if id_oglas else None  # konverzija vo int ako postoi
         db_cursor.execute("""
             INSERT INTO prijaveni_lekari (id_oglas, pozicija, ime_lekar, prezime_lekar, broj_med_licenca, email, telefon, datum_prijava)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)

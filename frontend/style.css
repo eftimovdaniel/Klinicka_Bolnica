@@ -4404,6 +4404,35 @@ html {
   color: #1f2937;
 }
 
+.kbs-ai-msg-agent .kbs-ai-nav-link {
+  color: var(--kbs-asst-red, #b91c1c);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.kbs-ai-msg-agent .kbs-ai-nav-link:hover {
+  color: var(--kbs-asst-red-deep, #991b1b);
+}
+
+.kbs-ai-msg-agent .kbs-ai-signature {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px solid #eef0f3;
+  text-align: center;
+}
+.kbs-ai-msg-agent .kbs-ai-signature-line {
+  display: block;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  color: #64748b;
+}
+.kbs-ai-msg-agent .kbs-ai-signature-line:first-child {
+  font-weight: 600;
+  color: #475569;
+}
+
 .kbs-ai-typing span {
   width: 7px; height: 7px; border-radius: 50%;
   background: #9ca3af;
@@ -4502,7 +4531,8 @@ html {
   flex-shrink: 0;
 }
 
-.kbs-ai-header-plus {
+.kbs-ai-header-plus,
+.kbs-ai-header-history {
   width: 30px;
   height: 30px;
   border-radius: 50%;
@@ -4519,9 +4549,96 @@ html {
   padding: 0;
   transition: background 0.15s, border-color 0.15s;
 }
-.kbs-ai-header-plus:hover {
+.kbs-ai-header-history {
+  font-size: 15px;
+  font-weight: 600;
+}
+.kbs-ai-header-plus:hover,
+.kbs-ai-header-history:hover {
   background: rgba(255, 255, 255, 0.22);
   border-color: rgba(255, 255, 255, 0.7);
+}
+
+.kbs-ai-history-panel {
+  flex-shrink: 0;
+  max-height: 42%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+.kbs-ai-history-panel[hidden] {
+  display: none !important;
+}
+.kbs-ai-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid #eef0f3;
+  background: #f8fafc;
+}
+.kbs-ai-history-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+}
+.kbs-ai-history-close {
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+  line-height: 1;
+}
+.kbs-ai-history-close:hover {
+  color: #0f172a;
+}
+.kbs-ai-history-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 8px;
+  overflow-y: auto;
+  flex: 1;
+}
+.kbs-ai-history-item {
+  width: 100%;
+  text-align: left;
+  border: none;
+  background: transparent;
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  display: block;
+  transition: background 0.12s;
+}
+.kbs-ai-history-item:hover,
+.kbs-ai-history-item.is-active {
+  background: #f1f5f9;
+}
+.kbs-ai-history-item-title {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kbs-ai-history-item-date {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #64748b;
+}
+.kbs-ai-history-empty {
+  margin: 0;
+  padding: 14px 16px;
+  font-size: 13px;
+  color: #64748b;
+  text-align: center;
 }
 
 /* ---------- BODY ---------- */
