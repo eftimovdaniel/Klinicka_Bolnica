@@ -738,11 +738,7 @@
         <!-- Под-таб за новости -->
         <div id="novosti-admin" class="admin-sub-tab-content">
           <h4>Новости</h4>
-          <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 1rem;">
-            <button type="button" class="btn-primary btn-admin-add" onclick="openNovostForm()">+ Додади новост</button>
-            <button type="button" class="btn-raspored-load" onclick="syncFacebookNovosti()">Синхронизирај Facebook</button>
-          </div>
-          <div id="fb-pending-admin" class="admin-list" style="margin-bottom: 1rem; display: none;"></div>
+          <button type="button" class="btn-primary btn-admin-add" onclick="openNovostForm()" style="margin-bottom: 1rem;">+ Додади новост</button>
           <div id="novosti-admin-list" class="admin-list">
             <div class="loading">Вчитувам новости...</div>
           </div>

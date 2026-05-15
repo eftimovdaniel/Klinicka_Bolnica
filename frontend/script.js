@@ -3206,7 +3206,6 @@ function showAdminSubTab(subTabName) {
     loadAdminOglasi();
   } else if (subTabName === 'novosti-admin') {
     loadNovostiAdmin();
-    loadFbPendingAdmin();
   } else if (subTabName === 'statistika-optovaruvanje-admin') {
     loadAdminStatistikaOptovaruvanje();
   } else if (subTabName === 'statistika-prosek-ocena-admin') {
@@ -4083,102 +4082,6 @@ function closeNovostViewModal() {
   if (modal) modal.style.display = 'none';
 }
 
-async function loadFbPendingAdmin() {
-  var wrap = document.getElementById('fb-pending-admin');
-  if (!wrap || !currentLekar) return;
-  try {
-    var res = await fetch(
-      API_BASE + '/admin/facebook/pending?admin_doctor_id=' + currentLekar.doctor_ID
-    );
-    if (!res.ok) {
-      wrap.style.display = 'none';
-      return;
-    }
-    var data = await res.json();
-    var pending = data.pending || [];
-    if (!pending.length) {
-      wrap.style.display = 'none';
-      wrap.innerHTML = '';
-      return;
-    }
-    wrap.style.display = 'block';
-    wrap.innerHTML = '<h5 style="margin:0 0 0.5rem 0;">Facebook — чекаат одобрување</h5>';
-    pending.forEach(function(p) {
-      var div = document.createElement('div');
-      div.className = 'admin-list-item';
-      var naslov = (p.naslov || '').replace(/</g, '&lt;');
-      div.innerHTML =
-        '<div class="admin-list-item-content"><strong>' + naslov + '</strong></div>' +
-        '<div class="admin-list-item-actions">' +
-        '<button type="button" class="btn-edit" onclick="publishFbPending(' + p.id + ')">Објави</button> ' +
-        '<button type="button" class="btn-delete" onclick="skipFbPending(' + p.id + ')">Прескокни</button>' +
-        '</div>';
-      wrap.appendChild(div);
-    });
-  } catch (e) {
-    wrap.style.display = 'none';
-  }
-}
-
-async function syncFacebookNovosti() {
-  if (!currentLekar) return;
-  try {
-    var res = await fetch(
-      API_BASE + '/admin/facebook/sync?admin_doctor_id=' + currentLekar.doctor_ID,
-      { method: 'POST' }
-    );
-    var data = await res.json().catch(function() { return {}; });
-    if (!res.ok) throw new Error(data.detail || 'Грешка при синхронизација');
-    var mode = data.sync_mode || '';
-    var msg =
-      (mode === 'mock' ? '[ДЕМО режим, не е вистински FB] ' : '') +
-      (data.page_id ? 'Page ID: ' + data.page_id + '. ' : '') +
-      'Нови за одобрување: ' + (data.added || 0) +
-      '. На сајтот сè уште ништо не е објавено. Чекаат: ' + (data.pending_count || 0);
-    if (data.deferred) {
-      msg += '. Уште ' + data.deferred + ' — синхронизирај повторно по одобрување.';
-    }
-    showLekarToast(msg, false);
-    loadFbPendingAdmin();
-    loadNovosti();
-  } catch (err) {
-    showLekarToast(err.message || 'Грешка', true);
-  }
-}
-
-async function publishFbPending(id) {
-  if (!currentLekar) return;
-  try {
-    var res = await fetch(
-      API_BASE + '/admin/facebook/pending/' + id + '/publish?admin_doctor_id=' + currentLekar.doctor_ID,
-      { method: 'POST' }
-    );
-    var data = await res.json().catch(function() { return {}; });
-    if (!res.ok) throw new Error(data.detail || 'Грешка');
-    showLekarToast('Објавено на сајтот.', false);
-    loadFbPendingAdmin();
-    loadNovostiAdmin();
-    loadNovosti();
-  } catch (err) {
-    showLekarToast(err.message || 'Грешка', true);
-  }
-}
-
-async function skipFbPending(id) {
-  if (!currentLekar) return;
-  try {
-    var res = await fetch(
-      API_BASE + '/admin/facebook/pending/' + id + '/skip?admin_doctor_id=' + currentLekar.doctor_ID,
-      { method: 'POST' }
-    );
-    var data = await res.json().catch(function() { return {}; });
-    if (!res.ok) throw new Error(data.detail || 'Грешка');
-    showLekarToast('Прескокнато.', false);
-    loadFbPendingAdmin();
-  } catch (err) {
-    showLekarToast(err.message || 'Грешка', true);
-  }
-}
 
 async function loadNovostiAdmin() {
   var listEl = document.getElementById('novosti-admin-list');
