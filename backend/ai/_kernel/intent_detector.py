@@ -51,6 +51,16 @@
 
 
 # 00. ОБЈАВИ ВЕСТ (мора први - има YouTube линк или зборови за публикување)
+# Facebook → новости (директор одобрува)
+KLUCNI_FB_NOVOSTI = [
+    "facebook новости", "facebook novosti", "од facebook",
+    "синхронизирај facebook", "синхронизирај фејсбук", "sync facebook",
+    "нови постови facebook", "објава од facebook",
+    "фејсбук новости", "fejsbuk novosti", "sinhroniziraj fejsbuk",
+    "одобри facebook", "facebook пост", "фејсбук пост",
+    "повлечи од facebook", "земи од facebook",
+]
+
 KLUCNI_OBJAVI_VEST = [
     "објави вест", "објави новост", "публикувај",
     "креирај вест", "создади вест", "напиши вест",
@@ -404,8 +414,32 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
     if "youtube.com" in orig_low or "youtu.be" in orig_low:
         return "objavi_vest"
 
+    # Facebook sync (пред транслитерација — „facebook" да не се расипе)
+    _fb_wants = (
+        "facebook" in orig_low
+        or "fejsbuk" in orig_low
+        or "fejbuk" in orig_low
+        or "фејсбук" in orig_low
+    )
+    _fb_action = any(
+        w in orig_low
+        for w in (
+            "синхрониз", "sync", "новост", "novost", "објав", "пост", "post",
+            "одобр", "повлеч", "земи", "pending", "објави",
+        )
+    )
+
     # Автоматски преводи: латиница → кирилица
     p = transliterijaj(prashanje).lower().strip()
+
+    if _ima_zbor(p, KLUCNI_FB_NOVOSTI):
+        return "fb_novosti_odobruvanje"
+    if _fb_wants and (_fb_action or _ima_zbor(p, KLUCNI_FB_NOVOSTI)):
+        return "fb_novosti_odobruvanje"
+    if ("facebook" in p or "фејсбук" in p or "fejsbuk" in p) and any(
+        w in p for w in ("новост", "novost", "објав", "пост", "post", "синхрониз", "sync", "одобр")
+    ):
+        return "fb_novosti_odobruvanje"
 
     if _ima_zbor(p, KLUCNI_OBJAVI_VEST):
         return "objavi_vest"

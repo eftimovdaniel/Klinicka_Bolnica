@@ -113,6 +113,8 @@ def _resolve_intent(
 ) -> str:
     if aktiven_kontekst and aktiven_kontekst.get("intent") == "apliciraj_za_rabota":
         return "apliciraj_za_rabota"
+    if aktiven_kontekst and aktiven_kontekst.get("intent") == "fb_novosti_odobruvanje":
+        return "fb_novosti_odobruvanje"
 
     try:
         intent = detektiraj_intent(pitanje_norm)

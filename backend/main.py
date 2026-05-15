@@ -1,15 +1,41 @@
+import os
+import threading
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, cast
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from routers import lekari, pacienti, termini, admin, aparati, uslugi, novosti, kariera, ai_chat
+from routers import lekari, pacienti, termini, admin, aparati, uslugi, novosti, kariera, ai_chat, facebook_sync
+
+_FB_SYNC_INTERVAL_MIN = int(os.getenv("FB_SYNC_INTERVAL_MINUTES", "0") or "0")
+
+
+@asynccontextmanager
+async def _app_lifespan(app: FastAPI):
+    stop = threading.Event()
+
+    def _periodic_fb_sync() -> None:
+        if _FB_SYNC_INTERVAL_MIN <= 0:
+            return
+        import time
+        from fb_sync import run_sync_if_configured
+
+        while not stop.wait(timeout=_FB_SYNC_INTERVAL_MIN * 60):
+            run_sync_if_configured()
+
+    if _FB_SYNC_INTERVAL_MIN > 0:
+        threading.Thread(target=_periodic_fb_sync, daemon=True).start()
+    yield
+    stop.set()
+
 
 app = FastAPI(
     title="Клиничка Болница Штип – API",
     description="API за системот за управување со прегледи, термини и администрација",
     version="1.0",
+    lifespan=_app_lifespan,
 )
 #dozvola za povik na api od frontend delot 
 app.add_middleware(
@@ -41,6 +67,7 @@ app.include_router(novosti.router)
 app.include_router(kariera.router)
 app.include_router(kariera.app_router)  # /aplikacija (пријава за оглас)
 app.include_router(ai_chat.router)  # AI чат со Groq (Llama 3.3)
+app.include_router(facebook_sync.router)
 
 
 @app.get("/")

@@ -3206,6 +3206,7 @@ function showAdminSubTab(subTabName) {
     loadAdminOglasi();
   } else if (subTabName === 'novosti-admin') {
     loadNovostiAdmin();
+    loadFbPendingAdmin();
   } else if (subTabName === 'statistika-optovaruvanje-admin') {
     loadAdminStatistikaOptovaruvanje();
   } else if (subTabName === 'statistika-prosek-ocena-admin') {
@@ -4080,6 +4081,103 @@ function openNovostGalleryLightbox(urls, startIndex) {
 function closeNovostViewModal() {
   var modal = document.getElementById('novost-view-modal');
   if (modal) modal.style.display = 'none';
+}
+
+async function loadFbPendingAdmin() {
+  var wrap = document.getElementById('fb-pending-admin');
+  if (!wrap || !currentLekar) return;
+  try {
+    var res = await fetch(
+      API_BASE + '/admin/facebook/pending?admin_doctor_id=' + currentLekar.doctor_ID
+    );
+    if (!res.ok) {
+      wrap.style.display = 'none';
+      return;
+    }
+    var data = await res.json();
+    var pending = data.pending || [];
+    if (!pending.length) {
+      wrap.style.display = 'none';
+      wrap.innerHTML = '';
+      return;
+    }
+    wrap.style.display = 'block';
+    wrap.innerHTML = '<h5 style="margin:0 0 0.5rem 0;">Facebook — чекаат одобрување</h5>';
+    pending.forEach(function(p) {
+      var div = document.createElement('div');
+      div.className = 'admin-list-item';
+      var naslov = (p.naslov || '').replace(/</g, '&lt;');
+      div.innerHTML =
+        '<div class="admin-list-item-content"><strong>' + naslov + '</strong></div>' +
+        '<div class="admin-list-item-actions">' +
+        '<button type="button" class="btn-edit" onclick="publishFbPending(' + p.id + ')">Објави</button> ' +
+        '<button type="button" class="btn-delete" onclick="skipFbPending(' + p.id + ')">Прескокни</button>' +
+        '</div>';
+      wrap.appendChild(div);
+    });
+  } catch (e) {
+    wrap.style.display = 'none';
+  }
+}
+
+async function syncFacebookNovosti() {
+  if (!currentLekar) return;
+  try {
+    var res = await fetch(
+      API_BASE + '/admin/facebook/sync?admin_doctor_id=' + currentLekar.doctor_ID,
+      { method: 'POST' }
+    );
+    var data = await res.json().catch(function() { return {}; });
+    if (!res.ok) throw new Error(data.detail || 'Грешка при синхронизација');
+    var mode = data.sync_mode || '';
+    var msg =
+      (mode === 'mock' ? '[ДЕМО режим, не е вистински FB] ' : '') +
+      (data.page_id ? 'Page ID: ' + data.page_id + '. ' : '') +
+      'Нови за одобрување: ' + (data.added || 0) +
+      '. На сајтот сè уште ништо не е објавено. Чекаат: ' + (data.pending_count || 0);
+    if (data.deferred) {
+      msg += '. Уште ' + data.deferred + ' — синхронизирај повторно по одобрување.';
+    }
+    showLekarToast(msg, false);
+    loadFbPendingAdmin();
+    loadNovosti();
+  } catch (err) {
+    showLekarToast(err.message || 'Грешка', true);
+  }
+}
+
+async function publishFbPending(id) {
+  if (!currentLekar) return;
+  try {
+    var res = await fetch(
+      API_BASE + '/admin/facebook/pending/' + id + '/publish?admin_doctor_id=' + currentLekar.doctor_ID,
+      { method: 'POST' }
+    );
+    var data = await res.json().catch(function() { return {}; });
+    if (!res.ok) throw new Error(data.detail || 'Грешка');
+    showLekarToast('Објавено на сајтот.', false);
+    loadFbPendingAdmin();
+    loadNovostiAdmin();
+    loadNovosti();
+  } catch (err) {
+    showLekarToast(err.message || 'Грешка', true);
+  }
+}
+
+async function skipFbPending(id) {
+  if (!currentLekar) return;
+  try {
+    var res = await fetch(
+      API_BASE + '/admin/facebook/pending/' + id + '/skip?admin_doctor_id=' + currentLekar.doctor_ID,
+      { method: 'POST' }
+    );
+    var data = await res.json().catch(function() { return {}; });
+    if (!res.ok) throw new Error(data.detail || 'Грешка');
+    showLekarToast('Прескокнато.', false);
+    loadFbPendingAdmin();
+  } catch (err) {
+    showLekarToast(err.message || 'Грешка', true);
+  }
 }
 
 async function loadNovostiAdmin() {
@@ -5260,6 +5358,7 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
     const panel = qs("#kbs-ai-panel", root);
     const form = qs("#kbs-ai-form", root);
     const input = qs("#kbs-ai-input", root);
+    const panelBodyEl = qs(".kbs-ai-panel-body", root);
     const messagesEl = qs("#kbs-ai-messages", root);
     const introEl = qs("#kbs-ai-intro", root);
     const newChatBtn = qs("#kbs-ai-new-chat", root);
@@ -5269,13 +5368,34 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
     const historyEmpty = qs("#kbs-ai-history-empty", root);
     const historyCloseBtn = qs("#kbs-ai-history-close", root);
 
-    if (!launcher || !panel || !form || !input || !messagesEl) return;
+    if (!launcher || !panel || !form || !input || !messagesEl || !panelBodyEl) return;
+
+    /** Скрол на конецот на чатот (листата е во .kbs-ai-panel-body, не во #kbs-ai-messages). */
+    function kbsScrollChatToBottom(force, smooth) {
+      var el = panelBodyEl;
+      if (!el) return;
+      if (force !== true) {
+        var gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+        if (gap > 100) return;
+      }
+      var behavior = smooth !== false ? "smooth" : "auto";
+      requestAnimationFrame(function () {
+        requestAnimationFrame(function () {
+          try {
+            el.scrollTo({ top: el.scrollHeight, behavior: behavior });
+          } catch (err) {
+            el.scrollTop = el.scrollHeight;
+          }
+        });
+      });
+    }
 
     function kbsAppendUserMsg(text) {
       const userEl = document.createElement("p");
       userEl.className = "kbs-ai-msg kbs-ai-msg-user";
       userEl.textContent = text;
       messagesEl.appendChild(userEl);
+      kbsScrollChatToBottom(true, true);
     }
 
     function kbsAppendAgentMsg(text) {
@@ -5283,6 +5403,7 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       botEl.className = "kbs-ai-msg kbs-ai-msg-agent";
       botEl.innerHTML = kbsFormatAiAgentHtml(text || "");
       messagesEl.appendChild(botEl);
+      kbsScrollChatToBottom(true, true);
       return botEl;
     }
 
@@ -5354,7 +5475,7 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
           kbsAppendAgentMsg(m.sodrzina || "");
         }
       });
-      messagesEl.scrollTop = messagesEl.scrollHeight;
+      kbsScrollChatToBottom(true, false);
       kbsCloseHistoryPanel();
       await kbsRenderHistoryList(sessionId);
     }
@@ -5372,7 +5493,12 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       panel.setAttribute("aria-hidden", open ? "false" : "true");
       launcher.setAttribute("aria-expanded", open ? "true" : "false");
       launcher.setAttribute("aria-label", open ? "Затвори AI асистент" : "Отвори AI асистент");
-      if (open) input.focus();
+      if (open) {
+        input.focus();
+        setTimeout(function () {
+          kbsScrollChatToBottom(true, false);
+        }, 80);
+      }
     };
 
     // Чистење на разговорот (нова сесија).
@@ -5462,7 +5588,6 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       kbsCloseHistoryPanel();
 
       input.value = "";
-      messagesEl.scrollTop = messagesEl.scrollHeight;
 
       const typingEl = document.createElement("div");
       typingEl.className = "kbs-ai-typing";
@@ -5473,7 +5598,7 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
         typingEl.appendChild(document.createElement("span"));
       }
       messagesEl.appendChild(typingEl);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
+      kbsScrollChatToBottom(true, true);
 
       pitajAI(text).then(function (rezultat) {
         typingEl.remove();
@@ -5482,7 +5607,6 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
         var akc = (rezultat && typeof rezultat === "object") ? rezultat.akcija : null;
 
         kbsAppendAgentMsg(odgovor || "");
-        messagesEl.scrollTop = messagesEl.scrollHeight;
 
         if (nav) kbsIzvrsiNavigacija(nav);
         if (akc) kbsIzvrsiAkcija(akc);

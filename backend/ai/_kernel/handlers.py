@@ -31,6 +31,7 @@ def _build_handlers() -> dict[str, HandlerSpec]:
         aplikanti_oglas,
         bolnica_info,
         faq_pregled,
+        fb_novosti_odobruvanje,
         info_lekar,
         istorija_pacient,
         izbrisi_vest_oglas,
@@ -94,6 +95,9 @@ def _build_handlers() -> dict[str, HandlerSpec]:
         "novosti_rezime": HandlerSpec(novosti_rezime.odgovori_za_novosti_rezime, kind="none"),
         "faq_pregled": HandlerSpec(faq_pregled.odgovori_za_faq_pregled),
         "izvestaj_den_nedela": HandlerSpec(izvestaj_den_nedela.odgovori_za_izvestaj),
+        "fb_novosti_odobruvanje": HandlerSpec(
+            fb_novosti_odobruvanje.odgovori_za_fb_novosti, kind="dict_full"
+        ),
     }
 
 
@@ -128,6 +132,8 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
         "apliciraj_za_rabota",
     ):
         raw = spec.fn(q, ctx.pacient, ctx.kontekst)
+    elif intent == "fb_novosti_odobruvanje":
+        raw = spec.fn(q, ctx.lekar, ctx.kontekst)
     elif intent in (
         "otkazi_termin",
         "prenesi_termin",
@@ -170,6 +176,8 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
         if isinstance(raw, dict):
             out["odgovor"] = raw.get("odgovor", "")
             out["kontekst"] = raw.get("kontekst")
+            if raw.get("navigacija"):
+                out["navigacija"] = raw["navigacija"]
             if raw.get("akcija"):
                 out["akcija"] = raw["akcija"]
             elif intent == "zakazi_termin" and ctx.kontekst and ctx.kontekst.get("zakazi_od_slobodni"):
