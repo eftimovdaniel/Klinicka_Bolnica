@@ -12,6 +12,7 @@
 Се оценуваат САМО прегледи со status_pregled = 'завршен'.
 """
 
+from ai._kernel.prompt_loader import load_prompt
 import json
 import re
 from datetime import date
@@ -21,43 +22,8 @@ from ai._kernel.groq_client import ask_ai
 from ai.pacient.slobodni_termini import zimi_site_lekari
 
 
-OCENI_EXTRACT_PROMPT = """
-Ти си систем што извлекува податоци за оценување на завршен медицински преглед.
-Од прашањето извлечи:
-- ocena: цел број од 1 до 5 (или null ако не е спомнато)
-- komentar: текстот што е коментар на пациентот за прегледот (или null)
-- doctor_id: ID на лекарот (или null)
-- datum: датум на прегледот во формат YYYY-MM-DD (или null)
-
-ПРАВИЛА за оцена:
-- "оцена 5", "5/5", "петка", "одличен (=5)", "5" → 5
-- "одличен" без број → 5
-- "многу добар" → 5
-- "добар" → 4
-- "среден", "ОК" → 3
-- "лош" → 2
-- "ужасен", "катастрофа" → 1
-- Ако пациентот спомне број (1, 2, 3, 4, 5) → користи го него
-
-ПРАВИЛА за коментар:
-- Извади ја описната фраза за прегледот ("беше одличен", "не ми се допадна како се однесуваше")
-- Не вклучувај го самиот број на оцена во коментарот
-- Ако нема коментар → null
-
-ПРАВИЛА за датум:
-- "вчера" → денешен - 1
-- "денес" → денешен
-- "понеделник", "среда"... → последниот таков ден во минатото
-- "15.05" → во оваа година
-- Ако не е специфицирано → null
-
-Врати САМО JSON без објаснувања:
-{"ocena": число_или_null, "komentar": "текст"_или_null, "doctor_id": число_или_null, "datum": "YYYY-MM-DD"_или_null}
-""".strip()
-
-
 def izvlechi_ocena_podatoci(prashanje: str) -> dict:
-    """Користи AI (Groq) да извлече оцена + коментар + идентификатори."""
+    """Извлекува оцена, коментар, лекар и датум од пораката."""
     site_lekari = zimi_site_lekari()
 
     lista_text = ""
@@ -79,7 +45,7 @@ def izvlechi_ocena_podatoci(prashanje: str) -> dict:
 Извлечи ocena, komentar, doctor_id и datum.
 """.strip()
 
-    odgovor = ask_ai(full_prompt, system_prompt=OCENI_EXTRACT_PROMPT)
+    odgovor = ask_ai(full_prompt, system_prompt=load_prompt("oceni_extract"))
     podatoci = parse_ai_json(odgovor, log_tag="oceni_pregled")
     ocena_raw = podatoci.get("ocena")
     try:

@@ -11,34 +11,15 @@
 Користи табела `prijaveni_lekari`.
 """
 
+from ai._kernel.prompt_loader import load_prompt
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.auth import require_direktor
 from ai._kernel.db_helpers import as_dict, db_cursor
 from ai._kernel.groq_client import ask_ai
 
 
-PROMPT = """
-Ти си систем што од прашање извлекува филтри за листа на апликанти за оглас.
-
-Корисникот пишува на македонски. Извлечи:
-- "pozicija": име на позицијата (Кардиолог, Хирург, …) или null ако сака сите
-- "id_oglas": ID на оглас (само цифри) или null
-
-Врати САМО JSON:
-{"pozicija": "..." | null, "id_oglas": <число> | null}
-
-Примери:
-- „апликанти за хирург" → {"pozicija":"Хирург","id_oglas":null}
-- „кандидати за оглас 42" → {"pozicija":null,"id_oglas":42}
-- „сите апликанти" → {"pozicija":null,"id_oglas":null}
-- „aplikanti za kardiolog" → {"pozicija":"Кардиолог","id_oglas":null}
-
-БЕЗ markdown, БЕЗ објаснувања.
-""".strip()
-
-
 def _izvlechi(prashanje: str) -> dict:
-    odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=PROMPT)
+    odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=load_prompt("direktor_aplikanti_oglas"))
     print(f"[aplikanti] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="aplikanti_oglas")
 

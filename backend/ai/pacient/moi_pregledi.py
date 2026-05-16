@@ -1,3 +1,4 @@
+from ai._kernel.prompt_loader import load_prompt
 import json
 import re
 from datetime import date, datetime, timedelta
@@ -7,32 +8,8 @@ from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 
 
-PROMPT = """
-Ти си систем што извлекува филтри за приказ на лични прегледи на пациент.
-
-Корисникот пишува на македонски. Извлечи:
-- "status": "сите" / "завршен" / "закажан" / "откажан" / null
-- "kategorija": "минати" / "идни" / "сите" / null
-- "broj": максимум прегледи (число) или null
-- "datum": ISO датум (YYYY-MM-DD) ако спомне конкретен датум, или null
-
-Врати САМО JSON:
-{"status": "...", "kategorija": "...", "broj": ..., "datum": "..."}
-
-Примери:
-- „моите прегледи" → {"status":"сите","kategorija":"сите","broj":null,"datum":null}
-- „идни прегледи" → {"status":null,"kategorija":"идни","broj":null,"datum":null}
-- „минати прегледи" → {"status":null,"kategorija":"минати","broj":null,"datum":null}
-- „завршените прегледи" → {"status":"завршен","kategorija":null,"broj":null,"datum":null}
-- „закажаните прегледи" → {"status":"закажан","kategorija":null,"broj":null,"datum":null}
-- „последните 5 прегледи" → {"status":null,"kategorija":null,"broj":5,"datum":null}
-
-БЕЗ markdown, БЕЗ објаснувања.
-""".strip()
-
-
 def _izvlechi(prashanje: str) -> dict:
-    odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=PROMPT)
+    odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=load_prompt("pacient_moi_pregledi"))
     print(f"[moi_pregledi] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="moi_pregledi")
 

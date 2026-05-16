@@ -13,6 +13,7 @@
 Бара логиран пациент.
 """
 
+from ai._kernel.prompt_loader import load_prompt
 import json
 import re
 from datetime import date
@@ -22,25 +23,8 @@ from ai._kernel.groq_client import ask_ai
 from ai.pacient.slobodni_termini import zimi_site_lekari
 
 
-TRGNI_EXTRACT_PROMPT = """
-Ти си систем што извлекува податоци за бришење на оцена за медицински преглед.
-Од прашањето извлечи:
-- doctor_id: ID на лекарот (или null)
-- datum: датум на прегледот во формат YYYY-MM-DD (или null)
-
-ПРАВИЛА за датум:
-- "денес" → денешен датум
-- "вчера" → денешен - 1
-- "понеделник", "среда"... → последниот таков ден во минатото
-- "15.05" → во оваа година
-- Ако не е специфицирано → null
-
-Врати САМО JSON: {"doctor_id": число_или_null, "datum": "YYYY-MM-DD"_или_null}
-""".strip()
-
-
 def izvlechi_trgni_podatoci(prashanje: str) -> dict:
-    """Користи AI (Groq) да извлече лекар + датум за бришење оцена."""
+    """Извлекува лекар + датум за бришење оцена."""
     site_lekari = zimi_site_lekari()
 
     lista_text = ""
@@ -62,7 +46,7 @@ def izvlechi_trgni_podatoci(prashanje: str) -> dict:
 Извлечи doctor_id и datum.
 """.strip()
 
-    odgovor = ask_ai(full_prompt, system_prompt=TRGNI_EXTRACT_PROMPT)
+    odgovor = ask_ai(full_prompt, system_prompt=load_prompt("trgni_ocena_extract"))
 
     podatoci = parse_ai_json(odgovor, log_tag="trgni_ocena")
     return {

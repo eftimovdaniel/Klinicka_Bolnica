@@ -12,30 +12,10 @@ from database import get_connection
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.auth import require_direktor
 from ai._kernel.groq_client import ask_ai
+from ai._kernel.prompt_loader import load_prompt
 from ai._kernel.prompt_helpers import today_prompt_line
 from ai._kernel.transliteracija import transliterijaj
 from ai.pacient.slobodni_termini import _DEN_WD, _DEN_ALT, _den_od_match, _sleden_takov_kalendarski_den
-
-
-PROMPT = """
-Ти си систем што извлекува податоци за оглас за работа од СЛОБОДЕН текст.
-
-Корисникот (директор) може да пишува неструктурирано: залепен оглас, Facebook пост,
-разговор („треба сестра на гино до јуни"), со грешки во пишувањето (Гиникологија).
-
-Врати САМО JSON:
-{"pozicija": "...", "oddel": "...", "rok": "YYYY-MM-DD"}
-
-Правила:
-- pozicija: наслов на работното место (Медицинска сестра, Кардиолог, Уролог…). Не целата реченица.
-- oddel: избери НАЈБЛИСК од листата „Оддели" подолу (точно име или многу блиску).
-  Гинекологија/гиникологија/акаушерство → оддел што содржи гинеколог или акушерство.
-- rok: краен датум за пријавување YYYY-MM-DD. „до 10 јуни 2026", „10.06.2026", „аплицирање до …".
-  Игнорирај час (23:59). Ако нема датум → null.
-
-Ако текстот е само „оглас за работа" без детали → сите null.
-БЕЗ markdown. Само JSON.
-""".strip()
 
 
 _RE_NAR_NEDELA_DO = re.compile(
@@ -225,7 +205,7 @@ def _izvlechi_ai(prashanje: str, denes: date, site_oddeli: list[str]) -> dict:
         f"Оддели во базата: {', '.join(site_oddeli)}\n\n"
         f"Текст од корисникот:\n{prashanje}\n\nВрати JSON."
     )
-    odgovor = ask_ai(prompt, system_prompt=PROMPT)
+    odgovor = ask_ai(prompt, system_prompt=load_prompt("direktor_kreiraj_oglas"))
     print(f"[kreiraj_oglas] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="kreiraj_oglas")
 

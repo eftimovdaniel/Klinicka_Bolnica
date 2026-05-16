@@ -12,6 +12,7 @@
 зачувува во базата за да биде достапен на dashboard-от на пациентот.
 """
 
+from ai._kernel.prompt_loader import load_prompt
 import json
 import re
 from datetime import datetime, date, timedelta
@@ -20,35 +21,12 @@ from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 
 
-POTSETNIK_EXTRACT_PROMPT = """
-Ти си систем што извлекува податоци за потсетник за медицински термин.
-Од прашањето извлечи:
-- offset_minuti: колку минути пред терминот да биде потсетникот
-- datum: датум на терминот (YYYY-MM-DD) или null
-
-ПРАВИЛА за offset:
-- "1 ден претходно" → 1440 (60*24)
-- "2 дена претходно" → 2880
-- "12 часа" → 720
-- "1 час" → 60
-- "30 минути" → 30
-- ако не е специфицирано → 60 (стандардно 1 час)
-
-ПРАВИЛА за датум:
-- "утре" → денес+1
-- "среда" → следната среда
-- "прегледот" без датум → null (ќе земеме најблискиот термин)
-
-Врати САМО JSON: {"offset_minuti": число, "datum": "YYYY-MM-DD"_или_null}
-""".strip()
-
-
 def izvlechi_potsetnik(prashanje: str) -> dict:
-    """Користи AI (Groq) за извлекување."""
+    """Извлекува offset и датум за потсетник."""
     denes = date.today().strftime("%Y-%m-%d")
     full_prompt = f'Денес: {denes}\n\nКорисник: „{prashanje}"\n\nИзвлечи податоци.'
 
-    odgovor = ask_ai(full_prompt, system_prompt=POTSETNIK_EXTRACT_PROMPT)
+    odgovor = ask_ai(full_prompt, system_prompt=load_prompt("potsetnik_extract"))
     podatoci = parse_ai_json(odgovor, log_tag="postavi_potsetnik")
     try:
         offset = int(podatoci.get("offset_minuti", 60) or 60)

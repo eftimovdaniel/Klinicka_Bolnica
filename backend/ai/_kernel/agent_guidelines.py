@@ -26,6 +26,8 @@
   - Податоци во база ≠ имиња на сајтот → усогласување specialty / Oddeli.
 
 Нов код за оддели: ai._kernel.oddel_resolver
+
+Промптови / правила за Groq: backend/data/agent_prompts.txt (еден фајл, секции @@@ име @@@)
 """
 
 # Типови на извор за логирање / debug

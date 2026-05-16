@@ -24,6 +24,7 @@ from ai._kernel.agent_guidelines import (
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.db_helpers import db_cursor
 from ai._kernel.groq_client import ask_ai
+from ai._kernel.prompt_loader import load_prompt_template
 from ai._kernel.transliteracija import transliterijaj
 
 # Клучни зборови во прашањето (нормализирано) → мора да се појават во името од база
@@ -181,23 +182,13 @@ def _ai_izberi_od_lista(prashanje: str, site: tuple[str, ...]) -> str | None:
     if not site:
         return None
     lista = json.dumps(list(site), ensure_ascii=False)
-    prompt = f"""
-Ти избираш ЕДНО име на оддел од официјалната листа на болницата.
+    from ai._kernel.prompt_loader import load_prompt_template
 
-Дозволени имиња (копирај го ТОЧНО едно од листава, без промена):
-{lista}
-
-Прашање на корисникот: „{prashanje}"
-
-Врати САМО JSON: {{"oddel": "<точно име од листата>" | null}}
-
-Правила:
-- Ако прашањето не е за конкретен оддел → null
-- НЕ измислувај имиња надвор од листата
-- „Оториноларингологија" / „ОРЛ" → избери ставка од листата што содржи оториноларинголог (ако постои)
-- „Хирургија" без „невро" → НЕ избирај Неврохирургија освен ако тоа е единствената хируршка ставка и корисникот рече општа хирургија — тогаш null
-- Само JSON, без markdown
-""".strip()
+    prompt = load_prompt_template(
+        "oddel_closed_list",
+        lista=lista,
+        prashanje=prashanje,
+    )
     odgovor = ask_ai(f"Прашање: {prashanje}", system_prompt=prompt)
     data = parse_ai_json(odgovor, log_tag="oddel_resolver")
     if data.get("_error"):

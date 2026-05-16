@@ -9,6 +9,7 @@
 5. UPDATE
 """
 
+from ai._kernel.prompt_loader import load_prompt
 import json
 import re
 from datetime import datetime, date, time
@@ -17,36 +18,14 @@ from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 
 
-PRENESI_EXTRACT_PROMPT = """
-Ти си систем што извлекува податоци за пренесување на медицински термин.
-Корисникот сака да го префрли постоечки термин на друг датум/време.
-
-Од прашањето извлечи:
-- star_datum: датум на постоечкиот термин (YYYY-MM-DD) или null ако не е специфицирано
-- nov_datum: нов датум (YYYY-MM-DD), задолжителен
-- novo_vreme: ново време (HH:MM), задолжително
-
-ПРАВИЛА за датум: "денес"=денес, "утре"=денес+1, "понеделник", "среда"... = следниот таков ден,
-"15.05" → во оваа година.
-
-ПРАВИЛА за време: "10:00", "10 часот", "наутро"=09:00, "попладне"=14:00, само 08:00-15:30.
-
-ПРИМЕР: "Префрли го утрешниот преглед за петок 11:00"
-Денес 2026-05-12 (вторник) → утре=2026-05-13, петок=2026-05-15
-Одговор: {"star_datum":"2026-05-13","nov_datum":"2026-05-15","novo_vreme":"11:00"}
-
-Врати САМО JSON без објаснувања.
-""".strip()
-
-
 def izvlechi_prenesi(prashanje: str) -> dict:
-    """Користи AI (Groq) за извлекување на старо/ново."""
+    """Извлекува стар/нов датум и време за пренос на термин."""
     denes = date.today().strftime("%Y-%m-%d")
     denes_den = ["понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"][date.today().weekday()]
 
     full_prompt = f'Денес: {denes} ({denes_den})\n\nКорисник: „{prashanje}"\n\nИзвлечи податоци.'
 
-    odgovor = ask_ai(full_prompt, system_prompt=PRENESI_EXTRACT_PROMPT)
+    odgovor = ask_ai(full_prompt, system_prompt=load_prompt("prenesi_extract"))
     podatoci = parse_ai_json(odgovor, log_tag="prenesi_termin")
     return {
         "star_datum": podatoci.get("star_datum"),

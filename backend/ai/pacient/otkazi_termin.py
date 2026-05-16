@@ -12,6 +12,7 @@
 Бара логиран пациент.
 """
 
+from ai._kernel.prompt_loader import load_prompt
 import json
 import re
 from datetime import datetime, date
@@ -19,25 +20,6 @@ from database import get_connection
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 from ai.pacient.slobodni_termini import zimi_site_lekari
-
-
-# Prompt за извлекување на термини за откажување
-OTKAZI_EXTRACT_PROMPT = """
-Ти си систем што извлекува податоци за откажување на медицински термин.
-Од прашањето извлечи:
-- doctor_id: ID на лекарот (или null)
-- datum: датум во формат YYYY-MM-DD (или null)
-
-ПРАВИЛА за датум:
-- "денес" → денешен датум
-- "утре" → денешен + 1
-- "вчера" → денешен - 1
-- "понеделник", "среда"... → следниот таков ден
-- "15.05" → во оваа година
-- Ако не е специфицирано → null
-
-Врати САМО JSON без објаснувања: {"doctor_id": число_или_null, "datum": "YYYY-MM-DD"_или_null}
-""".strip()
 
 
 def izvlechi_otkazi_podatoci(prashanje: str) -> dict:
@@ -63,12 +45,12 @@ def izvlechi_otkazi_podatoci(prashanje: str) -> dict:
 Извлечи doctor_id и datum.
 """.strip()
 
-    odgovor = ask_ai(full_prompt, system_prompt=OTKAZI_EXTRACT_PROMPT)
+    odgovor = ask_ai(full_prompt, system_prompt=load_prompt("otkazi_extract"))
     podatoci = parse_ai_json(odgovor, log_tag="otkazi_termin")
     return {
-            "doctor_id": podatoci.get("doctor_id"),
-            "datum": podatoci.get("datum"),
-        }
+        "doctor_id": podatoci.get("doctor_id"),
+        "datum": podatoci.get("datum"),
+    }
 
 
 def najdi_termini_za_otkazuvanje(pacient_email: str, doctor_id: int | None, datum: str | None) -> list[dict]:
