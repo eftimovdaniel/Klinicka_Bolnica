@@ -60,6 +60,8 @@ VALIDNI_INTENTI = {
     "zapishi_terapija",
     "novosti_rezime",
     "faq_pregled",
+    "rezultati_testovi",
+    "preference_lekar",
     "izvestaj_den_nedela",
     "otvori_admin_panel",
     "general",

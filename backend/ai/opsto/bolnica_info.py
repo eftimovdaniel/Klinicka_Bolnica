@@ -149,7 +149,7 @@ def odgovori_za_kontakti(prashanje: str) -> str:
     if kontakti.get("itna"):
         delovi.append(f"Итна помош: {kontakti['itna']}")
     if kontakti.get("informacii"):
-        delovi.append(f"Информации: {kontakti['informacii']}")
+        delovi.append(f"Рецепција / информации: {kontakti['informacii']}")
     if kontakti.get("rezervacii"):
         delovi.append(f"Резервации: {kontakti['rezervacii']}")
     if kontakti.get("email"):

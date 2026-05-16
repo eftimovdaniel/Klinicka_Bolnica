@@ -34,6 +34,8 @@ def _build_handlers() -> dict[str, HandlerSpec]:
         aplikanti_oglas,
         bolnica_info,
         faq_pregled,
+        preference_lekar,
+        rezultati_testovi,
         info_lekar,
         istorija_pacient,
         izbrisi_vest_oglas,
@@ -73,7 +75,7 @@ def _build_handlers() -> dict[str, HandlerSpec]:
         "postavi_potsetnik": HandlerSpec(postavi_potsetnik.odgovori_za_potsetnik),
         "oceni_pregled": HandlerSpec(oceni_pregled.odgovori_za_ocenuvanje),
         "trgni_ocena": HandlerSpec(trgni_ocena.odgovori_za_trgni_ocena),
-        "info_lekar": HandlerSpec(info_lekar.odgovori_za_info_lekar),
+        "info_lekar": HandlerSpec(info_lekar.odgovori_za_info_lekar, kind="dict"),
         "preporaka_lekar": HandlerSpec(preporaka_lekar.odgovori_za_preporaka),
         "rabotno_vreme": HandlerSpec(bolnica_info.odgovori_za_rabotno_vreme),
         "lokacija": HandlerSpec(bolnica_info.odgovori_za_lokacija),
@@ -106,6 +108,10 @@ def _build_handlers() -> dict[str, HandlerSpec]:
         "zapishi_terapija": HandlerSpec(zapishi_terapija.odgovori_za_terapija),
         "novosti_rezime": HandlerSpec(novosti_rezime.odgovori_za_novosti_rezime, kind="none"),
         "faq_pregled": HandlerSpec(faq_pregled.odgovori_za_faq_pregled),
+        "rezultati_testovi": HandlerSpec(rezultati_testovi.odgovori_za_rezultati),
+        "preference_lekar": HandlerSpec(
+            preference_lekar.odgovori_za_preference, kind="dict"
+        ),
         "izvestaj_den_nedela": HandlerSpec(izvestaj_den_nedela.odgovori_za_izvestaj),
     }
 
@@ -152,6 +158,8 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
         "moi_pregledi",
     ):
         raw = spec.fn(q, ctx.pacient)
+    elif intent in ("info_lekar", "preference_lekar"):
+        raw = spec.fn(q, ctx.kontekst)
     elif intent in ("pregled_dezurstvo", "promeni_dezurstvo"):
         raw = spec.fn(q, ctx.lekar, ctx.kontekst)
     elif intent in (
@@ -178,11 +186,16 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
     if spec.kind == "dict":
         if isinstance(raw, dict):
             out["odgovor"] = raw.get("odgovor", "")
-            out["kontekst"] = raw.get("kontekst")
+            if raw.get("kontekst") is not None:
+                out["kontekst"] = raw.get("kontekst")
+            elif ctx.kontekst:
+                out["kontekst"] = ctx.kontekst
             if raw.get("akcija"):
                 out["akcija"] = raw["akcija"]
         else:
             out["odgovor"] = raw or ""
+            if ctx.kontekst and intent == "info_lekar":
+                out["kontekst"] = ctx.kontekst
 
     elif spec.kind == "dict_full":
         if isinstance(raw, dict):

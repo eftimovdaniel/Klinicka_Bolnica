@@ -226,6 +226,75 @@ def delete_session(
             conn.close()
 
 
+def import_guest_session(
+    *,
+    pacient_id: int | None = None,
+    doctor_id: int | None = None,
+    messages: list[dict[str, Any]] | None = None,
+    kontekst: dict | None = None,
+) -> int | None:
+    """
+    По најава: креира сесија и ги внесува пораки од гостинскиот чат (без AI).
+    messages: [{ "uloga": "user"|"assistant", "sodrzina": "..." }, ...]
+    """
+    if not pacient_id and not doctor_id:
+        return None
+    msgs = messages or []
+    if not msgs:
+        return create_session(pacient_id=pacient_id, doctor_id=doctor_id)
+
+    naslov = None
+    for m in msgs:
+        if (m.get("uloga") or "").lower() == "user":
+            naslov = _naslov_od_prasanje(m.get("sodrzina") or "")
+            break
+
+    sid = create_session(pacient_id=pacient_id, doctor_id=doctor_id, naslov=naslov)
+    if not sid:
+        return None
+
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor()
+        for m in msgs:
+            uloga = (m.get("uloga") or "user").lower()
+            if uloga not in ("user", "assistant"):
+                uloga = "user"
+            sodrzina = (m.get("sodrzina") or "").strip()
+            if not sodrzina:
+                continue
+            cur.execute(
+                """
+                INSERT INTO Ai_chat_message (session_id, uloga, sodrzina)
+                VALUES (%s, %s, %s)
+                """,
+                (sid, uloga, sodrzina),
+            )
+        cur.execute(
+            """
+            UPDATE Ai_chat_session
+            SET kontekst_json = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE session_id = %s
+            """,
+            (_json_dump(kontekst), sid),
+        )
+        conn.commit()
+        cur.close()
+        return sid
+    except Exception as e:
+        print(f"[ai_chat_store] import_guest_session: {e}")
+        if conn:
+            try:
+                conn.rollback()
+            except Exception:
+                pass
+        return None
+    finally:
+        if conn and conn.is_connected():
+            conn.close()
+
+
 def save_exchange(
     session_id: int,
     *,

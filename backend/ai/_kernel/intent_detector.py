@@ -44,6 +44,8 @@
 - "zapishi_terapija"  → лекар: запиши терапија/дијагноза на пациент
 - "novosti_rezime"    → краток преглед на последните новости (наслови + линк)
 - "faq_pregled"       → подготовка за преглед (гладно, што да понесам — од JSON)
+- "rezultati_testovi" → кога се готови резултати од тестови
+- "preference_lekar"  → преференција за лекар (пол, јазик, искуство)
 - "izvestaj_den_nedela" → дневен/неделен извештај за термини и апликации (само директор)
 - "otvori_admin_panel" → отвори административен панел на сајтот (само директор)
 - "general"           → одговор од AI за општо прашање
@@ -187,7 +189,7 @@ KLUCNI_NAVIGACIJA = [
     "дај ми ги сите лекари", "сите лекари во болницата",
     "лекари работат во болниц", "доктори работат во болниц",
     "лекари во болницата", "доктори во болницата",
-    "во оваа установа", "во установата", "во оваа болница",
+    "во оваа установа", "во установата",
     "медицински тим", "тимот на болницата",
     "покажи услуги", "прикажи услуги", "однеси на услуги",
     "покажи новости", "прикажи новости", "однеси на новости",
@@ -296,19 +298,24 @@ KLUCNI_RABOTNO = [
     "кога е затворен", "работни денови",
 ]
 
-# 5. ЛОКАЦИЈА
+# 5. ЛОКАЦИЈА (без „каде е" само — меша се со „каде е контакт?")
 KLUCNI_LOKACIJA = [
-    "каде е", "каде се наоѓа", "локација",
-    "адреса", "како да дојдам", "како да стигнам",
+    "каде се наоѓа", "локација", "локацијата",
+    "како да дојдам", "како да стигнам",
     "во кој спрат", "кој спрат", "соба",
+    "каде е оддел", "каде е гинеколог", "каде е кардиолог",
+    "каде е лаборатор", "каде е итна",
 ]
 
-# 6. КОНТАКТИ
+# 6. КОНТАКТИ (пред локација во редот на проверки)
 KLUCNI_KONTAKTI = [
-    "телефон", "број", "контакт",
-    "на кој број", "како да јавам", "како да повикам",
-    "итна помош", "ургентно",
-    "email", "е-пошта",
+    "телефон", "тел ", "контакт", "контакти",
+    "каде е контакт", "каде е контактот", "kade e kontakt",
+    "на кој број", "кој број", "бројот на",
+    "како да јавам", "како да повикам", "како да се јавам",
+    "итна помош", "итен", "итна", "ургентно",
+    "email", "е-пошта", "e-posta", "mail",
+    "рецепција", "recepcija", "централа",
 ]
 
 # 7. УСЛУГИ
@@ -323,6 +330,10 @@ KLUCNI_INFO_LEKAR = [
     "каков е", "каква е", "кој е",
     "информации за", "инфо за", "повеќе за",
     "опис на лекар",
+    "дали работи", "дали е вработен", "работи ли",
+    "работи тука", "работи во болницата", "работи во оваа болница",
+    "има ли тука", "дали е тука", "дали е во болницата",
+    "dali raboti", "raboti li",
 ]
 
 # 8c. МОИТЕ ПРЕГЛЕДИ (пациент)
@@ -343,12 +354,32 @@ KLUCNI_REZIME_NOVOSTI = [
     "последни новости", "најнови вести", "краток преглед на новости",
 ]
 
+# 8c2b. РЕЗУЛТАТИ ОД ТЕСТОВИ (мора пред FAQ — „крвна" може да се меша)
+KLUCNI_REZULTATI = [
+    "кога ќе готов", "кога ke gotov", "готов ли е", "gotov li e",
+    "резултат", "rezultat", "извештај", "izveshtaj", "лабораторија врати",
+    "кога ќе имам", "кога ke imam", "подигнување резултат", "online резултат",
+    "email резултат", "резултати од", "анализи кога",
+]
+
+# 8c2c. ПРЕФЕРЕНЦИ ЗА ЛЕКАР
+KLUCNI_PREFERENCE = [
+    "женски лекар", "женска докторка", "женски кардиолог", "женски невролог",
+    "zenski lekar", "zenski kardiolog",
+    "машки лекар", "maski lekar",
+    "има ли женски", "ima li zenski", "има ли машки",
+    "кој зборува англиски", "angliski", "англиски",
+    "со искуство", "млад лекар", "постар лекар",
+    "детска кардиологија", "детски лекар",
+]
+
 # 8c3. FAQ подготовка за преглед (од JSON; не симптоми)
 KLUCNI_FAQ_PREGLED = [
     "гладно", "на гладно", "на пост", "постот", "јадење пред", "јаденje пред",
     "што да понесам", "што да донесам", "подготовка за преглед", "пред преглед",
     "лична карта", "здравствена книшка", "лекови пред", "дали да пијам лекови",
     "доцнење на термин", "што ако доцнам", "gladno", "ponesam", "donesam",
+    "придружител", "бремена", "прва посета", "фотографија",
 ]
 
 # 8c4. ДНЕВЕН/НЕДЕЛЕН ИЗВЕШТАЈ (директор) — пред „апликаци" за apliciraj
@@ -423,6 +454,57 @@ from ai._kernel.ai_intent_detector import detektiraj_intent_so_ai
 def _ima_zbor(prashanje: str, kluchni: list[str]) -> bool:
     """Помошна функција - проверка на клучни зборови."""
     return any(zbor in prashanje for zbor in kluchni)
+
+
+def _prasanje_e_konkreten_lekar(prashanje: str) -> bool:
+    """
+    Прашање за конкретен лекар по име (не листа/навигација).
+    Пр. „Дали работи др Марија Хубрева?", „Кој е д-р Петров?"
+    """
+    import re
+
+    from ai._kernel.lekar_lookup import izvlechi_delovi_ime
+
+    p = transliterijaj(prashanje).lower()
+    if _ima_zbor(p, KLUCNI_SLOBODNI):
+        return False
+    if any(w in p for w in ("кои лекари", "кои доктори", "лекари на", "лекари од")):
+        return False
+    delovi = izvlechi_delovi_ime(prashanje)
+    if len(delovi) >= 2:
+        return True
+    if len(delovi) == 1 and re.search(r"\b(д-р|др|dr)\b", p, re.UNICODE):
+        return True
+    return False
+
+
+def _prasanje_e_kontakti(p: str) -> bool:
+    """Телефон/контакт/мејл — не локација на оддел (на пр. „Каде е контакт?")."""
+    if any(
+        x in p
+        for x in (
+            "контакт",
+            "контакти",
+            "телефон",
+            "тел.",
+            "kontakt",
+            "telefon",
+            "email",
+            "е-пошта",
+            "e-posta",
+            "рецепци",
+            "recepc",
+            "централа",
+        )
+    ):
+        return True
+    if "број" in p and any(
+        x in p for x in ("јавам", "повикам", "повик", "телефон", "рецепци")
+    ):
+        return True
+    if "итн" in p and any(x in p for x in ("помош", "број", "телефон", "повик")):
+        return True
+    return False
 
 
 def _baranje_e_promena_dezurstvo(p: str) -> bool:
@@ -698,7 +780,17 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
     if _ima_zbor(p, KLUCNI_REZIME_NOVOSTI):
         return "novosti_rezime"
 
-    # Навигација – пред uslugi/info_lekar
+    # „Избраниот лекар — во која област / специјалност?" (контекст од чат)
+    if any(x in p for x in ("избран", "истиот", "погоре")) and any(
+        x in p for x in ("област", "специјалност", "oddel", "oblast", "specijalnost")
+    ):
+        return "info_lekar"
+
+    # Конкретен лекар по име — пред навигација („во оваа болница работи др X")
+    if _prasanje_e_konkreten_lekar(prashanje) or _ima_zbor(p, KLUCNI_INFO_LEKAR):
+        return "info_lekar"
+
+    # Навигација – пред uslugi
     if _ima_zbor(p, KLUCNI_NAVIGACIJA):
         return "navigacija"
 
@@ -735,6 +827,12 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
     if _ima_zbor(p, KLUCNI_ZAKAZI):
         return "zakazi_termin"
 
+    if _ima_zbor(p, KLUCNI_REZULTATI):
+        return "rezultati_testovi"
+
+    if _ima_zbor(p, KLUCNI_PREFERENCE):
+        return "preference_lekar"
+
     if _ima_zbor(p, KLUCNI_FAQ_PREGLED):
         return "faq_pregled"
 
@@ -744,11 +842,32 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
     if _ima_zbor(p, KLUCNI_RABOTNO):
         return "rabotno_vreme"
 
+    if _prasanje_e_kontakti(p) or _ima_zbor(p, KLUCNI_KONTAKTI):
+        return "kontakti"
+
     if _ima_zbor(p, KLUCNI_LOKACIJA):
         return "lokacija"
 
-    if _ima_zbor(p, KLUCNI_KONTAKTI):
-        return "kontakti"
+    # „Каде е [оддел]" без контакт → локација
+    if any(x in p for x in ("каде е", "каде se", "kade e")) and not _prasanje_e_kontakti(p):
+        if any(
+            x in p
+            for x in (
+                "оддел",
+                "гинеколог",
+                "кардиолог",
+                "невролог",
+                "уролог",
+                "ортопед",
+                "лаборатор",
+                "радиолог",
+                "итна",
+                "аптека",
+                "спрат",
+                "соба",
+            )
+        ):
+            return "lokacija"
 
     if _ima_zbor(p, KLUCNI_USLUGI):
         return "uslugi"
@@ -770,8 +889,19 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
     ) and not any(w in p for w in ("каков", "каква", "како е", "опис")):
         return "lekari_oddel"
 
-    if _ima_zbor(p, KLUCNI_INFO_LEKAR):
-        return "info_lekar"
+    # „Кога е следен работен ден?" — датум/термини, не работно време на болница
+    if any(
+        w in p
+        for w in (
+            "следен работен",
+            "следниот работен",
+            "нареден работен",
+            "наредниот работен",
+            "прв работен ден",
+            "кога е работен ден",
+        )
+    ):
+        return "slobodni_termini"
 
     if _ima_zbor(p, KLUCNI_SLOBODNI):
         return "slobodni_termini"

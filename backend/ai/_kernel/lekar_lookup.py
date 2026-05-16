@@ -48,6 +48,29 @@ _STOP_IME = frozenset(
         "dezurstvo",
         "period",
         "naredniot",
+        "слободен",
+        "слободна",
+        "слободни",
+        "слободно",
+        "термин",
+        "термини",
+        "sloboden",
+        "slobodna",
+        "termin",
+        "ponedelnik",
+        "vtornik",
+        "sreda",
+        "chetvrtok",
+        "petok",
+        "sabota",
+        "nedela",
+        "понеделник",
+        "вторник",
+        "среда",
+        "четврток",
+        "петок",
+        "сабота",
+        "недела",
     }
 )
 
@@ -67,7 +90,7 @@ def _cist_ime_zbor(raw: str) -> str:
 def izvlechi_delovi_ime(prashanje: str) -> list[str]:
     p = transliterijaj(prashanje).lower()
 
-    # Најсигурно: текст веднаш после д-р / др
+    # Најсигурно: текст веднаш после д-р / др (не мешај со „слободен понеделник“)
     delovi: list[str] = []
     m = _RE_POSLE_DR.search(p)
     if m:
@@ -80,9 +103,8 @@ def izvlechi_delovi_ime(prashanje: str) -> list[str]:
             delovi.append(w)
             if len(delovi) >= 3:
                 break
-
-    if len(delovi) >= 2:
-        return delovi
+        if delovi:
+            return delovi[:3]
 
     # Резервно: сите зборови без титула
     p = re.sub(r"\b(д-р|др|dr|d-r)\b", " ", p, flags=re.IGNORECASE | re.UNICODE)
@@ -96,6 +118,70 @@ def izvlechi_delovi_ime(prashanje: str) -> list[str]:
     return delovi[:3] if delovi else []
 
 
+def najdi_lekari_po_prezime(prezime: str) -> list[dict]:
+    """Сите лекари чие презиме одговара (точно или по почеток)."""
+    prezime = (prezime or "").strip().lower()
+    if len(prezime) < 2:
+        return []
+
+    conn = get_connection()
+    cur = conn.cursor(dictionary=True)
+    try:
+        cur.execute(
+            """
+            SELECT doctor_ID, name, surname, specialty, email
+            FROM Doctors
+            WHERE LOWER(surname) LIKE %s
+            ORDER BY surname, name
+            """,
+            (f"{prezime}%",),
+        )
+        rows = cur.fetchall()
+    finally:
+        cur.close()
+        conn.close()
+
+    if not rows:
+        return []
+
+    exact = [r for r in rows if (r.get("surname") or "").lower() == prezime]
+    if exact:
+        return [_lekar_od_red(r) for r in exact]
+
+    if len(rows) == 1:
+        return [_lekar_od_red(rows[0])]
+
+    return [_lekar_od_red(r) for r in rows]
+
+
+def najdi_lekari_po_delovi(delovi: list[str]) -> list[dict]:
+    """0, 1 или повеќе лекари — без AI."""
+    if len(delovi) >= 2:
+        lekar = najdi_lekar_od_delovi(delovi)
+        return [lekar] if lekar else []
+    if len(delovi) == 1:
+        return najdi_lekari_po_prezime(delovi[0])
+    return []
+
+
+def poraka_za_vise_lekari(lekari: list[dict], delovi: list[str] | None = None) -> str:
+    linii = [
+        f"• Д-р {l['name']} {l['surname']} — {l.get('specialty') or 'Општа пракса'}"
+        for l in lekari
+    ]
+    hint = ""
+    if delovi and len(delovi) == 1:
+        hint = (
+            f"\n\nНаведете го и името (на пр. „д-р Стефан {delovi[0].title()}“) "
+            "или целосно име и презиме."
+        )
+    return (
+        "Има повеќе лекари со слично презиме во евиденцијата:\n"
+        + "\n".join(linii)
+        + hint
+    )
+
+
 def _lekar_od_red(row: dict | None) -> dict | None:
     if not row:
         return None
@@ -104,6 +190,7 @@ def _lekar_od_red(row: dict | None) -> dict | None:
         "name": row["name"],
         "surname": row["surname"],
         "specialty": row.get("specialty"),
+        "email": (row.get("email") or "").strip(),
     }
 
 
@@ -121,7 +208,7 @@ def najdi_lekar_od_delovi(delovi: list[str]) -> dict | None:
     try:
         cur.execute(
             """
-            SELECT doctor_ID, name, surname, specialty
+            SELECT doctor_ID, name, surname, specialty, email
             FROM Doctors
             WHERE LOWER(name) LIKE %s AND LOWER(surname) LIKE %s
             """,
@@ -135,7 +222,7 @@ def najdi_lekar_od_delovi(delovi: list[str]) -> dict | None:
             full_prezime = f"{sredina} {prezime}".strip()
             cur.execute(
                 """
-                SELECT doctor_ID, name, surname, specialty
+                SELECT doctor_ID, name, surname, specialty, email
                 FROM Doctors
                 WHERE LOWER(name) LIKE %s AND LOWER(surname) LIKE %s
                 """,
@@ -148,7 +235,7 @@ def najdi_lekar_od_delovi(delovi: list[str]) -> dict | None:
         pref = prezime[:4] if len(prezime) >= 4 else prezime
         cur.execute(
             """
-            SELECT doctor_ID, name, surname, specialty
+            SELECT doctor_ID, name, surname, specialty, email
             FROM Doctors
             WHERE LOWER(name) LIKE %s AND LOWER(surname) LIKE %s
             """,
@@ -161,7 +248,7 @@ def najdi_lekar_od_delovi(delovi: list[str]) -> dict | None:
         # Само презиме + филтер по име
         cur.execute(
             """
-            SELECT doctor_ID, name, surname, specialty
+            SELECT doctor_ID, name, surname, specialty, email
             FROM Doctors
             WHERE LOWER(surname) LIKE %s
             """,
@@ -181,6 +268,17 @@ def delovite_odgovaraat_na_lekar(lekar: dict | None, delovi: list[str]) -> bool:
     if not lekar or not delovi:
         return False
     blob = f"{lekar.get('name', '')} {lekar.get('surname', '')}".lower()
+    if len(delovi) == 1:
+        token = delovi[0]
+        sur = (lekar.get("surname") or "").lower()
+        ime = (lekar.get("name") or "").lower()
+        return (
+            token == sur
+            or token == ime
+            or sur.startswith(token)
+            or token in sur
+            or token in blob
+        )
     if delovi[0] not in blob:
         return False
     if len(delovi) < 2:
@@ -199,10 +297,11 @@ def najdi_lekar_od_prashanje(
     koristi_ai: bool = True,
 ) -> dict | None:
     delovi = izvlechi_delovi_ime(prashanje)
-    if len(delovi) >= 2:
-        found = najdi_lekar_od_delovi(delovi)
-        if found:
-            return found
+    kandidati = najdi_lekari_po_delovi(delovi)
+    if len(kandidati) == 1:
+        return kandidati[0]
+    if len(kandidati) > 1:
+        return None
 
     if not koristi_ai:
         return None
@@ -212,6 +311,9 @@ def najdi_lekar_od_prashanje(
     lekar = najdi_lekar_so_ai(prashanje)
     if not lekar:
         return None
-    if len(delovi) >= 2 and not delovite_odgovaraat_na_lekar(lekar, delovi):
-        return najdi_lekar_od_delovi(delovi)
+    if delovi and not delovite_odgovaraat_na_lekar(lekar, delovi):
+        povtorno = najdi_lekari_po_delovi(delovi)
+        if len(povtorno) == 1:
+            return povtorno[0]
+        return None
     return lekar

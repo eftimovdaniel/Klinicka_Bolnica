@@ -10,6 +10,12 @@ from datetime import date, datetime, time, timedelta
 
 from database import get_connection
 from ai._kernel.lekar_lookup import najdi_lekar_od_prashanje
+from ai._kernel.transliteracija import transliterijaj
+from ai.pacient.slobodni_termini import (
+    lekar_od_zakazi_kontekst,
+    prasanje_bar_lekar_od_kontekst,
+    prasanje_e_specijalnost_izbran_lekar,
+)
 
 
 def zimi_dezurstva_za_lekar(doctor_id: int, denovi_napred: int = 7) -> list[dict]:
@@ -128,29 +134,109 @@ def _dezuren_status(dezurstva: list[dict]) -> str:
     return "Дежурен: Не"
 
 
-def odgovori_za_info_lekar(prashanje: str) -> str:
+def _resolviraj_lekar(prashanje: str, kontekst: dict | None) -> tuple[dict | None, bool]:
+    if prasanje_bar_lekar_od_kontekst(prashanje) or prasanje_e_specijalnost_izbran_lekar(prashanje):
+        lekar = lekar_od_zakazi_kontekst(kontekst)
+        if lekar:
+            return lekar, True
     lekar = najdi_lekar_od_prashanje(prashanje)
+    if lekar:
+        return lekar, False
+    lekar = lekar_od_zakazi_kontekst(kontekst)
+    return lekar, lekar is not None
 
-    if not lekar:
-        return (
-            "Не препознав за кој лекар прашуваш. Те молам напиши име и презиме, "
-            'на пример: „Каков е д-р Марко Петров?"'
+
+def _e_prasanje_dali_raboti(prashanje: str) -> bool:
+    p = transliterijaj(prashanje).lower()
+    return any(
+        w in p
+        for w in (
+            "работи",
+            "вработен",
+            "дали работи",
+            "дали е вработен",
+            "работи ли",
+            "има ли тука",
+            "дали е тука",
+            "во оваа болница",
+            "во болницата",
+            "dali raboti",
+            "raboti li",
         )
+    )
 
+
+def _format_info_lekar(lekar: dict, prashanje: str, od_kontekst: bool) -> str:
     ime = f"Д-р {lekar['name']} {lekar['surname']}"
     spec = lekar.get("specialty") or "Општа пракса"
+    email = (lekar.get("email") or "").strip()
     doctor_id = lekar["doctor_ID"]
     dezurstva = zimi_dezurstva_za_lekar(doctor_id)
 
+    if prasanje_e_specijalnost_izbran_lekar(prashanje):
+        uvod = (
+            f"(Од претходната порака: {ime}.)\n\n"
+            if od_kontekst
+            else ""
+        )
+        return (
+            f"{uvod}{ime} работи во областа / специјалност: {spec}.\n"
+            f"Email: {email if email else '—'}"
+        )
+
+    if _e_prasanje_dali_raboti(prashanje):
+        naslov = f"Да, {ime} работи во Клиничка Болница Штип."
+    else:
+        naslov = f"Информации за {ime}"
+
     delovi = [
-        f"Информации за {ime}",
+        naslov,
         "",
-        f"Специјалност: {spec}",
-        f"Email: {lekar.get('email', '—')}",
+        f"Име и презиме: {lekar['name']} {lekar['surname']}",
+        f"Специјалност / оддел: {spec}",
+        f"Email: {email if email else '—'}",
         _dezuren_status(dezurstva),
         "",
         "Доколку сакате преглед, најавете се со кориснички профил на сајтот.",
         f'За слободни термини напишете: „Кога е слободен д-р {lekar["surname"]}?"',
     ]
-
+    if od_kontekst:
+        delovi.insert(1, "(Од претходната порака во разговорот.)")
     return "\n".join(delovi)
+
+
+def _kontekst_posle_info(lekar: dict, kontekst: dict | None) -> dict:
+    did = int(lekar["doctor_ID"])
+    ctx = dict(kontekst) if isinstance(kontekst, dict) else {}
+    ctx["zakazi_od_slobodni"] = {
+        "doctor_id": did,
+        "datum": (ctx.get("zakazi_od_slobodni") or {}).get("datum"),
+    }
+    ctx["last_doctor_id"] = did
+    return ctx
+
+
+def odgovori_za_info_lekar(prashanje: str, kontekst: dict | None = None) -> str | dict:
+    lekar, od_kontekst = _resolviraj_lekar(prashanje, kontekst)
+
+    if not lekar:
+        if prasanje_bar_lekar_od_kontekst(prashanje) or prasanje_e_specijalnost_izbran_lekar(prashanje):
+            return {
+                "odgovor": (
+                    "Не гледам зачуван избран лекар од претходната порака.\n\n"
+                    "Прво наведете го лекарот (на пр. „Кога е слободен д-р Петровски?“) "
+                    "или закажете преглед, па повторете."
+                ),
+                "kontekst": kontekst,
+            }
+        return {
+            "odgovor": (
+                "Не најдов лекар со тоа име во евиденцијата на Клиничка Болница Штип.\n"
+                'Проверете го правописот или пребарајте на сајтот во делот „Лекари".\n'
+                'Пример: „Информации за д-р Марко Петров" или „Дали работи др Марија Хубрева?"'
+            ),
+            "kontekst": kontekst if isinstance(kontekst, dict) else None,
+        }
+
+    text = _format_info_lekar(lekar, prashanje, od_kontekst)
+    return {"odgovor": text, "kontekst": _kontekst_posle_info(lekar, kontekst)}

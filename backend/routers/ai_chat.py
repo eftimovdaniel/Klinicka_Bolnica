@@ -21,6 +21,7 @@ from ai_chat_store import (
     create_session,
     delete_session,
     get_session_messages,
+    import_guest_session,
     list_sessions,
     save_exchange,
 )
@@ -53,6 +54,18 @@ class PitanjeModel(BaseModel):
     lekar: LekarModel | None = None
     kontekst: dict | None = None
     session_id: int | None = None
+
+
+class GuestChatMessage(BaseModel):
+    uloga: str
+    sodrzina: str = Field(..., max_length=MAX_PRASHANJE_LEN)
+
+
+class GuestImportModel(BaseModel):
+    pacient: PacientModel | None = None
+    lekar: LekarModel | None = None
+    messages: list[GuestChatMessage] = Field(default_factory=list)
+    kontekst: dict | None = None
 
 
 def _pacient_dict(p: PacientModel | None) -> dict | None:
@@ -115,6 +128,23 @@ def _resolve_intent(
     if aktiven_kontekst and aktiven_kontekst.get("intent") == "apliciraj_za_rabota":
         return "apliciraj_za_rabota"
 
+    if isinstance(aktiven_kontekst, dict) and aktiven_kontekst.get("last_oddel"):
+        q = pitanje_norm.lower()
+        if any(x in q for x in ("женск", "машк", "zensk", "maski")) or any(
+            x in q
+            for x in (
+                "овој дел",
+                "овој одел",
+                "овој оддел",
+                "истиот",
+                "таму",
+                "овде",
+                "а женски",
+                "а машки",
+            )
+        ):
+            return "preference_lekar"
+
     dk = (
         aktiven_kontekst.get("dezurstvo_kontekst")
         if isinstance(aktiven_kontekst, dict)
@@ -170,8 +200,52 @@ def _resolve_intent(
     if intent == "moj_raspored" and pacient_dict and not lekar_dict:
         intent = "moi_pregledi"
 
-    if aktiven_kontekst and aktiven_kontekst.get("zakazi_od_slobodni"):
+    from ai.pacient.slobodni_termini import (
+        cilj_datum_lokalno,
+        prasanje_bar_lekar_od_kontekst,
+        prasanje_e_sleden_raboten_den,
+        prasanje_e_specijalnost_izbran_lekar,
+    )
+
+    has_lekar_kontekst = isinstance(aktiven_kontekst, dict) and (
+        aktiven_kontekst.get("zakazi_od_slobodni")
+        or aktiven_kontekst.get("zakazi_pending")
+        or aktiven_kontekst.get("last_doctor_id")
+    )
+    if has_lekar_kontekst and prasanje_e_specijalnost_izbran_lekar(pitanje_norm):
+        return "info_lekar"
+
+    if isinstance(aktiven_kontekst, dict) and (
+        aktiven_kontekst.get("zakazi_od_slobodni") or aktiven_kontekst.get("zakazi_pending")
+    ):
+        if prasanje_bar_lekar_od_kontekst(pitanje_norm):
+            return "slobodni_termini"
+
+    has_zakazi_flow = bool(
+        aktiven_kontekst
+        and (
+            aktiven_kontekst.get("zakazi_od_slobodni")
+            or aktiven_kontekst.get("zakazi_pending")
+        )
+    )
+    if has_zakazi_flow:
         q = pitanje_norm.lower()
+        if prasanje_e_sleden_raboten_den(pitanje_norm):
+            return "slobodni_termini"
+        if prasanje_e_specijalnost_izbran_lekar(pitanje_norm):
+            return "info_lekar"
+        if any(
+            x in q
+            for x in (
+                "избран",
+                "избраниот",
+                "истиот",
+                "погоре",
+                "од листата",
+                "од горе",
+            )
+        ):
+            return "slobodni_termini"
         # Закажување со време / „закажи во 10:30“
         if re.search(r"\b\d{1,2}\s*[:.]\s*\d{2}\b", q) or re.search(
             r"\bво\s+\d{1,2}\b", q
@@ -199,8 +273,6 @@ def _resolve_intent(
             intent = "zakazi_termin"
         # Следна порака: друг ден / „наредниот петок“ кај истиот лекар
         elif intent in ("general", "zakazi_termin"):
-            from ai.pacient.slobodni_termini import cilj_datum_lokalno
-
             if cilj_datum_lokalno(pitanje_norm) or any(
                 w in q
                 for w in (
@@ -227,6 +299,42 @@ def _resolve_intent(
                 intent = "slobodni_termini"
 
     return intent
+
+
+@router.post("/sessions/import-guest")
+def import_guest_chat(data: GuestImportModel):
+    """
+    По најава: пренеси гостински разговор во нова DB сесија за најавениот корисник.
+    """
+    pacient_dict = _pacient_dict(data.pacient)
+    lekar_dict = _lekar_dict(data.lekar)
+    pacient_id, doctor_id = _owner_ids(pacient_dict, lekar_dict)
+    if not pacient_id and not doctor_id:
+        raise HTTPException(status_code=400, detail="Потребен е најавен пациент или лекар.")
+
+    msgs = []
+    for m in data.messages or []:
+        sodrzina = (m.sodrzina or "").strip()
+        if not sodrzina:
+            continue
+        uloga = (m.uloga or "user").lower()
+        if uloga not in ("user", "assistant"):
+            uloga = "user"
+        msgs.append({"uloga": uloga, "sodrzina": sodrzina})
+    sid = import_guest_session(
+        pacient_id=pacient_id,
+        doctor_id=doctor_id,
+        messages=msgs,
+        kontekst=data.kontekst if isinstance(data.kontekst, dict) else None,
+    )
+    if not sid:
+        raise HTTPException(status_code=500, detail="Не успеав да ја зачувам сесијата.")
+
+    return {
+        "session_id": sid,
+        "kontekst": data.kontekst,
+        "imported": len(msgs),
+    }
 
 
 @router.get("/sessions")

@@ -49,6 +49,8 @@ def _spoi_zakazi_so_slobodni_kontekst(
         return
     zos = kontekst.get("zakazi_od_slobodni")
     if not isinstance(zos, dict):
+        zos = kontekst.get("zakazi_pending")
+    if not isinstance(zos, dict):
         return
     p = (prashanje or "").lower()
     izbran = any(
@@ -246,7 +248,7 @@ def odgovori_za_zakazuvanje(
                 "можеш и поинаку, на пример „закажи ми преглед“ или „сакам термин кај…“."
             ),
             "akcija": "otvori_pacient_login",
-            "kontekst": None,
+            "kontekst": kontekst,
         }
 
     # AI извлекува податоци
@@ -346,9 +348,21 @@ def odgovori_za_zakazuvanje(
         }
 
     if datum_obj.weekday() >= 5:
+        nov_kontekst = dict(kontekst) if kontekst else {}
+        pending: dict = {}
+        if doctor_id is not None:
+            pending["doctor_id"] = doctor_id
+        if vreme_str:
+            pending["vreme"] = vreme_str
+        if pending:
+            nov_kontekst["zakazi_pending"] = pending
         return {
-            "odgovor": "Не се закажуваат прегледи во сабота и недела. Избери друг ден.",
-            "kontekst": kontekst,
+            "odgovor": (
+                "Не се закажуваат прегледи во сабота и недела. Избери друг ден.\n\n"
+                'Можеш да прашаш: „Кога е следен работен ден?" — ќе ти кажам датум '
+                "и слободни термини кај истиот лекар, доколку веќе го имаше избран."
+            ),
+            "kontekst": nov_kontekst,
         }
 
     # Валидација на време
@@ -423,5 +437,11 @@ def odgovori_za_zakazuvanje(
             datum_str=datum_str,
             vreme_str=vreme_str,
         ),
-        "kontekst": None,
+        "kontekst": {
+            "zakazi_od_slobodni": {
+                "doctor_id": int(doctor_id),
+                "datum": datum_str,
+            },
+            "last_doctor_id": int(doctor_id),
+        },
     }
