@@ -1,110 +1,97 @@
-"""
-Преглед на апликанти за оглас (само за директор).
-
-Примери:
-- „Покажи ми ги апликантите за хирург"
-- „Кој се аплицирал за кардиолог?"
-- „Аплицирани кандидати за анестезиолог"
-- „Сите апликанти" (без позиција – ги враќа сите)
-- „Апликанти за оглас 42" (по ID на оглас)
-
-Користи табела `prijaveni_lekari`.
-"""
-
-from ai._kernel.prompt_loader import load_prompt
-from ai._kernel.ai_json import parse_ai_json
-from ai._kernel.auth import require_direktor
-from ai._kernel.db_helpers import as_dict, db_cursor
-from ai._kernel.groq_client import ask_ai
+from ai._kernel.prompt_loader import load_prompt  # vcituvanje AI prompt od agent_prompts.txt
+from ai._kernel.ai_json import parse_ai_json  # AI odgovor -> JSON dict
+from ai._kernel.auth import require_direktor  # samo direktor ima pristap
+from ai._kernel.db_helpers import as_dict, db_cursor  # pomos za MySQL kursor
+from ai._kernel.groq_client import ask_ai  # povik kon Groq (Llama)
 
 
-def _izvlechi(prashanje: str) -> dict:
-    odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=load_prompt("direktor_aplikanti_oglas"))
-    print(f"[aplikanti] AI: {odgovor!r}")
-    return parse_ai_json(odgovor, log_tag="aplikanti_oglas")
+def _izvlechi(prashanje: str) -> dict:  # izvleci pozicija ili id_oglas od prasanjeto
+    odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=load_prompt("direktor_aplikanti_oglas"))  # AI analiza
+    print(f"[aplikanti] AI: {odgovor!r}")  # log za debug
+    return parse_ai_json(odgovor, log_tag="aplikanti_oglas")  # dict ili _error
 
 
-def _format_datum(d) -> str:
-    if not d:
-        return "—"
-    if hasattr(d, "strftime"):
-        return d.strftime("%d.%m.%Y %H:%M")
-    return str(d)[:16]
+def _format_datum(d) -> str:  # lep format na datum_prijava
+    if not d:  # nema datum
+        return "—"  # prazno
+    if hasattr(d, "strftime"):  # datetime objekt
+        return d.strftime("%d.%m.%Y %H:%M")  # den.mesec.godina cas:min
+    return str(d)[:16]  # string skraten
 
 
-def odgovori_za_aplikanti(prashanje: str, lekar: dict | None) -> str:
-    if err := require_direktor(lekar):
-        return err
+def odgovori_za_aplikanti(prashanje: str, lekar: dict | None) -> str:  # glaven handler (intent aplikanti_oglas)
+    if err := require_direktor(lekar):  # proveri uloga direktor
+        return err  # odbien pristap
 
-    podatoci = _izvlechi(prashanje)
-    if podatoci.get("_error"):
-        return podatoci["_error"]
+    podatoci = _izvlechi(prashanje)  # {pozicija, id_oglas} od AI
+    if podatoci.get("_error"):  # Groq limit ili los JSON
+        return podatoci["_error"]  # prikazi greska
 
-    pozicija = (podatoci.get("pozicija") or "").strip() or None
-    id_oglas = podatoci.get("id_oglas")
-    try:
-        id_oglas = int(id_oglas) if id_oglas else None
-    except (ValueError, TypeError):
-        id_oglas = None
+    pozicija = (podatoci.get("pozicija") or "").strip() or None  # filter po pozicija (opcionalno)
+    id_oglas = podatoci.get("id_oglas")  # filter po broj na oglas (opcionalno)
+    try:  # pretvori id vo int
+        id_oglas = int(id_oglas) if id_oglas else None  # cel broj ili None
+    except (ValueError, TypeError):  # nevaliden id od AI
+        id_oglas = None  # bez filter po id
 
-    try:
-        with db_cursor() as (_, cur):
-            sql = (
-                "SELECT id, id_oglas, pozicija, ime_lekar, prezime_lekar, "
-                "       broj_med_licenca, email, telefon, datum_prijava "
-                "FROM prijaveni_lekari "
-                "WHERE 1=1"
+    try:  # citaj od baza
+        with db_cursor() as (_, cur):  # konekcija + kursor (auto close)
+            sql = (  # SQL za site aplikanti
+                "SELECT id, id_oglas, pozicija, ime_lekar, prezime_lekar, "  # koloni
+                "       broj_med_licenca, email, telefon, datum_prijava "  # kontakt i datum
+                "FROM prijaveni_lekari "  # tabela so prijavi
+                "WHERE 1=1"  # osnova za AND uslovi
             )
-            params: list = []
+            params: list = []  # vrednosti za %s
 
-            if id_oglas:
-                sql += " AND id_oglas = %s"
-                params.append(id_oglas)
-            elif pozicija:
-                sql += " AND LOWER(TRIM(pozicija)) LIKE %s"
-                params.append(f"%{pozicija.strip().lower()}%")
+            if id_oglas:  # baranje po konkreten oglas
+                sql += " AND id_oglas = %s"  # tocno id
+                params.append(id_oglas)  # parametar
+            elif pozicija:  # baranje po ime na pozicija
+                sql += " AND LOWER(TRIM(pozicija)) LIKE %s"  # del od tekst
+                params.append(f"%{pozicija.strip().lower()}%")  # npr. %kardiolog%
 
-            sql += " ORDER BY datum_prijava DESC"
-            cur.execute(sql, tuple(params))
-            rows = cur.fetchall() or []
-    except Exception as e:
-        print(f"[aplikanti] DB greshka: {e}")
-        return "Се случи грешка при вчитувањето на апликантите. Те молам обиди се повторно."
+            sql += " ORDER BY datum_prijava DESC"  # najnovi prvi
+            cur.execute(sql, tuple(params))  # izvrsi query
+            rows = cur.fetchall() or []  # lista redovi
+    except Exception as e:  # greska na baza
+        print(f"[aplikanti] DB greshka: {e}")  # log
+        return "Се случи грешка при вчитувањето на апликантите. Те молам обиди се повторно."  # poraka
 
-    if not rows:
-        if id_oglas:
-            return f"Нема апликанти за оглас со ID {id_oglas}."
-        if pozicija:
-            return f'Нема апликанти за позицијата „{pozicija}".'
-        return "Нема апликанти во системот."
+    if not rows:  # nema rezultati
+        if id_oglas:  # barashe po id
+            return f"Нема апликанти за оглас со ID {id_oglas}."  # prazen oglas
+        if pozicija:  # barashe po pozicija
+            return f'Нема апликанти за позицијата „{pozicija}".'  # nema takva pozicija
+        return "Нема апликанти во системот."  # prazna tabela
 
-    naslov_filtri = []
-    if id_oglas:
-        naslov_filtri.append(f"оглас #{id_oglas}")
-    if pozicija:
-        naslov_filtri.append(f'„{pozicija}"')
-    naslov_suffix = (" (" + ", ".join(naslov_filtri) + ")") if naslov_filtri else ""
-    naslov = f"Апликанти ({len(rows)}){naslov_suffix}:"
+    naslov_filtri = []  # tekst za naslov (filtri)
+    if id_oglas:  # filtrirano po oglas
+        naslov_filtri.append(f"оглас #{id_oglas}")  # dodaj vo naslov
+    if pozicija:  # filtrirano po pozicija
+        naslov_filtri.append(f'„{pozicija}"')  # dodaj vo naslov
+    naslov_suffix = (" (" + ", ".join(naslov_filtri) + ")") if naslov_filtri else ""  # zagrada ili prazno
+    naslov = f"Апликанти ({len(rows)}){naslov_suffix}:"  # naslov so broj
 
-    redovi = [naslov, ""]
-    for raw in rows:
-        r = as_dict(raw)
-        ime = (r.get("ime_lekar") or "").strip()
-        prezime = (r.get("prezime_lekar") or "").strip()
-        polno = f"{ime} {prezime}".strip() or "—"
-        poz = (r.get("pozicija") or "").strip() or "—"
-        email = (r.get("email") or "").strip() or "—"
-        tel = r.get("telefon") or "—"
-        lic = r.get("broj_med_licenca") or "—"
-        kogo = _format_datum(r.get("datum_prijava"))
-        oglas_ref = r.get("id_oglas")
-        oglas_str = f" | оглас #{oglas_ref}" if oglas_ref else ""
+    redovi = [naslov, ""]  # pocni lista za odgovor
+    for raw in rows:  # sekoj aplikant
+        r = as_dict(raw)  # red -> dict
+        ime = (r.get("ime_lekar") or "").strip()  # ime
+        prezime = (r.get("prezime_lekar") or "").strip()  # prezime
+        polno = f"{ime} {prezime}".strip() or "—"  # celo ime
+        poz = (r.get("pozicija") or "").strip() or "—"  # pozicija
+        email = (r.get("email") or "").strip() or "—"  # email
+        tel = r.get("telefon") or "—"  # telefon
+        lic = r.get("broj_med_licenca") or "—"  # licenca
+        kogo = _format_datum(r.get("datum_prijava"))  # datum na prijava
+        oglas_ref = r.get("id_oglas")  # id na oglasot
+        oglas_str = f" | оглас #{oglas_ref}" if oglas_ref else ""  # dopolnitelen tekst
 
-        red = (
-            f"• {polno} – {poz}{oglas_str}\n"
-            f"   Email: {email} | Тел: {tel} | Лиценца: {lic}\n"
-            f"   Пријавен: {kogo}"
+        red = (  # blok za eden aplikant
+            f"• {polno} – {poz}{oglas_str}\n"  # ime i pozicija
+            f"   Email: {email} | Тел: {tel} | Лиценца: {lic}\n"  # kontakt
+            f"   Пријавен: {kogo}"  # koga
         )
-        redovi.append(red)
+        redovi.append(red)  # dodadi vo listata
 
-    return "\n".join(redovi)
+    return "\n".join(redovi)  # finalen tekst za chat

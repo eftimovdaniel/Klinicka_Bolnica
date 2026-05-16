@@ -1,130 +1,124 @@
-from pathlib import Path
-from typing import Any, cast
+from pathlib import Path  # biblioteka za patеки do papki i fajlovi
+from typing import Any, cast  # tipovi za Python (Any = bilo što, cast = pretvorba na tip)
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from routers import lekari, pacienti, termini, admin, aparati, uslugi, novosti, kariera, ai_chat
+from fastapi import FastAPI  # glavnata klasa za web API
+from fastapi.middleware.cors import CORSMiddleware  # dozvoluva frontend od drug domen da povikuva API
+from fastapi.staticfiles import StaticFiles  # serviranje na sliki, CSS, HTML kako statički fajlovi
+from routers import lekari, pacienti, termini, admin, aparati, uslugi, novosti, kariera, ai_chat  # site router moduli so ruti
 
-app = FastAPI(
-    title="Клиничка Болница Штип – API",
-    description="API за системот за управување со прегледи, термини и администрација",
-    version="1.0",
+app = FastAPI(  # kreiranje na FastAPI aplikacijata
+    title="Клиничка Болница Штип – API",  # naslov što se gleda vo /docs
+    description="API за системот за управување со прегледи, термини и администрација",  # kratok opis na API
+    version="1.0",  # verzija na API
 )
-#dozvola za povik na api od frontend delot 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+app.add_middleware(  # dodavanje na CORS sloj (pred sekoj odgovor)
+    CORSMiddleware,  # tip na middleware za cross-origin baranja
+    allow_origins=["*"],  # dozvoleni izvori (* = site, samo za razvoj)
+    allow_credentials=True,  # dozvoluva cookies / credentials vo baranjata
+    allow_methods=["*"],  # dozvoleni HTTP metodi (GET, POST, ...)
+    allow_headers=["*"],  # dozvoleni HTTP zaglavja
 )
-# Статички фајлови (слики од новости, итн.)
-STATIC_DIR = Path(__file__).resolve().parent / "static"
-if STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+STATIC_DIR = Path(__file__).resolve().parent / "static"  # pateka do backend/static (sliki od novosti)
+if STATIC_DIR.exists():  # proveri dali papkata postoi
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")  # URL /static → fajlovi od STATIC_DIR
 
-# Frontend фајлови (за развој) - сервирани од http://localhost:8000/
-# Тоа решава Error 153 на YouTube embed-и кои не работат преку file:// протокол.
-FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"
-if FRONTEND_DIR.exists():
-    app.mount("/app", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
+FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"  # pateka do frontend papkata (eden nivo nagore)
+if FRONTEND_DIR.exists():  # ako frontend papkata postoi
+    app.mount("/app", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")  # serviranje na sajtot na /app (html=True = index.html)
 
-# site ruti gi povikuvam da ne mi e se vo main
-app.include_router(lekari.router)
-app.include_router(pacienti.router)
-app.include_router(termini.router)
-app.include_router(admin.router)
-app.include_router(aparati.router)
-app.include_router(uslugi.router)
-app.include_router(novosti.router)
-app.include_router(kariera.router)
-app.include_router(kariera.app_router)  # /aplikacija (пријава за оглас)
-app.include_router(ai_chat.router)  # AI чат со Groq (Llama 3.3)
+app.include_router(lekari.router)  # ruti za lekari (login, lista, profil, ...)
+app.include_router(pacienti.router)  # ruti za pacienti
+app.include_router(termini.router)  # ruti za termini / pregledi
+app.include_router(admin.router)  # ruti za admin panel
+app.include_router(aparati.router)  # ruti za aparati
+app.include_router(uslugi.router)  # ruti za uslugi
+app.include_router(novosti.router)  # ruti za novosti
+app.include_router(kariera.router)  # ruti za kariera / oglasi
+app.include_router(kariera.app_router)  # posebni ruti za /aplikacija (prijava za rabota)
+app.include_router(ai_chat.router)  # AI chat so Groq (asistentot)
 
 
-@app.get("/")
-def root():
-    return {"message": "Клиничка Болница Штип – API", "docs": "/docs"}
+@app.get("/")  # HTTP GET na korenot na API (/)
+def root():  # funkcija koja go obrabotuva baranjeto
+    return {"message": "Клиничка Болница Штип – API", "docs": "/docs"}  # JSON odgovor so poraka i link do dokumentacija
 
-# vie treba da gi proveram ama mislam deka nema da mi trebat, voa mi bese za debug 
-@app.get("/debug-novosti")
-def debug_novosti():
+
+@app.get("/debug-novosti")  # privremen endpoint za test na novosti (debug)
+def debug_novosti():  # funkcija za čitanje na novosti od baza
     """Приказ на slika_path и slike_extra за сите новости – за проверка што е во базата."""
-    from database import get_connection
-    try:
-        conn = get_connection()
-        cur = conn.cursor(dictionary=True)
-        cur.execute("SELECT id, naslov, slika_path, slike_extra FROM Novosti ORDER BY id")
-        rows = cur.fetchall()
-        cur.close()
-        conn.close()
-        return {"novosti": rows}
-    except Exception as e:
-        return {"error": str(e)}
+    from database import get_connection  # funkcija za konekcija so MySQL
+    try:  # probaj da se povrzeš so bazata
+        conn = get_connection()  # otvori konekcija
+        cur = conn.cursor(dictionary=True)  # kursor so rezultati kako rečnici (kluč = ime na kolona)
+        cur.execute("SELECT id, naslov, slika_path, slike_extra FROM Novosti ORDER BY id")  # SQL: site novosti
+        rows = cur.fetchall()  # zemi gi site redovi
+        cur.close()  # zatvori kursor
+        conn.close()  # zatvori konekcija
+        return {"novosti": rows}  # vrati gi podatocite kako JSON
+    except Exception as e:  # ako nešto padne (baza, SQL, ...)
+        return {"error": str(e)}  # vrati ja greškata kako tekst
 
-# isto i vaj endpoint nema da mi treba za kraj, prezentacija na proekt
-@app.get("/debug-kariera")
-def debug_kariera():
+
+@app.get("/debug-kariera")  # privremen endpoint za oglasi za rabota
+def debug_kariera():  # funkcija za lista na oglasi
     """Приказ на огласи од Vrabotuvanje – за проверка зошто кариера не се прикажува."""
-    from database import get_connection
-    try:
-        conn = get_connection()
-        cur = conn.cursor(dictionary=True)
-        cur.execute("""
+    from database import get_connection  # konekcija so baza
+    try:  # obidi se da čitaš
+        conn = get_connection()  # konekcija
+        cur = conn.cursor(dictionary=True)  # kursor so dict redovi
+        cur.execute("""  # SQL so poveke redovi
             SELECT id_oglas, pozicija, oddel, datum_na_prijavuvanje, status_oglas
             FROM Vrabotuvanje
             ORDER BY datum_na_prijavuvanje ASC
         """)
-        rows = cur.fetchall()
-        out = []
-        for r in rows:
-            row = cast(dict[str, Any], r)
-            d = row.get("datum_na_prijavuvanje")
-            rok = d.strftime("%d.%m.%Y") if d and hasattr(d, "strftime") else (str(d)[:10] if d else "")
-            out.append({**row, "rok_str": rok})
-        cur.close()
-        conn.close()
-        return {"count": len(out), "oglasi": out}
-    except Exception as e:
-        return {"error": str(e)}
+        rows = cur.fetchall()  # site oglasi
+        out = []  # prazna lista za formatiran izlez
+        for r in rows:  # za sekoj red od bazata
+            row = cast(dict[str, Any], r)  # pretvori go redot vo dict so tipovi
+            d = row.get("datum_na_prijavuvanje")  # zemi go datumot na prijava
+            rok = d.strftime("%d.%m.%Y") if d and hasattr(d, "strftime") else (str(d)[:10] if d else "")  # formatiraj datum ili prazno
+            out.append({**row, "rok_str": rok})  # dodadi go formatiraniot datum vo rečnikot
+        cur.close()  # zatvori kursor
+        conn.close()  # zatvori konekcija
+        return {"count": len(out), "oglasi": out}  # kolku oglasi + lista
+    except Exception as e:  # greška
+        return {"error": str(e)}  # vrati greška
 
-# isto kako i prethodnite dva
-@app.get("/debug-db")
-def debug_db():
+
+@app.get("/debug-db")  # proverka dali bazata i tabelite rabotat
+def debug_db():  # funkcija za test na konekcija i tabeli
     """Проверка на конекција и табели – прикажува точна грешка при проблем."""
-    from database import get_connection
-    results = {}
-    try:
-        conn = get_connection()
-        results["connection"] = "OK"
-        cur = conn.cursor(dictionary=True)
-        # Тест на табели (истите query-и како endpoints)
-        tests = [
+    from database import get_connection  # konekcija so MySQL
+    results = {}  # rečnik za rezultati od testovite
+    try:  # glaven try blok
+        conn = get_connection()  # konekcija
+        results["connection"] = "OK"  # konekcijata e uspešna
+        cur = conn.cursor(dictionary=True)  # kursor
+        tests = [  # lista na tabeli i SQL što ke se izvršat
             ("Doctors", "SELECT COUNT(*) as c FROM Doctors"),
             ("Oddeli", "SELECT ime_na_oddel FROM Oddeli LIMIT 1"),
             ("Vrabotuvanje", "SELECT id_oglas, pozicija, oddel, datum_na_prijavuvanje FROM Vrabotuvanje LIMIT 1"),
             ("Novosti", "SELECT id, naslov FROM Novosti LIMIT 1"),
         ]
-        for name, sql in tests:
-            try:
-                cur.execute(sql)
-                rows = cur.fetchall()
-                cnt = (
-                    cast(dict[str, Any], rows[0]).get("c", len(rows))
-                    if rows
-                    else 0
+        for name, sql in tests:  # za sekoja tabela
+            try:  # probaj query
+                cur.execute(sql)  # izvrši SQL
+                rows = cur.fetchall()  # rezultati
+                cnt = (  # brojka za prikaz
+                    cast(dict[str, Any], rows[0]).get("c", len(rows))  # COUNT ili broj na redovi
+                    if rows  # ako ima baranje eden red
+                    else 0  # inaku 0
                 )
-                results[name] = {"ok": True, "count": cnt}
-            except Exception as e:
-                results[name] = {"ok": False, "error": str(e)}
-        cur.close()
-        conn.close()
-    except Exception as e:
-        results["connection"] = f"ГРЕШКА: {e}"
-    return results
+                results[name] = {"ok": True, "count": cnt}  # tabelata e OK
+            except Exception as e:  # greška na konkretna tabela
+                results[name] = {"ok": False, "error": str(e)}  # zabeleži greška
+        cur.close()  # zatvori kursor
+        conn.close()  # zatvori konekcija
+    except Exception as e:  # ne može da se povrze so bazata
+        results["connection"] = f"ГРЕШКА: {e}"  # zabeleži greška na konekcija
+    return results  # vrati gi site test rezultati
 
-# startuvanje lokalno
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+if __name__ == "__main__":  # samo ako go startuvaš so: python main.py
+    import uvicorn  # ASGI server za FastAPI
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)  # start na server (reload = avtomatski restart pri promena)
