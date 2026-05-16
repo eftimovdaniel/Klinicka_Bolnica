@@ -146,12 +146,22 @@ def najdi_lekari_po_prezime(prezime: str) -> list[dict]:
 
     exact = [r for r in rows if (r.get("surname") or "").lower() == prezime]
     if exact:
-        return [_lekar_od_red(r) for r in exact]
+        return _lekari_od_rows(exact)
 
     if len(rows) == 1:
-        return [_lekar_od_red(rows[0])]
+        one = _lekar_od_red(rows[0])
+        return [one] if one else []
 
-    return [_lekar_od_red(r) for r in rows]
+    return _lekari_od_rows(rows)
+
+
+def _lekari_od_rows(rows: list[dict]) -> list[dict]:
+    out: list[dict] = []
+    for r in rows:
+        lekar = _lekar_od_red(r)
+        if lekar:
+            out.append(lekar)
+    return out
 
 
 def najdi_lekari_po_delovi(delovi: list[str]) -> list[dict]:

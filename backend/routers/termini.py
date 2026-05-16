@@ -49,7 +49,7 @@ def _poslati_potvrda_na_email(to_email: str, ime_pacient: str, ime_lekar: str, d
             msg = MIMEMultipart()
             msg["From"] = from_addr
             msg["To"] = to_email
-            msg["Subject"] = Header(subject, "utf-8")
+            msg["Subject"] = str(Header(subject, "utf-8"))
             msg.attach(MIMEText(body, "plain", "utf-8"))
             with smtplib.SMTP(smtp_host, smtp_port) as server:
                 server.starttls()
@@ -445,9 +445,9 @@ async def poslati_izvestaj_na_pacient(termin_id: int):
         smtp_port = int(os.environ.get("SMTP_PORT", "587"))
         smtp_user = os.environ.get("SMTP_USER")
         smtp_password = os.environ.get("SMTP_PASSWORD")
-        from_email = os.environ.get("FROM_EMAIL") or smtp_user
+        from_email = (os.environ.get("FROM_EMAIL") or smtp_user or "").strip()
 
-        if not smtp_host or not smtp_user or not smtp_password:
+        if not smtp_host or not smtp_user or not smtp_password or not from_email:
             raise HTTPException(
                 status_code=503,
                 detail="Испраќањето е-пошта не е конфигурирано (SMTP_HOST, SMTP_USER, SMTP_PASSWORD)."

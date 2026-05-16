@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from dotenv import load_dotenv
 
@@ -15,8 +16,13 @@ except ImportError:
     mysql = None
     MySQLError = Exception
 
+if TYPE_CHECKING:
+    from mysql.connector.connection import MySQLConnection
+else:
+    MySQLConnection = Any
 
-def get_connection():
+
+def get_connection() -> "MySQLConnection":
     if mysql is None:
         raise RuntimeError(
             "mysql-connector-python не е инсталиран. Инсталирај: pip install mysql-connector-python"

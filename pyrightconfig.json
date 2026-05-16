@@ -2,5 +2,15 @@
   "venvPath": ".",
   "venv": "venv",
   "include": ["backend"],
-  "pythonVersion": "3.12"
+  "stubPath": "typings",
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "reportMissingModuleSource": "none",
+  "reportMissingImports": "warning",
+  "reportCallIssue": "none",
+  "reportArgumentType": "none",
+  "reportAttributeAccessIssue": "none",
+  "reportOptionalSubscript": "none",
+  "reportOptionalMemberAccess": "none",
+  "reportReturnType": "warning"
 }

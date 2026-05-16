@@ -14,6 +14,7 @@ def run_sql_file(sql_file_path):
         return False
     
     conn = None
+    db_cursor = None
     try:
         # Вчитај го SQL фајлот
         with open(sql_file_path, 'r', encoding='utf-8') as f:
@@ -63,8 +64,9 @@ def run_sql_file(sql_file_path):
             conn.rollback()
         return False
     finally:
-        if conn and conn.is_connected():
+        if db_cursor is not None:
             db_cursor.close()
+        if conn is not None and conn.is_connected():
             conn.close()
 
 if __name__ == "__main__":

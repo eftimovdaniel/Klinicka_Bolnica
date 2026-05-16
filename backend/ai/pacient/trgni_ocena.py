@@ -73,7 +73,7 @@ def najdi_oceneti_termini(pacient_email: str, doctor_id: int | None, datum: str 
             WHERE LOWER(TRIM(t.email_pacient)) = LOWER(TRIM(%s))
               AND t.status_pregled = 'завршен'
         """
-        params = [pacient_email]
+        params: list[object] = [pacient_email]
 
         if doctor_id:
             query += " AND t.doctor_ID = %s"

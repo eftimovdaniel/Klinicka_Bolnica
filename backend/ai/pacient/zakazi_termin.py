@@ -334,10 +334,15 @@ def odgovori_za_zakazuvanje(
         )
 
     # Сите 3 полиња се присутни - продолжи со валидација и INSERT
+    if doctor_id is None or not datum_str or not vreme_str:
+        return "Недостасуваат податоци за закажување (лекар, датум, време)."
+    did = int(doctor_id)
+    ds = str(datum_str)
+    vs = str(vreme_str)
 
     # Валидација на датум
     try:
-        datum_obj = datetime.strptime(datum_str, "%Y-%m-%d").date()
+        datum_obj = datetime.strptime(ds, "%Y-%m-%d").date()
     except ValueError:
         return "Неважечки формат на датум."
 
@@ -350,10 +355,10 @@ def odgovori_za_zakazuvanje(
     if datum_obj.weekday() >= 5:
         nov_kontekst = dict(kontekst) if kontekst else {}
         pending: dict = {}
-        if doctor_id is not None:
-            pending["doctor_id"] = doctor_id
-        if vreme_str:
-            pending["vreme"] = vreme_str
+        if did is not None:
+            pending["doctor_id"] = did
+        if vs:
+            pending["vreme"] = vs
         if pending:
             nov_kontekst["zakazi_pending"] = pending
         return {
@@ -367,7 +372,7 @@ def odgovori_za_zakazuvanje(
 
     # Валидација на време
     try:
-        vreme_obj = datetime.strptime(vreme_str, "%H:%M").time()
+        vreme_obj = datetime.strptime(vs, "%H:%M").time()
     except ValueError:
         return "Неважечки формат на време."
 
@@ -380,7 +385,7 @@ def odgovori_za_zakazuvanje(
         }
 
     # Проверка дали е слободен
-    if not proveri_dali_e_slobodno(doctor_id, datum_str, vreme_str):
+    if not proveri_dali_e_slobodno(did, ds, vs):
         return {
             "odgovor": (
                 'Тој термин е веќе зафатен. Те молам прашај за слободни термини '
@@ -402,12 +407,12 @@ def odgovori_za_zakazuvanje(
 
     # INSERT во базата
     uspesh, greshka, info = vmetni_termin_vo_baza(
-        doctor_id=doctor_id,
+        doctor_id=did,
         ime_pacient=ime_pacient,
         email_pacient=email_pacient,
         telefon_pacient=telefon_pacient,
-        datum_str=datum_str,
-        vreme_str=vreme_str,
+        datum_str=ds,
+        vreme_str=vs,
     )
 
     if not uspesh:
@@ -423,8 +428,8 @@ def odgovori_za_zakazuvanje(
             to_email=email_pacient,
             ime_pacient=ime_pacient,
             ime_lekar=info["ime_lekar"],
-            datum=datum_str,
-            vreme=vreme_str,
+            datum=ds,
+            vreme=vs,
         )
     except Exception as e:
         print(f"[zakazi_termin] email greshka: {e}")
@@ -434,13 +439,13 @@ def odgovori_za_zakazuvanje(
             ime_pacient=ime_pacient,
             ime_lekar=info["ime_lekar"],
             specialty=info["specialty"],
-            datum_str=datum_str,
-            vreme_str=vreme_str,
+            datum_str=ds,
+            vreme_str=vs,
         ),
         "kontekst": {
             "zakazi_od_slobodni": {
-                "doctor_id": int(doctor_id),
-                "datum": datum_str,
+                "doctor_id": did,
+                "datum": ds,
             },
             "last_doctor_id": int(doctor_id),
         },

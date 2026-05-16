@@ -77,5 +77,6 @@ def transliterate_mk_to_lat(text):
 
     result = ""
     for char in text:
-        result += translit_map.get(char, char.lower())
+        repl = translit_map.get(char)
+        result += repl if repl is not None else char.lower()
     return result

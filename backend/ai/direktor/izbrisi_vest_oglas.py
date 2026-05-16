@@ -8,101 +8,80 @@
 - „Избриши вест 3"                       → DELETE Novosti WHERE id=3
 """
 
-import re
+from typing import Any
 
-from database import get_connection
-from ai._kernel.auth import require_direktor
 from ai._kernel.ai_json import parse_ai_json
+from ai._kernel.auth import require_direktor
+from ai._kernel.db_helpers import ai_error_text, db_cursor, fetch_one, normalize_int
 from ai._kernel.groq_client import ask_ai
+from ai._kernel.prompt_loader import load_prompt
 
 
-PROMPT = """
-Ти си систем што одредува што сака корисникот да избрише.
-
-Корисникот е директор и може да брише ВЕСТ или ОГЛАС. Врати САМО JSON:
-{"tip": "vest" | "oglas", "id": число | null, "kriterium": "najnov" | "id" | null}
-
-Правила:
-- "tip" мора да биде "vest" или "oglas" (на македонски: вест=новост, оглас=за работа/вработување).
-- Ако корисникот спомне ID (бр.) → "id"=число, "kriterium"="id".
-- Ако корисникот вели „најнов", „последен", „најновата", „последната" → "kriterium"="najnov", "id"=null.
-- Ако не е јасно → "tip"=null.
-
-БЕЗ markdown, БЕЗ објаснувања. Само JSON.
-""".strip()
-
-
-def _izvlechi(prashanje: str) -> dict:
+def _izvlechi(prashanje: str) -> dict[str, Any]:
     """AI враќа dict со tip/id/kriterium."""
-    odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=PROMPT)
+    odgovor = ask_ai(
+        f"Прашање: „{prashanje}\"",
+        system_prompt=load_prompt("direktor_izbrisi_vest_oglas"),
+    )
     print(f"[izbrisi] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="izbrisi_vest_oglas")
 
 
 def _izbrisi_vest(target_id: int | None) -> str:
     """Брише вест по ID или најновата."""
-    conn = get_connection()
-    cur = conn.cursor(dictionary=True)
-
-    if target_id:
-        cur.execute("SELECT id, naslov FROM Novosti WHERE id = %s", (target_id,))
-    else:
-        cur.execute("SELECT id, naslov FROM Novosti ORDER BY created_at DESC, id DESC LIMIT 1")
-
-    vest = cur.fetchone()
-    if not vest:
-        cur.close()
-        conn.close()
+    with db_cursor() as (conn, cur):
         if target_id:
-            return f"Не најдов вест со ID {target_id}."
-        return "Немате вести во базата."
+            cur.execute("SELECT id, naslov FROM Novosti WHERE id = %s", (target_id,))
+        else:
+            cur.execute(
+                "SELECT id, naslov FROM Novosti ORDER BY created_at DESC, id DESC LIMIT 1"
+            )
 
-    cur2 = conn.cursor()
-    cur2.execute("DELETE FROM Novosti WHERE id = %s", (vest["id"],))
-    conn.commit()
-    cur.close()
-    cur2.close()
-    conn.close()
+        vest = fetch_one(cur)
+        if not vest:
+            if target_id:
+                return f"Не најдов вест со ID {target_id}."
+            return "Немате вести во базата."
 
-    return f"Вест е избришана.\n\nID: {vest['id']}\nНаслов: {vest['naslov']}"
+        vest_id = int(vest["id"])
+        naslov = str(vest.get("naslov") or "")
+        cur.execute("DELETE FROM Novosti WHERE id = %s", (vest_id,))
+        conn.commit()
+
+    return f"Вест е избришана.\n\nID: {vest_id}\nНаслов: {naslov}"
 
 
 def _izbrisi_oglas(target_id: int | None) -> str:
     """Брише оглас по ID или најновиот."""
-    conn = get_connection()
-    cur = conn.cursor(dictionary=True)
-
-    if target_id:
-        cur.execute(
-            "SELECT id_oglas, pozicija, oddel FROM Vrabotuvanje WHERE id_oglas = %s",
-            (target_id,),
-        )
-    else:
-        cur.execute(
-            "SELECT id_oglas, pozicija, oddel FROM Vrabotuvanje"
-            " ORDER BY datum_na_objava DESC, id_oglas DESC LIMIT 1"
-        )
-
-    oglas = cur.fetchone()
-    if not oglas:
-        cur.close()
-        conn.close()
+    with db_cursor() as (conn, cur):
         if target_id:
-            return f"Не најдов оглас со ID {target_id}."
-        return "Немате огласи во базата."
+            cur.execute(
+                "SELECT id_oglas, pozicija, oddel FROM Vrabotuvanje WHERE id_oglas = %s",
+                (target_id,),
+            )
+        else:
+            cur.execute(
+                "SELECT id_oglas, pozicija, oddel FROM Vrabotuvanje"
+                " ORDER BY datum_na_objava DESC, id_oglas DESC LIMIT 1"
+            )
 
-    cur2 = conn.cursor()
-    cur2.execute("DELETE FROM Vrabotuvanje WHERE id_oglas = %s", (oglas["id_oglas"],))
-    conn.commit()
-    cur.close()
-    cur2.close()
-    conn.close()
+        oglas = fetch_one(cur)
+        if not oglas:
+            if target_id:
+                return f"Не најдов оглас со ID {target_id}."
+            return "Немате огласи во базата."
+
+        oglas_id = int(oglas["id_oglas"])
+        pozicija = str(oglas.get("pozicija") or "")
+        oddel = str(oglas.get("oddel") or "")
+        cur.execute("DELETE FROM Vrabotuvanje WHERE id_oglas = %s", (oglas_id,))
+        conn.commit()
 
     return (
         f"Огласот е избришан.\n\n"
-        f"ID: {oglas['id_oglas']}\n"
-        f"Позиција: {oglas['pozicija']}\n"
-        f"Оддел: {oglas['oddel']}"
+        f"ID: {oglas_id}\n"
+        f"Позиција: {pozicija}\n"
+        f"Оддел: {oddel}"
     )
 
 
@@ -112,13 +91,12 @@ def odgovori_za_brisenje(prashanje: str, lekar: dict | None) -> str:
         return err
 
     podatoci = _izvlechi(prashanje)
-    if podatoci.get("_error"):
-        return podatoci["_error"]
+    if msg := ai_error_text(podatoci):
+        return msg
 
     tip = (podatoci.get("tip") or "").strip().lower()
-    target_id = podatoci.get("id")
+    target_id = normalize_int(podatoci.get("id"))
 
-    # Дополнителна проверка: ако AI не препозна, пробај локално
     if tip not in ("vest", "oglas"):
         low = prashanje.lower()
         if any(w in low for w in ("оглас", "oglas")):
@@ -127,10 +105,10 @@ def odgovori_za_brisenje(prashanje: str, lekar: dict | None) -> str:
             tip = "vest"
         else:
             return (
-                'Не разбирам што да избришам. Пример:\n'
-                '• „Избриши го најновиот оглас"\n'
-                '• „Избриши ја најновата вест"\n'
-                '• „Избриши оглас ID 5"'
+                "Не разбирам што да избришам. Пример:\n"
+                "• „Избриши го најновиот оглас\"\n"
+                "• „Избриши ја најновата вест\"\n"
+                "• „Избриши оглас ID 5\""
             )
 
     if tip == "vest":

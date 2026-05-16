@@ -71,7 +71,7 @@ def najdi_termini_za_otkazuvanje(pacient_email: str, doctor_id: int | None, datu
               AND t.status_pregled = 'закажан'
               AND t.datum_pregled >= CURDATE()
         """
-        params = [pacient_email]
+        params: list[object] = [pacient_email]
 
         if doctor_id:
             query += " AND t.doctor_ID = %s"

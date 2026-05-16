@@ -32,7 +32,14 @@ def get_aparati():
 
 
 @router.get("/termini/dostapnost")
-def check_aparat_dostapnost(aparat: str, datum: str, vreme: str, lekar_id: int = None, pacient_ime: str = None, pacient_prezime: str = None):
+def check_aparat_dostapnost(
+    aparat: str,
+    datum: str,
+    vreme: str,
+    lekar_id: int | None = None,
+    pacient_ime: str | None = None,
+    pacient_prezime: str | None = None,
+):
     """
     Endpoint за проверка на достапност на апарат за даден датум и време.
     Враќа дали апаратот е достапен или не.

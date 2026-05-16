@@ -16,6 +16,7 @@ import re
 from datetime import date, time, datetime, timedelta
 
 from database import get_connection
+from ai._kernel.db_helpers import normalize_int
 from ai._kernel.groq_client import ask_ai
 from ai._kernel.prompts import LEKAR_EXTRACT_PROMPT
 from ai._kernel.transliteracija import transliterijaj
@@ -375,16 +376,10 @@ def lekar_od_zakazi_kontekst(kontekst: dict | None) -> dict | None:
     zos = kontekst.get("zakazi_od_slobodni")
     if not isinstance(zos, dict):
         zos = kontekst.get("zakazi_pending")
-    if isinstance(zos, dict) and zos.get("doctor_id") is not None:
-        try:
-            doctor_id = int(zos.get("doctor_id"))
-        except (TypeError, ValueError):
-            doctor_id = None
-    if doctor_id is None and kontekst.get("last_doctor_id") is not None:
-        try:
-            doctor_id = int(kontekst.get("last_doctor_id"))
-        except (TypeError, ValueError):
-            doctor_id = None
+    if isinstance(zos, dict):
+        doctor_id = normalize_int(zos.get("doctor_id"))
+    if doctor_id is None:
+        doctor_id = normalize_int(kontekst.get("last_doctor_id"))
     if doctor_id is None:
         return None
     for lekar in zimi_site_lekari():
