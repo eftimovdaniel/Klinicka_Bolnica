@@ -1,6 +1,9 @@
 """
 Регистар на AI интенти → handler функции.
 Едно место за рутирање; ai_chat.py само детектира интент и повикува dispatch().
+
+Агентски модел: intent → handler (def) → правила/база → понекогаш AI од листа.
+Водич: ai._kernel.agent_guidelines
 """
 
 from dataclasses import dataclass
