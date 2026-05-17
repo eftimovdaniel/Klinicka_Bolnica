@@ -18,7 +18,6 @@ from datetime import date, time, datetime, timedelta
 from database import get_connection
 from ai._kernel.db_helpers import normalize_int
 from ai._kernel.groq_client import ask_ai
-from ai._kernel.odgovor_formatter import formatiraj_odgovor_so_ai
 from ai._kernel.prompts import LEKAR_EXTRACT_PROMPT
 from ai._kernel.transliteracija import transliterijaj
 
@@ -805,57 +804,10 @@ def _formatiraj_den_lekar(
     return "\n".join(delovi)
 
 
-def _podatoci_za_slobodni_odgovor(
-    lekar: dict,
-    slobodni: list[datetime],
-    denovi: list[str],
-) -> dict:
-    po_den: dict[tuple[date, int], list[str]] = {}
-    for dt in slobodni:
-        kluc = (dt.date(), dt.weekday())
-        po_den.setdefault(kluc, []).append(dt.strftime("%H:%M"))
-
-    dni: list[dict] = []
-    for (datum, weekday), casovi in po_den.items():
-        po_period: dict[str, list[str]] = {}
-        for cas in sorted(casovi):
-            po_period.setdefault(_kluc_period_za_cas(cas), []).append(cas)
-        periodi = {
-            _PERIOD_NASLOVI[k]: v
-            for k in _PERIOD_REDO
-            if (v := po_period.get(k))
-        }
-        dni.append(
-            {
-                "datum": datum.strftime("%d.%m.%Y"),
-                "den": denovi[weekday],
-                "casovi": sorted(casovi),
-                "periodi": periodi,
-                "raspon_opis": _opis_raspon_termini(casovi),
-            }
-        )
-
-    prezime = lekar.get("surname") or ""
-    eden_den = len(dni) == 1
-    return {
-        "lekar_ime": lekar.get("name") or "",
-        "lekar_prezime": prezime,
-        "specialnost": lekar.get("specialty") or "Општа пракса",
-        "dni": dni,
-        "sledna_akcija": (
-            "За закажување напишете го часот (на пр. „закажи во 08:30“). "
-            "За друг ден — наведете нова дата."
-            if eden_den
-            else "За закажување наведете датум и час од листата."
-        ),
-    }
-
-
 def formatiraj_odgovor(
     lekar: dict,
     slobodni: list[datetime],
     na_datum: date | None = None,
-    prasanje: str | None = None,
 ) -> str:
     """
     Формира порака на македонски, групирано по ден.
@@ -898,26 +850,18 @@ def formatiraj_odgovor(
 
     if eden_den:
         (datum, weekday), casovi = next(iter(po_den.items()))
-        sablon = (
+        return (
             _formatiraj_den_lekar(lekar, casovi, datum, weekday, DENOVI)
             + _footer_za_zakazuvanje(eden_datum=True)
         )
-    else:
-        delovi: list[str] = []
-        for (datum, weekday), casovi in po_den.items():
-            if delovi:
-                delovi.append("")
-            delovi.append(_formatiraj_den_lekar(lekar, casovi, datum, weekday, DENOVI))
-        delovi.append(_footer_za_zakazuvanje(eden_datum=False))
-        sablon = "\n".join(delovi)
 
-    podatoci = _podatoci_za_slobodni_odgovor(lekar, slobodni, DENOVI)
-    return formatiraj_odgovor_so_ai(
-        "slobodni_termini",
-        podatoci,
-        sablon,
-        prasanje=prasanje,
-    )
+    delovi: list[str] = []
+    for (datum, weekday), casovi in po_den.items():
+        if delovi:
+            delovi.append("")
+        delovi.append(_formatiraj_den_lekar(lekar, casovi, datum, weekday, DENOVI))
+    delovi.append(_footer_za_zakazuvanje(eden_datum=False))
+    return "\n".join(delovi)
 
 
 def odgovori_za_slobodni_termini(
@@ -941,7 +885,7 @@ def odgovori_za_slobodni_termini(
             return {"odgovor": nejasno, "kontekst": kontekst}
         if lekar:
             slobodni = pronajdi_slobodni_termini(lekar["doctor_ID"], na_datum=sleden)
-            text = formatiraj_odgovor(lekar, slobodni, na_datum=sleden, prasanje=prasanje)
+            text = formatiraj_odgovor(lekar, slobodni, na_datum=sleden)
             ctx = {
                 "zakazi_od_slobodni": {
                     "doctor_id": int(lekar["doctor_ID"]),
@@ -986,7 +930,7 @@ def odgovori_za_slobodni_termini(
         )
     baran_datum = izvleci_datum_za_slobodni(prasanje, kontekst)
     slobodni = pronajdi_slobodni_termini(lekar["doctor_ID"], na_datum=baran_datum)
-    text = formatiraj_odgovor(lekar, slobodni, na_datum=baran_datum, prasanje=prasanje)
+    text = formatiraj_odgovor(lekar, slobodni, na_datum=baran_datum)
 
     did = int(lekar["doctor_ID"])
     ctx = {

@@ -13,6 +13,9 @@ from typing import Any
 from ai._kernel.groq_client import ask_ai
 from ai._kernel.prompt_loader import load_prompt
 
+# Типови каде шаблонот е подобар од LLM (структурирани часови, периоди)
+_TIPOVI_SAMO_SABLON = frozenset({"slobodni_termini", "zakazi_potvrda"})
+
 _GRESKA_POCETOCI = (
     "Не е поставен GROQ_API_KEY",
     "Те молам внеси прашање",
@@ -47,13 +50,16 @@ def formatiraj_odgovor_so_ai(
     prasanje: str | None = None,
 ) -> str:
     """
-    tip: info_lekar | slobodni_termini | zakazi_potvrda | lekari_oddel | uslugi | novosti_rezime
+    tip: info_lekar | zakazi_potvrda | lekari_oddel | uslugi | novosti_rezime
     podatoci: структурирани факти од handler
-    sablon_fallback: текст ако Groq не успее
+    sablon_fallback: текст ако Groq не успее (или единствен излез за slobodni_termini)
     """
     fallback = (sablon_fallback or "").strip()
     if not fallback:
         return ""
+
+    if tip in _TIPOVI_SAMO_SABLON:
+        return fallback
 
     try:
         system = load_prompt("formatiraj_odgovor")

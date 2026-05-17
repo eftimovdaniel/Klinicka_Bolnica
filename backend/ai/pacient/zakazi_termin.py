@@ -490,7 +490,6 @@ def odgovori_za_zakazuvanje(
 
     Враќа: текст (str) или dict со „odgovor“, опционално „akcija“, опционално „kontekst“ (None = избриши го на фронтот).
     """
-    # AI извлекува податоци (и пред најава — за да се зачува датумот/времето)
     izvleceno = izvlechi_podatoci_so_ai(prasanje)
     _spoi_zakazi_so_slobodni_kontekst(prasanje, izvleceno, kontekst)
 
