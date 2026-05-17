@@ -56,8 +56,17 @@ _ALIAS_KEYWORDS: dict[str, str] = {
     "онкологија": "онколог",
     "dermatologija": "дерматолог",
     "дерматологија": "дерматолог",
+    "дерматовенерологија": "дерматолог",
+    "дерматовенеролог": "дерматолог",
+    "dermatovenerologija": "дерматолог",
+    "dermatovenerolog": "дерматолог",
     "oftalmologija": "офталмолог",
     "офталмологија": "офталмолог",
+    "интернист": "интерна",
+    "internist": "intern",
+    "интерна": "интерна",
+    "interna": "intern",
+    "интерн": "интерна",
 }
 
 _RE_ODDEL_ZA = re.compile(
@@ -117,6 +126,15 @@ def _match_po_klucen_zbor(klucen: str, site: tuple[str, ...]) -> str | None:
     return None
 
 
+def _match_ime_vo_prasanje(p: str, site: tuple[str, ...]) -> str | None:
+    """Целосно име на специјалност од база ако се појавува во прашањето (најдолго прво)."""
+    for ime in sorted(site, key=lambda x: len(_normaliziraj(x)), reverse=True):
+        in_norm = _normaliziraj(ime)
+        if len(in_norm) >= 6 and in_norm in p:
+            return ime
+    return None
+
+
 def _match_alias_vo_prasanje(p: str, site: tuple[str, ...]) -> str | None:
     for alias, klucen in _ALIAS_KEYWORDS.items():
         if alias in p:
@@ -170,6 +188,10 @@ def _pravila_izvlechi(prasanje: str, site: tuple[str, ...]) -> tuple[str | None,
             tocno = _match_tocno_ili_blisko(fragment, site)
             if tocno:
                 return tocno, SOURCE_RULES
+
+    direktno = _match_ime_vo_prasanje(p, site)
+    if direktno:
+        return direktno, SOURCE_RULES
 
     alias = _match_alias_vo_prasanje(p, site)
     if alias:

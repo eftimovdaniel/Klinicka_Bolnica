@@ -276,21 +276,51 @@ function populateSpecialtyFilter(doctors) {
   });
 }
 
+function normalizeSpecijalnost(s) {
+  return String(s || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
+}
+
+/** Најди точно име на специјалност од вчитаните лекари (без разлика на големи букви). */
+function findCanonicalSpecialty(hint) {
+  if (!hint || !Array.isArray(allDoctors) || allDoctors.length === 0) {
+    return (hint || '').trim();
+  }
+  const h = normalizeSpecijalnost(hint);
+  const specs = [...new Set(allDoctors.map((d) => d.specijalnost).filter(Boolean))];
+  for (let i = 0; i < specs.length; i += 1) {
+    if (normalizeSpecijalnost(specs[i]) === h) return specs[i];
+  }
+  for (let i = 0; i < specs.length; i += 1) {
+    const sn = normalizeSpecijalnost(specs[i]);
+    if (sn.includes(h) || h.includes(sn)) return specs[i];
+  }
+  return String(hint).trim();
+}
+
+function specialtyMatches(doctorSpec, filterSpec) {
+  if (!filterSpec) return true;
+  const a = normalizeSpecijalnost(doctorSpec);
+  const b = normalizeSpecijalnost(filterSpec);
+  if (!a || !b) return false;
+  return a === b || a.includes(b) || b.includes(a);
+}
+
 // Функција за филтрирање на лекари според име и специјалност
-// Корисникот може да пребарува по име и да филтрира по специјалност
 function filterDoctors() {
   const nameFilter = document.getElementById('filter-name').value.toLowerCase();
   const specialtyFilter = document.getElementById('filter-specialty').value;
 
-  filteredDoctors = allDoctors.filter(doctor => {
+  filteredDoctors = allDoctors.filter((doctor) => {
     const matchesName = !nameFilter ||
       `${doctor.name} ${doctor.surname}`.toLowerCase().includes(nameFilter);
-    const matchesSpecialty = !specialtyFilter || doctor.specijalnost === specialtyFilter;
-
+    const matchesSpecialty = specialtyMatches(doctor.specijalnost, specialtyFilter);
     return matchesName && matchesSpecialty;
   });
 
-  displayedDoctorsCount = 8; // По филтрирање, повторно прикажи само 2 реда (8 лекари)
+  displayedDoctorsCount = 8;
   renderDoctors(filteredDoctors);
 }
 
@@ -308,6 +338,42 @@ function setupFilters() {
     specialtySelect.addEventListener('change', filterDoctors);
   }
 }
+
+/** Филтрирај лекари по специјалност (на пр. од AI навигација). */
+function applyLekariSpecialtyFilter(specijalnost) {
+  if (!specijalnost) return false;
+  const specialtySelect = document.getElementById('filter-specialty');
+  if (!specialtySelect || !Array.isArray(allDoctors) || allDoctors.length === 0) {
+    return false;
+  }
+
+  const spec = findCanonicalSpecialty(specijalnost);
+  let found = false;
+  for (let i = 0; i < specialtySelect.options.length; i += 1) {
+    const opt = specialtySelect.options[i];
+    if (specialtyMatches(opt.value, spec)) {
+      specialtySelect.value = opt.value;
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    const option = document.createElement('option');
+    option.value = spec;
+    option.textContent = spec;
+    specialtySelect.appendChild(option);
+    specialtySelect.value = spec;
+  }
+
+  const nameInput = document.getElementById('filter-name');
+  if (nameInput) nameInput.value = '';
+
+  filteredDoctors = allDoctors.filter((doctor) => specialtyMatches(doctor.specijalnost, spec));
+  displayedDoctorsCount = filteredDoctors.length > 0 ? filteredDoctors.length : 8;
+  renderDoctors(filteredDoctors);
+  return filteredDoctors.length > 0;
+}
+window.applyLekariSpecialtyFilter = applyLekariSpecialtyFilter;
 // ФУНКЦИИ ЗА ЗАКАЖУВАЊЕ НА ПРЕГЛЕД
 
 // Прикажи/скриј линк „Закажи преглед“ во навигацијата кога пациентот е најавен
@@ -1838,6 +1904,11 @@ function initialize() {
   if (lekariList) {
     loadLekari().then(() => {
       setupFilters();
+      var kbsLekariFilter = sessionStorage.getItem('kbs_lekari_filter');
+      if (kbsLekariFilter) {
+        sessionStorage.removeItem('kbs_lekari_filter');
+        applyLekariSpecialtyFilter(kbsLekariFilter);
+      }
       // По вчитување на лекарите, провери дали има закажан преглед во чекање
       const pendingDoctorId = sessionStorage.getItem('pending_appointment_doctor_id');
       if (pendingDoctorId && currentPacient) {
@@ -5409,6 +5480,7 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
   function kbsIzvrsiNavigacija(nav) {
     if (!nav || !nav.target) return;
     var target = String(nav.target);
+    var specFilter = nav.specijalnost ? String(nav.specijalnost).trim() : "";
 
     if (target === "lekar:admin" || target.indexOf("lekar:admin") === 0) {
       kbsOtvoriAdminPanel(nav);
@@ -5424,16 +5496,48 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
 
     var sameFile = (!fileChunk || fileChunk === "" || fileChunk === currentFile);
 
+    function kbsPrimeniLekariFilter() {
+      if (!specFilter) return;
+      if (typeof window.applyLekariSpecialtyFilter !== "function") return;
+
+      var attempt = 0;
+      function runFilter() {
+        attempt += 1;
+        if (!allDoctors || !allDoctors.length) {
+          if (typeof loadLekari === "function" && attempt < 6) {
+            loadLekari().then(function () {
+              if (typeof setupFilters === "function") setupFilters();
+              runFilter();
+            });
+          }
+          return;
+        }
+        var ok = window.applyLekariSpecialtyFilter(specFilter);
+        if (!ok && attempt < 8) {
+          setTimeout(runFilter, 350);
+        }
+      }
+      runFilter();
+    }
+
     if (sameFile && hashChunk) {
       var el = document.getElementById(hashChunk);
       if (el) {
+        kbsPrimeniLekariFilter();
         setTimeout(function () {
           el.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 350);
+          kbsPrimeniLekariFilter();
+        }, 400);
+        setTimeout(kbsPrimeniLekariFilter, 1200);
         return;
       }
     }
 
+    if (specFilter) {
+      try {
+        sessionStorage.setItem("kbs_lekari_filter", specFilter);
+      } catch (e) { /* ignore */ }
+    }
     window.location.href = target;
   }
 

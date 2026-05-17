@@ -14,7 +14,7 @@ from ai._kernel.groq_client import ask_ai
 from ai._kernel.prompt_loader import load_prompt
 
 # Типови каде шаблонот е подобар од LLM (структурирани часови, периоди)
-_TIPOVI_SAMO_SABLON = frozenset({"slobodni_termini", "zakazi_potvrda"})
+_TIPOVI_SAMO_SABLON = frozenset({"slobodni_termini", "zakazi_potvrda", "lekari_oddel"})
 
 _GRESKA_POCETOCI = (
     "Не е поставен GROQ_API_KEY",

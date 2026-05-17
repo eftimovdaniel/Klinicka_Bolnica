@@ -247,9 +247,53 @@ def datum_od_zakazi_kontekst(kontekst: dict | None) -> date | None:
 def prasanje_e_drugi_lekari_specijalnost(prasanje: str) -> bool:
     """
     Листа на други лекари од иста специјалност/оддел — lekari_oddel, не info_lekar.
-    Пр. „други лекари од оваа специјалност", „а други од истата специјалности".
+    Пр. „други лекари од оваа специјалност", „лекари од истата специјалност".
     """
     p = transliterijaj(prasanje).lower()
+
+    ima_spec_ref = any(
+        x in p
+        for x in (
+            "специјалност",
+            "специјалности",
+            "оддел",
+            "истата",
+            "иста ",
+            "оваа",
+            "ова ",
+            "истиот",
+            "истиов",
+            "specijalnost",
+            "oddel",
+            "istata",
+            "ista ",
+            "ovaa",
+            "ova ",
+        )
+    )
+    ima_lekari_pl = any(x in p for x in ("лекари", "lekari", "доктори", "doktori"))
+
+    # „дај ми лекари од истата специјалност" (без зборот „други")
+    if ima_lekari_pl and ima_spec_ref:
+        if any(
+            x in p
+            for x in (
+                "истата",
+                "иста ",
+                "оваа",
+                "ова ",
+                "istata",
+                "ista ",
+                "ovaa",
+                "ova ",
+            )
+        ):
+            return True
+        if "од " in p and any(
+            x in p for x in ("специјалност", "specijalnost", "оддел", "oddel")
+        ):
+            return True
+
     if not any(
         x in p
         for x in (
@@ -265,23 +309,9 @@ def prasanje_e_drugi_lekari_specijalnost(prasanje: str) -> bool:
         )
     ):
         return False
-    if not any(x in p for x in ("лекар", "доктор", "lekari", "doktor")):
+    if not any(x in p for x in ("лекар", "лекари", "доктор", "lekari", "doktor")):
         return False
-    return any(
-        x in p
-        for x in (
-            "специјалност",
-            "специјалности",
-            "оддел",
-            "истата",
-            "оваа",
-            "истиот",
-            "истиов",
-            "истиов",
-            "specijalnost",
-            "oddel",
-        )
-    )
+    return ima_spec_ref
 
 
 def prasanje_e_specijalnost_izbran_lekar(
@@ -294,6 +324,7 @@ def prasanje_e_specijalnost_izbran_lekar(
     if prasanje_e_drugi_lekari_specijalnost(prasanje):
         return False
     p = transliterijaj(prasanje).lower()
+    ima_lekari_pl = any(x in p for x in ("лекари", "lekari", "доктори", "doktori"))
     if not any(
         x in p
         for x in (
@@ -316,14 +347,18 @@ def prasanje_e_specijalnost_izbran_lekar(
         return True
     if any(x in p for x in ("избран", "истиот", "погоре", "тој лекар", "togo lekar")):
         return True
+    if ima_lekari_pl:
+        return False
     if lekar_od_zakazi_kontekst(kontekst) and any(
         x in p
         for x in (
             "лекарот",
-            "лекар",
+            "лекар ",
+            " лекар",
             "д-р",
             " др",
             "докторот",
+            "доктор ",
             "toj lekar",
             "togo lekar",
         )
@@ -458,6 +493,20 @@ def datum_od_prasanje_lokalno(prasanje: str) -> date | None:
         return _parsiraj_dd_mm_gggg(denes, d, mo, g)
 
     return None
+
+
+def datum_za_zakazi_kontekst(
+    baran_datum: date | None, slobodni: list[datetime]
+) -> str | None:
+    """ISO датум за zakazi_od_slobodni — од барањето или од прикажаните слотови."""
+    if baran_datum is not None:
+        return baran_datum.strftime("%Y-%m-%d")
+    if not slobodni:
+        return None
+    dates = sorted({dt.date() for dt in slobodni})
+    if len(dates) == 1:
+        return dates[0].strftime("%Y-%m-%d")
+    return dates[0].strftime("%Y-%m-%d")
 
 
 def izvleci_datum_za_slobodni(
@@ -889,8 +938,9 @@ def odgovori_za_slobodni_termini(
             ctx = {
                 "zakazi_od_slobodni": {
                     "doctor_id": int(lekar["doctor_ID"]),
-                    "datum": sleden.strftime("%Y-%m-%d"),
-                }
+                    "datum": datum_za_zakazi_kontekst(sleden, slobodni),
+                },
+                "last_doctor_id": int(lekar["doctor_ID"]),
             }
             return {"odgovor": text, "kontekst": ctx}
 
@@ -936,7 +986,7 @@ def odgovori_za_slobodni_termini(
     ctx = {
         "zakazi_od_slobodni": {
             "doctor_id": did,
-            "datum": baran_datum.strftime("%Y-%m-%d") if baran_datum else None,
+            "datum": datum_za_zakazi_kontekst(baran_datum, slobodni),
         },
         "last_doctor_id": did,
     }

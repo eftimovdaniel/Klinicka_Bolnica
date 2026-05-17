@@ -29,6 +29,7 @@ from ai.pacient.slobodni_termini import (
     prasanje_bar_datum_od_kontekst,
     zimi_site_lekari,
 )
+from ai._kernel.db_helpers import db_cursor
 
 
 # Работно време - не дозволуваме закажување надвор
@@ -93,10 +94,119 @@ def _spoi_zakazi_so_slobodni_kontekst(
             izvleceno["vreme"] = v
 
 
+def _oddel_od_prasanje(prasanje: str) -> str | None:
+    """Специјалност/оддел од текст (правила + алијаси, без задолжително Groq)."""
+    from ai._kernel.oddel_resolver import resolve_oddel
+
+    r = resolve_oddel(prasanje or "")
+    if r.ok and r.oddel:
+        return r.oddel
+    return None
+
+
+def _lekari_po_oddel(oddel: str) -> list[dict]:
+    try:
+        with db_cursor() as (_, cur):
+            cur.execute(
+                """
+                SELECT doctor_ID, name, surname, specialty, email
+                FROM Doctors
+                WHERE LOWER(TRIM(specialty)) = LOWER(TRIM(%s))
+                ORDER BY surname, name
+                """,
+                (oddel,),
+            )
+            return list(cur.fetchall())
+    except Exception as e:
+        print(f"[zakazi_termin] lekari_po_oddel: {e}")
+        return []
+
+
+def _dopolnuvaj_izvleceno_lokalno(prasanje: str, izvleceno: dict) -> None:
+    """Датум од „следниот вторник“ и слично — без Groq."""
+    if izvleceno.get("datum"):
+        return
+    d = datum_od_prasanje_lokalno(prasanje)
+    if d is not None:
+        izvleceno["datum"] = d.isoformat()
+
+
+def _linii_lekari_specijalnost(oddel: str, lekari: list[dict]) -> list[str]:
+    linii = [
+        f"За преглед кај {oddel} во Клиничка Болница Штип, изберете лекар:",
+        "",
+    ]
+    for l in lekari:
+        linii.append(f"- Д-р {l['name']} {l['surname']}")
+    return linii
+
+
+def _poraka_izberi_lekar_specijalnost(
+    oddel: str,
+    lekari: list[dict],
+    datum_str: str | None,
+    kontekst: dict | None,
+) -> dict:
+    from ai.opsto.lekari_oddel import navigacija_lekari
+
+    DENOVI = ["Понеделник", "Вторник", "Среда", "Четврток", "Петок", "Сабота", "Недела"]
+    linii = _linii_lekari_specijalnost(oddel, lekari)
+    if datum_str:
+        try:
+            dt = datetime.strptime(str(datum_str)[:10], "%Y-%m-%d").date()
+            linii.append(
+                f"\nЗа датумот: {DENOVI[dt.weekday()]}, {dt.strftime('%d.%m.%Y')}."
+            )
+        except ValueError:
+            linii.append(f"\nЗа датумот: {datum_str}.")
+    linii.extend(
+        [
+            "",
+            "Наведете презиме (на пр. „кај Петров“) или прашајте:",
+            "„Кога е слободен д-р [презиме]?“ — ќе ви прикажам слободни часови.",
+            "",
+            "Можете и на страницата „Лекари“ да ги видите филтрирани по специјалност "
+            "(го отворам делот подолу).",
+        ]
+    )
+    ctx = dict(kontekst) if isinstance(kontekst, dict) else {}
+    pending = dict(ctx.get("zakazi_pending") or {})
+    pending["specialty"] = oddel
+    if datum_str:
+        pending["datum"] = str(datum_str).strip()[:10]
+    if _normalize_doctor_id(pending.get("doctor_id")) is None:
+        pending.pop("doctor_id", None)
+    ctx["zakazi_pending"] = pending
+    ctx["zakazi_od_slobodni"] = {
+        "doctor_id": pending.get("doctor_id"),
+        "datum": pending.get("datum"),
+    }
+    return {
+        "odgovor": "\n".join(linii),
+        "kontekst": ctx,
+        "navigacija": navigacija_lekari(oddel, lekari),
+    }
+
+
+def _vrati_zakazi_poraka(
+    odgovor: str,
+    kontekst: dict | None,
+    izvleceno: dict,
+    prasanje: str | None = None,
+) -> dict:
+    """Порака + зачуван контекст (лекар/датум/време) за следна порака."""
+    return {
+        "odgovor": odgovor,
+        "kontekst": _snimi_zakazi_pending(kontekst, izvleceno, prasanje),
+    }
+
+
 def _snimi_zakazi_pending(
-    kontekst: dict | None, izvleceno: dict
+    kontekst: dict | None,
+    izvleceno: dict,
+    prasanje: str | None = None,
 ) -> dict | None:
-    """Зачувај лекар/датум/време за продолжување по најава."""
+    """Зачувај лекар/датум/време/специјалност за продолжување по најава."""
     pending: dict = {}
     zos = {}
     if isinstance(kontekst, dict):
@@ -116,6 +226,10 @@ def _snimi_zakazi_pending(
     vreme = izvleceno.get("vreme") or zos.get("vreme")
     if vreme:
         pending["vreme"] = str(vreme).strip()[:5]
+    if prasanje and not pending.get("specialty"):
+        oddel = _oddel_od_prasanje(prasanje)
+        if oddel:
+            pending["specialty"] = oddel
 
     if not pending:
         return kontekst
@@ -125,6 +239,7 @@ def _snimi_zakazi_pending(
     ctx["zakazi_od_slobodni"] = {
         "doctor_id": pending.get("doctor_id"),
         "datum": pending.get("datum"),
+        "vreme": pending.get("vreme"),
     }
     if pending.get("doctor_id") is not None:
         ctx["last_doctor_id"] = int(pending["doctor_id"])
@@ -491,6 +606,7 @@ def odgovori_za_zakazuvanje(
     Враќа: текст (str) или dict со „odgovor“, опционално „akcija“, опционално „kontekst“ (None = избриши го на фронтот).
     """
     izvleceno = izvlechi_podatoci_so_ai(prasanje)
+    _dopolnuvaj_izvleceno_lokalno(prasanje, izvleceno)
     _spoi_zakazi_so_slobodni_kontekst(prasanje, izvleceno, kontekst)
 
     ceka_napomena = _kontekst_ceka_napomena(kontekst)
@@ -499,16 +615,45 @@ def odgovori_za_zakazuvanje(
 
     # Проверка дали пациентот е логиран — фронтот ја отвора формата за најава како пациент
     if not pacient or not pacient.get("email"):
-        return {
+        from ai.opsto.lekari_oddel import navigacija_lekari
+
+        oddel = _oddel_od_prasanje(prasanje)
+        spec_hint = ""
+        nav = None
+        if oddel:
+            lekari = _lekari_po_oddel(oddel)
+            datum_hint = (
+                f", датум {izvleceno['datum'][:10]}"
+                if izvleceno.get("datum")
+                else ""
+            )
+            if lekari:
+                spec_hint = (
+                    "\n\n"
+                    + "\n".join(_linii_lekari_specijalnost(oddel, lekari))
+                    + f"\n\nЗачувано: специјалност „{oddel}“{datum_hint}. "
+                    "По најава наведете презиме (на пр. „кај Петров“)."
+                )
+                nav = navigacija_lekari(oddel, lekari)
+            else:
+                spec_hint = (
+                    f"\n\nЗачувано: специјалност „{oddel}“{datum_hint}. "
+                    "По најава изберете лекар (презиме)."
+                )
+        odgovor: dict = {
             "odgovor": (
                 "За да закажам термин во твое име, треба да се најавиш како пациент "
                 "(системот ги користи твоето име, е-пошта и телефон од профилот).\n\n"
                 "Ти ја отворам формата за најава — по најавата повтори ја истата наредба; "
                 "можеш и поинаку, на пример „закажи во 10:00“ или „за претходно спомнатиот датум“."
+                f"{spec_hint}"
             ),
             "akcija": "otvori_pacient_login",
-            "kontekst": _snimi_zakazi_pending(kontekst, izvleceno),
+            "kontekst": _snimi_zakazi_pending(kontekst, izvleceno, prasanje),
         }
+        if nav:
+            odgovor["navigacija"] = nav
+        return odgovor
 
     # Ако имало AI грешка (rate limit, timeout) - врати ја директно на корисникот
     if izvleceno.get("_error"):
@@ -538,23 +683,36 @@ def odgovori_za_zakazuvanje(
         except Exception:
             pass
 
-    # Сите три недостасуваат → најмалку информации
+    # Сите три недостасуваат → провери специјалност (кардиолог, дерматолог, …)
     if not ima_lekar and not ima_datum and not ima_vreme:
-        return (
+        oddel = _oddel_od_prasanje(prasanje)
+        if oddel:
+            lekari = _lekari_po_oddel(oddel)
+            if lekari:
+                return _poraka_izberi_lekar_specijalnost(
+                    oddel, lekari, None, kontekst
+                )
+        return _vrati_zakazi_poraka(
             "Го разбирам барањето како закажување на преглед, но недостасуваат клучни податоци.\n\n"
             "Потребни се: лекар (име или презиме), датум и време. "
             "Можеш да ги кажеш во една реченица или во повеќе пораки — агентот ги собира.\n\n"
             'Пример: „Сакам преглед кај д-р Петров среда во 10:00"\n'
-            'или: „Закажи кај Серафимов утре во 12:30".'
+            'или: „Закажи кај Серафимов утре во 12:30".',
+            kontekst,
+            izvleceno,
+            prasanje,
         )
 
     # Имаме само лекар - прашај за датум и време
     if ima_lekar and not ima_datum and not ima_vreme:
         lekar_text = ime_lekar_za_poraka or "избраниот лекар"
-        return (
+        return _vrati_zakazi_poraka(
             f'Кога би сакал/а да закажеш термин кај {lekar_text}?\n\n'
             f'Кажи ми датум и време. Пример:\n'
-            f'„утре во 10:00" или „среда во 14:30"'
+            f'„утре во 10:00" или „среда во 14:30"',
+            kontekst,
+            izvleceno,
+            prasanje,
         )
 
     # Имаме лекар + датум, нема време
@@ -570,33 +728,74 @@ def odgovori_za_zakazuvanje(
             if prasanje_bar_datum_od_kontekst(prasanje)
             else ""
         )
-        return (
+        return _vrati_zakazi_poraka(
             f"Во кое време сакаш термин кај {lekar_text} на {datum_lepo}{pret}?\n\n"
             f"Работно време: {RABOTNO_OD.strftime('%H:%M')} – "
             f"{RABOTNO_DO.strftime('%H:%M')}\n"
-            'Пример: „во 10:00“ или „закажи во 10:30“.'
+            'Пример: „во 10:00“ или „закажи во 10:30“.',
+            kontekst,
+            izvleceno,
+            prasanje,
         )
 
     # Имаме лекар + време, нема датум
     if ima_lekar and not ima_datum and ima_vreme:
         lekar_text = ime_lekar_za_poraka or "лекарот"
-        return (
+        return _vrati_zakazi_poraka(
             f'Кој датум сакаш термин кај {lekar_text} во {vreme_str}?\n\n'
-            f'Пример: „утре", „среда", „15.05" или „2026-05-15"'
+            f'Пример: „утре", „среда", „15.05" или „2026-05-15"',
+            kontekst,
+            izvleceno,
+            prasanje,
         )
 
-    # Имаме датум и/или време, нема лекар
+    # Нема лекар — специјалност или име
     if not ima_lekar:
-        if kontekst and isinstance(kontekst.get("zakazi_od_slobodni"), dict):
+        oddel = _oddel_od_prasanje(prasanje)
+        if not oddel and isinstance(kontekst, dict):
+            oddel = (kontekst.get("zakazi_pending") or {}).get("specialty")
+        if oddel:
+            lekari = _lekari_po_oddel(oddel)
+            if lekari:
+                return _poraka_izberi_lekar_specijalnost(
+                    oddel, lekari, datum_str, kontekst
+                )
+            return {
+                "odgovor": (
+                    f'Моментално нема регистрирани лекари на „{oddel}".\n\n'
+                    'Прашајте „Кои лекари работат во болницата?" или изберете друга специјалност.'
+                ),
+                "kontekst": kontekst,
+            }
+
+        zos = (kontekst or {}).get("zakazi_od_slobodni") if isinstance(kontekst, dict) else {}
+        if isinstance(zos, dict) and _normalize_doctor_id(zos.get("doctor_id")):
             return (
-                'Не го препознавам лекарот од пораката. Кажи го презимето или избери од листата '
-                'со слободни термини погоре, на пример „кај Захариев во 10:30".'
+                "Не го препознавам лекарот од пораката. Кажи го презимето или избери од листата "
+                "со слободни термини погоре, на пример „кај Захариев во 10:30“."
             )
+
+        if isinstance(kontekst, dict) and (kontekst.get("zakazi_pending") or zos):
+            extra = ""
+            if datum_str:
+                try:
+                    dt = datetime.strptime(str(datum_str)[:10], "%Y-%m-%d").date()
+                    extra = f" Датумот {dt.strftime('%d.%m.%Y')} е зачуван."
+                except ValueError:
+                    extra = f" Датумот {datum_str} е зачуван."
+            return {
+                "odgovor": (
+                    "За да продолжиме со закажувањето, наведете лекар (презиме), "
+                    f"на пр. „кај Петров“ или „слободни термини кај [презиме]“.{extra}"
+                ),
+                "kontekst": kontekst,
+            }
+
         return (
-            'Кај кој лекар сакаш да закажеш термин? Кажи го името и презимето.\n\n'
-            'Пример: „кај д-р Петров", „кај Александар Серафимов"\n\n'
-            'Ако не знаеш кој лекар, прашај ме: „Кои лекари имате?" или опиши го '
-            'проблемот (на пр. „боли ме грб") и ќе ти препорачам.'
+            "Кај кој лекар сакаш да закажеш термин? Кажи го презимето или специјалноста.\n\n"
+            'Пример: „кај д-р Петров", „преглед кај интернист", „следниот вторник кај кардиолог“.\n\n'
+            'Ако не знаеш кој лекар, прашај: „Кои лекари имате на интерна?" или '
+            '„препорачај лекар за болки во градите".'
         )
 
     # Сите 3 полиња се присутни - продолжи со валидација и INSERT

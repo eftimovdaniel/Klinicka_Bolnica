@@ -116,6 +116,27 @@ _STOP_IME = frozenset(
         "контакт",
         "контактот",
         "контакти",
+        "дали",
+        "може",
+        "можете",
+        "да",
+        "провериш",
+        "проверите",
+        "провери",
+        "проверете",
+        "проверес",
+        "проверка",
+        "proveres",
+        "proveri",
+        "proverete",
+        "mozete",
+        "mozesh",
+        "dali",
+        "moze",
+        "da",
+        "slobodno",
+        "slobodna",
+        "slobodni",
     }
 )
 
@@ -125,6 +146,10 @@ _RE_POSLE_DR = re.compile(
     r"(?:д-р|др|dr|d-r)\.?\s+(.+)",
     re.IGNORECASE | re.UNICODE,
 )
+_RE_POSLE_KAJ = re.compile(
+    r"\bкај\s+(.+)",
+    re.IGNORECASE | re.UNICODE,
+)
 
 
 def _cist_ime_zbor(raw: str) -> str:
@@ -132,26 +157,41 @@ def _cist_ime_zbor(raw: str) -> str:
     return re.sub(r"[^\w\-]", "", raw, flags=re.UNICODE).lower()
 
 
+def _delovi_od_fragment(fragment: str) -> list[str]:
+    """Име/презиме од дел од прашањето (по „д-р“ или „кај“)."""
+    delovi: list[str] = []
+    frag = re.split(r"[?.!,;]", fragment, maxsplit=1)[0]
+    for raw in _RE_ZBOR.findall(frag):
+        w = _cist_ime_zbor(raw)
+        if len(w) < 2:
+            continue
+        if w in _STOP_IME:
+            break
+        delovi.append(w)
+        if len(delovi) >= 3:
+            break
+    return delovi[:3]
+
+
 def izvlechi_delovi_ime(prasanje: str) -> list[str]:
     p = transliterijaj(prasanje).lower()
 
     # Најсигурно: текст веднаш после д-р / др (не мешај со „слободен понеделник“)
-    delovi: list[str] = []
     m = _RE_POSLE_DR.search(p)
     if m:
-        for raw in _RE_ZBOR.findall(m.group(1)):
-            w = _cist_ime_zbor(raw)
-            if len(w) < 2:
-                continue
-            if w in _STOP_IME:
-                break
-            delovi.append(w)
-            if len(delovi) >= 3:
-                break
+        delovi = _delovi_od_fragment(m.group(1))
         if delovi:
-            return delovi[:3]
+            return delovi
 
-    # Резервно: сите зборови без титула
+    # „кај Моника Иванова“, „сlobodno kaj Петров“
+    m_kaj = _RE_POSLE_KAJ.search(p)
+    if m_kaj:
+        delovi = _delovi_od_fragment(m_kaj.group(1))
+        if delovi:
+            return delovi
+
+    # Резервно: зборови од целото прашање (без шумни зборови)
+    delovi = []
     p = re.sub(r"\b(д-р|др|dr|d-r)\b", " ", p, flags=re.IGNORECASE | re.UNICODE)
     for raw in _RE_ZBOR.findall(p):
         w = _cist_ime_zbor(raw)

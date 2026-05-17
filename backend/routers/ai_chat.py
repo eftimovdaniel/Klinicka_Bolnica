@@ -300,9 +300,31 @@ def _resolve_intent(
         if aktiven_kontekst.get("zakazi_ceka_napomena"):
             return "zakazi_termin"
         q = pitanje_norm.lower()
+        pending = aktiven_kontekst.get("zakazi_pending") or {}
+        zos = aktiven_kontekst.get("zakazi_od_slobodni") or {}
+        ima_lekar_ctx = bool(
+            pending.get("doctor_id")
+            or zos.get("doctor_id")
+            or aktiven_kontekst.get("last_doctor_id")
+        )
         if prasanje_e_otkazuvanje(pitanje_norm):
             return "otkazi_termin"
         if baranje_e_zakazuvanje(pitanje_norm):
+            return "zakazi_termin"
+        # „утре“, „за утре во 08:30“ — продолжување на закажување, не слободни/препорака
+        if ima_lekar_ctx and (
+            datum_od_prasanje_lokalno(pitanje_norm)
+            or (
+                pending.get("vreme")
+                and datum_od_prasanje_lokalno(pitanje_norm)
+            )
+        ):
+            return "zakazi_termin"
+        if ima_lekar_ctx and re.search(r"\b\d{1,2}\s*[:.]\s*\d{2}\b", q) and (
+            datum_od_prasanje_lokalno(pitanje_norm)
+            or "за " in q
+            or "za " in q
+        ):
             return "zakazi_termin"
         if prasanje_bar_datum_od_kontekst(pitanje_norm) and datum_od_zakazi_kontekst(
             aktiven_kontekst
@@ -354,9 +376,14 @@ def _resolve_intent(
         ):
             intent = "zakazi_termin"
         # Следна порака: друг ден / „наредниот петок“ кај истиот лекар
-        elif intent in ("general", "zakazi_termin") and not baranje_e_zakazuvanje(
+        elif intent in ("general", "zakazi_termin", "preporaka_lekar") and not baranje_e_zakazuvanje(
             pitanje_norm
         ):
+            if ima_lekar_ctx and (
+                datum_od_prasanje_lokalno(pitanje_norm)
+                or (pending.get("vreme") and len(q.split()) <= 4)
+            ):
+                return "zakazi_termin"
             if datum_od_prasanje_lokalno(pitanje_norm) or any(
                 w in q
                 for w in (
@@ -383,6 +410,9 @@ def _resolve_intent(
                 and not any(x in q for x in ("закаж", "zakaz", "преглед"))
             ):
                 intent = "slobodni_termini"
+
+    if has_zakazi_flow and intent == "preporaka_lekar":
+        return "zakazi_termin"
 
     return _intent_strukturiran_za_lekar(pitanje_norm, aktiven_kontekst, intent)
 

@@ -134,6 +134,12 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
     spec = handlers.get(intent)
 
     if spec is None:
+        from ai._kernel.intent_detector import _prasanje_e_asistent_opsto
+        from ai._kernel.transliteracija import transliterijaj
+        from ai.opsto.asistent_opsto import odgovori_za_asistent_opsto
+
+        if _prasanje_e_asistent_opsto(transliterijaj(ctx.pitanje_norm).lower()):
+            return {"odgovor": odgovori_za_asistent_opsto(ctx.pitanje_norm)}
         return {"odgovor": ask_ai(ctx.pitanje_norm)}
 
     q = ctx.pitanje if spec.use_raw_question else ctx.pitanje_norm

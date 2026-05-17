@@ -14,7 +14,6 @@ import re
 from typing import Any
 
 from ai._kernel.oddel_resolver import format_lista_oddeli, resolve_oddel
-from ai._kernel.odgovor_formatter import formatiraj_odgovor_so_ai
 from ai._kernel.transliteracija import transliterijaj
 from ai._kernel.db_helpers import db_cursor
 from ai.pacient.slobodni_termini import (
@@ -61,27 +60,74 @@ def _site_lekari_vo_ustanova(prasanje: str) -> bool:
     return False
 
 
-def odgovor_navigacija_lekari() -> dict[str, Any]:
-    """Кратка порака + скрол кон #lekari."""
+def _specijalnost_od_lekari(oddel: str, lekari: list[dict] | None) -> str:
+    """Точен низ од Doctors.specialty за филтер на фронтот."""
+    if lekari:
+        for l in lekari:
+            s = (l.get("specialty") or l.get("specijalnost") or "").strip()
+            if s:
+                return s
+    return (oddel or "").strip()
+
+
+def navigacija_lekari(
+    oddel: str | None = None,
+    lekari: list[dict] | None = None,
+) -> dict[str, str]:
+    """Навигација кон #lekari; опционално филтрирање по специјалност на фронтот."""
+    nav: dict[str, str] = {"target": "index.html#lekari", "label": "Лекари"}
+    if oddel:
+        spec = _specijalnost_od_lekari(oddel, lekari)
+        nav["label"] = f"Лекари — {spec or oddel}"
+        nav["specijalnost"] = spec or oddel
+    return nav
+
+
+def odgovor_navigacija_lekari(oddel: str | None = None) -> dict[str, Any]:
+    """Кратка порака + скрол кон #lekari (опционално филтрирано по оддел)."""
     from ai.pacient.slobodni_termini import zimi_site_lekari
 
     lekari = zimi_site_lekari()
     n = len(lekari) if lekari else 0
-    if n == 0:
-        odgovor = (
+    if oddel:
+        intro = (
+            f'Ве пренасочувам кон делот „Лекари" со филтер за „{oddel}". '
+            "На екранот ќе ги видите само лекарите од таа специјалност."
+        )
+    elif n == 0:
+        intro = (
             'Ве пренасочувам кон делот „Лекари" на почетната страница. '
             "Моментално нема регистрирани лекари во системот."
         )
     else:
-        odgovor = (
+        intro = (
             'Ве пренасочувам кон делот „Лекари" на почетната страница. '
             f"На екранот ќе ја видите листата со {n} лекари — "
             "можете да пребарувате по име или специјалност и да закажете преглед."
         )
-    return {
-        "odgovor": odgovor,
-        "navigacija": {"target": "index.html#lekari", "label": "Лекари"},
-    }
+    return {"odgovor": intro, "navigacija": navigacija_lekari(oddel)}
+
+
+def _linija_lekar(l: dict) -> str:
+    """Една ставка — еднаш „Д-р", без дуплирање."""
+    return f"- Д-р {l.get('name', '').strip()} {l.get('surname', '').strip()}".strip()
+
+
+def _naslov_lista_lekari(
+    oddel_ime: str,
+    lekari: list[dict],
+    lekar_ref: dict | None,
+    drugi_od_istata: bool,
+) -> str:
+    if drugi_od_istata and lekar_ref:
+        ref = f"д-р {lekar_ref.get('name', '')} {lekar_ref.get('surname', '')}".strip()
+        spec = (oddel_ime or lekar_ref.get("specialty") or "").strip()
+        if spec:
+            return (
+                f"Лекари кои работат во истата специјалност како {ref} ({spec}) се:"
+            )
+        return f"Лекари кои работат во истата специјалност како {ref} се:"
+    return f'Лекари од специјалноста „{oddel_ime}" ({len(lekari)}):'
 
 
 def _zimi_lekari_od_oddel(oddel: str) -> list[dict]:
@@ -110,11 +156,14 @@ def odgovori_za_lekari_oddel(
 
     oddel_ime: str | None = None
     exclude_doctor_id: int | None = None
+    lekar_ref: dict | None = None
+    drugi_od_istata = prasanje_e_drugi_lekari_specijalnost(prasanje)
     site_oddeli: tuple[str, ...] = ()
 
-    if prasanje_e_drugi_lekari_specijalnost(prasanje):
+    if drugi_od_istata:
         lekar_ctx = lekar_od_zakazi_kontekst(kontekst)
         if lekar_ctx:
+            lekar_ref = lekar_ctx
             oddel_ime = (lekar_ctx.get("specialty") or "").strip() or None
             exclude_doctor_id = int(lekar_ctx["doctor_ID"])
 
@@ -164,42 +213,26 @@ def odgovori_za_lekari_oddel(
             + format_lista_oddeli(site_oddeli)
         )
 
-    if exclude_doctor_id is not None:
-        naslov = f'Други лекари од „{oddel_ime}" ({len(lekari)}):'
-    else:
-        naslov = f'Лекари на одделот „{oddel_ime}" ({len(lekari)}):'
+    naslov = _naslov_lista_lekari(
+        oddel_ime or "",
+        lekari,
+        lekar_ref,
+        drugi_od_istata and exclude_doctor_id is not None,
+    )
 
-    lista_lekari = []
     redovi = [naslov, ""]
     for l in lekari:
-        polno = f"Д-р {l['name']} {l['surname']}"
-        email = (l.get("email") or "").strip()
-        lista_lekari.append(
-            {"ime_prezime": polno, "email": email or None, "doctor_id": int(l["doctor_ID"])}
-        )
-        if email:
-            redovi.append(f"- {polno} ({email})")
-        else:
-            redovi.append(f"- {polno}")
+        redovi.append(_linija_lekar(l))
 
     redovi.append("")
     sledna = (
-        "За повеќе информации или термин, наведете презиме "
-        '(на пр.: „Кога е слободен д-р [презиме]?").'
+        "За слободни термини напишете: „Кога е слободен д-р [презиме]?“ "
+        "или „закажи кај [презиме] во [час]“."
     )
     redovi.append(sledna)
     sablon = "\n".join(redovi)
 
-    podatoci = {
-        "oddel": oddel_ime,
-        "broj_lekari": len(lekari),
-        "drugi_lekari_ist_oddel": exclude_doctor_id is not None,
-        "lekari": lista_lekari,
-        "sledna_akcija": sledna,
+    return {
+        "odgovor": sablon,
+        "navigacija": navigacija_lekari(oddel_ime, lekari),
     }
-    return formatiraj_odgovor_so_ai(
-        "lekari_oddel",
-        podatoci,
-        sablon,
-        prasanje=prasanje,
-    )
