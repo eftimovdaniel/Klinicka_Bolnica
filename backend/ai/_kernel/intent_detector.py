@@ -306,18 +306,40 @@ KLUCNI_PREPORAKA = [
 
 # 4. РАБОТНО ВРЕМЕ
 KLUCNI_RABOTNO = [
-    "работно време", "кога е отворен", "кога е отворено",
-    "кога работи болницата", "кога ради болницата",
-    "кога е затворен", "работни денови",
+    "работно време",
+    "работното време",
+    "работно време на",
+    "работното време на",
+    "кое е работно",
+    "ко е работното",
+    "кога е отворен",
+    "кога е отворено",
+    "кога работи болницата",
+    "кога ради болницата",
+    "кога е затворен",
+    "работни денови",
+    "rabotno vreme",
+    "rabotnoto vreme",
 ]
 
 # 5. ЛОКАЦИЈА (без „каде е" само — меша се со „каде е контакт?")
 KLUCNI_LOKACIJA = [
-    "каде се наоѓа", "локација", "локацијата",
-    "како да дојдам", "како да стигнам",
-    "во кој спрат", "кој спрат", "соба",
-    "каде е оддел", "каде е гинеколог", "каде е кардиолог",
-    "каде е лаборатор", "каде е итна",
+    "каде се наоѓа",
+    "каде се наоѓаат",
+    "локација",
+    "локацијата",
+    "како да дојдам",
+    "како да стигнам",
+    "во кој спрат",
+    "кој спрат",
+    "соба",
+    "каде е оддел",
+    "каде е гинеколог",
+    "каде е кардиолог",
+    "каде е лаборатор",
+    "каде е итна",
+    "kade se naogja",
+    "lokacija",
 ]
 
 # 6. КОНТАКТИ (пред локација во редот на проверки)
@@ -338,16 +360,54 @@ KLUCNI_USLUGI = [
     "специјалности", "оддели",
 ]
 
-# 8. ИНФО ЗА ЛЕКАР
+# 8. ИНФО ЗА ЛЕКАР (без „каков е" само — меша се со телефон/контакт)
 KLUCNI_INFO_LEKAR = [
-    "каков е", "каква е", "кој е",
     "информации за", "инфо за", "повеќе за",
     "опис на лекар",
     "дали работи", "дали е вработен", "работи ли",
     "работи тука", "работи во болницата", "работи во оваа болница",
     "има ли тука", "дали е тука", "дали е во болницата",
     "dali raboti", "raboti li",
+    "koi e dr", "кој е д-р", "кој е др",
 ]
+
+# Зборови што НЕ се имиња на лекари (info_lekar false positive)
+_ZBOROVI_NE_SE_IMENA = frozenset(
+    {
+        "каков",
+        "каква",
+        "кој",
+        "кое",
+        "ко",
+        "телефон",
+        "телефонот",
+        "контакт",
+        "контактот",
+        "контакти",
+        "email",
+        "mail",
+        "е-пошта",
+        "рецепција",
+        "централа",
+        "болница",
+        "болницата",
+        "работно",
+        "работното",
+        "време",
+        "локација",
+        "локацијата",
+        "наоѓа",
+        "наоѓаат",
+        "каде",
+        "оддел",
+        "услуги",
+        "услугите",
+        "kontakt",
+        "telefon",
+        "kakov",
+        "koe",
+    }
+)
 
 # 8c. МОИТЕ ПРЕГЛЕДИ (пациент)
 KLUCNI_MOI_PREGLEDI = [
@@ -438,8 +498,16 @@ KLUCNI_LEKARI_ODDEL = [
     "докторите на",
     "лекарите од",
     "лекарите на",
+    "други лекари",
+    "друг лекар",
+    "уште лекари",
+    "истата специјалност",
+    "оваа специјалност",
+    "истиот оддел",
+    "оваа специјалности",
     "koi lekari se na",
     "koi se lekarite od",
+    "drugi lekari",
 ]
 
 # 9. СЛОБОДНИ ТЕРМИНИ (исто прашање — различни начини)
@@ -460,6 +528,8 @@ KLUCNI_SLOBODNI = [
 ]
 
 
+import re
+
 from ai._kernel.transliteracija import transliterijaj
 from ai._kernel.ai_intent_detector import detektiraj_intent_so_ai
 
@@ -467,6 +537,80 @@ from ai._kernel.ai_intent_detector import detektiraj_intent_so_ai
 def _ima_zbor(prasanje: str, kluchni: list[str]) -> bool:
     """Помошна функција - проверка на клучни зборови."""
     return any(zbor in prasanje for zbor in kluchni)
+
+
+def _prasanje_e_rabotno_vreme(p: str) -> bool:
+    """
+    Работно време на болница/оддел — не конкретен лекар.
+    „Кое е работното време на болницата?" мора да не оди на info_lekar.
+    """
+    if any(
+        w in p
+        for w in (
+            "следен работен",
+            "следниот работен",
+            "нареден работен",
+            "наредниот работен",
+            "прв работен ден",
+            "кога е работен ден",
+        )
+    ):
+        return False
+    if _ima_zbor(p, KLUCNI_RABOTNO):
+        return True
+    if re.search(r"работн\w*\s+време", p):
+        return True
+    if "време" in p and any(w in p for w in ("работн", "rabotn", "отворен", "затворен")):
+        if any(w in p for w in ("болниц", "оддел", "рецепци", "прием", "итна", "лаборатор")):
+            return True
+    return False
+
+
+def _prasanje_e_lokacija_oddel(p: str) -> bool:
+    """
+    Локација на оддел/специјалност — не конкретен лекар по име.
+    „Каде се наоѓа кардиологијата?" → lokacija, не info_lekar.
+    """
+    if _prasanje_e_kontakti(p):
+        return False
+    if _ima_zbor(p, KLUCNI_LOKACIJA):
+        return True
+    if any(x in p for x in ("каде е", "каде se", "kade e", "каде се", "kade se")):
+        if any(
+            x in p
+            for x in (
+                "наоѓа",
+                "naogja",
+                "локаци",
+                "lokaci",
+                "спрат",
+                "соба",
+                "оддел",
+                "дојдам",
+                "стигнам",
+            )
+        ):
+            return True
+        if any(
+            x in p
+            for x in (
+                "гинеколог",
+                "кардиолог",
+                "невролог",
+                "уролог",
+                "ортопед",
+                "лаборатор",
+                "радиолог",
+                "итна",
+                "аптека",
+                "хирург",
+                "педиатр",
+                "онколог",
+                "интерна",
+            )
+        ):
+            return True
+    return False
 
 
 def _prasanje_e_konkreten_lekar(prasanje: str) -> bool:
@@ -479,16 +623,51 @@ def _prasanje_e_konkreten_lekar(prasanje: str) -> bool:
     from ai._kernel.lekar_lookup import izvlechi_delovi_ime
 
     p = transliterijaj(prasanje).lower()
+    if _bolnica_info_intent(p):
+        return False
     if _ima_zbor(p, KLUCNI_SLOBODNI):
         return False
     if any(w in p for w in ("кои лекари", "кои доктори", "лекари на", "лекари од")):
         return False
     delovi = izvlechi_delovi_ime(prasanje)
-    if len(delovi) >= 2:
+    if _delovi_izgledaat_kako_ime(delovi):
         return True
-    if len(delovi) == 1 and re.search(r"\b(д-р|др|dr)\b", p, re.UNICODE):
+    if len(delovi) == 1 and delovi[0] not in _ZBOROVI_NE_SE_IMENA:
+        if re.search(r"\b(д-р|др|dr)\b", p, re.UNICODE):
+            return True
+    return False
+
+
+def _bolnica_info_intent(p: str) -> str | None:
+    """Општи информации за болницата — никогаш info_lekar."""
+    if _prasanje_e_kontakti(p):
+        return "kontakti"
+    if _prasanje_e_rabotno_vreme(p):
+        return "rabotno_vreme"
+    if _prasanje_e_lokacija_oddel(p):
+        return "lokacija"
+    if _ima_zbor(p, KLUCNI_USLUGI):
+        return "uslugi"
+    return None
+
+
+def _ima_kluc_info_lekar(p: str) -> bool:
+    """Клучни зборови за лекар — не ако прашањето е за контакт/време/локација."""
+    if _bolnica_info_intent(p):
+        return False
+    if _ima_zbor(p, KLUCNI_INFO_LEKAR):
+        return True
+    if re.search(r"\b(каков\w*|каква\w*|кој)\s+е\b", p) and any(
+        w in p for w in ("лекар", "д-р", " др", "доктор", "lekар", "dr ", "d-r")
+    ):
         return True
     return False
+
+
+def _delovi_izgledaat_kako_ime(delovi: list[str]) -> bool:
+    """Дали извлечените зборови личат на име/презиме, не на „телефон/контакт"."""
+    smisleni = [d for d in delovi if d not in _ZBOROVI_NE_SE_IMENA]
+    return len(smisleni) >= 2
 
 
 def _prasanje_e_kontakti(p: str) -> bool:
@@ -499,6 +678,7 @@ def _prasanje_e_kontakti(p: str) -> bool:
             "контакт",
             "контакти",
             "телефон",
+            "телефонот",
             "тел.",
             "kontakt",
             "telefon",
@@ -508,6 +688,8 @@ def _prasanje_e_kontakti(p: str) -> bool:
             "рецепци",
             "recepc",
             "централа",
+            "за контакт",
+            "за kontakt",
         )
     ):
         return True
@@ -793,7 +975,19 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
     if _ima_zbor(p, KLUCNI_REZIME_NOVOSTI):
         return "novosti_rezime"
 
-    # Област / специјалност на лекар (избран, лекарот, д-р …)
+    # Листа лекари по специјалност — пред info_lekar („други лекари од оваа специјалност")
+    try:
+        from ai.pacient.slobodni_termini import prasanje_e_drugi_lekari_specijalnost
+
+        if prasanje_e_drugi_lekari_specijalnost(prasanje):
+            return "lekari_oddel"
+    except ImportError:
+        pass
+
+    if _ima_zbor(p, KLUCNI_LEKARI_ODDEL):
+        return "lekari_oddel"
+
+    # Област / специјалност на избраниот лекар (не листа „други лекари")
     if any(x in p for x in ("област", "специјалност", "oddel", "oblast", "specijalnost")) and any(
         x in p
         for x in (
@@ -801,7 +995,6 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
             "истиот",
             "погоре",
             "лекарот",
-            "лекар",
             "д-р",
             " др",
             "докторот",
@@ -809,8 +1002,13 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
     ):
         return "info_lekar"
 
+    # Контакт / работно време / локација / услуги — пред info_lekar
+    bi = _bolnica_info_intent(p)
+    if bi:
+        return bi
+
     # Конкретен лекар по име — пред навигација („во оваа болница работи др X")
-    if _prasanje_e_konkreten_lekar(prasanje) or _ima_zbor(p, KLUCNI_INFO_LEKAR):
+    if _prasanje_e_konkreten_lekar(prasanje) or _ima_kluc_info_lekar(p):
         return "info_lekar"
 
     # Навигација – пред uslugi

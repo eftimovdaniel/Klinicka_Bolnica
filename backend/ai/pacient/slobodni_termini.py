@@ -244,6 +244,46 @@ def datum_od_zakazi_kontekst(kontekst: dict | None) -> date | None:
     return None
 
 
+def prasanje_e_drugi_lekari_specijalnost(prasanje: str) -> bool:
+    """
+    Листа на други лекари од иста специјалност/оддел — lekari_oddel, не info_lekar.
+    Пр. „други лекари од оваа специјалност", „а други од истата специјалности".
+    """
+    p = transliterijaj(prasanje).lower()
+    if not any(
+        x in p
+        for x in (
+            "други",
+            "друг ",
+            "друга ",
+            "уште",
+            "останати",
+            "drugi",
+            "drug ",
+            "ushte",
+            "останati",
+        )
+    ):
+        return False
+    if not any(x in p for x in ("лекар", "доктор", "lekari", "doktor")):
+        return False
+    return any(
+        x in p
+        for x in (
+            "специјалност",
+            "специјалности",
+            "оддел",
+            "истата",
+            "оваа",
+            "истиот",
+            "истиов",
+            "истиов",
+            "specijalnost",
+            "oddel",
+        )
+    )
+
+
 def prasanje_e_specijalnost_izbran_lekar(
     prasanje: str, kontekst: dict | None = None
 ) -> bool:
@@ -251,6 +291,8 @@ def prasanje_e_specijalnost_izbran_lekar(
     Прашање за специјалност/област — „избраниот лекар“ или „лекарот“ од контекст.
     (не слободни термини)
     """
+    if prasanje_e_drugi_lekari_specijalnost(prasanje):
+        return False
     p = transliterijaj(prasanje).lower()
     if not any(
         x in p

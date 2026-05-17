@@ -3006,10 +3006,19 @@ window.loadMojRaspored = async function loadMojRaspored() {
     });
 
     if (filtered.length === 0) {
-      terminiList.innerHTML =
-        '<div class="loading">Немате закажани термини за ' +
-        datum +
-        '. Кликнете „Сите термини“ за целосна листа.</div>';
+      if (termini.length > 0) {
+        terminiList.innerHTML =
+          '<div class="loading">Нема термини за <strong>' +
+          datum +
+          '</strong>, но имате <strong>' +
+          termini.length +
+          '</strong> на други датуми (вклучувајќи завршени). Кликнете „Сите термини“.</div>';
+      } else {
+        terminiList.innerHTML =
+          '<div class="loading">Немате термини за ' +
+          datum +
+          '. Кликнете „Сите термини“ за целосна листа.</div>';
+      }
       return;
     }
 
@@ -3036,23 +3045,38 @@ function displayLekarTermini(data) {
 
   if (terminiList) {
     if (!data.termini || data.termini.length === 0) {
-      terminiList.innerHTML = '<div class="loading">Немате закажани термини.</div>';
+      terminiList.innerHTML =
+        '<div class="loading">Немате закажани или завршени термини. Кликнете „Сите термини“.</div>';
       return;
     }
 
+    var aktivniList = data.termini.filter(function (t) {
+      return (t.status_pregled || 'закажан').trim() !== 'завршен';
+    });
+    var zavrseniList = data.termini.filter(function (t) {
+      return (t.status_pregled || '').trim() === 'завршен';
+    });
+
     terminiList.innerHTML = '';
-    data.termini.forEach(termin => {
+
+    function appendTerminCards(list) {
+      list.forEach(function (termin) {
       const terminDiv = document.createElement('div');
-      terminDiv.className = 'termin-card';
-      
+      const status = (termin.status_pregled || 'закажан').trim();
+      const zavrsen = status === 'завршен';
+      terminDiv.className = 'termin-card' + (zavrsen ? ' termin-card--completed' : '');
+
       // Подели го името на пациентот на име и презиме
       const imeParts = (termin.ime_pacient || '').split(' ');
       const ime = imeParts[0] || '';
       const prezime = imeParts.slice(1).join(' ') || '';
-      
+      const statusBadge = zavrsen
+        ? '<span class="termin-status-badge termin-status-badge--done">Завршен</span>'
+        : '<span class="termin-status-badge termin-status-badge--booked">Закажан</span>';
+
       terminDiv.innerHTML = `
         <div class="termin-header">
-          <h4>${termin.ime_pacient || 'Нема име'}</h4>
+          <h4>${termin.ime_pacient || 'Нема име'} ${statusBadge}</h4>
           <p><strong>Датум:</strong> ${termin.datum_pregled}</p>
           <p><strong>Време:</strong> ${termin.vreme_pregled}</p>
         </div>
@@ -3079,7 +3103,23 @@ function displayLekarTermini(data) {
         </div>
       `;
       terminiList.appendChild(terminDiv);
-    });
+      });
+    }
+
+    if (aktivniList.length) {
+      var secAkt = document.createElement('h4');
+      secAkt.className = 'termini-section-title';
+      secAkt.textContent = 'Закажани прегледи (' + aktivniList.length + ')';
+      terminiList.appendChild(secAkt);
+      appendTerminCards(aktivniList);
+    }
+    if (zavrseniList.length) {
+      var secZav = document.createElement('h4');
+      secZav.className = 'termini-section-title termini-section-title--done';
+      secZav.textContent = 'Завршени прегледи (' + zavrseniList.length + ')';
+      terminiList.appendChild(secZav);
+      appendTerminCards(zavrseniList);
+    }
   }
 }
 
@@ -3115,6 +3155,9 @@ async function saveTerminChanges(terminId) {
 
     const result = await res.json();
     showLekarToast(result.message || 'Промените се зачувани успешно!', false);
+    if (typeof refreshLekarTerminiAll === 'function') {
+      refreshLekarTerminiAll();
+    }
   } catch (err) {
     showLekarToast('Грешка при зачувување. Проверете дали серверот работи.', true);
   }

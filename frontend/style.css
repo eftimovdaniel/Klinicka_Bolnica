@@ -2690,6 +2690,42 @@ html {
   box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
+.termin-card--completed {
+  border-color: #c8e6c9;
+  background-color: #f9fff9;
+}
+
+.termin-status-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.termin-status-badge--booked {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.termin-status-badge--done {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.termini-section-title {
+  margin: 1.25rem 0 0.75rem;
+  color: #c0392b;
+  font-size: 1.05rem;
+}
+
+.termini-section-title--done {
+  color: #2e7d32;
+  margin-top: 1.75rem;
+}
+
 .termin-header {
   border-bottom: 2px solid #e74c3c;
   padding-bottom: 0.8rem;

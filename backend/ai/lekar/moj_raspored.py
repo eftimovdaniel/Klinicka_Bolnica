@@ -113,7 +113,9 @@ def odgovori_za_raspored(prasanje: str, lekar: dict | None) -> str:
         "SELECT termin_ID, ime_pacient, email_pacient, telefon_pacient,"
         "       datum_pregled, vreme_pregled, status_pregled, napomena"
         " FROM Termin_pregled"
-        " WHERE doctor_ID = %s AND status_pregled = 'закажан'"
+        " WHERE doctor_ID = %s"
+        "   AND COALESCE(NULLIF(TRIM(status_pregled), ''), 'закажан')"
+        " NOT IN ('откажан', 'отказан')"
     )
     params: list = [doctor_id]
     label = ""
@@ -144,9 +146,9 @@ def odgovori_za_raspored(prasanje: str, lekar: dict | None) -> str:
     ime_lekar = f"{lekar.get('name','')} {lekar.get('surname','')}".strip() or "тебе"
 
     if not rows:
-        return f"Немаш закажани прегледи {label}."
+        return f"Немаш закажани или завршени прегледи {label}."
 
-    linii = [f"Закажани прегледи {label} ({len(rows)} вкупно):", ""]
+    linii = [f"Прегледи {label} ({len(rows)} вкупно):", ""]
 
     # Групирај по датум за полесно читање
     po_datum: dict = {}
@@ -157,8 +159,11 @@ def odgovori_za_raspored(prasanje: str, lekar: dict | None) -> str:
     for d in sorted(po_datum.keys()):
         linii.append(f"━━ {_fmt_datum(d)} ━━")
         for r in po_datum[d]:
+            st = (r.get("status_pregled") or "закажан").strip()
+            st_oznaka = f" [{st}]" if st != "закажан" else ""
             linija = (
-                f"• {_fmt_vreme(r['vreme_pregled'])} — {r['ime_pacient']} (ID {r['termin_ID']})"
+                f"• {_fmt_vreme(r['vreme_pregled'])} — {r['ime_pacient']}"
+                f" (ID {r['termin_ID']}){st_oznaka}"
             )
             nap = napomena_za_prikaz_lekar(r.get("napomena"))
             if nap:

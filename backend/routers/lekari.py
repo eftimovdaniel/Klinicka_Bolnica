@@ -164,11 +164,17 @@ async def login_lekar(request: Request):
         # ВАЖНО: Според базата, колоните се: Ime_pacient, Ime_lekar (со голема буква I)
         # COALESCE: ако дијагноза/терапија е NULL во базата, врати празен string '' наместо NULL
         posrednik.execute("""
-            SELECT termin_ID, ime_pacient AS Ime_pacient, datum_pregled, vreme_pregled, email_pacient, telefon_pacient,
+            SELECT termin_ID, ime_pacient AS Ime_pacient, datum_pregled, vreme_pregled,
+                   email_pacient, telefon_pacient, status_pregled,
                    COALESCE(dijagnoza, '') AS dijagnoza, COALESCE(terapija, '') AS terapija
             FROM Termin_pregled
-            WHERE doctor_ID = %s AND (status_pregled IS NULL OR status_pregled = 'закажан')
-            ORDER BY datum_pregled, vreme_pregled
+            WHERE doctor_ID = %s
+              AND COALESCE(NULLIF(TRIM(status_pregled), ''), 'закажан')
+                  NOT IN ('откажан', 'отказан')
+            ORDER BY
+              CASE WHEN COALESCE(NULLIF(TRIM(status_pregled), ''), 'закажан') = 'закажан'
+                   THEN 0 ELSE 1 END,
+              datum_pregled DESC, vreme_pregled DESC
         """, (doctor_id,))
         
         rows = posrednik.fetchall()  # ги земаме сите термини за лекарот
@@ -198,6 +204,7 @@ async def login_lekar(request: Request):
                 "telefon_pacient": (r.get("telefon_pacient") or "").strip(),  # го зема телефонскиот број на пациентот
                 "dijagnoza": (r.get("dijagnoza") or "").strip(),  # се зема дијагнозата
                 "terapija": (r.get("terapija") or "").strip(),  # се зема терапијата
+                "status_pregled": (r.get("status_pregled") or "закажан").strip(),
             })
 
         print(f"[DEBUG login] Успешна најава: {doctor.get('name')} {doctor.get('surname')} (ID: {doctor_id})")
@@ -386,11 +393,17 @@ def get_lekari_termini(email: str):             # funkcija za vrakanje na termin
         # COALESCE: ako dijagnoza/terapija e NULL vo bazata, vrati prazen string '' namesto NULL
         # ВАЖНО: Според базата, колоните се: Ime_pacient, Ime_lekar (со голема буква I)
         posrednik.execute("""
-            SELECT termin_ID, ime_pacient AS Ime_pacient, datum_pregled, vreme_pregled, email_pacient, telefon_pacient,
+            SELECT termin_ID, ime_pacient AS Ime_pacient, datum_pregled, vreme_pregled,
+                   email_pacient, telefon_pacient, status_pregled,
                    COALESCE(dijagnoza, '') AS dijagnoza, COALESCE(terapija, '') AS terapija
             FROM Termin_pregled
-            WHERE doctor_ID = %s AND (status_pregled IS NULL OR status_pregled = 'закажан')
-            ORDER BY datum_pregled, vreme_pregled
+            WHERE doctor_ID = %s
+              AND COALESCE(NULLIF(TRIM(status_pregled), ''), 'закажан')
+                  NOT IN ('откажан', 'отказан')
+            ORDER BY
+              CASE WHEN COALESCE(NULLIF(TRIM(status_pregled), ''), 'закажан') = 'закажан'
+                   THEN 0 ELSE 1 END,
+              datum_pregled DESC, vreme_pregled DESC
         """, (doctor_id,))
         rows = posrednik.fetchall()    # vo rows se zemaat site termini kaj lekar
         termini = []                # lista za termini
@@ -415,6 +428,7 @@ def get_lekari_termini(email: str):             # funkcija za vrakanje na termin
                 "telefon_pacient": (r.get("telefon_pacient") or "").strip(),    # go zema telefonskiot broj na pacientot
                 "dijagnoza": (r.get("dijagnoza") or "").strip(),                # se zema dijagnozata
                 "terapija": (r.get("terapija") or "").strip(),                  # se zema terapijata
+                "status_pregled": (r.get("status_pregled") or "закажан").strip(),
             })
         return {        # dava JSON objekti 
             "doctor": {

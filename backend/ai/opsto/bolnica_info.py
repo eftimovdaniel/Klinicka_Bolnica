@@ -30,6 +30,35 @@ def _zimi_info() -> dict:
         return {}
 
 
+_ODDEL_KLUCNI = (
+    ("кардиолог", "Кардиологија"),
+    ("гинеколог", "Гинекологија"),
+    ("невролог", "Неврологија"),
+    ("ортопед", "Ортопедија"),
+    ("лаборатор", "Лабораторија"),
+    ("радиолог", "Радиологија"),
+    ("хирург", "Хирургија"),
+    ("педиатр", "Педиатрија"),
+    ("онколог", "Онкологија"),
+    ("интерна", "Интерна медицина"),
+    ("итна", "Итна помош"),
+    ("аптека", "Аптека"),
+)
+
+
+def _najdi_oddel_lokalno(prasanje: str, oddeli: list[str]) -> str | None:
+    """Правила без AI — кардиологијата → Кардиологија."""
+    p = prasanje.lower()
+    for kluc, ime in _ODDEL_KLUCNI:
+        if kluc in p:
+            for o in oddeli:
+                if o.lower() == ime.lower() or kluc in o.lower():
+                    return o
+            if ime in oddeli:
+                return ime
+    return None
+
+
 def _najdi_oddel_so_ai(prasanje: str, oddeli: list[str]) -> str | None:
     """
     Прашува AI (Groq) кој оддел е во прашањето.
@@ -105,7 +134,9 @@ def odgovori_za_lokacija(prasanje: str) -> str:
         return "Нема расположливи податоци за локации."
 
     oddeli = list(lokacii.keys())
-    izbran_oddel = _najdi_oddel_so_ai(prasanje, oddeli)
+    izbran_oddel = _najdi_oddel_lokalno(prasanje, oddeli) or _najdi_oddel_so_ai(
+        prasanje, oddeli
+    )
 
     if izbran_oddel:
         lokacija = lokacii.get(izbran_oddel, "—")

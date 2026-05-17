@@ -126,9 +126,15 @@ def _intent_strukturiran_za_lekar(
 ) -> str:
     """Прашања за конкретен лекар не одат на general/AI — ист handler за сите имиња."""
     from ai.pacient.slobodni_termini import prasanje_e_otkazuvanje
+    from ai._kernel.intent_detector import _bolnica_info_intent, _prasanje_e_konkreten_lekar
 
     if prasanje_e_otkazuvanje(pitanje_norm):
         return "otkazi_termin"
+
+    p_low = pitanje_norm.lower()
+    bi = _bolnica_info_intent(p_low)
+    if bi:
+        return bi
 
     if intent not in ("general",):
         return intent
@@ -139,6 +145,9 @@ def _intent_strukturiran_za_lekar(
         lekar_od_zakazi_kontekst,
         prasanje_e_specijalnost_izbran_lekar,
     )
+
+    if not _prasanje_e_konkreten_lekar(pitanje_norm):
+        return intent
 
     lekar = lekar_od_zakazi_kontekst(aktiven_kontekst)
     if not lekar:
@@ -260,9 +269,13 @@ def _resolve_intent(
         datum_od_zakazi_kontekst,
         prasanje_bar_datum_od_kontekst,
         prasanje_bar_lekar_od_kontekst,
+        prasanje_e_drugi_lekari_specijalnost,
         prasanje_e_sleden_raboten_den,
         prasanje_e_specijalnost_izbran_lekar,
     )
+
+    if prasanje_e_drugi_lekari_specijalnost(pitanje_norm):
+        return "lekari_oddel"
 
     has_lekar_kontekst = isinstance(aktiven_kontekst, dict) and (
         aktiven_kontekst.get("zakazi_od_slobodni")

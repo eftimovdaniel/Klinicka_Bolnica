@@ -16,6 +16,10 @@ from typing import Any
 from ai._kernel.oddel_resolver import format_lista_oddeli, resolve_oddel
 from ai._kernel.transliteracija import transliterijaj
 from ai._kernel.db_helpers import db_cursor
+from ai.pacient.slobodni_termini import (
+    lekar_od_zakazi_kontekst,
+    prasanje_e_drugi_lekari_specijalnost,
+)
 
 
 def _site_lekari_vo_ustanova(prasanje: str) -> bool:
@@ -97,38 +101,72 @@ def _zimi_lekari_od_oddel(oddel: str) -> list[dict]:
         return []
 
 
-def odgovori_za_lekari_oddel(prasanje: str) -> str | dict[str, Any]:
+def odgovori_za_lekari_oddel(
+    prasanje: str, kontekst: dict | None = None
+) -> str | dict[str, Any]:
     if _site_lekari_vo_ustanova(prasanje):
         return odgovor_navigacija_lekari()
 
-    resolved = resolve_oddel(prasanje)
+    oddel_ime: str | None = None
+    exclude_doctor_id: int | None = None
+    site_oddeli: tuple[str, ...] = ()
 
-    if resolved.poraka_greska == "_ai_busy":
-        return "Привремено сум зафатен. Те молам обиди се повторно за неколку секунди."
+    if prasanje_e_drugi_lekari_specijalnost(prasanje):
+        lekar_ctx = lekar_od_zakazi_kontekst(kontekst)
+        if lekar_ctx:
+            oddel_ime = (lekar_ctx.get("specialty") or "").strip() or None
+            exclude_doctor_id = int(lekar_ctx["doctor_ID"])
 
-    if not resolved.ok or not resolved.oddel:
+    resolved = resolve_oddel(prasanje) if not oddel_ime else None
+    if resolved:
+        site_oddeli = resolved.site_oddeli
+        if resolved.poraka_greska == "_ai_busy":
+            return "Привремено сум зафатен. Те молам обиди се повторно за неколку секунди."
+        if resolved.ok and resolved.oddel:
+            oddel_ime = resolved.oddel
+    elif not site_oddeli:
+        from ai._kernel.oddel_resolver import zimi_site_oddeli
+
+        site_oddeli = zimi_site_oddeli()
+
+    if not oddel_ime:
         if _site_lekari_vo_ustanova(prasanje):
             return odgovor_navigacija_lekari()
         delovi = [
             'Ако прашувате за конкретен оддел, наведете го (на пр.: „Кои лекари се на Кардиологија?").',
             'За целиот тим: „Кои лекари работат во болницата?" или „Каде се лекарите?".',
             "",
-            format_lista_oddeli(resolved.site_oddeli),
+            format_lista_oddeli(site_oddeli),
         ]
         return "\n".join(delovi)
 
-    oddel_ime = resolved.oddel
-    print(f"[lekari_oddel] оддел={oddel_ime!r} method={resolved.method}")
+    method = resolved.method if resolved else "kontekst_lekar"
+    print(f"[lekari_oddel] оддел={oddel_ime!r} method={method}")
 
     lekari = _zimi_lekari_od_oddel(oddel_ime)
+    if exclude_doctor_id is not None:
+        lekari = [
+            l for l in lekari if int(l["doctor_ID"]) != int(exclude_doctor_id)
+        ]
 
     if not lekari:
+        if exclude_doctor_id is not None:
+            return (
+                f'На специјалноста „{oddel_ime}" нема други регистрирани лекари '
+                "освен оној од претходната порака.\n\n"
+                "Можете да закажете кај него (напишете го часот) или да изберете "
+                "друга специјалност од листата:\n\n"
+                + format_lista_oddeli(site_oddeli)
+            )
         return (
             f'На одделот „{oddel_ime}" моментално нема регистрирани лекари.\n\n'
-            + format_lista_oddeli(resolved.site_oddeli)
+            + format_lista_oddeli(site_oddeli)
         )
 
-    naslov = f'Лекари на одделот „{oddel_ime}" ({len(lekari)}):'
+    if exclude_doctor_id is not None:
+        naslov = f'Други лекари од „{oddel_ime}" ({len(lekari)}):'
+    else:
+        naslov = f'Лекари на одделот „{oddel_ime}" ({len(lekari)}):'
     redovi = [naslov, ""]
     for l in lekari:
         polno = f"Д-р {l['name']} {l['surname']}"
