@@ -202,7 +202,7 @@ def _resolve_intent(
 
     from ai.pacient.slobodni_termini import (
         baranje_e_zakazuvanje,
-        cilj_datum_lokalno,
+        datum_od_prasanje_lokalno,
         datum_od_zakazi_kontekst,
         prasanje_bar_datum_od_kontekst,
         prasanje_bar_lekar_od_kontekst,
@@ -282,7 +282,7 @@ def _resolve_intent(
         elif intent in ("general", "zakazi_termin") and not baranje_e_zakazuvanje(
             pitanje_norm
         ):
-            if cilj_datum_lokalno(pitanje_norm) or any(
+            if datum_od_prasanje_lokalno(pitanje_norm) or any(
                 w in q
                 for w in (
                     "провери",

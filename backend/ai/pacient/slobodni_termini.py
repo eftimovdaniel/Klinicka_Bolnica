@@ -329,7 +329,7 @@ def _parsiraj_dd_mm_gggg(denes: date, d: int, m: int, g: int | None) -> date | N
     return out
 
 
-def cilj_datum_lokalno(prasanje: str) -> date | None:
+def datum_od_prasanje_lokalno(prasanje: str) -> date | None:
     """Брзо препознавање на датум во прашање (кирилица по транслит.)."""
     p = transliterijaj(prasanje).lower()
     denes = date.today()
@@ -381,13 +381,13 @@ def cilj_datum_lokalno(prasanje: str) -> date | None:
     return None
 
 
-def izvleci_cilj_datum_za_slobodni(
+def izvleci_datum_za_slobodni(
     prasanje: str, kontekst: dict | None = None
 ) -> date | None:
     """Датум од прашање или од kontekst (претходно спомнат / избран ден)."""
-    cilj = cilj_datum_lokalno(prasanje)
-    if cilj is not None:
-        return cilj
+    baran_datum = datum_od_prasanje_lokalno(prasanje)
+    if baran_datum is not None:
+        return baran_datum
     if prasanje_bar_datum_od_kontekst(prasanje):
         return datum_od_zakazi_kontekst(kontekst)
     return None
@@ -850,15 +850,15 @@ def odgovori_za_slobodni_termini(
             '(на пример: „Кога е слободен д-р Марко Петров?" или „има ли термин кај Петров?").\n\n'
             'Ако лекарот не работи кај нас, ќе треба да одбереш друг од секцијата „Лекари" на сајтот.'
         )
-    cilj = izvleci_cilj_datum_za_slobodni(prasanje, kontekst)
-    slobodni = pronajdi_slobodni_termini(lekar["doctor_ID"], na_datum=cilj)
-    text = formatiraj_odgovor(lekar, slobodni, na_datum=cilj)
+    baran_datum = izvleci_datum_za_slobodni(prasanje, kontekst)
+    slobodni = pronajdi_slobodni_termini(lekar["doctor_ID"], na_datum=baran_datum)
+    text = formatiraj_odgovor(lekar, slobodni, na_datum=baran_datum)
 
     did = int(lekar["doctor_ID"])
     ctx = {
         "zakazi_od_slobodni": {
             "doctor_id": did,
-            "datum": cilj.strftime("%Y-%m-%d") if cilj else None,
+            "datum": baran_datum.strftime("%Y-%m-%d") if baran_datum else None,
         },
         "last_doctor_id": did,
     }

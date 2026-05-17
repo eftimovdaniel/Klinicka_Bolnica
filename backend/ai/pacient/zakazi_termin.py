@@ -23,7 +23,7 @@ from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 from ai._kernel.prompts import ZAKAZI_EXTRACT_PROMPT
 from ai.pacient.slobodni_termini import (
-    cilj_datum_lokalno,
+    datum_od_prasanje_lokalno,
     prasanje_bar_datum_od_kontekst,
     zimi_site_lekari,
 )
@@ -76,7 +76,7 @@ def _spoi_zakazi_so_slobodni_kontekst(
     if zos.get("datum"):
         d = str(zos["datum"]).strip()[:10]
         if d:
-            if cilj_datum_lokalno(prasanje) is None:
+            if datum_od_prasanje_lokalno(prasanje) is None:
                 izvleceno["datum"] = d
             elif koristi_kontekst_datum or not izvleceno.get("datum"):
                 izvleceno["datum"] = d
