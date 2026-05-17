@@ -360,6 +360,18 @@ KLUCNI_USLUGI = [
     "специјалности", "оддели",
 ]
 
+# 7b. АСИСТЕНТ / ПОЗДРАВ / ИДЕНТИТЕТ → general (не info_lekar)
+KLUCNI_ASISTENT_OPSTO = [
+    "кој си", "кој сте", "ко си", "ти кој си", "што си", "што сте",
+    "како се викаш", "како те викат", "кое е твоето име", "твоето име",
+    "дали си вистински", "дали си бот", "дали си ai", "дали си робот",
+    "што правиш", "што можеш", "како работиш", "како можеш да помогнеш",
+    "здраво", "добар ден", "добро утро", "добровече", "поздрав", "чао",
+    "благодарам", "фала", "thanks", "thank you",
+    "hello", "hi ", "hey ",
+    "koj si", "koi si", "sto si", "zdravo", "pozdrav", "dobar den",
+]
+
 # 8. ИНФО ЗА ЛЕКАР (без „каков е" само — меша се со телефон/контакт)
 KLUCNI_INFO_LEKAR = [
     "информации за", "инфо за", "повеќе за",
@@ -406,6 +418,16 @@ _ZBOROVI_NE_SE_IMENA = frozenset(
         "telefon",
         "kakov",
         "koe",
+        "си",
+        "ти",
+        "те",
+        "мене",
+        "вие",
+        "нас",
+        "вас",
+        "себе",
+        "si",
+        "ti",
     }
 )
 
@@ -613,16 +635,37 @@ def _prasanje_e_lokacija_oddel(p: str) -> bool:
     return False
 
 
+def _prasanje_e_asistent_opsto(p: str) -> bool:
+    """Прашања за асистентот, не за лекар во база."""
+    if _ima_zbor(p, KLUCNI_ASISTENT_OPSTO):
+        return True
+    if re.search(
+        r"\b(кој|koi|ko)\s+(си|си\s+ти|ste|si|e\s+ти)\b",
+        p,
+        re.UNICODE,
+    ):
+        return True
+    if re.search(
+        r"\b(што|sto|what)\s+(си|сме|ste|are|правиш|pravish|можеш)\b",
+        p,
+        re.UNICODE,
+    ):
+        return True
+    if re.search(r"\b(здраво|zdravo|поздрав|pozdrav|hello|hey)\b", p, re.UNICODE):
+        return True
+    return False
+
+
 def _prasanje_e_konkreten_lekar(prasanje: str) -> bool:
     """
     Прашање за конкретен лекар по име (не листа/навигација).
     Пр. „Дали работи др Марија Хубрева?", „Кој е д-р Петров?"
     """
-    import re
-
     from ai._kernel.lekar_lookup import izvlechi_delovi_ime
 
     p = transliterijaj(prasanje).lower()
+    if _prasanje_e_asistent_opsto(p):
+        return False
     if _bolnica_info_intent(p):
         return False
     if _ima_zbor(p, KLUCNI_SLOBODNI):
@@ -653,6 +696,8 @@ def _bolnica_info_intent(p: str) -> str | None:
 
 def _ima_kluc_info_lekar(p: str) -> bool:
     """Клучни зборови за лекар — не ако прашањето е за контакт/време/локација."""
+    if _prasanje_e_asistent_opsto(p):
+        return False
     if _bolnica_info_intent(p):
         return False
     if _ima_zbor(p, KLUCNI_INFO_LEKAR):
@@ -783,6 +828,9 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
 
     # Автоматски преводи: латиница → кирилица
     p = transliterijaj(prasanje).lower().strip()
+
+    if _prasanje_e_asistent_opsto(p):
+        return "general"
 
     # Директор: креирај / објави оглас (пред navigacija и apliciraj)
     if any(

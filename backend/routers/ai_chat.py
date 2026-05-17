@@ -6,14 +6,11 @@ AI чат рутер — POST /ai-chat/ask
 3. dispatch() → соодветен handler од ai/_kernel/handlers.py
 4. За најавен пациент/лекар — зачувување на историја (Ai_chat_session / Ai_chat_message)
 """
-
 import re
 from datetime import datetime
 from typing import Any
-
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
-
 from ai._kernel.handlers import AiContext, dispatch
 from ai._kernel.intent_detector import detektiraj_intent
 from ai._kernel.transliteracija import normaliziraj_prasanje
@@ -25,12 +22,8 @@ from ai_chat_store import (
     list_sessions,
     save_exchange,
 )
-
 router = APIRouter(prefix="/ai-chat", tags=["AI Chat"])
-
 MAX_PRASANJE_LEN = 4000
-
-
 class PacientModel(BaseModel):
     pacient_ID: int | None = None
     ime: str | None = None
@@ -126,7 +119,15 @@ def _intent_strukturiran_za_lekar(
 ) -> str:
     """Прашања за конкретен лекар не одат на general/AI — ист handler за сите имиња."""
     from ai.pacient.slobodni_termini import prasanje_e_otkazuvanje
-    from ai._kernel.intent_detector import _bolnica_info_intent, _prasanje_e_konkreten_lekar
+    from ai._kernel.intent_detector import (
+        _bolnica_info_intent,
+        _prasanje_e_asistent_opsto,
+        _prasanje_e_konkreten_lekar,
+    )
+    from ai._kernel.transliteracija import transliterijaj
+
+    if _prasanje_e_asistent_opsto(transliterijaj(pitanje_norm).lower()):
+        return "general"
 
     if prasanje_e_otkazuvanje(pitanje_norm):
         return "otkazi_termin"
