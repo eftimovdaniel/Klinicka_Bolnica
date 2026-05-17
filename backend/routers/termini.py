@@ -20,24 +20,11 @@ from io import BytesIO
 router = APIRouter(prefix="/termini", tags=["termini"])
 
 
-# funkcija koja praka mail na korisnikot koga ke se najave i ke napraev uspesno realizacija na termin
-# ke mu stigne na mail vreme lekar i datum za toa kaj koj lekar e napraveno termin so soodveten datum i vreme 
-# kako potvrda da bide na nekoj nacin deka so sigurnost e zakazan pregledot 
-def _poslati_potvrda_na_email(to_email: str, ime_pacient: str, ime_lekar: str, datum: str, vreme: str):
-    """Испрати потврда на е-пошта до пациентот по закажан термин. Ако SMTP не е поставен, се печати во конзола."""
+def _isprati_email_poraka(to_email: str, subject: str, body: str, log_uspesno: str) -> None:
+    """Заедничка SMTP испраќање (или печатење во конзола без SMTP)."""
     if not to_email or "@" not in to_email:
         return
-    subject = "Потврда за закажан термин – Клиничка Болница Штип"
-    body = f"""Почитуван/а {ime_pacient},
 
-Вашиот термин е успешно закажан.
-
-Лекар: {ime_lekar}
-Датум: {datum}
-Време: {vreme}
-
-Клиничка Болница Штип
-"""
     smtp_host = os.environ.get("SMTP_HOST", "").strip()
     smtp_user = os.environ.get("SMTP_USER", "").strip()
     smtp_pass = os.environ.get("SMTP_PASSWORD", "").strip()
@@ -55,11 +42,10 @@ def _poslati_potvrda_na_email(to_email: str, ime_pacient: str, ime_lekar: str, d
                 server.starttls()
                 server.login(smtp_user, smtp_pass)
                 server.sendmail(from_addr, to_email, msg.as_string())
-            print(f"[EMAIL] Потврда испратена на {to_email}")
+            print(f"[EMAIL] {log_uspesno} {to_email}")
         except Exception as e:
             print(f"[EMAIL] Грешка при испраќање на {to_email}: {e}")
     else:
-        # Без SMTP: прикажи ја пораката во конзола за да видите како изгледа
         print("\n" + "=" * 60)
         print("[EMAIL] (SMTP не е поставен – пораката би се испратила на)")
         print("  До:", to_email)
@@ -67,6 +53,50 @@ def _poslati_potvrda_na_email(to_email: str, ime_pacient: str, ime_lekar: str, d
         print("-" * 60)
         print(body)
         print("=" * 60 + "\n")
+
+
+def _poslati_potvrda_na_email(
+    to_email: str, ime_pacient: str, ime_lekar: str, datum: str, vreme: str
+):
+    """Испрати потврда на е-пошта до пациентот по закажан термин."""
+    subject = "Потврда за закажан термин – Клиничка Болница Штип"
+    body = f"""Почитуван/а {ime_pacient},
+
+Вашиот термин е успешно закажан.
+
+Лекар: {ime_lekar}
+Датум: {datum}
+Време: {vreme}
+
+Клиничка Болница Штип
+"""
+    _isprati_email_poraka(to_email, subject, body, "Потврда за закажување испратена на")
+
+
+def _poslati_otkaz_na_email(
+    to_email: str,
+    ime_pacient: str,
+    ime_lekar: str,
+    datum: str,
+    vreme: str,
+    specialnost: str = "",
+):
+    """Испрати потврда на е-пошта до пациентот по откажан термин."""
+    spec_red = f"\nСпецијалност: {specialnost}" if specialnost else ""
+    subject = "Потврда за откажан термин – Клиничка Болница Штип"
+    body = f"""Почитуван/а {ime_pacient},
+
+Вашиот термин е откажан.
+
+Лекар: {ime_lekar}{spec_red}
+Датум: {datum}
+Време: {vreme}
+
+Доколку сакате нов термин, закажете преку сајтот или AI асистентот.
+
+Клиничка Болница Штип
+"""
+    _isprati_email_poraka(to_email, subject, body, "Потврда за откажување испратена на")
 
 
 def _get_termin_za_izvestaj(db_cursor, termin_id: int):

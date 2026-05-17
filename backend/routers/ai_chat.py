@@ -119,6 +119,55 @@ def _dt_iso(val: Any) -> str | None:
     return str(val)
 
 
+def _intent_strukturiran_za_lekar(
+    pitanje_norm: str,
+    aktiven_kontekst: dict | None,
+    intent: str,
+) -> str:
+    """Прашања за конкретен лекар не одат на general/AI — ист handler за сите имиња."""
+    from ai.pacient.slobodni_termini import prasanje_e_otkazuvanje
+
+    if prasanje_e_otkazuvanje(pitanje_norm):
+        return "otkazi_termin"
+
+    if intent not in ("general",):
+        return intent
+
+    from ai._kernel.lekar_lookup import najdi_lekar_od_prasanje
+    from ai.pacient.slobodni_termini import (
+        baranje_e_zakazuvanje,
+        lekar_od_zakazi_kontekst,
+        prasanje_e_specijalnost_izbran_lekar,
+    )
+
+    lekar = lekar_od_zakazi_kontekst(aktiven_kontekst)
+    if not lekar:
+        lekar = najdi_lekar_od_prasanje(pitanje_norm)
+    if not lekar:
+        return intent
+
+    if baranje_e_zakazuvanje(pitanje_norm):
+        return "zakazi_termin"
+
+    q = pitanje_norm.lower()
+    if prasanje_e_specijalnost_izbran_lekar(pitanje_norm, aktiven_kontekst):
+        return "info_lekar"
+    if any(
+        w in q
+        for w in (
+            "слобод",
+            "термин",
+            "кога",
+            "има ли",
+            "slobod",
+            "termin",
+            "koga",
+        )
+    ):
+        return "slobodni_termini"
+    return "info_lekar"
+
+
 def _resolve_intent(
     pitanje_norm: str,
     aktiven_kontekst: dict | None,
@@ -127,6 +176,11 @@ def _resolve_intent(
 ) -> str:
     if aktiven_kontekst and aktiven_kontekst.get("intent") == "apliciraj_za_rabota":
         return "apliciraj_za_rabota"
+
+    from ai.pacient.slobodni_termini import prasanje_e_otkazuvanje
+
+    if prasanje_e_otkazuvanje(pitanje_norm):
+        return "otkazi_termin"
 
     if isinstance(aktiven_kontekst, dict) and aktiven_kontekst.get("last_oddel"):
         q = pitanje_norm.lower()
@@ -215,7 +269,9 @@ def _resolve_intent(
         or aktiven_kontekst.get("zakazi_pending")
         or aktiven_kontekst.get("last_doctor_id")
     )
-    if has_lekar_kontekst and prasanje_e_specijalnost_izbran_lekar(pitanje_norm):
+    if has_lekar_kontekst and prasanje_e_specijalnost_izbran_lekar(
+        pitanje_norm, aktiven_kontekst
+    ):
         return "info_lekar"
 
     has_zakazi_flow = bool(
@@ -223,10 +279,15 @@ def _resolve_intent(
         and (
             aktiven_kontekst.get("zakazi_od_slobodni")
             or aktiven_kontekst.get("zakazi_pending")
+            or aktiven_kontekst.get("zakazi_ceka_napomena")
         )
     )
     if has_zakazi_flow:
+        if aktiven_kontekst.get("zakazi_ceka_napomena"):
+            return "zakazi_termin"
         q = pitanje_norm.lower()
+        if prasanje_e_otkazuvanje(pitanje_norm):
+            return "otkazi_termin"
         if baranje_e_zakazuvanje(pitanje_norm):
             return "zakazi_termin"
         if prasanje_bar_datum_od_kontekst(pitanje_norm) and datum_od_zakazi_kontekst(
@@ -235,7 +296,7 @@ def _resolve_intent(
             return "zakazi_termin"
         if prasanje_e_sleden_raboten_den(pitanje_norm):
             return "slobodni_termini"
-        if prasanje_e_specijalnost_izbran_lekar(pitanje_norm):
+        if prasanje_e_specijalnost_izbran_lekar(pitanje_norm, aktiven_kontekst):
             return "info_lekar"
         if any(
             x in q
@@ -309,7 +370,7 @@ def _resolve_intent(
             ):
                 intent = "slobodni_termini"
 
-    return intent
+    return _intent_strukturiran_za_lekar(pitanje_norm, aktiven_kontekst, intent)
 
 
 @router.post("/sessions/import-guest")

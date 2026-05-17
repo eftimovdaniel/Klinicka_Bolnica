@@ -19,7 +19,11 @@ from datetime import datetime, date
 from database import get_connection
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
-from ai.pacient.slobodni_termini import zimi_site_lekari
+from ai.pacient.slobodni_termini import (
+    datum_od_zakazi_kontekst,
+    lekar_od_zakazi_kontekst,
+    zimi_site_lekari,
+)
 
 
 def izvlechi_otkazi_podatoci(prasanje: str) -> dict:
@@ -130,7 +134,43 @@ def format_vreme(v) -> str:
     return str(v)[:5]
 
 
-def odgovori_za_otkazuvanje(prasanje: str, pacient: dict | None) -> str:
+def _spoi_otkazi_so_kontekst(
+    prasanje: str,
+    izvleceno: dict,
+    kontekst: dict | None,
+) -> None:
+    """Лекар/датум од претходен разговор (слободни термини / закажување)."""
+    if not isinstance(kontekst, dict):
+        return
+    lekar = lekar_od_zakazi_kontekst(kontekst)
+    if lekar and not izvleceno.get("doctor_id"):
+        izvleceno["doctor_id"] = lekar["doctor_ID"]
+    if izvleceno.get("datum"):
+        return
+    baran = datum_od_zakazi_kontekst(kontekst)
+    if not baran:
+        return
+    p = (prasanje or "").lower()
+    if any(
+        x in p
+        for x in (
+            "терминот",
+            "термин",
+            "прегледот",
+            "преглед",
+            "го откаж",
+            "го отказ",
+            "избраниот",
+            "истиот",
+            "погоре",
+        )
+    ):
+        izvleceno["datum"] = baran.isoformat()
+
+
+def odgovori_za_otkazuvanje(
+    prasanje: str, pacient: dict | None, kontekst: dict | None = None
+) -> str:
     """Главна точка - повикана од router-от."""
     if not pacient or not pacient.get("email"):
         return (
@@ -139,6 +179,7 @@ def odgovori_za_otkazuvanje(prasanje: str, pacient: dict | None) -> str:
         )
 
     izvleceno = izvlechi_otkazi_podatoci(prasanje)
+    _spoi_otkazi_so_kontekst(prasanje, izvleceno, kontekst)
     doctor_id = izvleceno.get("doctor_id")
     datum_str = izvleceno.get("datum")
 
@@ -175,12 +216,32 @@ def odgovori_za_otkazuvanje(prasanje: str, pacient: dict | None) -> str:
     datum = t["datum_pregled"]
     den_ime = DENOVI[datum.weekday()]
     vreme = format_vreme(t["vreme_pregled"])
+    datum_lep = datum.strftime("%d.%m.%Y")
+
+    ime_pacient = (
+        (pacient.get("ime") or "") + " " + (pacient.get("prezime") or "")
+    ).strip() or (t.get("ime_pacient") or pacient.get("email", ""))
+
+    try:
+        from routers.termini import _poslati_otkaz_na_email
+
+        _poslati_otkaz_na_email(
+            to_email=pacient["email"],
+            ime_pacient=ime_pacient,
+            ime_lekar=f"Д-р {t['ime_lekar']}",
+            datum=f"{den_ime}, {datum_lep}",
+            vreme=vreme,
+            specialnost=t.get("specijalnost_termin") or "",
+        )
+    except Exception as e:
+        print(f"[otkazi_termin] email greska: {e}")
 
     return (
         f"Терминот е откажан!\n\n"
         f"Лекар: Д-р {t['ime_lekar']}\n"
         f"Специјалност: {t['specijalnost_termin']}\n"
-        f"Датум: {den_ime}, {datum.strftime('%d.%m.%Y')}\n"
+        f"Датум: {den_ime}, {datum_lep}\n"
         f"Време: {vreme}\n\n"
+        "Потврда е испратена на вашата е-пошта (ако е поставен SMTP на серверот).\n\n"
         'Можеш да закажеш нов термин со „Сакам преглед кај [презиме] [датум] [време]".'
     )

@@ -23,6 +23,7 @@ from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 from ai._kernel.prompts import ZAKAZI_EXTRACT_PROMPT
 from ai.pacient.slobodni_termini import (
+    baranje_e_zakazuvanje,
     datum_od_prasanje_lokalno,
     prasanje_bar_datum_od_kontekst,
     zimi_site_lekari,
@@ -70,15 +71,20 @@ def _spoi_zakazi_so_slobodni_kontekst(
         )
     )
     koristi_kontekst_datum = izbran or prasanje_bar_datum_od_kontekst(prasanje)
+    prodolzuva = baranje_e_zakazuvanje(prasanje)
+    nov_datum = datum_od_prasanje_lokalno(prasanje)
     nid = _normalize_doctor_id(zos.get("doctor_id"))
-    if nid is not None and (not izvleceno.get("doctor_id") or izbran):
-        izvleceno["doctor_id"] = nid
+    if nid is not None:
+        if not _normalize_doctor_id(izvleceno.get("doctor_id")):
+            izvleceno["doctor_id"] = nid
+        elif izbran or prodolzuva:
+            izvleceno["doctor_id"] = nid
     if zos.get("datum"):
         d = str(zos["datum"]).strip()[:10]
         if d:
-            if datum_od_prasanje_lokalno(prasanje) is None:
-                izvleceno["datum"] = d
-            elif koristi_kontekst_datum or not izvleceno.get("datum"):
+            if nov_datum is not None:
+                izvleceno["datum"] = nov_datum.isoformat()
+            elif koristi_kontekst_datum or prodolzuva or not izvleceno.get("datum"):
                 izvleceno["datum"] = d
     if zos.get("vreme") and not izvleceno.get("vreme"):
         v = str(zos["vreme"]).strip()[:5]
@@ -193,6 +199,70 @@ def proveri_dali_e_slobodno(doctor_id: int, datum_str: str, vreme_str: str) -> b
             conn.close()
 
 
+def _kontekst_ceka_napomena(kontekst: dict | None) -> dict | None:
+    z = (kontekst or {}).get("zakazi_ceka_napomena")
+    if isinstance(z, dict) and z.get("doctor_id") and z.get("datum") and z.get("vreme"):
+        return z
+    return None
+
+
+def _prasanje_odbiva_napomena(prasanje: str) -> bool:
+    p = re.sub(r"\s+", " ", (prasanje or "").strip().lower())
+    if not p:
+        return False
+    if p in (
+        "не",
+        "неа",
+        "нема",
+        "немам",
+        "no",
+        "nema",
+        "нема напомена",
+        "без напомена",
+        "не сакам",
+        "не сакам напомена",
+    ):
+        return True
+    return any(
+        x in p
+        for x in (
+            "нема напомена",
+            "без напомена",
+            "не сакам напомена",
+            "не сакам да оставам",
+            "нема да оставам",
+        )
+    )
+
+
+def _prasanje_samo_potvrda_da(prasanje: str) -> bool:
+    p = re.sub(r"\s+", " ", (prasanje or "").strip().lower())
+    return p in ("да", "da", "се", "сеа", "во ред", "ok", "okay")
+
+
+def _postavi_ceka_napomena(
+    kontekst: dict | None,
+    doctor_id: int,
+    datum_str: str,
+    vreme_str: str,
+) -> dict:
+    ctx = dict(kontekst) if kontekst else {}
+    ctx["zakazi_ceka_napomena"] = {
+        "doctor_id": int(doctor_id),
+        "datum": datum_str,
+        "vreme": vreme_str,
+    }
+    return ctx
+
+
+def _poraka_prasanje_napomena(ime_lekar: str, datum_lepo: str, vreme_str: str) -> str:
+    return (
+        f"Сè е подготвено за закажување кај {ime_lekar} на {datum_lepo} во {vreme_str}.\n\n"
+        "Дали сакате да оставите напомена за лекарот?\n"
+        "Напишете ја (на пр. алергија, претходна терапија) или кажете „не\" / „нема напомена\"."
+    )
+
+
 def vmetni_termin_vo_baza(
     doctor_id: int,
     ime_pacient: str,
@@ -200,6 +270,7 @@ def vmetni_termin_vo_baza(
     telefon_pacient: str,
     datum_str: str,
     vreme_str: str,
+    napomena: str | None = None,
 ) -> tuple[bool, str, dict | None]:
     """
     INSERT во Termin_pregled.
@@ -218,6 +289,7 @@ def vmetni_termin_vo_baza(
             return False, "Лекарот не постои.", None
 
         ime_lekar = f"{doctor['name']} {doctor['surname']}"
+        napomena_db = (napomena or "").strip() or None
 
         cur.execute("""
             INSERT INTO Termin_pregled
@@ -235,7 +307,7 @@ def vmetni_termin_vo_baza(
             'закажан',
             email_pacient,
             telefon_pacient,
-            'Закажано преку AI асистент'
+            napomena_db,
         ))
         conn.commit()
         cur.close()
@@ -251,6 +323,121 @@ def vmetni_termin_vo_baza(
     finally:
         if conn:
             conn.close()
+
+
+def _finaliziraj_zakazuvanje(
+    doctor_id: int,
+    datum_str: str,
+    vreme_str: str,
+    pacient: dict,
+    kontekst: dict | None,
+    napomena: str | None,
+) -> str | dict:
+    """Валидација (повторна), INSERT, email и потврда."""
+    did = int(doctor_id)
+    ds = str(datum_str)
+    vs = str(vreme_str)
+
+    if not proveri_dali_e_slobodno(did, ds, vs):
+        ctx = dict(kontekst) if kontekst else {}
+        ctx.pop("zakazi_ceka_napomena", None)
+        return {
+            "odgovor": (
+                "Тој термин е веќе зафатен. Прашај за слободни термини и обиди се повторно."
+            ),
+            "kontekst": ctx,
+        }
+
+    ime_pacient = (
+        (pacient.get("ime") or pacient.get("name_patient") or "")
+        + " "
+        + (pacient.get("prezime") or pacient.get("surname_patient") or "")
+    ).strip()
+    if not ime_pacient:
+        ime_pacient = pacient.get("email", "")
+
+    email_pacient = pacient.get("email", "")
+    telefon_pacient = pacient.get("telefon") or pacient.get("phone_number") or ""
+
+    uspesno, greska, info = vmetni_termin_vo_baza(
+        doctor_id=did,
+        ime_pacient=ime_pacient,
+        email_pacient=email_pacient,
+        telefon_pacient=telefon_pacient,
+        datum_str=ds,
+        vreme_str=vs,
+        napomena=napomena,
+    )
+
+    if not uspesno:
+        return {
+            "odgovor": f"Не успеа закажувањето: {greska}",
+            "kontekst": kontekst,
+        }
+
+    try:
+        from routers.termini import _poslati_potvrda_na_email
+
+        _poslati_potvrda_na_email(
+            to_email=email_pacient,
+            ime_pacient=ime_pacient,
+            ime_lekar=info["ime_lekar"],
+            datum=ds,
+            vreme=vs,
+        )
+    except Exception as e:
+        print(f"[zakazi_termin] email greska: {e}")
+
+    return {
+        "odgovor": formatiraj_potvrda(
+            ime_pacient=ime_pacient,
+            ime_lekar=info["ime_lekar"],
+            specialty=info["specialty"],
+            datum_str=ds,
+            vreme_str=vs,
+        ),
+        "kontekst": {
+            "zakazi_od_slobodni": {
+                "doctor_id": did,
+                "datum": ds,
+            },
+            "last_doctor_id": did,
+        },
+    }
+
+
+def _odgovori_napomena_faza(
+    prasanje: str,
+    pacient: dict,
+    ceka: dict,
+    kontekst: dict | None,
+) -> str | dict:
+    did = int(ceka["doctor_id"])
+    ds = str(ceka["datum"])
+    vs = str(ceka["vreme"])
+
+    if _prasanje_odbiva_napomena(prasanje):
+        return _finaliziraj_zakazuvanje(did, ds, vs, pacient, kontekst, napomena=None)
+
+    if _prasanje_samo_potvrda_da(prasanje):
+        return {
+            "odgovor": (
+                "Во ред. Напишете ја напомената за лекарот "
+                "(на пр. алергија, хронична болест) во следната порака."
+            ),
+            "kontekst": _postavi_ceka_napomena(kontekst, did, ds, vs),
+        }
+
+    tekst = (prasanje or "").strip()
+    if len(tekst) < 2:
+        return {
+            "odgovor": (
+                "Напишете ја напомената или кажете „не\" ако не сакате да оставите напомена."
+            ),
+            "kontekst": _postavi_ceka_napomena(kontekst, did, ds, vs),
+        }
+
+    return _finaliziraj_zakazuvanje(did, ds, vs, pacient, kontekst, napomena=tekst)
 
 
 def formatiraj_potvrda(ime_pacient: str, ime_lekar: str, specialty: str, datum_str: str, vreme_str: str) -> str:
@@ -291,6 +478,10 @@ def odgovori_za_zakazuvanje(
     # AI извлекува податоци (и пред најава — за да се зачува датумот/времето)
     izvleceno = izvlechi_podatoci_so_ai(prasanje)
     _spoi_zakazi_so_slobodni_kontekst(prasanje, izvleceno, kontekst)
+
+    ceka_napomena = _kontekst_ceka_napomena(kontekst)
+    if ceka_napomena and pacient and pacient.get("email"):
+        return _odgovori_napomena_faza(prasanje, pacient, ceka_napomena, kontekst)
 
     # Проверка дали пациентот е логиран — фронтот ја отвора формата за најава како пациент
     if not pacient or not pacient.get("email"):
@@ -455,59 +646,14 @@ def odgovori_za_zakazuvanje(
             "kontekst": kontekst,
         }
 
-    # Состави име на пациент
-    ime_pacient = (
-        (pacient.get("ime") or pacient.get("name_patient") or "") + " " +
-        (pacient.get("prezime") or pacient.get("surname_patient") or "")
-    ).strip()
-    if not ime_pacient:
-        ime_pacient = pacient.get("email", "")
-
-    email_pacient = pacient.get("email", "")
-    telefon_pacient = pacient.get("telefon") or pacient.get("phone_number") or ""
-
-    # INSERT во базата
-    uspesno, greska, info = vmetni_termin_vo_baza(
-        doctor_id=did,
-        ime_pacient=ime_pacient,
-        email_pacient=email_pacient,
-        telefon_pacient=telefon_pacient,
-        datum_str=ds,
-        vreme_str=vs,
-    )
-
-    if not uspesno:
-        return {
-            "odgovor": f"Не успеа закажувањето: {greska}",
-            "kontekst": kontekst,
-        }
-
-    # Прати email потврда (го користиме постоечкиот SMTP код)
+    lekar_text = ime_lekar_za_poraka or "избраниот лекар"
     try:
-        from routers.termini import _poslati_potvrda_na_email
-        _poslati_potvrda_na_email(
-            to_email=email_pacient,
-            ime_pacient=ime_pacient,
-            ime_lekar=info["ime_lekar"],
-            datum=ds,
-            vreme=vs,
-        )
-    except Exception as e:
-        print(f"[zakazi_termin] email greska: {e}")
+        dt = datetime.strptime(ds, "%Y-%m-%d").date()
+        datum_lepo = dt.strftime("%d.%m.%Y")
+    except ValueError:
+        datum_lepo = ds
 
     return {
-        "odgovor": formatiraj_potvrda(
-            ime_pacient=ime_pacient,
-            ime_lekar=info["ime_lekar"],
-            specialty=info["specialty"],
-            datum_str=ds,
-            vreme_str=vs,
-        ),
-        "kontekst": {
-            "zakazi_od_slobodni": {
-                "doctor_id": did,
-                "datum": ds,
-            },
-            "last_doctor_id": int(doctor_id),
-        },
+        "odgovor": _poraka_prasanje_napomena(lekar_text, datum_lepo, vs),
+        "kontekst": _postavi_ceka_napomena(kontekst, did, ds, vs),
     }

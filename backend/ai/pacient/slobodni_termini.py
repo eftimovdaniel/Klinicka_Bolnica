@@ -139,6 +139,24 @@ def prasanje_bar_lekar_od_kontekst(prasanje: str) -> bool:
     )
 
 
+def prasanje_e_otkazuvanje(prasanje: str) -> bool:
+    """Откажување на термин (откажи, откажеш, откажам, …)."""
+    p = transliterijaj(prasanje).lower()
+    if "откаж" in p or "otkaz" in p:
+        return True
+    if "cancel" in p and "termin" in p:
+        return True
+    return any(
+        x in p
+        for x in (
+            "сторнира",
+            "поништи термин",
+            "не доаѓам",
+            "не сакам термин",
+        )
+    )
+
+
 def baranje_e_zakazuvanje(prasanje: str) -> bool:
     """Дали пораката е закажување (не повторна проверка на слободни термини)."""
     q = transliterijaj(prasanje).lower()
@@ -171,7 +189,7 @@ def baranje_e_zakazuvanje(prasanje: str) -> bool:
         )
     ):
         return True
-    if "закаж" in q and not any(
+    if "закаж" in q and "откаж" not in q and not any(
         w in q
         for w in (
             "слобод",
@@ -226,31 +244,50 @@ def datum_od_zakazi_kontekst(kontekst: dict | None) -> date | None:
     return None
 
 
-def prasanje_e_specijalnost_izbran_lekar(prasanje: str) -> bool:
-    """„Во која област / специјалност е избраниот лекар?" (не слободни термини)."""
+def prasanje_e_specijalnost_izbran_lekar(
+    prasanje: str, kontekst: dict | None = None
+) -> bool:
+    """
+    Прашање за специјалност/област — „избраниот лекар“ или „лекарот“ од контекст.
+    (не слободни термини)
+    """
     p = transliterijaj(prasanje).lower()
-    ima_izbran = prasanje_bar_lekar_od_kontekst(prasanje) or any(
-        x in p for x in ("избран", "истиот", "погоре", "тој лекар", "togo lekar")
-    )
-    if not ima_izbran:
-        return False
-    return any(
+    if not any(
         x in p
         for x in (
             "област",
             "специјалност",
             "оддел",
             "каде работи",
-            "што е",
             "која е",
+            "кое е",
+            "од која",
             "koja oblast",
             "vo koja",
             "specijalnost",
             "oblast",
             "oddel",
-            "raboti",
         )
-    )
+    ):
+        return False
+    if prasanje_bar_lekar_od_kontekst(prasanje):
+        return True
+    if any(x in p for x in ("избран", "истиот", "погоре", "тој лекар", "togo lekar")):
+        return True
+    if lekar_od_zakazi_kontekst(kontekst) and any(
+        x in p
+        for x in (
+            "лекарот",
+            "лекар",
+            "д-р",
+            " др",
+            "докторот",
+            "toj lekar",
+            "togo lekar",
+        )
+    ):
+        return True
+    return False
 
 
 def resolviraj_lekar_za_slobodni(

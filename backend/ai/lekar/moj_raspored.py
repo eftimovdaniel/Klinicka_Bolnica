@@ -16,6 +16,7 @@ from datetime import date, timedelta
 
 from database import get_connection
 from ai._kernel.auth import require_lekar
+from ai._kernel.napomena import napomena_za_prikaz_lekar
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 
@@ -159,8 +160,9 @@ def odgovori_za_raspored(prasanje: str, lekar: dict | None) -> str:
             linija = (
                 f"• {_fmt_vreme(r['vreme_pregled'])} — {r['ime_pacient']} (ID {r['termin_ID']})"
             )
-            if r.get("napomena"):
-                linija += f"\n  Напомена: {r['napomena']}"
+            nap = napomena_za_prikaz_lekar(r.get("napomena"))
+            if nap:
+                linija += f"\n  Напомена: {nap}"
             linii.append(linija)
         linii.append("")
 

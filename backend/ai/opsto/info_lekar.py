@@ -135,7 +135,9 @@ def _dezuren_status(dezurstva: list[dict]) -> str:
 
 
 def _resolviraj_lekar(prasanje: str, kontekst: dict | None) -> tuple[dict | None, bool]:
-    if prasanje_bar_lekar_od_kontekst(prasanje) or prasanje_e_specijalnost_izbran_lekar(prasanje):
+    if prasanje_bar_lekar_od_kontekst(prasanje) or prasanje_e_specijalnost_izbran_lekar(
+        prasanje, kontekst
+    ):
         lekar = lekar_od_zakazi_kontekst(kontekst)
         if lekar:
             return lekar, True
@@ -166,38 +168,48 @@ def _e_prasanje_dali_raboti(prasanje: str) -> bool:
     )
 
 
-def _format_info_lekar(lekar: dict, prasanje: str, od_kontekst: bool) -> str:
-    ime = f"Д-р {lekar['name']} {lekar['surname']}"
+def _format_info_lekar(
+    lekar: dict, prasanje: str, od_kontekst: bool, kontekst: dict | None = None
+) -> str:
+    """Ист шаблон за секој лекар — без повторување на специјалност."""
     spec = lekar.get("specialty") or "Општа пракса"
     email = (lekar.get("email") or "").strip()
     doctor_id = lekar["doctor_ID"]
     dezurstva = zimi_dezurstva_za_lekar(doctor_id)
+    prezime = lekar.get("surname") or ""
+    ime = f"д-р {lekar['name']} {lekar['surname']}"
 
-    if prasanje_e_specijalnost_izbran_lekar(prasanje):
-        return (
-            f"А од која област е: {ime}\n\n"
-            f"Специјалност: {spec}.\n"
-            f"Email: {email if email else '—'}"
-        )
-
-    if _e_prasanje_dali_raboti(prasanje):
-        naslov = f"Да, {ime} работи во Клиничка Болница Штип."
-    else:
-        naslov = f"Информации за {ime}"
-
-    delovi = [
-        naslov,
-        "",
-        f"Име и презиме: {lekar['name']} {lekar['surname']}",
-        f"Специјалност / оддел: {spec}",
-        f"Email: {email if email else '—'}",
-        _dezuren_status(dezurstva),
+    footer = [
         "",
         "Доколку сакате преглед, најавете се со кориснички профил на сајтот.",
-        f'За слободни термини напишете: „Кога е слободен д-р {lekar["surname"]}?"',
+        f'За слободни термини напишете: „Кога е слободен д-р {prezime}?"',
     ]
+
+    # Избраниот лекар / област — само име, специјалност, email
+    if prasanje_e_specijalnost_izbran_lekar(prasanje, kontekst):
+        return "\n".join(
+            [
+                f"Име и презиме: {lekar['name']} {lekar['surname']}",
+                f"Специјалност: {spec}",
+                f"Email: {email if email else '—'}",
+            ]
+        )
+
+    # Општи информации за лекар
+    delovi = [f"{ime} ({spec})"]
     if od_kontekst:
-        delovi.insert(1, "(Од претходната порака во разговорот.)")
+        delovi.append("(Од претходната порака во разговорот.)")
+    if _e_prasanje_dali_raboti(prasanje):
+        delovi.append("")
+        delovi.append("Да, работи во Клиничка Болница Штип.")
+    delovi.extend(
+        [
+            "",
+            f"Email: {email if email else '—'}",
+            _dezuren_status(dezurstva),
+            *footer,
+        ]
+    )
     return "\n".join(delovi)
 
 
@@ -216,7 +228,9 @@ def odgovori_za_info_lekar(prasanje: str, kontekst: dict | None = None) -> str |
     lekar, od_kontekst = _resolviraj_lekar(prasanje, kontekst)
 
     if not lekar:
-        if prasanje_bar_lekar_od_kontekst(prasanje) or prasanje_e_specijalnost_izbran_lekar(prasanje):
+        if prasanje_bar_lekar_od_kontekst(prasanje) or prasanje_e_specijalnost_izbran_lekar(
+            prasanje, kontekst
+        ):
             return {
                 "odgovor": (
                     "Не гледам зачуван избран лекар од претходната порака.\n\n"
@@ -234,5 +248,5 @@ def odgovori_za_info_lekar(prasanje: str, kontekst: dict | None = None) -> str |
             "kontekst": kontekst if isinstance(kontekst, dict) else None,
         }
 
-    text = _format_info_lekar(lekar, prasanje, od_kontekst)
+    text = _format_info_lekar(lekar, prasanje, od_kontekst, kontekst)
     return {"odgovor": text, "kontekst": _kontekst_posle_info(lekar, kontekst)}
