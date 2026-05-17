@@ -22,8 +22,8 @@ def _load() -> dict:
         return {}
 
 
-def odgovori_za_faq_pregled(prashanje: str) -> str:
-    p = (prashanje or "").lower().strip()
+def odgovori_za_faq_pregled(prasanje: str) -> str:
+    p = (prasanje or "").lower().strip()
     if not p:
         return "Напиши го прашањето (на пр. дали на гладно, што да понесам на преглед)."
 
@@ -53,7 +53,7 @@ def odgovori_za_faq_pregled(prashanje: str) -> str:
 
     try:
         ai_odg = ask_ai(
-            f'Прашање: „{prashanje}"',
+            f'Прашање: „{prasanje}"',
             system_prompt=load_prompt("faq_pregled"),
         ).strip()
         if ai_odg:

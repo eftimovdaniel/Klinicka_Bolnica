@@ -21,10 +21,10 @@ from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 
 
-def izvlechi_potsetnik(prashanje: str) -> dict:
+def izvlechi_potsetnik(prasanje: str) -> dict:
     """Извлекува offset и датум за потсетник."""
     denes = date.today().strftime("%Y-%m-%d")
-    full_prompt = f'Денес: {denes}\n\nКорисник: „{prashanje}"\n\nИзвлечи податоци.'
+    full_prompt = f'Денес: {denes}\n\nКорисник: „{prasanje}"\n\nИзвлечи податоци.'
 
     odgovor = ask_ai(full_prompt, system_prompt=load_prompt("potsetnik_extract"))
     podatoci = parse_ai_json(odgovor, log_tag="postavi_potsetnik")
@@ -63,7 +63,7 @@ def najdi_termin_za_potsetnik(pacient_email: str, datum: str | None) -> dict | N
         cur.close()
         return rezultat
     except Exception as e:
-        print(f"[postavi_potsetnik] greshka: {e}")
+        print(f"[postavi_potsetnik] greska: {e}")
         return None
     finally:
         if conn:
@@ -84,7 +84,7 @@ def vmetni_potsetnik(termin_id: int, pacient_email: str, vreme_potsetuvanje: dat
         cur.close()
         return True
     except Exception as e:
-        print(f"[postavi_potsetnik] insert greshka: {e}")
+        print(f"[postavi_potsetnik] insert greska: {e}")
         return False
     finally:
         if conn:
@@ -113,12 +113,12 @@ def format_offset(minuti: int) -> str:
     return f"{minuti} минути"
 
 
-def odgovori_za_potsetnik(prashanje: str, pacient: dict | None) -> str:
+def odgovori_za_potsetnik(prasanje: str, pacient: dict | None) -> str:
     """Главна точка."""
     if not pacient or not pacient.get("email"):
         return 'За да поставиш потсетник, прво најави се како пациент.'
 
-    izvleceno = izvlechi_potsetnik(prashanje)
+    izvleceno = izvlechi_potsetnik(prasanje)
     offset_min = izvleceno["offset_minuti"]
     datum_str = izvleceno.get("datum")
 

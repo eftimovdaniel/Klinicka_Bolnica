@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from ai._kernel.handlers import AiContext, dispatch
 from ai._kernel.intent_detector import detektiraj_intent
-from ai._kernel.transliteracija import normaliziraj_prashanje
+from ai._kernel.transliteracija import normaliziraj_prasanje
 from ai_chat_store import (
     create_session,
     delete_session,
@@ -28,7 +28,7 @@ from ai_chat_store import (
 
 router = APIRouter(prefix="/ai-chat", tags=["AI Chat"])
 
-MAX_PRASHANJE_LEN = 4000
+MAX_PRASANJE_LEN = 4000
 
 
 class PacientModel(BaseModel):
@@ -49,7 +49,7 @@ class LekarModel(BaseModel):
 
 
 class PitanjeModel(BaseModel):
-    prashanje: str = Field(..., max_length=MAX_PRASHANJE_LEN)
+    prasanje: str = Field(..., max_length=MAX_PRASANJE_LEN)
     pacient: PacientModel | None = None
     lekar: LekarModel | None = None
     kontekst: dict | None = None
@@ -58,7 +58,7 @@ class PitanjeModel(BaseModel):
 
 class GuestChatMessage(BaseModel):
     uloga: str
-    sodrzina: str = Field(..., max_length=MAX_PRASHANJE_LEN)
+    sodrzina: str = Field(..., max_length=MAX_PRASANJE_LEN)
 
 
 class GuestImportModel(BaseModel):
@@ -201,7 +201,10 @@ def _resolve_intent(
         intent = "moi_pregledi"
 
     from ai.pacient.slobodni_termini import (
+        baranje_e_zakazuvanje,
         cilj_datum_lokalno,
+        datum_od_zakazi_kontekst,
+        prasanje_bar_datum_od_kontekst,
         prasanje_bar_lekar_od_kontekst,
         prasanje_e_sleden_raboten_den,
         prasanje_e_specijalnost_izbran_lekar,
@@ -215,12 +218,6 @@ def _resolve_intent(
     if has_lekar_kontekst and prasanje_e_specijalnost_izbran_lekar(pitanje_norm):
         return "info_lekar"
 
-    if isinstance(aktiven_kontekst, dict) and (
-        aktiven_kontekst.get("zakazi_od_slobodni") or aktiven_kontekst.get("zakazi_pending")
-    ):
-        if prasanje_bar_lekar_od_kontekst(pitanje_norm):
-            return "slobodni_termini"
-
     has_zakazi_flow = bool(
         aktiven_kontekst
         and (
@@ -230,6 +227,12 @@ def _resolve_intent(
     )
     if has_zakazi_flow:
         q = pitanje_norm.lower()
+        if baranje_e_zakazuvanje(pitanje_norm):
+            return "zakazi_termin"
+        if prasanje_bar_datum_od_kontekst(pitanje_norm) and datum_od_zakazi_kontekst(
+            aktiven_kontekst
+        ):
+            return "zakazi_termin"
         if prasanje_e_sleden_raboten_den(pitanje_norm):
             return "slobodni_termini"
         if prasanje_e_specijalnost_izbran_lekar(pitanje_norm):
@@ -244,6 +247,10 @@ def _resolve_intent(
                 "од листата",
                 "од горе",
             )
+        ) and not baranje_e_zakazuvanje(pitanje_norm):
+            return "slobodni_termini"
+        if prasanje_bar_lekar_od_kontekst(pitanje_norm) and not baranje_e_zakazuvanje(
+            pitanje_norm
         ):
             return "slobodni_termini"
         # Закажување со време / „закажи во 10:30“
@@ -272,7 +279,9 @@ def _resolve_intent(
         ):
             intent = "zakazi_termin"
         # Следна порака: друг ден / „наредниот петок“ кај истиот лекар
-        elif intent in ("general", "zakazi_termin"):
+        elif intent in ("general", "zakazi_termin") and not baranje_e_zakazuvanje(
+            pitanje_norm
+        ):
             if cilj_datum_lokalno(pitanje_norm) or any(
                 w in q
                 for w in (
@@ -282,7 +291,6 @@ def _resolve_intent(
                     "термин",
                     "има ли",
                     "кога",
-                    "може",
                     "наредн",
                     "следн",
                     "утре",
@@ -295,6 +303,9 @@ def _resolve_intent(
                     "сабота",
                     "недела",
                 )
+            ) or (
+                "може" in q
+                and not any(x in q for x in ("закаж", "zakaz", "преглед"))
             ):
                 intent = "slobodni_termini"
 
@@ -407,13 +418,13 @@ def delete_chat_session(
 
 @router.post("/ask")
 def ask(data: PitanjeModel):
-    pitanje = (data.prashanje or "").strip()
+    pitanje = (data.prasanje or "").strip()
     if not pitanje:
         return {"odgovor": "Те молам внеси прашање."}
-    if len(pitanje) > MAX_PRASHANJE_LEN:
-        return {"odgovor": f"Пораката е предолга (макс. {MAX_PRASHANJE_LEN} знаци)."}
+    if len(pitanje) > MAX_PRASANJE_LEN:
+        return {"odgovor": f"Пораката е предолга (макс. {MAX_PRASANJE_LEN} знаци)."}
 
-    pitanje_norm = normaliziraj_prashanje(pitanje)
+    pitanje_norm = normaliziraj_prasanje(pitanje)
     pacient_dict = _pacient_dict(data.pacient)
     lekar_dict = _lekar_dict(data.lekar)
     aktiven_kontekst = data.kontekst if isinstance(data.kontekst, dict) else None

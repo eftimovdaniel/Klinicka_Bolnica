@@ -8,8 +8,8 @@ from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 
 
-def _izvlechi(prashanje: str) -> dict:
-    odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=load_prompt("pacient_moi_pregledi"))
+def _izvlechi(prasanje: str) -> dict:
+    odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=load_prompt("pacient_moi_pregledi"))
     print(f"[moi_pregledi] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="moi_pregledi")
 
@@ -40,14 +40,14 @@ STATUS_OZNAKI = {
 }
 
 
-def odgovori_za_moi_pregledi(prashanje: str, pacient: dict | None) -> str:
+def odgovori_za_moi_pregledi(prasanje: str, pacient: dict | None) -> str:
     if not pacient or not pacient.get("email"):
         return (
             'За да ги видиш своите прегледи преку AI асистентот, прво најави '
             'се како пациент (горе десно копчето „Најави се").'
         )
 
-    podatoci = _izvlechi(prashanje)
+    podatoci = _izvlechi(prasanje)
     if podatoci.get("_error"):
         return podatoci["_error"]
 
@@ -99,7 +99,7 @@ def odgovori_za_moi_pregledi(prashanje: str, pacient: dict | None) -> str:
         rows = cur.fetchall() or []
         cur.close()
     except Exception as e:
-        print(f"[moi_pregledi] DB greshka: {e}")
+        print(f"[moi_pregledi] DB greska: {e}")
         return "Се случи грешка при вчитувањето на твоите прегледи. Те молам обиди се повторно."
     finally:
         if conn:

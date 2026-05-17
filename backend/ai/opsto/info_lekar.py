@@ -9,7 +9,7 @@
 from datetime import date, datetime, time, timedelta
 
 from database import get_connection
-from ai._kernel.lekar_lookup import najdi_lekar_od_prashanje
+from ai._kernel.lekar_lookup import najdi_lekar_od_prasanje
 from ai._kernel.transliteracija import transliterijaj
 from ai.pacient.slobodni_termini import (
     lekar_od_zakazi_kontekst,
@@ -37,7 +37,7 @@ def zimi_dezurstva_za_lekar(doctor_id: int, denovi_napred: int = 7) -> list[dict
         cur.close()
         return rezultati
     except Exception as e:
-        print(f"[info_lekar] dezurstva greshka: {e}")
+        print(f"[info_lekar] dezurstva greska: {e}")
         return []
     finally:
         if conn:
@@ -134,20 +134,20 @@ def _dezuren_status(dezurstva: list[dict]) -> str:
     return "Дежурен: Не"
 
 
-def _resolviraj_lekar(prashanje: str, kontekst: dict | None) -> tuple[dict | None, bool]:
-    if prasanje_bar_lekar_od_kontekst(prashanje) or prasanje_e_specijalnost_izbran_lekar(prashanje):
+def _resolviraj_lekar(prasanje: str, kontekst: dict | None) -> tuple[dict | None, bool]:
+    if prasanje_bar_lekar_od_kontekst(prasanje) or prasanje_e_specijalnost_izbran_lekar(prasanje):
         lekar = lekar_od_zakazi_kontekst(kontekst)
         if lekar:
             return lekar, True
-    lekar = najdi_lekar_od_prashanje(prashanje)
+    lekar = najdi_lekar_od_prasanje(prasanje)
     if lekar:
         return lekar, False
     lekar = lekar_od_zakazi_kontekst(kontekst)
     return lekar, lekar is not None
 
 
-def _e_prasanje_dali_raboti(prashanje: str) -> bool:
-    p = transliterijaj(prashanje).lower()
+def _e_prasanje_dali_raboti(prasanje: str) -> bool:
+    p = transliterijaj(prasanje).lower()
     return any(
         w in p
         for w in (
@@ -166,25 +166,21 @@ def _e_prasanje_dali_raboti(prashanje: str) -> bool:
     )
 
 
-def _format_info_lekar(lekar: dict, prashanje: str, od_kontekst: bool) -> str:
+def _format_info_lekar(lekar: dict, prasanje: str, od_kontekst: bool) -> str:
     ime = f"Д-р {lekar['name']} {lekar['surname']}"
     spec = lekar.get("specialty") or "Општа пракса"
     email = (lekar.get("email") or "").strip()
     doctor_id = lekar["doctor_ID"]
     dezurstva = zimi_dezurstva_za_lekar(doctor_id)
 
-    if prasanje_e_specijalnost_izbran_lekar(prashanje):
-        uvod = (
-            f"(Од претходната порака: {ime}.)\n\n"
-            if od_kontekst
-            else ""
-        )
+    if prasanje_e_specijalnost_izbran_lekar(prasanje):
         return (
-            f"{uvod}{ime} работи во областа / специјалност: {spec}.\n"
+            f"А од која област е: {ime}\n\n"
+            f"Специјалност: {spec}.\n"
             f"Email: {email if email else '—'}"
         )
 
-    if _e_prasanje_dali_raboti(prashanje):
+    if _e_prasanje_dali_raboti(prasanje):
         naslov = f"Да, {ime} работи во Клиничка Болница Штип."
     else:
         naslov = f"Информации за {ime}"
@@ -216,11 +212,11 @@ def _kontekst_posle_info(lekar: dict, kontekst: dict | None) -> dict:
     return ctx
 
 
-def odgovori_za_info_lekar(prashanje: str, kontekst: dict | None = None) -> str | dict:
-    lekar, od_kontekst = _resolviraj_lekar(prashanje, kontekst)
+def odgovori_za_info_lekar(prasanje: str, kontekst: dict | None = None) -> str | dict:
+    lekar, od_kontekst = _resolviraj_lekar(prasanje, kontekst)
 
     if not lekar:
-        if prasanje_bar_lekar_od_kontekst(prashanje) or prasanje_e_specijalnost_izbran_lekar(prashanje):
+        if prasanje_bar_lekar_od_kontekst(prasanje) or prasanje_e_specijalnost_izbran_lekar(prasanje):
             return {
                 "odgovor": (
                     "Не гледам зачуван избран лекар од претходната порака.\n\n"
@@ -238,5 +234,5 @@ def odgovori_za_info_lekar(prashanje: str, kontekst: dict | None = None) -> str 
             "kontekst": kontekst if isinstance(kontekst, dict) else None,
         }
 
-    text = _format_info_lekar(lekar, prashanje, od_kontekst)
+    text = _format_info_lekar(lekar, prasanje, od_kontekst)
     return {"odgovor": text, "kontekst": _kontekst_posle_info(lekar, kontekst)}

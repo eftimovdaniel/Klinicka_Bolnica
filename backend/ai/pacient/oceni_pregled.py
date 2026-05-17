@@ -22,7 +22,7 @@ from ai._kernel.groq_client import ask_ai
 from ai.pacient.slobodni_termini import zimi_site_lekari
 
 
-def izvlechi_ocena_podatoci(prashanje: str) -> dict:
+def izvlechi_ocena_podatoci(prasanje: str) -> dict:
     """Извлекува оцена, коментар, лекар и датум од пораката."""
     site_lekari = zimi_site_lekari()
 
@@ -40,7 +40,7 @@ def izvlechi_ocena_podatoci(prashanje: str) -> dict:
 Лекари:
 {lista_text}
 
-Корисник: „{prashanje}"
+Корисник: „{prasanje}"
 
 Извлечи ocena, komentar, doctor_id и datum.
 """.strip()
@@ -96,7 +96,7 @@ def najdi_zaversen_termin(pacient_email: str, doctor_id: int | None, datum: str 
         return rezultati
 
     except Exception as e:
-        print(f"[oceni_pregled] greshka: {e}")
+        print(f"[oceni_pregled] greska: {e}")
         return []
     finally:
         if conn:
@@ -126,7 +126,7 @@ def vmetni_ili_azhuriraj_ocena(termin_id: int, ocena: int, komentar: str | None)
         cur.close()
         return True
     except Exception as e:
-        print(f"[oceni_pregled] insert greshka: {e}")
+        print(f"[oceni_pregled] insert greska: {e}")
         return False
     finally:
         if conn:
@@ -144,7 +144,7 @@ def format_vreme(v) -> str:
     return str(v)[:5]
 
 
-def odgovori_za_ocenuvanje(prashanje: str, pacient: dict | None) -> str:
+def odgovori_za_ocenuvanje(prasanje: str, pacient: dict | None) -> str:
     """Главна точка - повикана од router-от."""
     if not pacient or not pacient.get("email"):
         return (
@@ -152,7 +152,7 @@ def odgovori_za_ocenuvanje(prashanje: str, pacient: dict | None) -> str:
             'Кликни „Најави се!" горе десно.'
         )
 
-    izvleceno = izvlechi_ocena_podatoci(prashanje)
+    izvleceno = izvlechi_ocena_podatoci(prasanje)
     ocena = izvleceno.get("ocena")
     komentar = izvleceno.get("komentar")
     doctor_id = izvleceno.get("doctor_id")

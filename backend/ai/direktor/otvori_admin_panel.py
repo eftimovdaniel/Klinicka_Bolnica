@@ -6,9 +6,9 @@ from ai._kernel.auth import require_direktor, require_lekar
 from ai._kernel.transliteracija import transliterijaj
 
 
-def _baranje_e_prikazi_dezurstvo_vo_admin(prashanje: str) -> bool:
+def _baranje_e_prikazi_dezurstvo_vo_admin(prasanje: str) -> bool:
     """„Прикажи го во админ" по преглед на дежурство."""
-    p = transliterijaj(prashanje).lower()
+    p = transliterijaj(prasanje).lower()
     ima_admin = any(
         x in p
         for x in (
@@ -37,8 +37,8 @@ def _baranje_e_prikazi_dezurstvo_vo_admin(prashanje: str) -> bool:
     )
 
 
-def _odredi_subtab(prashanje: str) -> str:
-    p = transliterijaj(prashanje).lower()
+def _odredi_subtab(prasanje: str) -> str:
+    p = transliterijaj(prasanje).lower()
     if any(x in p for x in ("оглас", "огласи", "kariera", "oglas", "вработување")):
         return "oglasi-admin"
     if any(x in p for x in ("новост", "новости", "вест", "vesti")):
@@ -53,7 +53,7 @@ def _odredi_subtab(prashanje: str) -> str:
 
 
 def odgovori_za_otvori_admin(
-    prashanje: str,
+    prasanje: str,
     lekar: dict | None,
     kontekst: dict | None = None,
 ) -> dict:
@@ -74,7 +74,7 @@ def odgovori_za_otvori_admin(
             ),
         }
 
-    subtab = _odredi_subtab(prashanje)
+    subtab = _odredi_subtab(prasanje)
     labels = {
         "dezurstva-admin": "Управување со дежурства",
         "oglasi-admin": "Управување со огласи",
@@ -92,7 +92,7 @@ def odgovori_za_otvori_admin(
     odgovor_extra = ""
 
     dk = (kontekst or {}).get("dezurstvo_kontekst") if kontekst else None
-    if dk and subtab == "dezurstva-admin" and _baranje_e_prikazi_dezurstvo_vo_admin(prashanje):
+    if dk and subtab == "dezurstva-admin" and _baranje_e_prikazi_dezurstvo_vo_admin(prasanje):
         if dk.get("doctor_id"):
             navigacija["doctor_id"] = dk["doctor_id"]
         if dk.get("datum"):

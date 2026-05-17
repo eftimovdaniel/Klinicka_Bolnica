@@ -105,7 +105,7 @@ def zimi_site_oddeli() -> tuple[str, ...]:
             )
             oddeli = [r["oddel"] for r in cur.fetchall() if r.get("oddel")]
     except Exception as e:
-        print(f"[oddel_resolver] fetch greshka: {e}")
+        print(f"[oddel_resolver] fetch greska: {e}")
         return tuple()
     return tuple(sorted({*speci, *oddeli}, key=lambda x: (len(x), x)))
 
@@ -160,10 +160,10 @@ def _match_tocno_ili_blisko(baran: str, site: tuple[str, ...]) -> str | None:
     return None
 
 
-def _pravila_izvlechi(prashanje: str, site: tuple[str, ...]) -> tuple[str | None, str]:
-    p = _normaliziraj(prashanje)
+def _pravila_izvlechi(prasanje: str, site: tuple[str, ...]) -> tuple[str | None, str]:
+    p = _normaliziraj(prasanje)
 
-    m = _RE_ODDEL_ZA.search(prashanje)
+    m = _RE_ODDEL_ZA.search(prasanje)
     if m:
         fragment = next((g.strip() for g in m.groups() if g), "")
         if fragment:
@@ -182,7 +182,7 @@ def _pravila_izvlechi(prashanje: str, site: tuple[str, ...]) -> tuple[str | None
     return None, ""
 
 
-def _ai_izberi_od_lista(prashanje: str, site: tuple[str, ...]) -> str | None:
+def _ai_izberi_od_lista(prasanje: str, site: tuple[str, ...]) -> str | None:
     if not site:
         return None
     lista = json.dumps(list(site), ensure_ascii=False)
@@ -191,9 +191,9 @@ def _ai_izberi_od_lista(prashanje: str, site: tuple[str, ...]) -> str | None:
     prompt = load_prompt_template(
         "oddel_closed_list",
         lista=lista,
-        prashanje=prashanje,
+        prasanje=prasanje,
     )
-    odgovor = ask_ai(f"Прашање: {prashanje}", system_prompt=prompt)
+    odgovor = ask_ai(f"Прашање: {prasanje}", system_prompt=prompt)
     data = parse_ai_json(odgovor, log_tag="oddel_resolver")
     if data.get("_error"):
         return "_error"
@@ -207,7 +207,7 @@ def _ai_izberi_od_lista(prashanje: str, site: tuple[str, ...]) -> str | None:
     return None
 
 
-def resolve_oddel(prashanje: str) -> OddelResolveResult:
+def resolve_oddel(prasanje: str) -> OddelResolveResult:
     """
     Главна функција: од прашање → каноничко име од база или јасна грешка.
     """
@@ -222,7 +222,7 @@ def resolve_oddel(prashanje: str) -> OddelResolveResult:
             poraka_greska="Нема регистрирани оддели во системот.",
         )
 
-    oddel, method = _pravila_izvlechi(prashanje, site)
+    oddel, method = _pravila_izvlechi(prasanje, site)
     if oddel:
         return OddelResolveResult(
             ok=True,
@@ -232,7 +232,7 @@ def resolve_oddel(prashanje: str) -> OddelResolveResult:
             method=method,
         )
 
-    ai_val = _ai_izberi_od_lista(prashanje, site)
+    ai_val = _ai_izberi_od_lista(prasanje, site)
     if ai_val == "_error":
         return OddelResolveResult(
             ok=False,

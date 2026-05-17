@@ -65,9 +65,9 @@ PROMPT_LICENCA = """
 """.strip()
 
 
-def _tekst_e_zalepen_oglas(prashanje: str) -> bool:
+def _tekst_e_zalepen_oglas(prasanje: str) -> bool:
     """Цел текст на оглас (копиран од сајт/FB), не само „сакам да аплицирам“."""
-    p = transliterijaj(prashanje).lower()
+    p = transliterijaj(prasanje).lower()
     ima_oglas = any(
         x in p
         for x in (
@@ -98,9 +98,9 @@ def _tekst_e_zalepen_oglas(prashanje: str) -> bool:
     return ima_oglas and ima_pozicija
 
 
-def _izvlechi_pozicija_od_oglas_pravila(prashanje: str) -> str | None:
+def _izvlechi_pozicija_od_oglas_pravila(prasanje: str) -> str | None:
     """Брзо извлекување од типичен текст на оглас (без Groq)."""
-    p = transliterijaj(prashanje).lower()
+    p = transliterijaj(prasanje).lower()
     if "медицинск" in p and "сестр" in p:
         return "Медицинска сестра"
     if "гинекол" in p or "гиникол" in p:
@@ -117,7 +117,7 @@ def _izvlechi_pozicija_od_oglas_pravila(prashanje: str) -> str | None:
         return "Уролог"
     if "анестез" in p:
         return "Анестезиолог"
-    m = re.search(r"\(([^)]+)\)", prashanje)
+    m = re.search(r"\(([^)]+)\)", prasanje)
     if m:
         inner = m.group(1).strip()
         if len(inner) > 3 and len(inner) < 80:
@@ -125,13 +125,13 @@ def _izvlechi_pozicija_od_oglas_pravila(prashanje: str) -> str | None:
     return None
 
 
-def _baraj_pozicija_za_aplikacija(prashanje: str) -> str | None:
+def _baraj_pozicija_za_aplikacija(prasanje: str) -> str | None:
     """Позиција од оглас (правила) или преку AI."""
-    if _tekst_e_zalepen_oglas(prashanje):
-        poz = _izvlechi_pozicija_od_oglas_pravila(prashanje)
+    if _tekst_e_zalepen_oglas(prasanje):
+        poz = _izvlechi_pozicija_od_oglas_pravila(prasanje)
         if poz:
             return poz
-    return _izvlechi_pozicija(prashanje)
+    return _izvlechi_pozicija(prasanje)
 
 
 def _odgovor_bara_pacient_login(kontekst_za_po_login: dict | None, prikaz_pozicija: str) -> dict:
@@ -153,9 +153,9 @@ def _odgovor_bara_pacient_login(kontekst_za_po_login: dict | None, prikaz_pozici
     return out
 
 
-def _prasanje_e_opsto_za_rabota(prashanje: str) -> bool:
+def _prasanje_e_opsto_za_rabota(prasanje: str) -> bool:
     """„Аплицирам за работа" без конкретна позиција/специјалност."""
-    p = transliterijaj(prashanje).lower()
+    p = transliterijaj(prasanje).lower()
     if not any(
         w in p
         for w in (
@@ -234,9 +234,9 @@ def _format_pozicija_oglas(oglas: dict) -> str:
     return f'„{poz}"'
 
 
-def _parse_da_ne(prashanje: str) -> str | None:
+def _parse_da_ne(prasanje: str) -> str | None:
     """Враќа 'da', 'ne' или None."""
-    p = transliterijaj(prashanje).lower().strip()
+    p = transliterijaj(prasanje).lower().strip()
     p = re.sub(r"[^\w\sа-яѓќѕџ]+", " ", p, flags=re.IGNORECASE)
     p = re.sub(r"\s+", " ", p).strip()
 
@@ -289,7 +289,7 @@ def _pocni_potvrda_flow(oglas: dict) -> dict:
         ),
         "kontekst": {
             "intent": "apliciraj_za_rabota",
-            "cekam": "potvrda",
+            "ceka": "potvrda",
             "pozicija": pozicija_naslov,
             "id_oglas": id_o,
             "oddel": oglas.get("oddel") or "",
@@ -323,7 +323,7 @@ def _pocni_licenca_flow(oglas: dict, pacient: dict) -> dict:
         ),
         "kontekst": {
             "intent": "apliciraj_za_rabota",
-            "cekam": "licenca",
+            "ceka": "licenca",
             "pozicija": pozicija_naslov,
             "id_oglas": id_o,
         },
@@ -387,8 +387,8 @@ def _odgovor_izberi_pozicija(pacient: dict) -> dict:
     }
 
 
-def _izvlechi_pozicija(prashanje: str) -> str | None:
-    odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=PROMPT_POZICIJA)
+def _izvlechi_pozicija(prasanje: str) -> str | None:
+    odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=PROMPT_POZICIJA)
     print(f"[apliciraj] pozicija AI: {odgovor!r}")
     data = parse_ai_json(odgovor, log_tag="apliciraj_pozicija")
     if data.get("_error"):
@@ -397,9 +397,9 @@ def _izvlechi_pozicija(prashanje: str) -> str | None:
     return str(val).strip() if val else None
 
 
-def _izvlechi_licenca(prashanje: str) -> tuple[str | None, bool]:
+def _izvlechi_licenca(prasanje: str) -> tuple[str | None, bool]:
     """Враќа (licenca, preskoki)."""
-    odgovor = ask_ai(f"Одговор: „{prashanje}\"", system_prompt=PROMPT_LICENCA)
+    odgovor = ask_ai(f"Одговор: „{prasanje}\"", system_prompt=PROMPT_LICENCA)
     print(f"[apliciraj] licenca AI: {odgovor!r}")
     data = parse_ai_json(odgovor, log_tag="apliciraj_licenca")
     if data.get("_error"):
@@ -424,7 +424,7 @@ def _najdi_aktiven_oglas(pozicija_baranо: str) -> dict | None:
         site = fetch_aktivni_oglasi_rows(cur)
         cur.close()
     except Exception as e:
-        print(f"[apliciraj] DB greshka: {e}")
+        print(f"[apliciraj] DB greska: {e}")
         return None
     finally:
         if conn:
@@ -479,7 +479,7 @@ def _zapisi_aplikacija(
         cur.close()
         return True, ""
     except Exception as e:
-        print(f"[apliciraj] INSERT greshka: {e}")
+        print(f"[apliciraj] INSERT greska: {e}")
         return False, str(e)
     finally:
         if conn:
@@ -487,7 +487,7 @@ def _zapisi_aplikacija(
 
 
 def odgovori_za_aplikacija(
-    prashanje: str,
+    prasanje: str,
     pacient: dict | None,
     kontekst: dict | None,
 ) -> dict:
@@ -497,14 +497,14 @@ def odgovori_za_aplikacija(
     Логика:
     - Ако нема пациент логиран → бара логин.
     - Ако нема активен kontekst → почни нов flow: извлечи позиција, потврди, прашај за лиценца.
-    - Ако има активен kontekst со cekam='licenca' → прими лиценца и испрати апликација.
-    - Ако има активен kontekst со cekam='potvrduvanje' → потврди и испрати.
+    - Ако има активен kontekst со ceka='licenca' → прими лиценца и испрати апликација.
+    - Ако има активен kontekst со ceka='potvrduvanje' → потврди и испрати.
     """
 
-    cekam = (kontekst or {}).get("cekam")
+    ceka = (kontekst or {}).get("ceka")
 
     # По најава: продолжи од зачуваниот оглас
-    if cekam == "login" and pacient and pacient.get("email"):
+    if ceka == "login" and pacient and pacient.get("email"):
         oglas = _oglas_od_kontekst(kontekst or {})
         if oglas.get("id_oglas") and oglas.get("pozicija"):
             return _pocni_potvrda_flow(
@@ -517,8 +517,8 @@ def odgovori_za_aplikacija(
             )
 
     if not pacient or not pacient.get("email"):
-        if not cekam and (_tekst_e_zalepen_oglas(prashanje) or "аплиц" in transliterijaj(prashanje).lower()):
-            baran = _baraj_pozicija_za_aplikacija(prashanje)
+        if not ceka and (_tekst_e_zalepen_oglas(prasanje) or "аплиц" in transliterijaj(prasanje).lower()):
+            baran = _baraj_pozicija_za_aplikacija(prasanje)
             if baran:
                 oglas = _najdi_aktiven_oglas(baran)
                 if oglas:
@@ -526,7 +526,7 @@ def odgovori_za_aplikacija(
                     return _odgovor_bara_pacient_login(
                         {
                             "intent": "apliciraj_za_rabota",
-                            "cekam": "login",
+                            "ceka": "login",
                             "pozicija": oglas["pozicija"],
                             "id_oglas": oglas["id_oglas"],
                             "oddel": oglas.get("oddel") or "",
@@ -547,11 +547,11 @@ def odgovori_za_aplikacija(
     id_oglas = (kontekst or {}).get("id_oglas")
 
     # === Чекор 1: нов flow — извлечи позиција ===
-    if not cekam:
-        if _prasanje_e_opsto_za_rabota(prashanje):
+    if not ceka:
+        if _prasanje_e_opsto_za_rabota(prasanje):
             return _odgovor_izberi_pozicija(pacient)
 
-        baran = _baraj_pozicija_za_aplikacija(prashanje)
+        baran = _baraj_pozicija_za_aplikacija(prasanje)
         if not baran:
             return _odgovor_izberi_pozicija(pacient)
 
@@ -570,8 +570,8 @@ def odgovori_za_aplikacija(
         return _pocni_potvrda_flow(oglas)
 
     # === Чекор 2: потврда (да / не) ===
-    if cekam == "potvrda":
-        odluka = _parse_da_ne(prashanje)
+    if ceka == "potvrda":
+        odluka = _parse_da_ne(prasanje)
         if odluka is None:
             prikaz = _format_pozicija_oglas(_oglas_od_kontekst(kontekst or {}))
             return {
@@ -586,8 +586,8 @@ def odgovori_za_aplikacija(
         return _pocni_licenca_flow(_oglas_od_kontekst(kontekst or {}), pacient)
 
     # === Чекор 3: лиценца ===
-    if cekam == "licenca":
-        licenca, preskoki = _izvlechi_licenca(prashanje)
+    if ceka == "licenca":
+        licenca, preskoki = _izvlechi_licenca(prasanje)
         if licenca is None and not preskoki:
             return {
                 "odgovor": (
@@ -629,7 +629,7 @@ def odgovori_za_aplikacija(
             "kontekst": None,
         }
 
-    # Безбедност: непознат cekam – чисти го контекстот
+    # Безбедност: непознат ceka – чисти го контекстот
     return {
         "odgovor": 'Те молам обиди се повторно: „Сакам да аплицирам за [позиција]".',
         "kontekst": None,

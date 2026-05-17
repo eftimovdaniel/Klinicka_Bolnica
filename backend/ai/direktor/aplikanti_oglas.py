@@ -5,8 +5,8 @@ from ai._kernel.db_helpers import as_dict, db_cursor  # pomos za MySQL kursor
 from ai._kernel.groq_client import ask_ai  # povik kon Groq (Llama)
 
 
-def _izvlechi(prashanje: str) -> dict:  # izvleci pozicija ili id_oglas od prasanjeto
-    odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=load_prompt("direktor_aplikanti_oglas"))  # AI analiza
+def _izvlechi(prasanje: str) -> dict:  # izvleci pozicija ili id_oglas od prasanjeto
+    odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=load_prompt("direktor_aplikanti_oglas"))  # AI analiza
     print(f"[aplikanti] AI: {odgovor!r}")  # log za debug
     return parse_ai_json(odgovor, log_tag="aplikanti_oglas")  # dict ili _error
 
@@ -19,11 +19,11 @@ def _format_datum(d) -> str:  # lep format na datum_prijava
     return str(d)[:16]  # string skraten
 
 
-def odgovori_za_aplikanti(prashanje: str, lekar: dict | None) -> str:  # glaven handler (intent aplikanti_oglas)
+def odgovori_za_aplikanti(prasanje: str, lekar: dict | None) -> str:  # glaven handler (intent aplikanti_oglas)
     if err := require_direktor(lekar):  # proveri uloga direktor
         return err  # odbien pristap
 
-    podatoci = _izvlechi(prashanje)  # {pozicija, id_oglas} od AI
+    podatoci = _izvlechi(prasanje)  # {pozicija, id_oglas} od AI
     if podatoci.get("_error"):  # Groq limit ili los JSON
         return podatoci["_error"]  # prikazi greska
 
@@ -52,10 +52,10 @@ def odgovori_za_aplikanti(prashanje: str, lekar: dict | None) -> str:  # glaven 
                 params.append(f"%{pozicija.strip().lower()}%")  # npr. %kardiolog%
 
             sql += " ORDER BY datum_prijava DESC"  # najnovi prvi
-            cur.execute(sql, tuple(params))  # izvrsi query
+            cur.execute(sql, tuple(params))  # izvrshi query
             rows = cur.fetchall() or []  # lista redovi
     except Exception as e:  # greska na baza
-        print(f"[aplikanti] DB greshka: {e}")  # log
+        print(f"[aplikanti] DB greska: {e}")  # log
         return "Се случи грешка при вчитувањето на апликантите. Те молам обиди се повторно."  # poraka
 
     if not rows:  # nema rezultati

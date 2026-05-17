@@ -451,12 +451,12 @@ from ai._kernel.transliteracija import transliterijaj
 from ai._kernel.ai_intent_detector import detektiraj_intent_so_ai
 
 
-def _ima_zbor(prashanje: str, kluchni: list[str]) -> bool:
+def _ima_zbor(prasanje: str, kluchni: list[str]) -> bool:
     """Помошна функција - проверка на клучни зборови."""
-    return any(zbor in prashanje for zbor in kluchni)
+    return any(zbor in prasanje for zbor in kluchni)
 
 
-def _prasanje_e_konkreten_lekar(prashanje: str) -> bool:
+def _prasanje_e_konkreten_lekar(prasanje: str) -> bool:
     """
     Прашање за конкретен лекар по име (не листа/навигација).
     Пр. „Дали работи др Марија Хубрева?", „Кој е д-р Петров?"
@@ -465,12 +465,12 @@ def _prasanje_e_konkreten_lekar(prashanje: str) -> bool:
 
     from ai._kernel.lekar_lookup import izvlechi_delovi_ime
 
-    p = transliterijaj(prashanje).lower()
+    p = transliterijaj(prasanje).lower()
     if _ima_zbor(p, KLUCNI_SLOBODNI):
         return False
     if any(w in p for w in ("кои лекари", "кои доктори", "лекари на", "лекари од")):
         return False
-    delovi = izvlechi_delovi_ime(prashanje)
+    delovi = izvlechi_delovi_ime(prasanje)
     if len(delovi) >= 2:
         return True
     if len(delovi) == 1 and re.search(r"\b(д-р|др|dr)\b", p, re.UNICODE):
@@ -572,22 +572,22 @@ def _tekst_e_oglas_za_objava(p: str) -> bool:
     return False
 
 
-def detektiraj_intent_keyword(prashanje: str) -> str | None:
+def detektiraj_intent_keyword(prasanje: str) -> str | None:
     """
     Брза проверка преку клучни зборови.
     Враќа: име на интент ИЛИ None ако нема јасно совпаѓање.
     """
-    if not prashanje:
+    if not prasanje:
         return None
 
     # ВРВ (пред транслитерација): провери за YouTube линк во оригинален текст
     # (трансли. би ги претворила www.youtube.com → ввв.јоутубе.цом)
-    orig_low = prashanje.lower().strip()
+    orig_low = prasanje.lower().strip()
     if "youtube.com" in orig_low or "youtu.be" in orig_low:
         return "objavi_vest"
 
     # Автоматски преводи: латиница → кирилица
-    p = transliterijaj(prashanje).lower().strip()
+    p = transliterijaj(prasanje).lower().strip()
 
     # Директор: креирај / објави оглас (пред navigacija и apliciraj)
     if any(
@@ -787,7 +787,7 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
         return "info_lekar"
 
     # Конкретен лекар по име — пред навигација („во оваа болница работи др X")
-    if _prasanje_e_konkreten_lekar(prashanje) or _ima_zbor(p, KLUCNI_INFO_LEKAR):
+    if _prasanje_e_konkreten_lekar(prasanje) or _ima_zbor(p, KLUCNI_INFO_LEKAR):
         return "info_lekar"
 
     # Навигација – пред uslugi
@@ -909,7 +909,7 @@ def detektiraj_intent_keyword(prashanje: str) -> str | None:
     return None  # нема jasen keyword match
 
 
-def detektiraj_intent(prashanje: str) -> str:
+def detektiraj_intent(prasanje: str) -> str:
     """
     Главна функција - хибриден пристап.
 
@@ -917,20 +917,20 @@ def detektiraj_intent(prashanje: str) -> str:
     2. Ако не најде → AI (Groq) за природни варијации.
     3. Ако и AI не успее → "general".
     """
-    if not prashanje:
+    if not prasanje:
         return "general"
 
     # Чекор 1: keyword detector со транслитерација
-    intent = detektiraj_intent_keyword(prashanje)
+    intent = detektiraj_intent_keyword(prasanje)
     if intent:
         return intent
 
     # Чекор 2: AI fallback - проба со Groq
     try:
-        ai_intent = detektiraj_intent_so_ai(prashanje)
+        ai_intent = detektiraj_intent_so_ai(prasanje)
         if ai_intent:
             return ai_intent
     except Exception as e:
-        print(f"[intent_detector] AI fallback greshka: {e}")
+        print(f"[intent_detector] AI fallback greska: {e}")
 
     return "general"

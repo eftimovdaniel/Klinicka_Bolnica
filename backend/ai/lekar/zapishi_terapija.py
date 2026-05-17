@@ -55,8 +55,8 @@ PROMPT = """
 """.strip()
 
 
-def _izvlechi(prashanje: str) -> dict:
-    odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=PROMPT)
+def _izvlechi(prasanje: str) -> dict:
+    odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=PROMPT)
     print(f"[zapishi_terapija] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="zapishi_terapija")
 
@@ -76,7 +76,7 @@ def _najdi_termin_po_id(doctor_id: int, termin_id: int) -> dict | None:
         cur.close()
         return r
     except Exception as e:
-        print(f"[zapishi_terapija] DB greshka: {e}")
+        print(f"[zapishi_terapija] DB greska: {e}")
         return None
     finally:
         if conn:
@@ -109,7 +109,7 @@ def _najdi_termini_po_ime(doctor_id: int, ime_pacient: str) -> list[dict]:
         cur.close()
         return rows
     except Exception as e:
-        print(f"[zapishi_terapija] DB greshka: {e}")
+        print(f"[zapishi_terapija] DB greska: {e}")
         return []
     finally:
         if conn:
@@ -145,7 +145,7 @@ def _update_terapija(
         cur.close()
         return True
     except Exception as e:
-        print(f"[zapishi_terapija] UPDATE greshka: {e}")
+        print(f"[zapishi_terapija] UPDATE greska: {e}")
         return False
     finally:
         if conn:
@@ -171,14 +171,14 @@ def _format_vreme(v) -> str:
     return str(v)[:5]
 
 
-def odgovori_za_terapija(prashanje: str, lekar: dict | None) -> str:
+def odgovori_za_terapija(prasanje: str, lekar: dict | None) -> str:
     if not lekar or not lekar.get("doctor_ID"):
         return (
             "За да запишеш терапија преку AI асистентот, прво најави "
             "се како лекар."
         )
 
-    podatoci = _izvlechi(prashanje)
+    podatoci = _izvlechi(prasanje)
     if podatoci.get("_error"):
         return podatoci["_error"]
 
@@ -214,7 +214,7 @@ def odgovori_za_terapija(prashanje: str, lekar: dict | None) -> str:
         if not ok:
             return "Се случи грешка при зачувувањето. Те молам обиди се повторно."
 
-        return _ispisi_uspesh(termin, dijagnoza, terapija, avtomatski)
+        return _ispisi_po_uspesno(termin, dijagnoza, terapija, avtomatski)
 
     # --- Сценарио B: даден е ime_pacient ---
     if not ime_pacient:
@@ -235,7 +235,7 @@ def odgovori_za_terapija(prashanje: str, lekar: dict | None) -> str:
         ok = _update_terapija(t["termin_ID"], dijagnoza, terapija, avtomatski)
         if not ok:
             return "Се случи грешка при зачувувањето. Те молам обиди се повторно."
-        return _ispisi_uspesh(t, dijagnoza, terapija, avtomatski)
+        return _ispisi_po_uspesno(t, dijagnoza, terapija, avtomatski)
 
     # Има повеќе → понуди им избор (земи го најновиот „закажан" или „завршен"
     # без терапија, иначе кажи на доктор да даде ID)
@@ -280,10 +280,10 @@ def odgovori_za_terapija(prashanje: str, lekar: dict | None) -> str:
     ok = _update_terapija(najpriroditen["termin_ID"], dijagnoza, terapija, avtomatski)
     if not ok:
         return "Се случи грешка при зачувувањето. Те молам обиди се повторно."
-    return _ispisi_uspesh(najpriroditen, dijagnoza, terapija, avtomatski)
+    return _ispisi_po_uspesno(najpriroditen, dijagnoza, terapija, avtomatski)
 
 
-def _ispisi_uspesh(termin: dict, dijagnoza: str | None, terapija: str | None,
+def _ispisi_po_uspesno(termin: dict, dijagnoza: str | None, terapija: str | None,
                    avtomatski_zavrshi: bool) -> str:
     pac = (termin.get("ime_pacient") or "").strip() or "—"
     dat = _format_datum(termin.get("datum_pregled"))

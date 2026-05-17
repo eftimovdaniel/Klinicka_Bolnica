@@ -9,7 +9,7 @@ AI-driven intent detector со Groq (Llama 3.3 70B).
 - AI го разбира значењето, не само зборовите.
 
 Стратегија:
-- Главна функција: detektiraj_intent_so_ai(prashanje)
+- Главна функција: detektiraj_intent_so_ai(prasanje)
 - Прима природен текст, враќа intent string
 - Ако AI не одговори јасно → "general" (па одговара со општ AI)
 
@@ -68,19 +68,19 @@ VALIDNI_INTENTI = {
 }
 
 
-def detektiraj_intent_so_ai(prashanje: str) -> str:
+def detektiraj_intent_so_ai(prasanje: str) -> str:
     """
     Праша AI (Groq) да го класифицира прашањето во еден од поддржаните интенти.
 
     Враќа: име на интент (string). При било каква грешка → "general".
     """
-    if not prashanje or not prashanje.strip():
+    if not prasanje or not prasanje.strip():
         return "general"
 
     try:
-        odgovor = ask_ai(prashanje.strip(), system_prompt=load_prompt("intent_classifier"))
+        odgovor = ask_ai(prasanje.strip(), system_prompt=load_prompt("intent_classifier"))
     except Exception as e:
-        print(f"[ai_intent] greshka pri AI: {e}")
+        print(f"[ai_intent] greska pri AI: {e}")
         return "general"
 
     # Исчисти го одговорот

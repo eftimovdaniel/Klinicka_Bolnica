@@ -84,7 +84,7 @@ def _aktivni_oglasi_za_kariera() -> list[dict]:
             )
         return out
     except Exception as e:
-        print(f"[navigacija] greshka pri citanje oglasi: {e}")
+        print(f"[navigacija] greska pri citanje oglasi: {e}")
         return []
     finally:
         if conn and conn.is_connected():
@@ -114,19 +114,19 @@ def _tekst_za_kariera(oglasi: list[dict]) -> str:
     return "\n".join(linii)
 
 
-def _izvlechi(prashanje: str) -> dict:
-    odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=PROMPT)
+def _izvlechi(prasanje: str) -> dict:
+    odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=PROMPT)
     print(f"[navigacija] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="navigacija")
 
 
-def odgovori_za_navigacija(prashanje: str) -> dict:
+def odgovori_za_navigacija(prasanje: str) -> dict:
     """
     Враќа dict со 2 ставки:
     - odgovor: текст да го прикажеме во чатот
     - navigacija: dict со {target, label} - frontend-от ќе скрола/пренасочи
     """
-    podatoci = _izvlechi(prashanje)
+    podatoci = _izvlechi(prasanje)
     if podatoci.get("_error"):
         return {"odgovor": podatoci["_error"]}
 
@@ -152,7 +152,7 @@ def odgovori_za_navigacija(prashanje: str) -> dict:
 
             return odgovor_navigacija_lekari()
         except Exception as e:
-            print(f"[navigacija] greshka pri navigacija lekari: {e}")
+            print(f"[navigacija] greska pri navigacija lekari: {e}")
             odgovor = (
                 'Ве пренасочувам кон делот „Лекари" на почетната страница. '
                 "Листата со лекари ќе ја видите на екранот."

@@ -11,12 +11,12 @@ from ai._kernel.auth import require_direktor
 from ai._kernel.db_helpers import as_dict, db_cursor
 
 
-def _period_od_prashanje(prashanje: str) -> tuple[date, date, str]:
+def _period_od_prasanje(prasanje: str) -> tuple[date, date, str]:
     """
     Враќа (start, end, label).
     „недела“ = тековна календарска недела (пон–нед).
     """
-    p = (prashanje or "").lower()
+    p = (prasanje or "").lower()
     denes = date.today()
     if any(
         w in p
@@ -38,11 +38,11 @@ def _period_od_prashanje(prashanje: str) -> tuple[date, date, str]:
     return denes, denes, f"денес ({denes.strftime('%d.%m.%Y')})"
 
 
-def odgovori_za_izvestaj(prashanje: str, lekar: dict | None) -> str:
+def odgovori_za_izvestaj(prasanje: str, lekar: dict | None) -> str:
     if err := require_direktor(lekar):
         return err
 
-    d0, d1, label = _period_od_prashanje(prashanje)
+    d0, d1, label = _period_od_prasanje(prasanje)
 
     try:
         with db_cursor() as (_, cur):

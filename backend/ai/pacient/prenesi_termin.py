@@ -18,12 +18,12 @@ from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 
 
-def izvlechi_prenesi(prashanje: str) -> dict:
+def izvlechi_prenesi(prasanje: str) -> dict:
     """Извлекува стар/нов датум и време за пренос на термин."""
     denes = date.today().strftime("%Y-%m-%d")
     denes_den = ["понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"][date.today().weekday()]
 
-    full_prompt = f'Денес: {denes} ({denes_den})\n\nКорисник: „{prashanje}"\n\nИзвлечи податоци.'
+    full_prompt = f'Денес: {denes} ({denes_den})\n\nКорисник: „{prasanje}"\n\nИзвлечи податоци.'
 
     odgovor = ask_ai(full_prompt, system_prompt=load_prompt("prenesi_extract"))
     podatoci = parse_ai_json(odgovor, log_tag="prenesi_termin")
@@ -62,7 +62,7 @@ def najdi_aktivni_termini(pacient_email: str, datum: str | None) -> list[dict]:
         cur.close()
         return rezultati
     except Exception as e:
-        print(f"[prenesi_termin] najdi greshka: {e}")
+        print(f"[prenesi_termin] najdi greska: {e}")
         return []
     finally:
         if conn:
@@ -85,7 +85,7 @@ def proveri_slobodno(doctor_id: int, datum_str: str, vreme_str: str, exclude_ter
         """, (doctor_id, datum_str, vreme_str, exclude_termin_id))
         return cur.fetchone() is None
     except Exception as e:
-        print(f"[prenesi_termin] proveri greshka: {e}")
+        print(f"[prenesi_termin] proveri greska: {e}")
         return False
     finally:
         if conn:
@@ -107,7 +107,7 @@ def izvrsi_prenesuvanje(termin_id: int, nov_datum: str, novo_vreme: str) -> bool
         cur.close()
         return True
     except Exception as e:
-        print(f"[prenesi_termin] update greshka: {e}")
+        print(f"[prenesi_termin] update greska: {e}")
         return False
     finally:
         if conn:
@@ -125,12 +125,12 @@ def format_vreme(v) -> str:
     return str(v)[:5]
 
 
-def odgovori_za_prenesuvanje(prashanje: str, pacient: dict | None) -> str:
+def odgovori_za_prenesuvanje(prasanje: str, pacient: dict | None) -> str:
     """Главна точка."""
     if not pacient or not pacient.get("email"):
         return 'За да префрлиш термин, прво најави се како пациент.'
 
-    izvleceno = izvlechi_prenesi(prashanje)
+    izvleceno = izvlechi_prenesi(prasanje)
     nov_datum = izvleceno.get("nov_datum")
     novo_vreme = izvleceno.get("novo_vreme")
     star_datum = izvleceno.get("star_datum")

@@ -26,8 +26,8 @@ _ROKOVI = (
 )
 
 
-def _izvlechi(prashanje: str) -> dict:
-    full = f"{today_prompt_line()}\n\nКорисник: {prashanje!r}\n\nИзвлечи податоци."
+def _izvlechi(prasanje: str) -> dict:
+    full = f"{today_prompt_line()}\n\nКорисник: {prasanje!r}\n\nИзвлечи податоци."
     odgovor = ask_ai(full, system_prompt=load_prompt("rezultati_testovi_extract"))
     return parse_ai_json(odgovor, log_tag="rezultati_testovi")
 
@@ -42,13 +42,13 @@ def _rok_od_tip(tip: str | None) -> tuple[str, str]:
     return tip.strip(), "обично за 1–3 работни дена; за точен датум — рецепција (032/ 605-001) или вашиот лекар."
 
 
-def odgovori_za_rezultati(prashanje: str) -> str:
-    pod = _izvlechi(prashanje)
+def odgovori_za_rezultati(prasanje: str) -> str:
+    pod = _izvlechi(prasanje)
     tip = (pod.get("tip_test") or "").strip() or None
     label, rok = _rok_od_tip(tip)
 
     if not tip:
-        p = transliterijaj(prashanje).lower()
+        p = transliterijaj(prasanje).lower()
         for kluc, lbl, r in _ROKOVI:
             if kluc in p:
                 label, rok = lbl, r

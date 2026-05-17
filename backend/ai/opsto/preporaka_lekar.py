@@ -31,7 +31,7 @@ def zimi_site_specialnosti() -> list[str]:
         cur.close()
         return [r["specialty"] for r in rezultati]
     except Exception as e:
-        print(f"[preporaka_lekar] greshka: {e}")
+        print(f"[preporaka_lekar] greska: {e}")
         return []
     finally:
         if conn:
@@ -54,19 +54,19 @@ def najdi_lekari_po_specialnost(specialnost: str) -> list[dict]:
         cur.close()
         return rezultati
     except Exception as e:
-        print(f"[preporaka_lekar] greshka: {e}")
+        print(f"[preporaka_lekar] greska: {e}")
         return []
     finally:
         if conn:
             conn.close()
 
 
-def odgovori_za_preporaka(prashanje: str) -> str:
+def odgovori_za_preporaka(prasanje: str) -> str:
     """
     Главна точка - повикана од router-от.
 
     Параметри:
-        prashanje - опис на симптом од корисник
+        prasanje - опис на симптом од корисник
 
     Враќа: текстуален одговор со препораки.
     """
@@ -80,7 +80,7 @@ def odgovori_za_preporaka(prashanje: str) -> str:
 Достапни специјалности во болницата:
 {lista_text}
 
-Симптом/опис од пациент: „{prashanje}"
+Симптом/опис од пациент: „{prasanje}"
 
 Која специјалност препорачуваш?
 """.strip()

@@ -49,8 +49,8 @@ def _den_naredna_nedela(denes: date, ime_den: str) -> date:
     return pocetok_naredna + timedelta(days=twd)
 
 
-def _rok_lokalno_od_prashanje(prashanje: str, denes: date) -> date | None:
-    p = transliterijaj(prashanje).lower()
+def _rok_lokalno_od_prasanje(prasanje: str, denes: date) -> date | None:
+    p = transliterijaj(prasanje).lower()
 
     m = _RE_NAR_NEDELA_DO.search(p)
     if m:
@@ -90,7 +90,7 @@ def _rok_lokalno_od_prashanje(prashanje: str, denes: date) -> date | None:
             except ValueError:
                 pass
 
-    m4 = _RE_ROK_DMY.search(prashanje)
+    m4 = _RE_ROK_DMY.search(prasanje)
     if m4:
         d, mo, y = int(m4.group(1)), int(m4.group(2)), int(m4.group(3))
         try:
@@ -187,11 +187,11 @@ def _pozicija_od_tekst(p: str) -> str | None:
     return None
 
 
-def _izvlechi_pravila(prashanje: str, site_oddeli: list[str], denes: date) -> dict:
-    p = transliterijaj(prashanje).lower()
+def _izvlechi_pravila(prasanje: str, site_oddeli: list[str], denes: date) -> dict:
+    p = transliterijaj(prasanje).lower()
     poz = _pozicija_od_tekst(p)
     odd = _oddel_od_tekst(p, site_oddeli)
-    rok_dt = _rok_lokalno_od_prashanje(prashanje, denes)
+    rok_dt = _rok_lokalno_od_prasanje(prasanje, denes)
     return {
         "pozicija": poz,
         "oddel": odd,
@@ -199,11 +199,11 @@ def _izvlechi_pravila(prashanje: str, site_oddeli: list[str], denes: date) -> di
     }
 
 
-def _izvlechi_ai(prashanje: str, denes: date, site_oddeli: list[str]) -> dict:
+def _izvlechi_ai(prasanje: str, denes: date, site_oddeli: list[str]) -> dict:
     prompt = (
         f"{today_prompt_line()} ({denes.strftime('%d.%m.%Y')}).\n\n"
         f"Оддели во базата: {', '.join(site_oddeli)}\n\n"
-        f"Текст од корисникот:\n{prashanje}\n\nВрати JSON."
+        f"Текст од корисникот:\n{prasanje}\n\nВрати JSON."
     )
     odgovor = ask_ai(prompt, system_prompt=load_prompt("direktor_kreiraj_oglas"))
     print(f"[kreiraj_oglas] AI: {odgovor!r}")
@@ -227,8 +227,8 @@ def _spoj_izvlecheno(pravila: dict, ai: dict) -> tuple[str | None, str | None, d
     return poz, odd_raw, rok
 
 
-def _samo_naslov_bez_detali(prashanje: str) -> bool:
-    p = re.sub(r"\s+", " ", transliterijaj(prashanje).lower().strip())
+def _samo_naslov_bez_detali(prasanje: str) -> bool:
+    p = re.sub(r"\s+", " ", transliterijaj(prasanje).lower().strip())
     return p in (
         "оглас за работа",
         "oglas za rabota",
@@ -239,11 +239,11 @@ def _samo_naslov_bez_detali(prashanje: str) -> bool:
     )
 
 
-def odgovori_za_kreiranje_oglas(prashanje: str, lekar: dict | None) -> str:
+def odgovori_za_kreiranje_oglas(prasanje: str, lekar: dict | None) -> str:
     if err := require_direktor(lekar):
         return err
 
-    if _samo_naslov_bez_detali(prashanje):
+    if _samo_naslov_bez_detali(prasanje):
         return (
             "Сакате да објавите оглас — во ред.\n\n"
             "Пишете слободно, како што ви е згодно, на пример:\n"
@@ -254,14 +254,14 @@ def odgovori_za_kreiranje_oglas(prashanje: str, lekar: dict | None) -> str:
     denes = date.today()
     site_oddeli = _zimi_oddeli()
 
-    pravila = _izvlechi_pravila(prashanje, site_oddeli, denes)
-    ai = _izvlechi_ai(prashanje, denes, site_oddeli)
+    pravila = _izvlechi_pravila(prasanje, site_oddeli, denes)
+    ai = _izvlechi_ai(prasanje, denes, site_oddeli)
     if ai.get("_error"):
         ai = {}
 
     pozicija, oddel_raw, rok = _spoj_izvlecheno(pravila, ai)
     oddel = _najdi_oddel(oddel_raw or "", site_oddeli) if oddel_raw else _oddel_od_tekst(
-        transliterijaj(prashanje).lower(), site_oddeli
+        transliterijaj(prasanje).lower(), site_oddeli
     )
 
     if not pozicija or not oddel:

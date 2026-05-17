@@ -8,7 +8,7 @@
 from datetime import date, datetime, time
 
 from database import get_connection
-from ai._kernel.lekar_lookup import najdi_lekar_od_prashanje
+from ai._kernel.lekar_lookup import najdi_lekar_od_prasanje
 from ai.opsto.info_lekar import format_vreme, _as_time, _format_datum
 from ai.direktor.dezurstvo_kontekst import izgradи_kontekst
 
@@ -32,7 +32,7 @@ def zimi_idni_dezurstva(doctor_id: int, limit: int = 30) -> list[dict]:
         cur.close()
         return rows
     except Exception as e:
-        print(f"[pregled_dezurstvo] greshka: {e}")
+        print(f"[pregled_dezurstvo] greska: {e}")
         return []
     finally:
         if conn:
@@ -66,11 +66,11 @@ def _e_na_dezurstvo_sega(d: dict, sega: datetime) -> bool:
 
 
 def odgovori_za_pregled_dezurstvo(
-    prashanje: str,
+    prasanje: str,
     lekar: dict | None = None,
     kontekst: dict | None = None,
 ) -> dict:
-    found = najdi_lekar_od_prashanje(prashanje)
+    found = najdi_lekar_od_prasanje(prasanje)
     if not found:
         return {
             "odgovor": (

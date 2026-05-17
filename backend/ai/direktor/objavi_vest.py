@@ -52,7 +52,7 @@ def _zimi_transcript(video_id: str) -> str | None:
         tekst = " ".join(s.text.strip() for s in tr if s.text)
         return tekst[:8000] if tekst else None
     except Exception as e:
-        print(f"[objavi_vest] transcript greshka: {e}")
+        print(f"[objavi_vest] transcript greska: {e}")
         return None
 
 
@@ -79,12 +79,12 @@ def _generiraj_vest(transcript: str, naslov_yt: str | None) -> dict:
     return {"_error": "AI врати неочекуван формат."}
 
 
-def odgovori_za_objava_vest(prashanje: str, lekar: dict | None) -> str:
+def odgovori_za_objava_vest(prasanje: str, lekar: dict | None) -> str:
     """Главна точка - повикана од router-от."""
     if err := require_direktor(lekar):
         return err
 
-    vid = _video_id(prashanje)
+    vid = _video_id(prasanje)
     if not vid:
         return (
             'Испрати ми YouTube линк.\n\n'

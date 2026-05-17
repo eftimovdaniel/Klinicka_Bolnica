@@ -27,7 +27,7 @@ def zimi_oddeli() -> list[str]:
         cur.close()
         return [r["ime_na_oddel"] for r in rezultati]
     except Exception as e:
-        print(f"[uslugi] oddeli greshka: {e}")
+        print(f"[uslugi] oddeli greska: {e}")
         return []
     finally:
         if conn:
@@ -50,7 +50,7 @@ def zimi_aparati() -> list[dict]:
         cur.close()
         return rezultati
     except Exception as e:
-        print(f"[uslugi] aparati greshka: {e}")
+        print(f"[uslugi] aparati greska: {e}")
         return []
     finally:
         if conn:
@@ -64,11 +64,11 @@ def zimi_dopolnitelni_uslugi() -> list[str]:
             info = json.load(f)
         return info.get("uslugi_dopolnitelni", [])
     except Exception as e:
-        print(f"[uslugi] json greshka: {e}")
+        print(f"[uslugi] json greska: {e}")
         return []
 
 
-def odgovori_za_uslugi(prashanje: str) -> str:
+def odgovori_za_uslugi(prasanje: str) -> str:
     """
     Главна точка - повикана од router-от.
     Прикажува сите услуги, групирани.

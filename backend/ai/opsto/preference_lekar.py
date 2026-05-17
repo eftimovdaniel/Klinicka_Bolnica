@@ -89,8 +89,8 @@ _FOLLOWUP_MARKERS = (
 )
 
 
-def _izvlechi_pravila(prashanje: str) -> dict:
-    p = transliterijaj(prashanje).lower()
+def _izvlechi_pravila(prasanje: str) -> dict:
+    p = transliterijaj(prasanje).lower()
     pol = None
     if any(x in p for x in ("женск", "zensk", "докторк")):
         pol = "zenski"
@@ -100,14 +100,14 @@ def _izvlechi_pravila(prashanje: str) -> dict:
         "pol": pol,
         "jazik": None,
         "iskustvo": None,
-        "specialnost": prashanje,
+        "specialnost": prasanje,
     }
 
 
-def _izvlechi(prashanje: str) -> dict:
+def _izvlechi(prasanje: str) -> dict:
     try:
         odgovor = ask_ai(
-            f"Прашање: {prashanje!r}",
+            f"Прашање: {prasanje!r}",
             system_prompt=load_prompt("preference_lekar_extract"),
         )
         pod = parse_ai_json(odgovor, log_tag="preference_lekar")
@@ -115,7 +115,7 @@ def _izvlechi(prashanje: str) -> dict:
             return pod
     except Exception as e:
         print(f"[preference_lekar] AI extract: {e}")
-    return _izvlechi_pravila(prashanje)
+    return _izvlechi_pravila(prasanje)
 
 
 def _verojatno_zenski(ime: str) -> bool:
@@ -154,8 +154,8 @@ def _lekari_po_specialty(specialty: str) -> list[dict]:
         return list(cur.fetchall() or [])
 
 
-def _e_nastavok(prashanje: str) -> bool:
-    p = transliterijaj(prashanje).lower()
+def _e_nastavok(prasanje: str) -> bool:
+    p = transliterijaj(prasanje).lower()
     return any(m in p for m in _FOLLOWUP_MARKERS)
 
 
@@ -169,8 +169,8 @@ def _oddel_od_kontekst(kontekst: dict | None) -> str | None:
     return None
 
 
-def _specialty_se_sovpaagja(prashanje: str, specialty: str) -> bool:
-    p = transliterijaj(prashanje).lower()
+def _specialty_se_sovpaagja(prasanje: str, specialty: str) -> bool:
+    p = transliterijaj(prasanje).lower()
     sp = transliterijaj(specialty or "").lower()
     if not sp:
         return False
@@ -184,12 +184,12 @@ def _specialty_se_sovpaagja(prashanje: str, specialty: str) -> bool:
     return False
 
 
-def _najdi_oddel(prashanje: str, kontekst: dict | None) -> str | None:
-    resolved = resolve_oddel(prashanje)
+def _najdi_oddel(prasanje: str, kontekst: dict | None) -> str | None:
+    resolved = resolve_oddel(prasanje)
     if resolved.ok and resolved.oddel:
         return resolved.oddel
 
-    if _e_nastavok(prashanje) or _oddel_od_kontekst(kontekst):
+    if _e_nastavok(prasanje) or _oddel_od_kontekst(kontekst):
         oddel = _oddel_od_kontekst(kontekst)
         if oddel:
             return oddel
@@ -199,13 +199,13 @@ def _najdi_oddel(prashanje: str, kontekst: dict | None) -> str | None:
     site = zimi_site_lekari()
     for l in site:
         sp = l.get("specialty") or ""
-        if _specialty_se_sovpaagja(prashanje, sp):
+        if _specialty_se_sovpaagja(prasanje, sp):
             return sp
     return None
 
 
-def _najdi_lekari(prashanje: str, kontekst: dict | None) -> tuple[list[dict], str | None]:
-    oddel = _najdi_oddel(prashanje, kontekst)
+def _najdi_lekari(prasanje: str, kontekst: dict | None) -> tuple[list[dict], str | None]:
+    oddel = _najdi_oddel(prasanje, kontekst)
     if oddel:
         return _lekari_po_specialty(oddel), oddel
     return [], None
@@ -220,16 +220,16 @@ def _nov_kontekst(oddel: str | None, pol: str | None) -> dict:
     return ctx
 
 
-def odgovori_za_preference(prashanje: str, kontekst: dict | None = None) -> dict:
-    pod = _izvlechi(prashanje)
+def odgovori_za_preference(prasanje: str, kontekst: dict | None = None) -> dict:
+    pod = _izvlechi(prasanje)
     pol = (pod.get("pol") or "").strip().lower() or None
     if pol not in ("zenski", "muski"):
-        pol = _izvlechi_pravila(prashanje).get("pol")
+        pol = _izvlechi_pravila(prasanje).get("pol")
     if pol not in ("zenski", "muski"):
         pol = None
     jazik = (pod.get("jazik") or "").strip() or None
 
-    lekari, oddel = _najdi_lekari(prashanje, kontekst)
+    lekari, oddel = _najdi_lekari(prasanje, kontekst)
 
     if not oddel:
         return {

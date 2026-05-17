@@ -138,7 +138,7 @@ def transliterijaj(tekst: str) -> str:
     return "".join(rezultat)
 
 
-def normaliziraj_prashanje(tekst: str) -> str:
+def normaliziraj_prasanje(tekst: str) -> str:
     """
     Главна функција за нормализација на корисничко прашање:
     1. Тргни вишок белина

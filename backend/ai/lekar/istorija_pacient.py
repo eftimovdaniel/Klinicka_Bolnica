@@ -32,8 +32,8 @@ PROMPT = """
 """.strip()
 
 
-def _izvlechi(prashanje: str) -> dict:
-    odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=PROMPT)
+def _izvlechi(prasanje: str) -> dict:
+    odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=PROMPT)
     print(f"[istorija] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="istorija_pacient")
 
@@ -50,14 +50,14 @@ def _fmt_vreme(t) -> str:
     return str(t)[:5]
 
 
-def odgovori_za_istorija(prashanje: str, lekar: dict | None) -> str:
+def odgovori_za_istorija(prasanje: str, lekar: dict | None) -> str:
     """Главна точка - повикана од router-от."""
     if err := require_lekar(lekar):
         return err
 
     doctor_id = lekar["doctor_ID"]
 
-    podatoci = _izvlechi(prashanje)
+    podatoci = _izvlechi(prasanje)
     if podatoci.get("_error"):
         return podatoci["_error"]
 

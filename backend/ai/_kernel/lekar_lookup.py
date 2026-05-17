@@ -87,8 +87,8 @@ def _cist_ime_zbor(raw: str) -> str:
     return re.sub(r"[^\w\-]", "", raw, flags=re.UNICODE).lower()
 
 
-def izvlechi_delovi_ime(prashanje: str) -> list[str]:
-    p = transliterijaj(prashanje).lower()
+def izvlechi_delovi_ime(prasanje: str) -> list[str]:
+    p = transliterijaj(prasanje).lower()
 
     # Најсигурно: текст веднаш после д-р / др (не мешај со „слободен понеделник“)
     delovi: list[str] = []
@@ -116,6 +116,66 @@ def izvlechi_delovi_ime(prashanje: str) -> list[str]:
             break
 
     return delovi[:3] if delovi else []
+
+
+def _ocenka_prezime_sovpad(prezime: str, surname: str) -> int:
+    """
+    Поголема оценка = поблиску до она што корисникот најчесто мисли.
+    „Петров“ → Петровски (90), не Петровска (55) — освен ако самото бара „…ска“.
+    """
+    p = (prezime or "").strip().lower()
+    s = (surname or "").strip().lower()
+    if not p or not s:
+        return 0
+    if s == p:
+        return 100
+    if not s.startswith(p):
+        return 0
+
+    suf = s[len(p) :]
+    bara_ska = p.endswith("ска") or p.endswith("ska")
+    bara_ski = p.endswith("ски") or p.endswith("ski")
+
+    if s == p + "ски" or s == p + "ski":
+        return 95
+    if s == p + "ска" or s == p + "ska":
+        return 95 if bara_ska else 58
+
+    if suf in ("ски", "ski"):
+        return 92 if not bara_ska else 75
+    if suf in ("ска", "ska"):
+        return 92 if bara_ska else 55
+    if len(suf) <= 1:
+        return 88
+    return 72
+
+
+def _izberi_eden_od_rangiran(prezime: str, rows: list[dict]) -> list[dict]:
+    """Ако еден кандидат е јасно поблиску, врати само него."""
+    if len(rows) <= 1:
+        return rows
+
+    scored: list[tuple[int, dict]] = []
+    for r in rows:
+        oc = _ocenka_prezime_sovpad(prezime, r.get("surname") or "")
+        if oc > 0:
+            scored.append((oc, r))
+
+    if not scored:
+        return rows
+
+    scored.sort(key=lambda x: (-x[0], (x[1].get("surname") or ""), x[1].get("name") or ""))
+    najdobar, drugi = scored[0][0], scored[1][0] if len(scored) > 1 else 0
+
+    # Еден јасен победник (на пр. „петров“ → само Петровски)
+    if najdobar >= 85 and (len(scored) == 1 or najdobar - drugi >= 28):
+        return [scored[0][1]]
+
+    # Сите со иста највисока оценка — вистинска нејасност (два Петровски)
+    top = [r for o, r in scored if o == najdobar]
+    if len(top) == 1:
+        return top
+    return top
 
 
 def najdi_lekari_po_prezime(prezime: str) -> list[dict]:
@@ -148,6 +208,11 @@ def najdi_lekari_po_prezime(prezime: str) -> list[dict]:
     if exact:
         return _lekari_od_rows(exact)
 
+    if len(rows) == 1:
+        one = _lekar_od_red(rows[0])
+        return [one] if one else []
+
+    rows = _izberi_eden_od_rangiran(prezime, rows)
     if len(rows) == 1:
         one = _lekar_od_red(rows[0])
         return [one] if one else []
@@ -301,12 +366,12 @@ def delovite_odgovaraat_na_lekar(lekar: dict | None, delovi: list[str]) -> bool:
     return False
 
 
-def najdi_lekar_od_prashanje(
-    prashanje: str,
+def najdi_lekar_od_prasanje(
+    prasanje: str,
     *,
     koristi_ai: bool = True,
 ) -> dict | None:
-    delovi = izvlechi_delovi_ime(prashanje)
+    delovi = izvlechi_delovi_ime(prasanje)
     kandidati = najdi_lekari_po_delovi(delovi)
     if len(kandidati) == 1:
         return kandidati[0]
@@ -318,7 +383,7 @@ def najdi_lekar_od_prashanje(
 
     from ai.pacient.slobodni_termini import najdi_lekar_so_ai
 
-    lekar = najdi_lekar_so_ai(prashanje)
+    lekar = najdi_lekar_so_ai(prasanje)
     if not lekar:
         return None
     if delovi and not delovite_odgovaraat_na_lekar(lekar, delovi):

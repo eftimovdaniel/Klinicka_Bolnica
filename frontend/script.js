@@ -5084,11 +5084,11 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
 
   // Функција за праќање на прашање кон backend и враќање одговор.
   // Ако корисникот е логиран (пациент или лекар), ги праќа и неговите податоци.
-  async function pitajAI(prashanje) {
+  async function pitajAI(prasanje) {
     try {
       var auth = kbsAIAuthPayload();
       var body = {
-        prashanje: prashanje,
+        prasanje: prasanje,
         pacient: auth.pacientData,
         lekar: auth.lekarData,
         kontekst: kbsAIKontekst,

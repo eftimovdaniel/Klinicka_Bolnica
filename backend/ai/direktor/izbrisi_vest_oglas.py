@@ -17,10 +17,10 @@ from ai._kernel.groq_client import ask_ai
 from ai._kernel.prompt_loader import load_prompt
 
 
-def _izvlechi(prashanje: str) -> dict[str, Any]:
+def _izvlechi(prasanje: str) -> dict[str, Any]:
     """AI враќа dict со tip/id/kriterium."""
     odgovor = ask_ai(
-        f"Прашање: „{prashanje}\"",
+        f"Прашање: „{prasanje}\"",
         system_prompt=load_prompt("direktor_izbrisi_vest_oglas"),
     )
     print(f"[izbrisi] AI: {odgovor!r}")
@@ -85,12 +85,12 @@ def _izbrisi_oglas(target_id: int | None) -> str:
     )
 
 
-def odgovori_za_brisenje(prashanje: str, lekar: dict | None) -> str:
+def odgovori_za_brisenje(prasanje: str, lekar: dict | None) -> str:
     """Главна точка - повикана од router-от."""
     if err := require_direktor(lekar):
         return err
 
-    podatoci = _izvlechi(prashanje)
+    podatoci = _izvlechi(prasanje)
     if msg := ai_error_text(podatoci):
         return msg
 
@@ -98,7 +98,7 @@ def odgovori_za_brisenje(prashanje: str, lekar: dict | None) -> str:
     target_id = normalize_int(podatoci.get("id"))
 
     if tip not in ("vest", "oglas"):
-        low = prashanje.lower()
+        low = prasanje.lower()
         if any(w in low for w in ("оглас", "oglas")):
             tip = "oglas"
         elif any(w in low for w in ("вест", "новост", "vest", "novost")):

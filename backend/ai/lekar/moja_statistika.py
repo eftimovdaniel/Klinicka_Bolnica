@@ -35,8 +35,8 @@ PROMPT = """
 """.strip()
 
 
-def _izvlechi(prashanje: str) -> dict:
-    odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=PROMPT)
+def _izvlechi(prasanje: str) -> dict:
+    odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=PROMPT)
     print(f"[moja_statistika] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="moja_statistika")
 
@@ -55,14 +55,14 @@ def _period_to_dates(period: str | None) -> tuple[date | None, str]:
     return None, "од почеток"
 
 
-def odgovori_za_moja_statistika(prashanje: str, lekar: dict | None) -> str:
+def odgovori_za_moja_statistika(prasanje: str, lekar: dict | None) -> str:
     """Главна точка - повикана од router-от."""
     if err := require_lekar(lekar):
         return err
 
     doctor_id = lekar["doctor_ID"]
 
-    podatoci = _izvlechi(prashanje)
+    podatoci = _izvlechi(prasanje)
     if podatoci.get("_error"):
         return podatoci["_error"]
 

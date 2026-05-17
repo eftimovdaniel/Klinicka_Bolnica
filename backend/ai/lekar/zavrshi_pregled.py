@@ -43,8 +43,8 @@ PROMPT = """
 """.strip()
 
 
-def _izvlechi(prashanje: str) -> dict:
-    full = f'{today_prompt_line()}\n\nПрашање: „{prashanje}"\nВрати JSON.'
+def _izvlechi(prasanje: str) -> dict:
+    full = f'{today_prompt_line()}\n\nПрашање: „{prasanje}"\nВрати JSON.'
     odgovor = ask_ai(full, system_prompt=PROMPT)
     print(f"[zavrshi_pregled] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="zavrshi_pregled")
@@ -177,14 +177,14 @@ def _zavrshi_mnogu(rows: list[dict], dijagnoza: str | None, terapija: str | None
     return "\n".join(linii)
 
 
-def odgovori_za_zavrshi(prashanje: str, lekar: dict | None) -> str:
+def odgovori_za_zavrshi(prasanje: str, lekar: dict | None) -> str:
     """Главна точка - повикана од router-от."""
     if err := require_lekar(lekar):
         return err
 
     doctor_id = lekar["doctor_ID"]
 
-    podatoci = _izvlechi(prashanje)
+    podatoci = _izvlechi(prasanje)
     if podatoci.get("_error"):
         return podatoci["_error"]
 

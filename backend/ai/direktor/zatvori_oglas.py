@@ -32,8 +32,8 @@ PROMPT = """
 """.strip()
 
 
-def _izvlechi(prashanje: str) -> dict:
-    odgovor = ask_ai(f"Прашање: „{prashanje}\"", system_prompt=PROMPT)
+def _izvlechi(prasanje: str) -> dict:
+    odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=PROMPT)
     print(f"[zatvori_oglas] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="zatvori_oglas")
 
@@ -135,12 +135,12 @@ def _zatvori_site() -> str:
     return f"Затворени се {promeneti} огласи (статус: истечен)."
 
 
-def odgovori_za_zatvoranje_oglas(prashanje: str, lekar: dict | None) -> str:
+def odgovori_za_zatvoranje_oglas(prasanje: str, lekar: dict | None) -> str:
     """Главна точка - повикана од router-от."""
     if err := require_direktor(lekar):
         return err
 
-    podatoci = _izvlechi(prashanje)
+    podatoci = _izvlechi(prasanje)
     if podatoci.get("_error"):
         return podatoci["_error"]
 

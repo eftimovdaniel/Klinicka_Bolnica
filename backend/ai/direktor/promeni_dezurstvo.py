@@ -51,24 +51,24 @@ _MESECI = {
 }
 
 
-def _izvlechi_ai(prashanje: str, denes: date) -> dict:
+def _izvlechi_ai(prasanje: str, denes: date) -> dict:
     denes_den = ["понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"][
         denes.weekday()
     ]
     full = (
         f"Денес: {denes.isoformat()} ({denes_den})\n\n"
-        f'Прашање: „{prashanje}"\nВрати JSON.'
+        f'Прашање: „{prasanje}"\nВрати JSON.'
     )
     odgovor = ask_ai(full, system_prompt=PROMPT)
     print(f"[promeni_dezurstvo] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="promeni_dezurstvo")
 
 
-def _datum_od_tekst(prashanje: str, denes: date) -> date | None:
-    p = transliterijaj(prashanje).lower()
+def _datum_od_tekst(prasanje: str, denes: date) -> date | None:
+    p = transliterijaj(prasanje).lower()
     m = re.search(
         r"(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})",
-        prashanje,
+        prasanje,
     )
     if m:
         try:
@@ -91,26 +91,26 @@ def _datum_od_tekst(prashanje: str, denes: date) -> date | None:
     return None
 
 
-def _vreme_od_tekst(prashanje: str) -> tuple[str | None, str | None]:
+def _vreme_od_tekst(prasanje: str) -> tuple[str | None, str | None]:
     m = re.search(
         r"(?:од\s+)?(\d{1,2})[:.](\d{2})\s*(?:до|-|–)\s*(\d{1,2})[:.](\d{2})",
-        prashanje,
+        prasanje,
         re.IGNORECASE,
     )
     if m:
         return f"{int(m.group(1)):02d}:{m.group(2)}", f"{int(m.group(3)):02d}:{m.group(4)}"
     m2 = re.search(
         r"периодот\s+од\s+(\d{1,2})[:.](\d{2})\s+до\s+(\d{1,2})[:.](\d{2})",
-        transliterijaj(prashanje).lower(),
+        transliterijaj(prasanje).lower(),
     )
     if m2:
         return f"{int(m2.group(1)):02d}:{m2.group(2)}", f"{int(m2.group(3)):02d}:{m2.group(4)}"
     return None, None
 
 
-def _vreme_samo_do(prashanje: str) -> str | None:
+def _vreme_samo_do(prasanje: str) -> str | None:
     """«да е до 03:00», «до 03»."""
-    p = transliterijaj(prashanje).lower()
+    p = transliterijaj(prasanje).lower()
     m = re.search(
         r"(?:да\s+е\s+)?(?:до|do)\s+(\d{1,2})[:.]?(\d{2})?\b",
         p,
@@ -124,8 +124,8 @@ def _vreme_samo_do(prashanje: str) -> str | None:
     return None
 
 
-def _baranje_ista_data(prashanje: str) -> bool:
-    p = transliterijaj(prashanje).lower()
+def _baranje_ista_data(prasanje: str) -> bool:
+    p = transliterijaj(prasanje).lower()
     return any(
         x in p
         for x in (
@@ -140,18 +140,18 @@ def _baranje_ista_data(prashanje: str) -> bool:
     )
 
 
-def _baranje_e_premesti_datum(prashanje: str) -> bool:
-    p = transliterijaj(prashanje).lower()
+def _baranje_e_premesti_datum(prasanje: str) -> bool:
+    p = transliterijaj(prasanje).lower()
     return any(
         w in p
         for w in ("премести", "префрли", "пренеси", "одложи", "premesti", "prefrli")
     )
 
 
-def _baranje_e_promena(prashanje: str, ai_akcija: str | None) -> bool:
+def _baranje_e_promena(prasanje: str, ai_akcija: str | None) -> bool:
     if (ai_akcija or "").lower() == "promeni":
         return True
-    p = transliterijaj(prashanje).lower()
+    p = transliterijaj(prasanje).lower()
     return any(
         w in p
         for w in (
@@ -168,10 +168,10 @@ def _baranje_e_promena(prashanje: str, ai_akcija: str | None) -> bool:
     )
 
 
-def _baranje_e_dodadi(prashanje: str, ai_akcija: str | None) -> bool:
+def _baranje_e_dodadi(prasanje: str, ai_akcija: str | None) -> bool:
     if (ai_akcija or "").lower() == "dodadi":
         return True
-    p = transliterijaj(prashanje).lower()
+    p = transliterijaj(prasanje).lower()
     return any(
         w in p
         for w in (
@@ -193,7 +193,7 @@ def _najdi_lekar(ime_prezime: str) -> dict | None:
     from ai._kernel.lekar_lookup import (
         izvlechi_delovi_ime,
         najdi_lekar_od_delovi,
-        najdi_lekar_od_prashanje,
+        najdi_lekar_od_prasanje,
     )
 
     delovi = izvlechi_delovi_ime(ime_prezime) or [
@@ -201,7 +201,7 @@ def _najdi_lekar(ime_prezime: str) -> dict | None:
     ]
     if len(delovi) >= 2:
         return najdi_lekar_od_delovi(delovi)
-    return najdi_lekar_od_prashanje(ime_prezime)
+    return najdi_lekar_od_prasanje(ime_prezime)
 
 
 def _najdi_oddel_po_ime(oddel: str, specialty: str) -> str:
@@ -358,11 +358,11 @@ def _dodadi_dezurstvo(
     )
 
 
-def _prasanje_e_samo_pregled(prashanje: str) -> bool:
+def _prasanje_e_samo_pregled(prasanje: str) -> bool:
     from ai._kernel.intent_detector import _prasanje_e_pregled_dezurstvo
     from ai._kernel.transliteracija import transliterijaj
 
-    return _prasanje_e_pregled_dezurstvo(transliterijaj(prashanje).lower())
+    return _prasanje_e_pregled_dezurstvo(transliterijaj(prasanje).lower())
 
 
 def _odgovor(tekst: str, found: dict | None, dez: dict | None) -> dict:
@@ -375,22 +375,22 @@ def _odgovor(tekst: str, found: dict | None, dez: dict | None) -> dict:
 
 
 def odgovori_za_dezurstvo(
-    prashanje: str,
+    prasanje: str,
     lekar: dict | None,
     kontekst: dict | None = None,
 ) -> dict:
     if err := require_direktor(lekar):
         return {"odgovor": err}
 
-    if _prasanje_e_samo_pregled(prashanje):
+    if _prasanje_e_samo_pregled(prasanje):
         from ai.opsto.pregled_dezurstvo import odgovori_za_pregled_dezurstvo
 
-        raw = odgovori_za_pregled_dezurstvo(prashanje, lekar, kontekst)
+        raw = odgovori_za_pregled_dezurstvo(prasanje, lekar, kontekst)
         return raw if isinstance(raw, dict) else {"odgovor": raw}
 
     denes = date.today()
     dk = (kontekst or {}).get("dezurstvo_kontekst")
-    ai = _izvlechi_ai(prashanje, denes)
+    ai = _izvlechi_ai(prasanje, denes)
     if ai.get("_error"):
         return {"odgovor": ai["_error"]}
 
@@ -401,21 +401,21 @@ def odgovori_za_dezurstvo(
     oddel_hint = ai.get("oddel")
 
     if not datum_str:
-        dt = _datum_od_tekst(prashanje, denes)
+        dt = _datum_od_tekst(prasanje, denes)
         if dt:
             datum_str = dt.isoformat()
     if not vreme_od and not vreme_do:
-        ro, rd = _vreme_od_tekst(prashanje)
+        ro, rd = _vreme_od_tekst(prasanje)
         vreme_od, vreme_do = ro, rd
     if not vreme_do:
-        vd = _vreme_samo_do(prashanje)
+        vd = _vreme_samo_do(prasanje)
         if vd:
             vreme_do = vd
 
-    dodadi = _baranje_e_dodadi(prashanje, ai.get("akcija"))
-    promena = _baranje_e_promena(prashanje, ai.get("akcija"))
-    ista = _baranje_ista_data(prashanje)
-    if dk and not dodadi and (promena or ista or vreme_do or _vreme_samo_do(prashanje)):
+    dodadi = _baranje_e_dodadi(prasanje, ai.get("akcija"))
+    promena = _baranje_e_promena(prasanje, ai.get("akcija"))
+    ista = _baranje_ista_data(prasanje)
+    if dk and not dodadi and (promena or ista or vreme_do or _vreme_samo_do(prasanje)):
         promena = True
 
     found = _najdi_lekar(ime) if ime else None
@@ -489,7 +489,7 @@ def odgovori_za_dezurstvo(
         dez
         and not ista
         and _as_date(nov_datum) != _as_date(dez["datum"])
-        and not _baranje_e_premesti_datum(prashanje)
+        and not _baranje_e_premesti_datum(prasanje)
         and vreme_od
         and vreme_do
         and _valid_time(vreme_od)

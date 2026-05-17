@@ -26,11 +26,11 @@ def _zimi_info() -> dict:
         with open(_JSON_PATH, "r", encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
-        print(f"[bolnica_info] greshka pri citanje: {e}")
+        print(f"[bolnica_info] greska pri citanje: {e}")
         return {}
 
 
-def _najdi_oddel_so_ai(prashanje: str, oddeli: list[str]) -> str | None:
+def _najdi_oddel_so_ai(prasanje: str, oddeli: list[str]) -> str | None:
     """
     Прашува AI (Groq) кој оддел е во прашањето.
     Враќа точно име на оддел или None.
@@ -40,7 +40,7 @@ def _najdi_oddel_so_ai(prashanje: str, oddeli: list[str]) -> str | None:
 Достапни оддели:
 {lista_text}
 
-Корисник пишува: „{prashanje}"
+Корисник пишува: „{prasanje}"
 
 Кој оддел е во прашањето? Врати точно име од листата или NONE.
 """.strip()
@@ -64,7 +64,7 @@ def _najdi_oddel_so_ai(prashanje: str, oddeli: list[str]) -> str | None:
     return None
 
 
-def odgovori_za_rabotno_vreme(prashanje: str) -> str:
+def odgovori_za_rabotno_vreme(prasanje: str) -> str:
     """
     #12 - Работно време.
     Ако корисник прашува за конкретен оддел → специфично време.
@@ -76,7 +76,7 @@ def odgovori_za_rabotno_vreme(prashanje: str) -> str:
 
     # Дали прашува за конкретен оддел?
     oddeli = list(po_oddel.keys())
-    izbran_oddel = _najdi_oddel_so_ai(prashanje, oddeli)
+    izbran_oddel = _najdi_oddel_so_ai(prasanje, oddeli)
 
     if izbran_oddel:
         vreme = po_oddel.get(izbran_oddel, "—")
@@ -94,7 +94,7 @@ def odgovori_za_rabotno_vreme(prashanje: str) -> str:
     return "\n".join(delovi)
 
 
-def odgovori_za_lokacija(prashanje: str) -> str:
+def odgovori_za_lokacija(prasanje: str) -> str:
     """
     #13 - Локација на оддели во болницата.
     """
@@ -105,7 +105,7 @@ def odgovori_za_lokacija(prashanje: str) -> str:
         return "Нема расположливи податоци за локации."
 
     oddeli = list(lokacii.keys())
-    izbran_oddel = _najdi_oddel_so_ai(prashanje, oddeli)
+    izbran_oddel = _najdi_oddel_so_ai(prasanje, oddeli)
 
     if izbran_oddel:
         lokacija = lokacii.get(izbran_oddel, "—")
@@ -122,7 +122,7 @@ def odgovori_za_lokacija(prashanje: str) -> str:
     return "\n".join(delovi)
 
 
-def odgovori_za_kontakti(prashanje: str) -> str:
+def odgovori_za_kontakti(prasanje: str) -> str:
     """
     #14 - Контакти на болницата.
     """
@@ -133,8 +133,8 @@ def odgovori_za_kontakti(prashanje: str) -> str:
         return "Нема расположливи контакти."
 
     # Дали прашува за итна?
-    prashanje_lower = prashanje.lower()
-    if "итн" in prashanje_lower or "ургент" in prashanje_lower or "веднаш" in prashanje_lower:
+    prasanje_lower = prasanje.lower()
+    if "итн" in prasanje_lower or "ургент" in prasanje_lower or "веднаш" in prasanje_lower:
         return (
             f"Итна помош:\n\n"
             f"Телефон: {kontakti.get('itna', '—')}\n"

@@ -42,12 +42,12 @@ PROMPT = """
 """.strip()
 
 
-def _izvlechi(prashanje: str) -> dict:
+def _izvlechi(prasanje: str) -> dict:
     denes = date.today().strftime("%Y-%m-%d")
     denes_den = ["понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"][
         date.today().weekday()
     ]
-    full = f'Денес: {denes} ({denes_den})\n\nПрашање: „{prashanje}"\nВрати JSON.'
+    full = f'Денес: {denes} ({denes_den})\n\nПрашање: „{prasanje}"\nВрати JSON.'
     odgovor = ask_ai(full, system_prompt=PROMPT)
     print(f"[moj_raspored] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="moj_raspored")
@@ -87,14 +87,14 @@ def _fmt_vreme(t) -> str:
     return str(t)[:5]
 
 
-def odgovori_za_raspored(prashanje: str, lekar: dict | None) -> str:
+def odgovori_za_raspored(prasanje: str, lekar: dict | None) -> str:
     """Главна точка - повикана од router-от."""
     if err := require_lekar(lekar):
         return err
 
     doctor_id = lekar["doctor_ID"]
 
-    podatoci = _izvlechi(prashanje)
+    podatoci = _izvlechi(prasanje)
     if podatoci.get("_error"):
         return podatoci["_error"]
 

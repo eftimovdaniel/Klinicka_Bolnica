@@ -3,7 +3,7 @@
 
 Патека:
   1. Дали е прашање за СИТЕ лекари? → навигација #lekari
-  2. resolve_oddel(prashanje) — правила + алијаси + AI само од листа од база
+  2. resolve_oddel(prasanje) — правила + алијаси + AI само од листа од база
   3. SQL: Doctors WHERE specialty = <оддел>
   4. Форматиран одговор
 
@@ -18,9 +18,9 @@ from ai._kernel.transliteracija import transliterijaj
 from ai._kernel.db_helpers import db_cursor
 
 
-def _site_lekari_vo_ustanova(prashanje: str) -> bool:
+def _site_lekari_vo_ustanova(prasanje: str) -> bool:
     """Прашање за целиот лекарски тим (без конкретен оддел)."""
-    p = transliterijaj(prashanje).lower()
+    p = transliterijaj(prasanje).lower()
     if not any(w in p for w in ("лекар", "доктор", "специјалист")):
         return False
     if re.search(r"на\s+оддел", p) or re.search(r"од\s+оддел", p) or re.search(
@@ -93,21 +93,21 @@ def _zimi_lekari_od_oddel(oddel: str) -> list[dict]:
             )
             return list(cur.fetchall())
     except Exception as e:
-        print(f"[lekari_oddel] lekari greshka: {e}")
+        print(f"[lekari_oddel] lekari greska: {e}")
         return []
 
 
-def odgovori_za_lekari_oddel(prashanje: str) -> str | dict[str, Any]:
-    if _site_lekari_vo_ustanova(prashanje):
+def odgovori_za_lekari_oddel(prasanje: str) -> str | dict[str, Any]:
+    if _site_lekari_vo_ustanova(prasanje):
         return odgovor_navigacija_lekari()
 
-    resolved = resolve_oddel(prashanje)
+    resolved = resolve_oddel(prasanje)
 
     if resolved.poraka_greska == "_ai_busy":
         return "Привремено сум зафатен. Те молам обиди се повторно за неколку секунди."
 
     if not resolved.ok or not resolved.oddel:
-        if _site_lekari_vo_ustanova(prashanje):
+        if _site_lekari_vo_ustanova(prasanje):
             return odgovor_navigacija_lekari()
         delovi = [
             'Ако прашувате за конкретен оддел, наведете го (на пр.: „Кои лекари се на Кардиологија?").',
