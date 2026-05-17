@@ -21,6 +21,7 @@ from datetime import datetime, date, time
 from database import get_connection
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
+from ai._kernel.odgovor_formatter import formatiraj_odgovor_so_ai
 from ai._kernel.prompts import ZAKAZI_EXTRACT_PROMPT
 from ai.pacient.slobodni_termini import (
     baranje_e_zakazuvanje,
@@ -441,13 +442,13 @@ def _odgovori_napomena_faza(
 
 
 def formatiraj_potvrda(ime_pacient: str, ime_lekar: str, specialty: str, datum_str: str, vreme_str: str) -> str:
-    """Текст потврда за корисникот — повеќе реченици, јасна сумаризација."""
+    """Текст потврда за корисникот — Groq од факти, шаблон при грешка."""
     DENOVI = ["Понеделник", "Вторник", "Среда", "Четврток", "Петок", "Сабота", "Недела"]
     dt = datetime.strptime(datum_str, "%Y-%m-%d").date()
     den_ime = DENOVI[dt.weekday()]
     datum_lep = dt.strftime("%d.%m.%Y")
 
-    return (
+    sablon = (
         "Задачата за закажување е успешно завршена. Еве што е направено во системот.\n\n"
         f"Пациент: {ime_pacient}\n"
         f"Лекар: Д-р {ime_lekar}\n"
@@ -458,6 +459,20 @@ def formatiraj_potvrda(ime_pacient: str, ime_lekar: str, specialty: str, datum_s
         "Ако сакаш промена (откажување или преместување), напиши со свои зборови — "
         "агентот ги препознава формулациите „откажи термин“, „префрли на друг ден“ и слично."
     )
+    podatoci = {
+        "status": "zakazano",
+        "pacient": ime_pacient,
+        "lekar": f"Д-р {ime_lekar}",
+        "specialnost": specialty,
+        "datum": datum_lep,
+        "den": den_ime,
+        "vreme": vreme_str,
+        "email_potvrda": True,
+        "sledna_akcija": (
+            "За откажување или преместување напишете „откажи термин“ или „префрли на друг ден“."
+        ),
+    }
+    return formatiraj_odgovor_so_ai("zakazi_potvrda", podatoci, sablon)
 
 
 def odgovori_za_zakazuvanje(

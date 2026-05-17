@@ -14,6 +14,7 @@ import re
 from typing import Any
 
 from ai._kernel.oddel_resolver import format_lista_oddeli, resolve_oddel
+from ai._kernel.odgovor_formatter import formatiraj_odgovor_so_ai
 from ai._kernel.transliteracija import transliterijaj
 from ai._kernel.db_helpers import db_cursor
 from ai.pacient.slobodni_termini import (
@@ -167,18 +168,38 @@ def odgovori_za_lekari_oddel(
         naslov = f'Други лекари од „{oddel_ime}" ({len(lekari)}):'
     else:
         naslov = f'Лекари на одделот „{oddel_ime}" ({len(lekari)}):'
+
+    lista_lekari = []
     redovi = [naslov, ""]
     for l in lekari:
         polno = f"Д-р {l['name']} {l['surname']}"
-        email = l.get("email") or ""
+        email = (l.get("email") or "").strip()
+        lista_lekari.append(
+            {"ime_prezime": polno, "email": email or None, "doctor_id": int(l["doctor_ID"])}
+        )
         if email:
             redovi.append(f"- {polno} ({email})")
         else:
             redovi.append(f"- {polno}")
 
     redovi.append("")
-    redovi.append(
+    sledna = (
         "За повеќе информации или термин, наведете презиме "
         '(на пр.: „Кога е слободен д-р [презиме]?").'
     )
-    return "\n".join(redovi)
+    redovi.append(sledna)
+    sablon = "\n".join(redovi)
+
+    podatoci = {
+        "oddel": oddel_ime,
+        "broj_lekari": len(lekari),
+        "drugi_lekari_ist_oddel": exclude_doctor_id is not None,
+        "lekari": lista_lekari,
+        "sledna_akcija": sledna,
+    }
+    return formatiraj_odgovor_so_ai(
+        "lekari_oddel",
+        podatoci,
+        sablon,
+        prasanje=prasanje,
+    )

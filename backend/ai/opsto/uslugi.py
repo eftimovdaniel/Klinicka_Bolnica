@@ -10,6 +10,7 @@
 import json
 import os
 from database import get_connection
+from ai._kernel.odgovor_formatter import formatiraj_odgovor_so_ai
 
 
 _BAZA_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -105,6 +106,23 @@ def odgovori_za_uslugi(prasanje: str) -> str:
             delovi.append(f"- {u}")
         delovi.append("")
 
-    delovi.append('За закажување напиши: „Сакам преглед кај д-р [презиме] [датум] [време]"')
+    sledna = 'За закажување напиши: „Сакам преглед кај д-р [презиме] [датум] [време]"'
+    delovi.append(sledna)
+    sablon = "\n".join(delovi)
 
-    return "\n".join(delovi)
+    podatoci = {
+        "ustanova": "Клиничка Болница Штип",
+        "specijalisticki_oddeli": oddeli,
+        "dijagnostika_aparati": [
+            {"ime": a["ime"], "opis": (a.get("opis") or "").strip() or None}
+            for a in aparati
+        ],
+        "dopolnitelni_uslugi": dopolnitelni,
+        "sledna_akcija": sledna,
+    }
+    return formatiraj_odgovor_so_ai(
+        "uslugi",
+        podatoci,
+        sablon,
+        prasanje=prasanje,
+    )

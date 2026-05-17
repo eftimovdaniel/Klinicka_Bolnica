@@ -1,5 +1,5 @@
 """
-Краток преглед на последните новости од базата (без LLM).
+Краток преглед на последните новости од базата (+ Groq резиме).
 
 Примери:
 - „Што има ново?“
@@ -7,6 +7,7 @@
 """
 
 from ai._kernel.db_helpers import as_dict, db_cursor
+from ai._kernel.odgovor_formatter import formatiraj_odgovor_so_ai
 
 # Иста релативна патека како во navigacija.py (frontend со static сервер)
 NOVOSTI_STRANICA = "novosti.html"
@@ -52,4 +53,17 @@ def odgovori_za_novosti_rezime() -> str:
         f"{NOVOSTI_LINK}.\n\n"
         f"{POTPIS}"
     )
-    return "\n".join(linii)
+    sablon = "\n".join(linii)
+    naslovi = []
+    for r in rows:
+        row = as_dict(r)
+        naslovi.append((row.get("naslov") or "Без наслов").strip())
+
+    podatoci = {
+        "broj_novosti": len(naslovi),
+        "naslovi": naslovi,
+        "link_novosti": NOVOSTI_LINK,
+        "potpis": POTPIS,
+        "sledna_akcija": f"Повеќе детали на {NOVOSTI_LINK}.",
+    }
+    return formatiraj_odgovor_so_ai("novosti_rezime", podatoci, sablon)

@@ -11,6 +11,7 @@ from datetime import date, datetime, time, timedelta
 from database import get_connection
 from ai._kernel.lekar_lookup import najdi_lekar_od_prasanje
 from ai._kernel.transliteracija import transliterijaj
+from ai._kernel.odgovor_formatter import formatiraj_odgovor_so_ai
 from ai.pacient.slobodni_termini import (
     lekar_od_zakazi_kontekst,
     prasanje_bar_lekar_od_kontekst,
@@ -168,10 +169,31 @@ def _e_prasanje_dali_raboti(prasanje: str) -> bool:
     )
 
 
-def _format_info_lekar(
+def _dezurstvo_za_fakti(dezurstva: list[dict]) -> dict[str, str]:
+    sega = datetime.now()
+    for d in dezurstva:
+        if _e_na_dezurstvo_sega(d, sega):
+            datum, vreme_od, _ = _dezurstvo_datum_vreme(d)
+            return {
+                "status": "da_sega",
+                "datum": _format_datum(datum) if datum else "",
+                "pocetok": format_vreme(vreme_od),
+            }
+    sledno = _sledno_dezurstvo(dezurstva, sega)
+    if sledno:
+        datum, vreme_od, _ = _dezurstvo_datum_vreme(sledno)
+        return {
+            "status": "ne_so_idno",
+            "datum": _format_datum(datum) if datum else "",
+            "pocetok": format_vreme(vreme_od),
+        }
+    return {"status": "ne", "datum": "", "pocetok": ""}
+
+
+def _sablon_info_lekar(
     lekar: dict, prasanje: str, od_kontekst: bool, kontekst: dict | None = None
 ) -> str:
-    """Ист шаблон за секој лекар — без повторување на специјалност."""
+    """Шаблон fallback — истата содржина како порано."""
     spec = lekar.get("specialty") or "Општа пракса"
     email = (lekar.get("email") or "").strip()
     doctor_id = lekar["doctor_ID"]
@@ -211,6 +233,41 @@ def _format_info_lekar(
         ]
     )
     return "\n".join(delovi)
+
+
+def _format_info_lekar(
+    lekar: dict, prasanje: str, od_kontekst: bool, kontekst: dict | None = None
+) -> str:
+    sablon = _sablon_info_lekar(lekar, prasanje, od_kontekst, kontekst)
+    if prasanje_e_specijalnost_izbran_lekar(prasanje, kontekst):
+        return sablon
+
+    spec = lekar.get("specialty") or "Општа пракса"
+    email = (lekar.get("email") or "").strip()
+    dezurstva = zimi_dezurstva_za_lekar(lekar["doctor_ID"])
+    prezime = lekar.get("surname") or ""
+
+    podatoci = {
+        "ustanova": "Клиничка Болница Штип",
+        "ime": lekar.get("name") or "",
+        "prezime": prezime,
+        "specialnost": spec,
+        "email": email or None,
+        "dezurstvo": _dezurstvo_za_fakti(dezurstva),
+        "raboti_vo_bolnica": True,
+        "od_kontekst": od_kontekst,
+        "prasanje_dali_raboti": _e_prasanje_dali_raboti(prasanje),
+        "sledna_akcija": (
+            f'За слободни термини: „Кога е слободен д-р {prezime}?". '
+            "За преглед — најава со кориснички профил на сајтот."
+        ),
+    }
+    return formatiraj_odgovor_so_ai(
+        "info_lekar",
+        podatoci,
+        sablon,
+        prasanje=prasanje,
+    )
 
 
 def _kontekst_posle_info(lekar: dict, kontekst: dict | None) -> dict:
