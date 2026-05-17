@@ -26,6 +26,7 @@ from ai._kernel.prompts import ZAKAZI_EXTRACT_PROMPT
 from ai.pacient.slobodni_termini import (
     baranje_e_zakazuvanje,
     datum_od_prasanje_lokalno,
+    lekar_od_zakazi_kontekst,
     prasanje_bar_datum_od_kontekst,
     zimi_site_lekari,
 )
@@ -75,11 +76,20 @@ def _spoi_zakazi_so_slobodni_kontekst(
     koristi_kontekst_datum = izbran or prasanje_bar_datum_od_kontekst(prasanje)
     prodolzuva = baranje_e_zakazuvanje(prasanje)
     nov_datum = datum_od_prasanje_lokalno(prasanje)
+
+    from ai._kernel.lekar_lookup import izvlechi_delovi_ime, najdi_lekar_od_prasanje
+
+    lekar_od_ime = None
+    if izvlechi_delovi_ime(prasanje):
+        lekar_od_ime = najdi_lekar_od_prasanje(prasanje)
+    if lekar_od_ime and not izbran:
+        izvleceno["doctor_id"] = int(lekar_od_ime["doctor_ID"])
+
     nid = _normalize_doctor_id(zos.get("doctor_id"))
     if nid is not None:
         if not _normalize_doctor_id(izvleceno.get("doctor_id")):
             izvleceno["doctor_id"] = nid
-        elif izbran or prodolzuva:
+        elif izbran or (prodolzuva and not lekar_od_ime):
             izvleceno["doctor_id"] = nid
     if zos.get("datum"):
         d = str(zos["datum"]).strip()[:10]
@@ -92,6 +102,11 @@ def _spoi_zakazi_so_slobodni_kontekst(
         v = str(zos["vreme"]).strip()[:5]
         if v:
             izvleceno["vreme"] = v
+    if isinstance(kontekst, dict):
+        if not izvleceno.get("datum") and kontekst.get("last_slobodni_datum"):
+            izvleceno["datum"] = str(kontekst["last_slobodni_datum"]).strip()[:10]
+        if not izvleceno.get("vreme") and kontekst.get("last_slobodni_vreme"):
+            izvleceno["vreme"] = str(kontekst["last_slobodni_vreme"]).strip()[:5]
 
 
 def _oddel_od_prasanje(prasanje: str) -> str | None:
@@ -122,13 +137,62 @@ def _lekari_po_oddel(oddel: str) -> list[dict]:
         return []
 
 
+def vreme_od_prasanje_lokalno(prasanje: str) -> str | None:
+    """Час од „во 11“, „11:30“, „11 часот“ — без Groq."""
+    import re
+
+    from ai._kernel.transliteracija import transliterijaj
+
+    p = transliterijaj(prasanje or "").lower().strip()
+    if not p:
+        return None
+
+    m = re.search(r"\b(\d{1,2})\s*[:.]\s*(\d{2})\b", p)
+    if m:
+        h, mi = int(m.group(1)), int(m.group(2))
+        if 0 <= h <= 23 and 0 <= mi <= 59:
+            return f"{h:02d}:{mi:02d}"
+
+    m = re.search(
+        r"(?:во|vo|at)\s+(\d{1,2})(?:\s*(?:час|часот|cas|casot))?\b",
+        p,
+    )
+    if m:
+        h = int(m.group(1))
+        if 0 <= h <= 23:
+            return f"{h:02d}:00"
+
+    m = re.search(r"\b(\d{1,2})\s*(?:час|часот|cas|casot)\b", p)
+    if m:
+        h = int(m.group(1))
+        if 0 <= h <= 23:
+            return f"{h:02d}:00"
+
+    if re.fullmatch(r"\d{1,2}", p):
+        h = int(p)
+        if 0 <= h <= 23:
+            return f"{h:02d}:00"
+
+    return None
+
+
 def _dopolnuvaj_izvleceno_lokalno(prasanje: str, izvleceno: dict) -> None:
-    """Датум од „следниот вторник“ и слично — без Groq."""
-    if izvleceno.get("datum"):
-        return
-    d = datum_od_prasanje_lokalno(prasanje)
-    if d is not None:
-        izvleceno["datum"] = d.isoformat()
+    """Датум/време/лекар од правила — без Groq."""
+    if not _normalize_doctor_id(izvleceno.get("doctor_id")):
+        from ai._kernel.lekar_lookup import izvlechi_delovi_ime, najdi_lekar_od_prasanje
+
+        if izvlechi_delovi_ime(prasanje):
+            lekar = najdi_lekar_od_prasanje(prasanje)
+            if lekar:
+                izvleceno["doctor_id"] = int(lekar["doctor_ID"])
+    if not izvleceno.get("datum"):
+        d = datum_od_prasanje_lokalno(prasanje)
+        if d is not None:
+            izvleceno["datum"] = d.isoformat()
+    if not izvleceno.get("vreme"):
+        v = vreme_od_prasanje_lokalno(prasanje)
+        if v:
+            izvleceno["vreme"] = v
 
 
 def _linii_lekari_specijalnost(oddel: str, lekari: list[dict]) -> list[str]:
@@ -617,7 +681,13 @@ def odgovori_za_zakazuvanje(
     if not pacient or not pacient.get("email"):
         from ai.opsto.lekari_oddel import navigacija_lekari
 
-        oddel = _oddel_od_prasanje(prasanje)
+        oddel = None
+        if isinstance(kontekst, dict):
+            lekar_ctx = lekar_od_zakazi_kontekst(kontekst)
+            if lekar_ctx:
+                oddel = (lekar_ctx.get("specialty") or "").strip() or None
+        if not oddel:
+            oddel = _oddel_od_prasanje(prasanje)
         spec_hint = ""
         nav = None
         if oddel:

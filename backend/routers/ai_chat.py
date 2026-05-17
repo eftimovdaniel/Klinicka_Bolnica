@@ -183,7 +183,19 @@ def _resolve_intent(
     aktiven_kontekst: dict | None,
     pacient_dict: dict | None,
     lekar_dict: dict | None,
+    pitanje_raw: str | None = None,
 ) -> str:
+    from ai._kernel.intent_detector import prasanje_ima_youtube_link
+
+    raw = (pitanje_raw or pitanje_norm or "").strip()
+    if prasanje_ima_youtube_link(raw):
+        return "objavi_vest"
+
+    from ai.opsto.vest_naslov import prasanje_e_izbrisi_vest_oglas
+
+    if prasanje_e_izbrisi_vest_oglas(pitanje_norm):
+        return "izbrisi_vest_oglas"
+
     if aktiven_kontekst and aktiven_kontekst.get("intent") == "apliciraj_za_rabota":
         return "apliciraj_za_rabota"
 
@@ -273,8 +285,27 @@ def _resolve_intent(
         prasanje_e_drugi_lekari_specijalnost,
         prasanje_e_sleden_raboten_den,
         prasanje_e_specijalnost_izbran_lekar,
+        prasanje_e_slobodni_za_den,
     )
 
+    if intent == "info_lekar" and baranje_e_zakazuvanje(pitanje_norm):
+        if isinstance(aktiven_kontekst, dict) and (
+            aktiven_kontekst.get("zakazi_od_slobodni")
+            or aktiven_kontekst.get("zakazi_pending")
+        ):
+            intent = "zakazi_termin"
+
+    from ai.pacient.slobodni_termini import prasanje_e_ko_e_sloboden_datum_vreme
+
+    if prasanje_e_ko_e_sloboden_datum_vreme(pitanje_norm, aktiven_kontekst):
+        return "slobodni_termini"
+    if prasanje_e_slobodni_za_den(pitanje_norm, aktiven_kontekst):
+        return "slobodni_termini"
+
+    from ai.opsto.lekari_oddel import prasanje_e_lekari_po_oddel
+
+    if prasanje_e_lekari_po_oddel(pitanje_norm):
+        return "lekari_oddel"
     if prasanje_e_drugi_lekari_specijalnost(pitanje_norm):
         return "lekari_oddel"
 
@@ -311,19 +342,19 @@ def _resolve_intent(
             return "otkazi_termin"
         if baranje_e_zakazuvanje(pitanje_norm):
             return "zakazi_termin"
-        # „утре“, „за утре во 08:30“ — продолжување на закажување, не слободни/препорака
-        if ima_lekar_ctx and (
-            datum_od_prasanje_lokalno(pitanje_norm)
-            or (
-                pending.get("vreme")
-                and datum_od_prasanje_lokalno(pitanje_norm)
-            )
-        ):
-            return "zakazi_termin"
+        if prasanje_e_slobodni_za_den(pitanje_norm, aktiven_kontekst):
+            return "slobodni_termini"
         if ima_lekar_ctx and re.search(r"\b\d{1,2}\s*[:.]\s*\d{2}\b", q) and (
             datum_od_prasanje_lokalno(pitanje_norm)
             or "за " in q
             or "za " in q
+        ):
+            return "zakazi_termin"
+        if (
+            ima_lekar_ctx
+            and pending.get("vreme")
+            and datum_od_prasanje_lokalno(pitanje_norm)
+            and not prasanje_e_slobodni_za_den(pitanje_norm, aktiven_kontekst)
         ):
             return "zakazi_termin"
         if prasanje_bar_datum_od_kontekst(pitanje_norm) and datum_od_zakazi_kontekst(
@@ -379,9 +410,13 @@ def _resolve_intent(
         elif intent in ("general", "zakazi_termin", "preporaka_lekar") and not baranje_e_zakazuvanje(
             pitanje_norm
         ):
-            if ima_lekar_ctx and (
-                datum_od_prasanje_lokalno(pitanje_norm)
-                or (pending.get("vreme") and len(q.split()) <= 4)
+            if prasanje_e_slobodni_za_den(pitanje_norm, aktiven_kontekst):
+                return "slobodni_termini"
+            if (
+                ima_lekar_ctx
+                and pending.get("vreme")
+                and len(q.split()) <= 4
+                and datum_od_prasanje_lokalno(pitanje_norm)
             ):
                 return "zakazi_termin"
             if datum_od_prasanje_lokalno(pitanje_norm) or any(
@@ -554,7 +589,9 @@ def ask(data: PitanjeModel):
             session_id = create_session(pacient_id=pacient_id, doctor_id=doctor_id)
             is_new_session = bool(session_id)
 
-    intent = _resolve_intent(pitanje_norm, aktiven_kontekst, pacient_dict, lekar_dict)
+    intent = _resolve_intent(
+        pitanje_norm, aktiven_kontekst, pacient_dict, lekar_dict, pitanje_raw=pitanje
+    )
     print(f"[ai_chat] {pitanje_norm!r} -> {intent}")
 
     ctx = AiContext(

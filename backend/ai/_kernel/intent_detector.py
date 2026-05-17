@@ -56,14 +56,21 @@
 
 # 00. ОБЈАВИ ВЕСТ (мора први - има YouTube линк или зборови за публикување)
 KLUCNI_OBJAVI_VEST = [
-    "објави вест", "објави новост", "публикувај",
-    "креирај вест", "создади вест", "напиши вест",
+    "објави вест", "објави новост", "објави ја", "објави ја следната",
+    "следната вест", "вест на сајт", "вест на сајтот",
+    "публикувај", "креирај вест", "создади вест", "напиши вест",
     "новост од видео", "вест од видео", "вест од youtube",
     "youtube линк", "ютуб линк",
     "ставете на сајт", "стави на сајт",
-    # Англиски и латиница за директорот
-    "objavi vest", "publish news", "post news",
+    "objavi vest", "objavi ja", "slednata vest", "vest na sajtot",
+    "publish news", "post news",
 ]
+
+
+def prasanje_ima_youtube_link(prasanje: str) -> bool:
+    """YouTube URL — не транслитерирај (ниту проверувај по нормализиран јоутубе.цом)."""
+    t = (prasanje or "").lower()
+    return "youtube.com" in t or "youtu.be" in t
 
 # 00b. КРЕИРАЈ ОГЛАС ЗА РАБОТА (за директор)
 KLUCNI_OGLAS = [
@@ -78,6 +85,7 @@ KLUCNI_OGLAS = [
 # 00c. ИЗБРИШИ ВЕСТ / ОГЛАС (за директор) – мора пред trgni_ocena
 KLUCNI_IZBRISI_VEST_OGLAS = [
     "избриши вест", "избриши ја вест", "избриши новост", "избриши ја новост",
+    "избриши ја веста со наслов", "избриши веста со наслов",
     "избриши го најновиот оглас", "избриши го последниот оглас",
     "избриши го огласот", "избриши оглас",
     "тргни вест", "тргни оглас", "отстрани вест", "отстрани оглас",
@@ -403,6 +411,19 @@ _ZBOROVI_NE_SE_IMENA = frozenset(
         "централа",
         "болница",
         "болницата",
+        "клиничка",
+        "клиничката",
+        "штип",
+        "stip",
+        "нова",
+        "nova",
+        "опрема",
+        "oprema",
+        "вест",
+        "веста",
+        "новост",
+        "новоста",
+        "наслов",
         "работно",
         "работното",
         "време",
@@ -530,6 +551,16 @@ KLUCNI_LEKARI_ODDEL = [
     "koi lekari se na",
     "koi se lekarite od",
     "drugi lekari",
+    "лекари по",
+    "лекари од",
+    "прикажи ми лекари",
+    "прикази ми лекари",
+    "покажи ми лекари",
+    "лекари од областа",
+    "на одделот",
+    "одделот за",
+    "lekari po",
+    "lekari od",
 ]
 
 # 9. СЛОБОДНИ ТЕРМИНИ (исто прашање — различни начини)
@@ -666,12 +697,30 @@ def _prasanje_e_konkreten_lekar(prasanje: str) -> bool:
     p = transliterijaj(prasanje).lower()
     if _prasanje_e_asistent_opsto(p):
         return False
+    if prasanje_ima_youtube_link(prasanje) or _ima_zbor(p, KLUCNI_OBJAVI_VEST):
+        return False
     if _bolnica_info_intent(p):
         return False
     if _ima_zbor(p, KLUCNI_SLOBODNI):
         return False
     if any(w in p for w in ("кои лекари", "кои доктори", "лекари на", "лекари од")):
         return False
+    try:
+        from ai.opsto.lekari_oddel import prasanje_e_lekari_po_oddel
+        from ai.opsto.vest_naslov import (
+            prasanje_e_izbrisi_vest_oglas,
+            prasanje_e_samo_naslov_vest,
+        )
+        from ai.pacient.slobodni_termini import prasanje_e_ko_e_sloboden_datum_vreme
+
+        if prasanje_e_lekari_po_oddel(prasanje):
+            return False
+        if prasanje_e_ko_e_sloboden_datum_vreme(prasanje):
+            return False
+        if prasanje_e_izbrisi_vest_oglas(prasanje) or prasanje_e_samo_naslov_vest(prasanje):
+            return False
+    except ImportError:
+        pass
     delovi = izvlechi_delovi_ime(prasanje)
     if _delovi_izgledaat_kako_ime(delovi):
         return True
@@ -820,10 +869,7 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
     if not prasanje:
         return None
 
-    # ВРВ (пред транслитерација): провери за YouTube линк во оригинален текст
-    # (трансли. би ги претворила www.youtube.com → ввв.јоутубе.цом)
-    orig_low = prasanje.lower().strip()
-    if "youtube.com" in orig_low or "youtu.be" in orig_low:
+    if prasanje_ima_youtube_link(prasanje):
         return "objavi_vest"
 
     # Автоматски преводи: латиница → кирилица
@@ -858,14 +904,28 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
     if _ima_zbor(p, KLUCNI_OBJAVI_VEST):
         return "objavi_vest"
 
-    # ВАЖНО: „избриши" + („вест"/„оглас"/„новост") во истиот текст
-    # → флексибилно совпаѓање, дури и ако има зборови помеѓу
-    # (пр. „избриши ја најновата вест")
-    ima_brisi = any(w in p for w in ("избриши", "тргни", "отстрани", "izbrisi", "delete"))
-    ima_vest_ili_oglas = any(w in p for w in ("вест", "новост", "оглас", "vest", "novost", "oglas"))
-    # за да не се коли со trgni_ocena → исклучи ако има „оцена"
-    if ima_brisi and ima_vest_ili_oglas and "оцен" not in p:
-        return "izbrisi_vest_oglas"
+    try:
+        from ai.opsto.vest_naslov import prasanje_e_izbrisi_vest_oglas
+
+        if prasanje_e_izbrisi_vest_oglas(prasanje) and "оцен" not in p:
+            return "izbrisi_vest_oglas"
+    except ImportError:
+        ima_brisi = any(
+            w in p
+            for w in (
+                "избриши",
+                "избришете",
+                "тргни",
+                "отстрани",
+                "izbrisi",
+                "delete",
+            )
+        )
+        ima_vest_ili_oglas = any(
+            w in p for w in ("вест", "новост", "оглас", "vest", "novost", "oglas")
+        )
+        if ima_brisi and ima_vest_ili_oglas and "оцен" not in p:
+            return "izbrisi_vest_oglas"
 
     if _ima_zbor(p, KLUCNI_IZBRISI_VEST_OGLAS):
         return "izbrisi_vest_oglas"
@@ -1025,8 +1085,11 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
 
     # Листа лекари по специјалност — пред info_lekar („други лекари од оваа специјалност")
     try:
+        from ai.opsto.lekari_oddel import prasanje_e_lekari_po_oddel
         from ai.pacient.slobodni_termini import prasanje_e_drugi_lekari_specijalnost
 
+        if prasanje_e_lekari_po_oddel(prasanje):
+            return "lekari_oddel"
         if prasanje_e_drugi_lekari_specijalnost(prasanje):
             return "lekari_oddel"
     except ImportError:
@@ -1054,6 +1117,15 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
     bi = _bolnica_info_intent(p)
     if bi:
         return bi
+
+    # Закажување кај именуван лекар — пред info_lekar („може да ми закажете кај …")
+    try:
+        from ai.pacient.slobodni_termini import baranje_e_zakazuvanje
+
+        if baranje_e_zakazuvanje(prasanje) and _prasanje_e_konkreten_lekar(prasanje):
+            return "zakazi_termin"
+    except ImportError:
+        pass
 
     # Конкретен лекар по име — пред навигација („во оваа болница работи др X")
     if _prasanje_e_konkreten_lekar(prasanje) or _ima_kluc_info_lekar(p):
@@ -1171,6 +1243,14 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
         )
     ):
         return "slobodni_termini"
+
+    try:
+        from ai.pacient.slobodni_termini import prasanje_e_ko_e_sloboden_datum_vreme
+
+        if prasanje_e_ko_e_sloboden_datum_vreme(prasanje):
+            return "slobodni_termini"
+    except ImportError:
+        pass
 
     if _ima_zbor(p, KLUCNI_SLOBODNI):
         return "slobodni_termini"

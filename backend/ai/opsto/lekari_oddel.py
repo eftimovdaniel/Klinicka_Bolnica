@@ -14,12 +14,60 @@ import re
 from typing import Any
 
 from ai._kernel.oddel_resolver import format_lista_oddeli, resolve_oddel
+from ai._kernel.odgovor_formatter import formatiraj_odgovor_so_ai
 from ai._kernel.transliteracija import transliterijaj
 from ai._kernel.db_helpers import db_cursor
 from ai.pacient.slobodni_termini import (
     lekar_od_zakazi_kontekst,
     prasanje_e_drugi_lekari_specijalnost,
 )
+
+
+def prasanje_e_lekari_po_oddel(prasanje: str) -> bool:
+    """
+    Листа лекари по оддел/специјалност — не конкретен лекар по име.
+    Пр. „Прикажи ми лекари по урологија", „лекари од урологија".
+    """
+    p = transliterijaj(prasanje).lower()
+    if any(
+        x in p
+        for x in (
+            "кои лекари",
+            "кои доктори",
+            "лекари на",
+            "лекари од",
+            "лекари по",
+            "лекари од областа",
+            "лекари од област",
+            "на одделот",
+            "одделот за",
+            "lekari od",
+            "lekari po",
+            "lekari na",
+        )
+    ):
+        return True
+    if any(
+        x in p for x in ("прикажи", "прикази", "покажи", "prikazi", "pokazi", "прикажете")
+    ) and any(x in p for x in ("лекари", "lekari", "доктори", "doktori")):
+        return True
+    if any(x in p for x in ("лекари", "lekari", "доктори")) and any(
+        x in p
+        for x in (
+            "уролог",
+            "кардиолог",
+            "гинеколог",
+            "невролог",
+            "оддел",
+            "специјалност",
+            "област",
+            "specijalnost",
+            "oblast",
+            "одделот",
+        )
+    ):
+        return True
+    return False
 
 
 def _site_lekari_vo_ustanova(prasanje: str) -> bool:
@@ -127,7 +175,10 @@ def _naslov_lista_lekari(
                 f"Лекари кои работат во истата специјалност како {ref} ({spec}) се:"
             )
         return f"Лекари кои работат во истата специјалност како {ref} се:"
-    return f'Лекари од специјалноста „{oddel_ime}" ({len(lekari)}):'
+    oddel = (oddel_ime or "").strip()
+    if oddel.lower().startswith("на "):
+        oddel = oddel[3:].strip()
+    return f'На одделот за „{oddel}" работат ({len(lekari)} лекари):'
 
 
 def _zimi_lekari_od_oddel(oddel: str) -> list[dict]:
@@ -226,13 +277,42 @@ def odgovori_za_lekari_oddel(
 
     redovi.append("")
     sledna = (
-        "За слободни термини напишете: „Кога е слободен д-р [презиме]?“ "
-        "или „закажи кај [презиме] во [час]“."
+        "Следно можете да прашате:\n"
+        "„Кој од нив е слободен на 20.05 во 12:00“ — проверка меѓу лекарите погоре;\n"
+        "потоа „закажи кај [презиме]“ за закажување (датумот и часот се зачувуваат)."
     )
     redovi.append(sledna)
     sablon = "\n".join(redovi)
 
+    lista_lekari = []
+    for l in lekari:
+        lista_lekari.append(
+            {
+                "ime_prezime": f"{l.get('name', '')} {l.get('surname', '')}".strip(),
+                "email": (l.get("email") or "").strip() or None,
+            }
+        )
+    podatoci = {
+        "naslov": naslov,
+        "oddel": oddel_ime,
+        "broj_lekari": len(lekari),
+        "drugi_lekari_ist_oddel": drugi_od_istata and exclude_doctor_id is not None,
+        "lekari": lista_lekari,
+        "sledna_akcija": sledna,
+    }
+    odgovor_tekst = formatiraj_odgovor_so_ai(
+        "lekari_oddel",
+        podatoci,
+        sablon,
+        prasanje=prasanje,
+    )
+
+    ctx = dict(kontekst) if isinstance(kontekst, dict) else {}
+    ctx["last_oddel"] = oddel_ime
+    ctx["last_oddel_doctor_ids"] = [int(l["doctor_ID"]) for l in lekari]
+
     return {
-        "odgovor": sablon,
+        "odgovor": odgovor_tekst,
         "navigacija": navigacija_lekari(oddel_ime, lekari),
+        "kontekst": ctx,
     }

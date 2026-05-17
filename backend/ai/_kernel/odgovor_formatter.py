@@ -14,7 +14,8 @@ from ai._kernel.groq_client import ask_ai
 from ai._kernel.prompt_loader import load_prompt
 
 # Типови каде шаблонот е подобар од LLM (структурирани часови, периоди)
-_TIPOVI_SAMO_SABLON = frozenset({"slobodni_termini", "zakazi_potvrda", "lekari_oddel"})
+# Само потврда за закажување — фиксен шаблон (без дуплирање со AI)
+_TIPOVI_SAMO_SABLON = frozenset({"zakazi_potvrda"})
 
 _GRESKA_POCETOCI = (
     "Не е поставен GROQ_API_KEY",
@@ -86,4 +87,10 @@ def formatiraj_odgovor_so_ai(
     if _e_groq_greska(ai):
         print(f"[odgovor_formatter] fallback tip={tip!r}")
         return fallback
-    return ai.strip()
+    ai = ai.strip()
+    if tip == "lekari_oddel" and fallback:
+        naslov = str(podatoci.get("naslov") or "")
+        if naslov and naslov not in ai and len(ai) < len(fallback):
+            print(f"[odgovor_formatter] lekari_oddel краток AI → шаблон")
+            return fallback
+    return ai

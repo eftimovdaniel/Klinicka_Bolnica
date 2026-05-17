@@ -4,6 +4,7 @@
 Примери:
 - „Избриши го најновиот оглас"           → DELETE од Vrabotuvanje (последниот)
 - „Избриши ја најновата вест"            → DELETE од Novosti (последната)
+- „Избриши ја веста со наслов …"         → DELETE по наслов од Novosti
 - „Избриши оглас ID 5"                   → DELETE Vrabotuvanje WHERE id=5
 - „Избриши вест 3"                       → DELETE Novosti WHERE id=3
 """
@@ -15,6 +16,10 @@ from ai._kernel.auth import require_direktor
 from ai._kernel.db_helpers import ai_error_text, db_cursor, fetch_one, normalize_int
 from ai._kernel.groq_client import ask_ai
 from ai._kernel.prompt_loader import load_prompt
+from ai.opsto.vest_naslov import (
+    prasanje_e_izbrisi_vest_oglas,
+    pronajdi_vest_po_naslov,
+)
 
 
 def _izvlechi(prasanje: str) -> dict[str, Any]:
@@ -90,6 +95,15 @@ def odgovori_za_brisenje(prasanje: str, lekar: dict | None) -> str:
     if err := require_direktor(lekar):
         return err
 
+    low = prasanje.lower()
+    e_oglas = any(w in low for w in ("оглас", "oglas")) and not any(
+        w in low for w in ("вест", "новост", "vest", "novost", "наслов")
+    )
+    if not e_oglas and prasanje_e_izbrisi_vest_oglas(prasanje):
+        vest = pronajdi_vest_po_naslov(prasanje)
+        if vest:
+            return _izbrisi_vest(int(vest["id"]))
+
     podatoci = _izvlechi(prasanje)
     if msg := ai_error_text(podatoci):
         return msg
@@ -112,5 +126,15 @@ def odgovori_za_brisenje(prasanje: str, lekar: dict | None) -> str:
             )
 
     if tip == "vest":
+        kriterium = (podatoci.get("kriterium") or "").strip().lower()
+        naslov_ai = (podatoci.get("naslov") or "").strip()
+        if kriterium == "naslov" or naslov_ai:
+            vest = pronajdi_vest_po_naslov(naslov_ai or prasanje)
+            if vest:
+                return _izbrisi_vest(int(vest["id"]))
+            return (
+                "Не најдов вест со тој наслов.\n\n"
+                "Проверете го насловот или наведете ID, на пр. „Избриши вест 3“."
+            )
         return _izbrisi_vest(target_id)
     return _izbrisi_oglas(target_id)

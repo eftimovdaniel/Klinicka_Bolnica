@@ -225,6 +225,10 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
             out["odgovor"] = raw.get("odgovor", "")
             if raw.get("navigacija"):
                 out["navigacija"] = raw["navigacija"]
+            if raw.get("kontekst") is not None:
+                out["kontekst"] = raw.get("kontekst")
+            elif ctx.kontekst:
+                out["kontekst"] = ctx.kontekst
         else:
             out["odgovor"] = raw or ""
 

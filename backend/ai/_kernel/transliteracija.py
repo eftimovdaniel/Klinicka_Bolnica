@@ -138,17 +138,28 @@ def transliterijaj(tekst: str) -> str:
     return "".join(rezultat)
 
 
+_URL_ZAČUVAJ_RE = re.compile(
+    r"https?://[^\s<>\"']+|www\.[^\s<>\"']+",
+    re.IGNORECASE,
+)
+
+
 def normaliziraj_prasanje(tekst: str) -> str:
     """
     Главна функција за нормализација на корисничко прашање:
     1. Тргни вишок белина
-    2. Конвертирај латиница → кирилица
-    3. Долна буква (lowercase) за keyword matching
-
-    Враќа: (originalniot tekst, normaliziran tekst)
-    """
+    2. Конвертирај латиница → кирилица (URL-и остануваат непроменети)
+  """
     if not tekst:
         return ""
     t = tekst.strip()
-    t = transliterijaj(t)
-    return t
+    delovi: list[str] = []
+    pos = 0
+    for m in _URL_ZAČUVAJ_RE.finditer(t):
+        if m.start() > pos:
+            delovi.append(transliterijaj(t[pos : m.start()]))
+        delovi.append(m.group(0))
+        pos = m.end()
+    if pos < len(t):
+        delovi.append(transliterijaj(t[pos:]))
+    return "".join(delovi) if delovi else transliterijaj(t)

@@ -285,6 +285,19 @@ def odgovori_za_info_lekar(prasanje: str, kontekst: dict | None = None) -> str |
     lekar, od_kontekst = _resolviraj_lekar(prasanje, kontekst)
 
     if not lekar:
+        from ai.opsto.vest_naslov import pronajdi_vest_po_naslov
+
+        vest = pronajdi_vest_po_naslov(prasanje)
+        if vest:
+            naslov = (vest.get("naslov") or "").strip()
+            return {
+                "odgovor": (
+                    f"Ова личи на наслов на вест, не на име на лекар: „{naslov}“.\n\n"
+                    "За бришење (само директор) напишете, на пр.:\n"
+                    f"„Избриши ја веста со наслов {naslov}“."
+                ),
+                "kontekst": kontekst if isinstance(kontekst, dict) else None,
+            }
         if prasanje_bar_lekar_od_kontekst(prasanje) or prasanje_e_specijalnost_izbran_lekar(
             prasanje, kontekst
         ):

@@ -20,10 +20,13 @@ def require_lekar(lekar: dict | None, *, poraka: str | None = None) -> str | Non
 
 
 def require_direktor(lekar: dict | None, *, poraka: str | None = None) -> str | None:
-    """Лекар + check_admin_access (Владко Захариев / админ)."""
-    err = require_lekar(lekar, poraka=poraka or MSG_DIREKTOR)
-    if err:
-        return err
+    """Лекар + check_admin_access (директор на болницата — исто како таб Администрација)."""
+    if not lekar or not lekar.get("doctor_ID"):
+        return (
+            poraka
+            or "За објава вест на сајтот треба да сте најавени како лекар (директор).\n\n"
+            "Најавете се преку „Најава за лекари“ — гостинскиот режим не може да објавува вести."
+        )
     from routers.admin import check_admin_access
 
     try:
@@ -31,5 +34,12 @@ def require_direktor(lekar: dict | None, *, poraka: str | None = None) -> str | 
     except (TypeError, ValueError):
         return poraka or MSG_DIREKTOR
     if not check_admin_access(doctor_id):
-        return MSG_SAMO_DIREKTOR
+        ime = f"{lekar.get('name', '')} {lekar.get('surname', '')}".strip() or "лекар"
+        return (
+            "Објавување вести преку асистентот е достапно само за "
+            "директорот на болницата (исто како табот „Администрација“ на сајтот).\n\n"
+            f"Вие сте најавени како д-р {ime}.\n\n"
+            "Ако сте директор, најавете се со профилот на д-р Владко Захариев. "
+            "Инаку вестите ги додава директорот преку администрација или делот Новости."
+        )
     return None
