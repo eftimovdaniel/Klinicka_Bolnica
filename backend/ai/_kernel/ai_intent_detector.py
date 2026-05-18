@@ -66,8 +66,6 @@ VALIDNI_INTENTI = {
     "otvori_admin_panel",
     "general",
 }
-
-
 def detektiraj_intent_so_ai(prasanje: str) -> str:
     """
     Праша AI (Groq) да го класифицира прашањето во еден од поддржаните интенти.
