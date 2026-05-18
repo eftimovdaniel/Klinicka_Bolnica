@@ -28,6 +28,7 @@ from ai.pacient import moi_pregledi, apliciraj_za_rabota  # noqa: F401
 # === LEKAR ===
 from ai.lekar import zavrshi_pregled, istorija_pacient, karton_pacient  # noqa: F401
 from ai.lekar import moj_raspored, moja_statistika, zapishi_terapija  # noqa: F401
+from ai.lekar import lekar_panel_nav  # noqa: F401
 
 # === DIREKTOR ===
 from ai.direktor import kreiraj_oglas, zatvori_oglas, izbrisi_vest_oglas  # noqa: F401

@@ -151,6 +151,48 @@ def _resolviraj_lekar(prasanje: str, kontekst: dict | None) -> tuple[dict | None
     return lekar, lekar is not None
 
 
+def prasanje_e_oblast_ili_specijalnost_lekar(prasanje: str) -> bool:
+    """„Од која област е лекарот Драгица Тимова?" — конкретно име."""
+    from ai._kernel.lekar_lookup import (
+        _RE_POSLE_DR,
+        _RE_POSLE_LEKAROT,
+        izvlechi_delovi_ime,
+    )
+
+    p = transliterijaj(prasanje).lower()
+    if any(x in p for x in ("лекари", "lekari", "доктори", "doktori", "кои лекари")):
+        return False
+    if not any(
+        x in p
+        for x in (
+            "област",
+            "специјалност",
+            "oddel",
+            "oblast",
+            "specijalnost",
+            "од која",
+            "која е",
+            "кое е",
+            "од koja",
+        )
+    ):
+        return False
+    if _RE_POSLE_DR.search(p) or _RE_POSLE_LEKAROT.search(p):
+        return True
+    return len(izvlechi_delovi_ime(prasanje)) >= 2
+
+
+def _sablon_oblast_lekar(lekar: dict) -> str:
+    """Краток, точен одговор — без Groq („е инфектологија" и слично)."""
+    spec = (lekar.get("specialty") or "Општа пракса").strip()
+    prezime = (lekar.get("surname") or "").strip()
+    ime = f"д-р {lekar['name']} {lekar['surname']}"
+    return (
+        f"Специјалноста на {ime} е {spec}.\n\n"
+        f'За слободни термини: „Кога е слободен д-р {prezime}?"'
+    )
+
+
 def _e_prasanje_dali_raboti(prasanje: str) -> bool:
     p = transliterijaj(prasanje).lower()
     return any(
@@ -219,6 +261,9 @@ def _sablon_info_lekar(
             ]
         )
 
+    if prasanje_e_oblast_ili_specijalnost_lekar(prasanje):
+        return _sablon_oblast_lekar(lekar)
+
     # Општи информации за лекар
     delovi = [f"{ime} ({spec})"]
     if od_kontekst:
@@ -241,7 +286,9 @@ def _format_info_lekar(
     lekar: dict, prasanje: str, od_kontekst: bool, kontekst: dict | None = None
 ) -> str:
     sablon = _sablon_info_lekar(lekar, prasanje, od_kontekst, kontekst)
-    if prasanje_e_specijalnost_izbran_lekar(prasanje, kontekst):
+    if prasanje_e_specijalnost_izbran_lekar(
+        prasanje, kontekst
+    ) or prasanje_e_oblast_ili_specijalnost_lekar(prasanje):
         return sablon
 
     spec = lekar.get("specialty") or "Општа пракса"

@@ -86,6 +86,15 @@ def _lekar_dict(l: LekarModel | None) -> dict | None:
     }
 
 
+def _lekar_bara_raspored(pitanje: str, lekar_dict: dict | None) -> bool:
+    """Лекар: мои термини/прегледи или UI панел → moj_raspored."""
+    if not lekar_dict:
+        return False
+    from ai.lekar.lekar_intent import prasanje_bara_lekar_panel
+
+    return prasanje_bara_lekar_panel(pitanje)
+
+
 def _owner_ids(
     pacient_dict: dict | None, lekar_dict: dict | None
 ) -> tuple[int | None, int | None]:
@@ -140,6 +149,9 @@ def _intent_strukturiran_za_lekar(
 
     if _prasanje_e_pregled_dezurstvo(transliterijaj(pitanje_norm).lower()):
         return "pregled_dezurstvo"
+
+    if _lekar_bara_raspored(pitanje_norm, lekar_dict):
+        return "moj_raspored"
 
     if prasanje_e_lekari_po_oddel(pitanje_norm):
         return "lekari_oddel"
@@ -230,6 +242,9 @@ def _resolve_intent(
 
     if _prasanje_e_pregled_dezurstvo(transliterijaj(pitanje_norm).lower()):
         return "pregled_dezurstvo"
+
+    if _lekar_bara_raspored(pitanje_norm, lekar_dict):
+        return "moj_raspored"
 
     from ai.opsto.lekari_oddel import prasanje_e_lekari_po_oddel
     from ai.pacient.slobodni_termini import prasanje_e_drugi_lekari_specijalnost
@@ -343,6 +358,8 @@ def _resolve_intent(
         intent = "moi_pregledi"
     if intent == "moi_pregledi" and lekar_dict:
         intent = "moj_raspored"
+    if intent == "otvori_lekar_panel" and pacient_dict and not lekar_dict:
+        intent = "moi_pregledi"
     if prasanje_e_lista_site_pregledi(pitanje_norm) and intent == "info_lekar":
         intent = "moj_raspored" if lekar_dict else "moi_pregledi"
     if prasanje_e_lekari_po_oddel(pitanje_norm) and intent in (
@@ -360,6 +377,8 @@ def _resolve_intent(
         elif prasanje_e_lista_site_pregledi(pitanje_norm):
             intent = "moj_raspored"
         elif prasanje_e_pregledi_datum(pitanje_norm):
+            intent = "moj_raspored"
+        elif _lekar_bara_raspored(pitanje_norm, lekar_dict):
             intent = "moj_raspored"
 
     from ai.pacient.slobodni_termini import (

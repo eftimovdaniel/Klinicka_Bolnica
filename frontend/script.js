@@ -5376,6 +5376,8 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       }
     } else if (akcija === "otvori_admin_panel") {
       /* навигацијата го отвора панелот со филтер; не повикувај повторно */
+    } else if (akcija === "otvori_lekar_panel") {
+      /* навигацијата го отвора лекарскиот dashboard таб */
     } else if (akcija === "otvori_lekar_login") {
       setTimeout(function () {
         if (typeof window.openLekarLoginModal === "function") {
@@ -5421,6 +5423,48 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
     }, 500);
   }
   window.kbsOtvoriAdminPanel = kbsOtvoriAdminPanel;
+
+  function kbsOtvoriLekarPanel(nav) {
+    setTimeout(function () {
+      if (!currentLekar) {
+        if (typeof window.openLekarLoginModal === "function") {
+          window.openLekarLoginModal();
+        }
+        return;
+      }
+      if (typeof window.openLekarDashboardModal === "function") {
+        window.openLekarDashboardModal();
+      }
+      var navObj = nav && typeof nav === "object" ? nav : {};
+      var tab = navObj.tab || "pacienti";
+      if (navObj.target && String(navObj.target).indexOf("lekar:") === 0) {
+        tab = String(navObj.target).replace("lekar:", "") || tab;
+      }
+      if (tab === "admin") {
+        kbsOtvoriAdminPanel(navObj);
+        return;
+      }
+      if (typeof window.showLekarTab === "function") {
+        window.showLekarTab(tab);
+      }
+      if (tab === "pacienti") {
+        if (navObj.datum) {
+          var rds = document.getElementById("raspored-datum-select");
+          if (rds) rds.value = navObj.datum;
+        }
+        if (navObj.termini_mode === "date") {
+          if (typeof window.loadMojRaspored === "function") {
+            window.loadMojRaspored();
+          }
+        } else if (navObj.termini_mode === "all" || !navObj.termini_mode) {
+          if (typeof window.refreshLekarTerminiAll === "function") {
+            window.refreshLekarTerminiAll();
+          }
+        }
+      }
+    }, 500);
+  }
+  window.kbsOtvoriLekarPanel = kbsOtvoriLekarPanel;
 
   // Помошна функција – ресет на конверзациски контекст (повикана од reset/logout)
   function kbsResetKontekst() {
@@ -5484,6 +5528,10 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
 
     if (target === "lekar:admin" || target.indexOf("lekar:admin") === 0) {
       kbsOtvoriAdminPanel(nav);
+      return;
+    }
+    if (target.indexOf("lekar:") === 0) {
+      kbsOtvoriLekarPanel(nav);
       return;
     }
 

@@ -18,6 +18,7 @@ from database import get_connection
 from ai._kernel.auth import require_lekar
 from ai._kernel.napomena import napomena_za_prikaz_lekar
 from ai._kernel.groq_helpers import izvlechi_json_so_ai
+from ai.lekar.lekar_panel_nav import dopuni_so_lekar_panel
 
 
 PROMPT = """
@@ -41,6 +42,7 @@ PROMPT = """
 БЕЗ markdown, БЕЗ објаснувања. Само JSON.
 """.strip()
 
+from ai.lekar.lekar_intent import prasanje_e_moj_raspored_lekar  # noqa: F401 — re-export
 
 def _izvlechi_lokalno_raspored(prasanje: str) -> dict:
     from ai._kernel.transliteracija import transliterijaj
@@ -190,7 +192,13 @@ def odgovori_za_raspored(
     ime_lekar = f"{lekar.get('name','')} {lekar.get('surname','')}".strip() or "тебе"
 
     if not rows:
-        return f"Немаш закажани или завршени прегледи {label}."
+        termini_mode = "date" if konkreten_datum else "all"
+        return dopuni_so_lekar_panel(
+            f"Немаш закажани или завршени прегледи {label}.",
+            tab="pacienti",
+            termini_mode=termini_mode,
+            datum=konkreten_datum,
+        )
 
     zakazani_ids = [
         int(r["termin_ID"])
@@ -237,4 +245,14 @@ def odgovori_za_raspored(
     ctx = dict(kontekst) if isinstance(kontekst, dict) else {}
     if zakazani_ids:
         ctx["last_raspored_termin_ids"] = zakazani_ids
-    return {"odgovor": tekst, "kontekst": ctx} if zakazani_ids else tekst
+
+    termini_mode = "date" if konkreten_datum else "all"
+    telo: str | dict = (
+        {"odgovor": tekst, "kontekst": ctx} if zakazani_ids else tekst
+    )
+    return dopuni_so_lekar_panel(
+        telo,
+        tab="pacienti",
+        termini_mode=termini_mode,
+        datum=konkreten_datum,
+    )

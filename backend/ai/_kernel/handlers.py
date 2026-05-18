@@ -38,6 +38,7 @@ def _build_handlers() -> dict[str, HandlerSpec]:
         karton_pacient,
         kreiraj_oglas,
         lekari_oddel,
+        lekar_panel_nav,
         moj_raspored,
         moja_statistika,
         moi_pregledi,
@@ -96,7 +97,10 @@ def _build_handlers() -> dict[str, HandlerSpec]:
         "istorija_pacient": HandlerSpec(istorija_pacient.odgovori_za_istorija),
         "karton_pacient": HandlerSpec(karton_pacient.odgovori_za_karton),
         "moja_statistika": HandlerSpec(moja_statistika.odgovori_za_moja_statistika),
-        "moj_raspored": HandlerSpec(moj_raspored.odgovori_za_raspored, kind="dict"),
+        "moj_raspored": HandlerSpec(moj_raspored.odgovori_za_raspored, kind="dict_full"),
+        "otvori_lekar_panel": HandlerSpec(
+            lekar_panel_nav.odgovori_za_otvori_lekar_panel, kind="dict_full"
+        ),
         "navigacija": HandlerSpec(navigacija.odgovori_za_navigacija, kind="dict_nav"),
         "lekari_oddel": HandlerSpec(lekari_oddel.odgovori_za_lekari_oddel, kind="dict_nav"),
         "apliciraj_za_rabota": HandlerSpec(apliciraj_za_rabota.odgovori_za_aplikacija, kind="dict_full"),
@@ -162,7 +166,7 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
         raw = spec.fn()
     elif intent in ("slobodni_termini", "lekari_oddel"):
         raw = spec.fn(q, ctx.kontekst)
-    elif intent == "otvori_admin_panel":
+    elif intent in ("otvori_admin_panel", "otvori_lekar_panel"):
         raw = spec.fn(q, ctx.lekar, ctx.kontekst)
     elif intent == "zakazi_termin":
         raw = spec.fn(q, ctx.pacient, ctx.kontekst)

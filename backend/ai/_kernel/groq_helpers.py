@@ -31,6 +31,7 @@ _INTENTI_KLUCNI_BEZ_GROQ = frozenset(
         "preference_lekar",
         "moi_pregledi",
         "moj_raspored",
+        "otvori_lekar_panel",
         "lekari_oddel",
         "slobodni_termini",
         "info_lekar",

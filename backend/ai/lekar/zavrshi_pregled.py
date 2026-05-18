@@ -23,13 +23,31 @@ from ai._kernel.prompt_helpers import today_prompt_line
 from ai._kernel.transliteracija import transliterijaj
 
 _RE_TERMIN_ID = re.compile(r"\bID\s*(\d+)\b", re.IGNORECASE | re.UNICODE)
+_RE_ZAVRSI_ZATVORI = re.compile(
+    r"\b(заврш\w*|zavrsh\w*|затвор\w*|zatvor\w*|затвот\w*)\b",
+    re.IGNORECASE | re.UNICODE,
+)
 _RE_DX = re.compile(
-    r"(?:дијагноза|dijagnoza)\s*:\s*(.+?)(?=(?:терапија|terapija)\s*:|$)",
+    r"(?:дијагноза|dijagnoza)\s*:\s*(.+?)(?=\s+и\s+(?:терапија|terapija)|(?:терапија|terapija)\s*:|$)",
     re.IGNORECASE | re.UNICODE | re.DOTALL,
 )
 _RE_TX = re.compile(
     r"(?:терапија|terapija)\s*:\s*(.+)$",
     re.IGNORECASE | re.UNICODE | re.DOTALL,
+)
+_RE_DX_SO = re.compile(
+    r"со\s+дијагноза\s*[:/]?\s*(.+?)(?=\s+и\s+терапија|\s*$)",
+    re.IGNORECASE | re.UNICODE | re.DOTALL,
+)
+_RE_TX_SO = re.compile(
+    r"(?:и\s+)?терапија\s*[:/]?\s*(.+?)\s*$",
+    re.IGNORECASE | re.UNICODE | re.DOTALL,
+)
+_RE_PACIENT_POSLE_NA = re.compile(
+    r"(?:термин(?:от)?|преглед(?:от)?)\s+на\s+"
+    r"([A-Za-zА-Яа-яЁёІіЇїЈјЉљЊњЋћЏџ][\w\-']+(?:\s+[A-Za-zА-Яа-яЁёІіЇїЈјЉљЊњЋћЏџ][\w\-']+){0,2})"
+    r"\s+(?:со|за|на\s)",
+    re.IGNORECASE | re.UNICODE,
 )
 
 
@@ -56,30 +74,132 @@ PROMPT = """
 
 
 def prasanje_e_zavrshi_pregled(prasanje: str) -> bool:
-    """Заврши/затвори преглед со дијагноза и терапија — не info_lekar."""
+    """Заврши/затвори преглед/термин — не info_lekar (пациент ≠ лекар)."""
     if not prasanje or not prasanje.strip():
         return False
     p = transliterijaj(prasanje).lower()
-    if re.search(
-        r"\b(заврши|завршете|затвори|затворете|zavrshi|zatvori)\b", p, re.UNICODE
-    ) and re.search(r"\b(преглед|pregled|термин|termin)\b", p, re.UNICODE):
+    ima_akcija = bool(_RE_ZAVRSI_ZATVORI.search(p))
+    ima_termin = bool(
+        re.search(r"\b(преглед|pregled|термин|termin)\b", p, re.UNICODE)
+    )
+    ima_dx_tx = bool(
+        re.search(r"\b(дијагноз|dijagnoz|терап|terap)\b", p, re.UNICODE)
+    )
+    if ima_akcija and ima_termin:
+        return True
+    if ima_akcija and re.search(
+        r"\bна\s+[a-zа-я]", p, re.UNICODE
+    ):
         return True
     if _RE_DX.search(prasanje) and _RE_TX.search(prasanje):
         return True
-    if re.search(r"\b(заврши|затвори|zavrshi|zatvori)\b", p) and _RE_DX.search(prasanje):
+    if ima_akcija and (_RE_DX.search(prasanje) or _RE_DX_SO.search(prasanje)):
+        return True
+    if ima_akcija and ima_dx_tx:
         return True
     return False
+
+
+def _ocisti_dx_tx_vrednost(s: str | None) -> str | None:
+    if not s:
+        return None
+    t = s.strip().strip(" ,").strip("/").strip()
+    if not t or t in ("/", "—", "-", "…"):
+        return None
+    return t
 
 
 def _izvlechi_dx_tx_lokalno(prasanje: str) -> tuple[str | None, str | None]:
     dx = tx = None
     m_dx = _RE_DX.search(prasanje)
     if m_dx:
-        dx = m_dx.group(1).strip().strip(" ,")
+        dx = _ocisti_dx_tx_vrednost(m_dx.group(1))
     m_tx = _RE_TX.search(prasanje)
     if m_tx:
-        tx = m_tx.group(1).strip()
-    return dx or None, tx or None
+        tx = _ocisti_dx_tx_vrednost(m_tx.group(1))
+    if not dx:
+        m = _RE_DX_SO.search(prasanje)
+        if m:
+            dx = _ocisti_dx_tx_vrednost(m.group(1))
+    if not tx:
+        m = _RE_TX_SO.search(prasanje)
+        if m:
+            tx = _ocisti_dx_tx_vrednost(m.group(1))
+    return dx, tx
+
+
+def _izvlechi_ime_pacient_lokalno(prasanje: str) -> str | None:
+    """„терминот на Daniel Eftimov со …" → име на пациент."""
+    m = _RE_PACIENT_POSLE_NA.search(prasanje)
+    if m:
+        return m.group(1).strip()
+    for pat in (
+        r"(?:преглед|pregled|термин|termin)(?:от)?\s+на\s+"
+        r"([A-Za-zА-Яа-яЁёІіЇї][\w\-']+(?:\s+[A-Za-zА-Яа-яЁёІіЇї][\w\-']+){0,2})"
+        r"\s+(?:со|за)",
+        r"\bна\s+"
+        r"([A-Za-zА-Яа-яЁёІіЇї][\w\-']+(?:\s+[A-Za-zА-Яа-яЁёІіЇї][\w\-']+){0,2})"
+        r"\s+со\b",
+    ):
+        m = re.search(pat, prasanje, re.IGNORECASE | re.UNICODE)
+        if m:
+            ime = m.group(1).strip()
+            if len(ime) >= 3:
+                return ime
+    return None
+
+
+def _like_variants_ime(word: str) -> list[str]:
+    """Латиница + кирилица за пребарување во ime_pacient."""
+    w = (word or "").strip().lower()
+    if len(w) < 2:
+        return []
+    out: set[str] = {w}
+    cyr = transliterijaj(word).strip().lower()
+    if cyr and cyr != w:
+        out.add(cyr)
+    return list(out)
+
+
+def _sql_filter_ime_pacient(ime_pacient: str) -> tuple[str, list]:
+    """
+    (AND clause, params) — прво+последно име, латиница/кирилица, и обратен ред.
+    """
+    delovi = [d for d in ime_pacient.strip().split() if len(d) >= 2]
+    if not delovi:
+        return "", []
+
+    if len(delovi) == 1:
+        vars_ = _like_variants_ime(delovi[0])
+        if not vars_:
+            return "", []
+        clause = " AND (" + " OR ".join(["LOWER(ime_pacient) LIKE %s"] * len(vars_)) + ")"
+        return clause, [f"%{v}%" for v in vars_]
+
+    first, last = delovi[0], delovi[-1]
+    v_first = _like_variants_ime(first)
+    v_last = _like_variants_ime(last)
+
+    def _and_pair(va: list[str], vb: list[str]) -> tuple[str, list]:
+        p: list = []
+        parts: list[str] = []
+        for a in va:
+            parts.append("LOWER(ime_pacient) LIKE %s")
+            p.append(f"%{a}%")
+        for b in vb:
+            parts.append("LOWER(ime_pacient) LIKE %s")
+            p.append(f"%{b}%")
+        return "(" + " AND ".join(parts) + ")", p
+
+    fwd, p_fwd = _and_pair(v_first, v_last)
+    rev, p_rev = _and_pair(v_last, v_first)
+    return " AND (" + fwd + " OR " + rev + ")", p_fwd + p_rev
+
+
+def _status_zakazan_sql() -> str:
+    return (
+        "COALESCE(NULLIF(TRIM(status_pregled), ''), 'закажан') = 'закажан'"
+    )
 
 
 def _termin_id_od_prasanje(prasanje: str) -> int | None:
@@ -107,13 +227,46 @@ def _termin_ids_od_kontekst(kontekst: dict | None) -> list[int]:
     return ids
 
 
+def _izvlechi_lokalno(prasanje: str) -> dict:
+    """Без Groq — regex + контекст (работи и при 429 / GROQ_DISABLED)."""
+    from ai.pacient.moi_pregledi import datum_za_pregledi_od_prasanje
+
+    p = transliterijaj(prasanje).lower()
+    dx, tx = _izvlechi_dx_tx_lokalno(prasanje)
+    podatoci: dict = {
+        "termin_ids": None,
+        "ime_pacient": _izvlechi_ime_pacient_lokalno(prasanje),
+        "datum": None,
+        "site": bool(
+            _RE_ZAVRSI_ZATVORI.search(p)
+            and any(x in p for x in ("сите", "site", "all", "комплетн"))
+        ),
+        "dijagnoza": dx,
+        "terapija": tx,
+    }
+    tid = _termin_id_od_prasanje(prasanje)
+    if tid is not None:
+        podatoci["termin_ids"] = [tid]
+    d = datum_za_pregledi_od_prasanje(prasanje)
+    if d:
+        podatoci["datum"] = d.isoformat()
+    return podatoci
+
+
 def _izvlechi(prasanje: str) -> dict:
-    full = f'{today_prompt_line()}\n\nПрашање: „{prasanje}"\nВрати JSON.'
+    dx, tx = _izvlechi_dx_tx_lokalno(prasanje)
+    from ai._kernel.groq_client import groq_e_isklucen
+
+    if groq_e_isklucen():
+        return _izvlechi_lokalno(prasanje)
+
+    full = f'{today_prompt_line()}\n\nПрашање: "{prasanje}"\nВрати JSON.'
     podatoci = izvlechi_json_so_ai(full, PROMPT, log_tag="zavrshi_pregled")
+    if podatoci.get("_error"):
+        podatoci = _izvlechi_lokalno(prasanje)
     tid = _termin_id_od_prasanje(prasanje)
     if tid is not None and not podatoci.get("termin_ids"):
         podatoci["termin_ids"] = [tid]
-    dx, tx = _izvlechi_dx_tx_lokalno(prasanje)
     if dx and not podatoci.get("dijagnoza"):
         podatoci["dijagnoza"] = dx
     if tx and not podatoci.get("terapija"):
@@ -126,8 +279,10 @@ def _najdi_termin(
     termin_id: int | None,
     ime_pacient: str | None,
     datum_str: str | None,
+    *,
+    samo_zakazani: bool = True,
 ) -> list[dict]:
-    """Враќа активни (закажани) термини на овој лекар."""
+    """Термини на лекарот — по ID, име (лат/кир) или датум."""
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
 
@@ -144,23 +299,25 @@ def _najdi_termin(
 
     sql = (
         "SELECT termin_ID, ime_pacient, datum_pregled, vreme_pregled, status_pregled"
-        " FROM Termin_pregled"
-        " WHERE doctor_ID = %s AND status_pregled = 'закажан'"
+        " FROM Termin_pregled WHERE doctor_ID = %s"
     )
     params: list = [doctor_id]
+
+    if samo_zakazani:
+        sql += f" AND {_status_zakazan_sql()}"
 
     if datum_str:
         sql += " AND datum_pregled = %s"
         params.append(datum_str)
 
     if ime_pacient:
-        delovi = [d for d in ime_pacient.strip().split() if d]
-        if len(delovi) >= 2:
-            sql += " AND LOWER(ime_pacient) LIKE %s AND LOWER(ime_pacient) LIKE %s"
-            params.extend([f"%{delovi[0].lower()}%", f"%{delovi[-1].lower()}%"])
-        else:
-            sql += " AND LOWER(ime_pacient) LIKE %s"
-            params.append(f"%{delovi[0].lower()}%")
+        clause, clause_params = _sql_filter_ime_pacient(ime_pacient)
+        if clause:
+            sql += clause
+            params.extend(clause_params)
+        if "@" in ime_pacient:
+            sql += " AND LOWER(TRIM(email_pacient)) = LOWER(TRIM(%s))"
+            params.append(ime_pacient.strip())
 
     sql += " ORDER BY datum_pregled, vreme_pregled"
     cur.execute(sql, params)
@@ -170,16 +327,65 @@ def _najdi_termin(
     return rows
 
 
+def _poraka_ne_najden_termin(doctor_id: int, ime: str | None) -> str:
+    """Помошна порака — слични имиња или погрешен статус."""
+    base = "Не најдов соодветен закажан преглед кај тебе."
+    if not ime:
+        return (
+            base
+            + '\n\nПровери "Мој распоред" или наведи "Заврши термин ID …".'
+        )
+
+    site = _najdi_termin(doctor_id, None, ime, None, samo_zakazani=False)
+    if not site:
+        return (
+            base
+            + f'\n\nНемам термин за "{ime}" на твојот распоред.\n'
+            'Провери правопис (латиница/кирилица) или ID од "Мој распоред".'
+        )
+
+    zakazani = [
+        r
+        for r in site
+        if (r.get("status_pregled") or "закажан").strip() == "закажан"
+    ]
+    if zakazani:
+        return base
+
+    linii = [
+        base,
+        "",
+        f'Имам преглед за "{ime}", но не е со статус "закажан":',
+    ]
+    for r in site[:5]:
+        st = (r.get("status_pregled") or "—").strip()
+        linii.append(
+            f"• ID {r['termin_ID']}: {r['ime_pacient']} — "
+            f"{_fmt_dt(r['datum_pregled'], r['vreme_pregled'])} (статус: {st})"
+        )
+    linii.append(
+        "\nАко сакате да го ажурирате, наведете ID или контактирајте админ."
+    )
+    return "\n".join(linii)
+
+
+def _prazna_dx_tx(v: str | None) -> bool:
+    if v is None:
+        return True
+    t = str(v).strip()
+    return not t or t in ("/", "—", "-", "…", ".", "n/a", "N/A", "нема", "none")
+
+
 def _zavrshi(termin_id: int, dijagnoza: str | None, terapija: str | None) -> None:
     """Маркира преглед како завршен. Опционо запишува dx/tx."""
     conn = get_connection()
     cur = conn.cursor()
     sets = ["status_pregled = 'завршен'"]
     params: list = []
-    if dijagnoza:
+    if dijagnoza and not _prazna_dx_tx(dijagnoza):
         sets.append("dijagnoza = %s")
         params.append(dijagnoza)
-    if terapija:
+    if terapija and not _prazna_dx_tx(terapija):
         sets.append("terapija = %s")
         params.append(terapija)
     params.append(termin_id)
@@ -204,8 +410,7 @@ def _najdi_site_zakazani(doctor_id: int, datum_str: str | None) -> list[dict]:
     cur = conn.cursor(dictionary=True)
     sql = (
         "SELECT termin_ID, ime_pacient, datum_pregled, vreme_pregled, status_pregled"
-        " FROM Termin_pregled"
-        " WHERE doctor_ID = %s AND status_pregled = 'закажан'"
+        f" FROM Termin_pregled WHERE doctor_ID = %s AND {_status_zakazan_sql()}"
     )
     params: list = [doctor_id]
     if datum_str:
@@ -265,12 +470,25 @@ def odgovori_za_zavrshi(
 
     podatoci = _izvlechi(prasanje)
     if podatoci.get("_error"):
-        return podatoci["_error"]
+        return str(podatoci["_error"])
 
     if not dijagnoza:
         dijagnoza = (podatoci.get("dijagnoza") or "").strip() or None
     if not terapija:
         terapija = (podatoci.get("terapija") or "").strip() or None
+
+    if termin_ids and (_prazna_dx_tx(dijagnoza) or _prazna_dx_tx(terapija)):
+        parts = []
+        if _prazna_dx_tx(dijagnoza):
+            parts.append("дијагноза")
+        if _prazna_dx_tx(terapija):
+            parts.append("терапија")
+        return (
+            "За да го завршам прегледот, наведете вистинска "
+            + " и ".join(parts)
+            + ' (не само "/" или празно). Пример:\n'
+            '"Затвори го прегледот со Дијагноза: Мигрена, и терапија: Аналгетик".'
+        )
 
     if not termin_ids:
         ai_ids = podatoci.get("termin_ids") or []
@@ -287,6 +505,8 @@ def odgovori_za_zavrshi(
             termin_ids = ctx_ids
 
     ime = (podatoci.get("ime_pacient") or "").strip()
+    if not ime:
+        ime = (_izvlechi_ime_pacient_lokalno(prasanje) or "").strip()
     datum_str = podatoci.get("datum")
     site = bool(podatoci.get("site"))
 
@@ -329,20 +549,36 @@ def odgovori_za_zavrshi(
             msg += f"\n\nНе најдов: ID {', '.join(str(x) for x in nepostoekji)}"
         return msg
 
+    # Единствен закажан преглед денес (ако пишат само „затвори го терминот" + dx/tx)
+    if (
+        not termin_ids
+        and not ime
+        and not datum_str
+        and not site
+        and dijagnoza
+        and terapija
+    ):
+        denes = date.today().isoformat()
+        eden = _najdi_site_zakazani(doctor_id, denes)
+        if len(eden) == 1:
+            t = eden[0]
+            _zavrshi(t["termin_ID"], dijagnoza, terapija)
+            return _format_uspeh(t, dijagnoza, terapija)
+
     # СЛУЧАЈ 3: само име / датум (старо однесување)
     if not ime and not datum_str:
         return (
-            'За да завршам преглед ми треба: пациент, ID или „сите".\n'
+            'За да завршам преглед ми треба: пациент, ID, еден денешен термин, '
+            'или прво „Прикажи ми термините" (па повтори со дијагноза/терапија).\n'
             'Примери:\n'
-            '• „Заврши го прегледот на Петар Иванов"\n'
-            '• „Заврши термин ID 42"\n'
-            '• „Заврши термини 42, 43, 44"\n'
+            '• „Затвори термин ID 42 со дијагноза: … и терапија: …"\n'
+            '• „Заврши го прегледот на Петар Иванов со дијагноза: …"\n'
             '• „Заврши ги сите денешни прегледи"'
         )
 
     rows = _najdi_termin(doctor_id, None, ime, datum_str)
     if not rows:
-        return "Не најдов соодветен закажан преглед кај тебе."
+        return _poraka_ne_najden_termin(doctor_id, ime or None)
 
     if len(rows) > 1:
         lista = "\n".join(

@@ -52,6 +52,7 @@ VALIDNI_INTENTI = {
     "karton_pacient",
     "moja_statistika",
     "moj_raspored",
+    "otvori_lekar_panel",
     "navigacija",
     "lekari_oddel",
     "apliciraj_za_rabota",

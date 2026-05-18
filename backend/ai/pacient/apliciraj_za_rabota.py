@@ -437,10 +437,10 @@ def _odgovor_proverka_aplikacija(
             "odgovor": (
                 "Не — немам пронајдена апликација за работа во системот "
                 f"({ref}).\n\n"
-                "Ако сте аплицирале преку формата во „Кариера\", проверете дали "
+                'Ако сте аплицирале преку формата во "Кариера", проверете дали '
                 "сте внеле истата е-пошта како при најавата.\n\n"
                 "Ако сакате повторно да аплицирате, наведете ја позицијата, на пример:\n"
-                '„Сакам да аплицирам за Уролог".'
+                '"Сакам да аплицирам за Уролог".'
             ),
             "kontekst": None,
             "navigacija": NAV_KARIERA,
@@ -485,6 +485,8 @@ def _odgovor_proverka_aplikacija(
 def _prasanje_e_opsto_za_rabota(prasanje: str) -> bool:
     """„Аплицирам за работа" без конкретна позиција/специјалност."""
     if prasanje_e_proverka_aplikacija_rabota(prasanje):
+        return False
+    if prasanje_e_izbrisi_aplikacija_rabota(prasanje):
         return False
     p = transliterijaj(prasanje).lower()
     if not any(
@@ -615,26 +617,30 @@ def prasanje_e_proverka_aplikacija_rabota(prasanje: str) -> bool:
 
 
 def prasanje_e_izbrisi_aplikacija_rabota(prasanje: str) -> bool:
-    """„Избриши ја апликацијата", „откажи аплицирање" — не лиценца."""
+    """„Избриши/избришам ја апликацијата", „откажи пријава" — не нов apply flow."""
     p = transliterijaj(prasanje).lower()
     if not any(
         w in p
         for w in (
-            "избриши",
-            "избришете",
-            "тргни",
-            "отстрани",
-            "откажи",
-            "откажете",
-            "повлечи",
-            "izbrisi",
-            "otkazi",
-            "delete",
-            "cancel",
+            "апликаци",
+            "aplikaci",
+            "аплиц",
+            "aplic",
+            "пријав",
+            "prijav",
         )
     ):
         return False
-    return any(w in p for w in ("апликаци", "aplikaci", "аплиц", "aplic", "пријав"))
+    if re.search(
+        r"(избриш\w*|izbris\w*|откаж\w*|otkaz\w*|тргни|отстрани|повлеч\w*|delete|cancel)",
+        p,
+    ):
+        return True
+    if ("сакам" in p or "sakam" in p) and re.search(
+        r"(избриш|izbris|откаж|otkaz|тргни|отстрани)", p
+    ):
+        return True
+    return False
 
 
 def _otkazi_aplikacija_flow(kontekst: dict | None) -> dict:
@@ -650,13 +656,19 @@ def _otkazi_aplikacija_flow(kontekst: dict | None) -> dict:
 
 
 def _pozicija_hint_od_brisenje(prasanje: str) -> str | None:
-    """„… за медицинска сестра" → hint за пребарување."""
+    """„… за медицинска сестра" / „апликацијата за …" → hint за пребарување."""
     p = transliterijaj(prasanje).lower()
     m = re.search(
-        r"\bза\s+(.+?)(?:\s*$)",
+        r"апликаци\w*\s+за\s+(.+?)\s*$",
         p,
         flags=re.UNICODE | re.IGNORECASE,
     )
+    if not m:
+        m = re.search(
+            r"\bза\s+(.+?)\s*$",
+            p,
+            flags=re.UNICODE | re.IGNORECASE,
+        )
     if m:
         hint = m.group(1).strip()
         for stop in (
@@ -868,7 +880,7 @@ def _izbrisi_aplikacija_od_baza(
             "Апликацијата е избришана.\n\n"
             f"Позиција: {poz or '—'}\n"
             f"ID: {app_id_del}\n\n"
-            'Можете повторно да аплицирате преку „Кариера" ако сакате.'
+            'Можете повторно да аплицирате преку "Кариера" ако сакате.'
         )
     except Exception as e:
         print(f"[apliciraj] DELETE aplikacija: {e!r}")
@@ -1026,7 +1038,7 @@ def _odgovor_odbien_aplikacija() -> dict:
     return {
         "odgovor": (
             "Ви благодариме.\n\n"
-            'Следете ги огласите во делот „Кариера" на сајтот.\n\n'
+            'Следете ги огласите во делот "Кариера" на сајтот.\n\n'
             "Доколку подоцна сте заинтересирани, тука сме да го обработиме "
             "вашето барање за работа — слободно пишете повторно кога ќе сакате."
         ),
@@ -1042,7 +1054,7 @@ def _odgovor_izberi_pozicija(pacient: dict) -> dict:
         return {
             "odgovor": (
                 "Моментално нема отворени работни позиции за пријавување.\n\n"
-                'Страницата ќе се отвори на делот „Кариера" — проверете повторно подоцна '
+                'Страницата ќе се отвори на делот "Кариера" — проверете повторно подоцна '
                 "или контактирајте ја централата."
             ),
             "kontekst": None,
@@ -1068,7 +1080,7 @@ def _odgovor_izberi_pozicija(pacient: dict) -> dict:
             '„Сакам да аплицирам за Уролог" или „Аплицирај ме за кардиолог".',
             "Ќе ве водам чекор по чекор (лиценца и потврда).",
             "",
-            'Исто така можете да се пријавите преку формата во делот „Кариера" на страницата.',
+            'Исто така можете да се пријавите преку формата во делот "Кариера" на страницата.',
         ]
     )
     return {
@@ -1283,6 +1295,11 @@ def odgovori_za_aplikacija(
     if not ceka:
         if _prasanje_e_opsto_za_rabota(prasanje):
             return _odgovor_izberi_pozicija(pacient)
+
+        if prasanje_e_izbrisi_aplikacija_rabota(prasanje):
+            if _email_za_brisenje_aplikacija(pacient, kontekst) or _direktor_e_admin(lekar):
+                return _odgovor_izbrisi_aplikacija(pacient, kontekst, prasanje, lekar)
+            return _otkazi_aplikacija_flow(kontekst)
 
         baran = _baraj_pozicija_za_aplikacija(prasanje)
         if not baran:

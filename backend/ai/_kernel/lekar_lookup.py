@@ -164,8 +164,19 @@ _STOP_IME = frozenset(
         "оддел",
         "оделот",
         "одел",
+        "област",
+        "областа",
+        "области",
+        "специјалност",
+        "специјалноста",
+        "специјалности",
+        "лекар",
+        "лекарот",
+        "лекарот",
         "лекари",
         "лекарите",
+        "доктор",
+        "докторот",
         "доктори",
         "докторите",
         "каков",
@@ -246,6 +257,11 @@ _RE_POSLE_KAJ = re.compile(
     r"\bкај\s+(.+)",
     re.IGNORECASE | re.UNICODE,
 )
+# „… е лекарот Драгица Тимова", „информации за лекарот …"
+_RE_POSLE_LEKAROT = re.compile(
+    r"(?:^|\s)лекар(?:от)?\s+(.+?)(?:\?|$)",
+    re.IGNORECASE | re.UNICODE,
+)
 
 
 def _cist_ime_zbor(raw: str) -> str:
@@ -320,6 +336,17 @@ def izvlechi_delovi_ime(prasanje: str) -> list[str]:
         delovi = _delovi_od_fragment(m_kaj.group(1))
         if delovi:
             return delovi
+
+    # „Од која област е лекарот Драгица Тимова"
+    m_lek = _RE_POSLE_LEKAROT.search(p)
+    if m_lek:
+        delovi = _delovi_od_fragment(m_lek.group(1))
+        if len(delovi) >= 2:
+            return delovi
+        if len(delovi) == 1:
+            prezime = delovi[0]
+            if len(najdi_lekari_po_prezime(prezime)) == 1:
+                return delovi
 
     # Резервно: зборови од целото прашање (без шумни зборови)
     delovi = []

@@ -157,6 +157,7 @@ KLUCNI_ZAVRSHI = [
     "заврши преглед", "заврши го прегледот", "заврши го терминот",
     "заврши термин", "заврши го",
     "затвори преглед", "затвори го прегледот", "затвори го терминот",
+    "затвоти го терминот", "затвоти преглед", "zatvoti termin",
     "означи како завршен", "означи го прегледот", "финализирај преглед",
     "пациентот заврши", "прегледот заврши",
     "complete pregled", "zavrshi pregled", "zavrshi termin",
@@ -217,23 +218,16 @@ KLUCNI_NAVIGACIJA = [
     "navigacija",
 ]
 
-# 00k. МОЈ РАСПОРЕД (лекар) – мора пред „zakazi_termin"
-KLUCNI_RASPORED = [
-    "распоред", "распоредот", "мој распоред", "мојот распоред",
-    "закажани прегледи", "закажаните прегледи",
-    "закажани термини", "закажаните термини",
-    "моите прегледи", "моите закажани", "моите термини",
-    "прикажи прегледи", "прикажи закажани", "покажи прегледи",
-    "прикажи ги сите прегледи", "прикази ги сите прегледи",
-    "прикажи ги site прегледи", "прикази gi site pregledi",
-    "prikazi gi site pregledi", "prikazi site pregledi",
-    "прикажи ги моите", "покажи ги моите",
-    "следни прегледи", "следните прегледи",
-    "идни прегледи", "идните прегледи",
-    "што имам утре", "што имам денес", "што имам наредно",
-    "кои се моите следни", "кои ми се идните",
-    "moj raspored", "raspored",
-]
+def _prasanje_za_lekar_panel(p: str) -> bool:
+    """Лекар: распоред или UI панел (ai.lekar.lekar_intent)."""
+    from ai.lekar.lekar_intent import prasanje_bara_lekar_panel
+
+    return prasanje_bara_lekar_panel(p)
+
+
+# 00k–00l. Резерва ако lekar_intent не се вчита
+KLUCNI_RASPORED = ["moj raspored", "raspored", "распоред", "распоредот"]
+KLUCNI_LEKAR_PANEL = ["dashboard", "дашборд", "панел", "panel"]
 
 # 0a. ТРГНИ / ИЗБРИШИ ОЦЕНА (мора пред "оцени" и пред "откажи")
 KLUCNI_TRGNI_OCENA = [
@@ -436,8 +430,14 @@ _ZBOROVI_NE_SE_IMENA = frozenset(
         "pregledi",
         "термин",
         "термини",
+        "термините",
         "termin",
         "termini",
+        "terminite",
+        "ми",
+        "ги",
+        "mi",
+        "gi",
         "site",
         "сите",
         "prikazi",
@@ -758,6 +758,13 @@ def _prasanje_e_konkreten_lekar(prasanje: str) -> bool:
     p = transliterijaj(prasanje).lower()
     if _prasanje_e_asistent_opsto(p):
         return False
+    try:
+        from ai.lekar.lekar_intent import prasanje_e_moj_raspored_lekar
+
+        if prasanje_e_moj_raspored_lekar(prasanje):
+            return False
+    except ImportError:
+        pass
     if prasanje_ima_youtube_link(prasanje) or _ima_zbor(p, KLUCNI_OBJAVI_VEST):
         return False
     if _bolnica_info_intent(p):
@@ -1176,6 +1183,9 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
     if _prasanje_e_pregled_dezurstvo(p):
         return "pregled_dezurstvo"
 
+    if _prasanje_za_lekar_panel(p):
+        return "moj_raspored"
+
     if _ima_zbor(p, KLUCNI_OTVORI_ADMIN):
         return "otvori_admin_panel"
     if "администрација" in p and any(
@@ -1217,9 +1227,18 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
     if _ima_zbor(p, KLUCNI_MOI_PREGLEDI):
         return "moi_pregledi"
 
-    # B1 „мој распоред" / „закажаните прегледи" - мора пред zakazi_termin
-    # ВАЖНО: ова може да биде или лекарски распоред или пациентски преглед –
-    # router-от ја решава амбигуитетот според улогата.
+    # Лекарски таб / распоред – мора пред zakazi_termin (логика: lekar_intent)
+    try:
+        from ai.lekar.lekar_intent import prasanje_bara_lekar_panel, prasanje_e_moj_raspored_lekar
+
+        if prasanje_e_moj_raspored_lekar(prasanje):
+            return "moj_raspored"
+        if prasanje_bara_lekar_panel(prasanje):
+            return "otvori_lekar_panel"
+    except ImportError:
+        pass
+    if _ima_zbor(p, KLUCNI_LEKAR_PANEL):
+        return "otvori_lekar_panel"
     if _ima_zbor(p, KLUCNI_RASPORED):
         return "moj_raspored"
 
