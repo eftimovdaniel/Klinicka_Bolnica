@@ -1,7 +1,7 @@
 from ai._kernel.prompt_loader import load_prompt  # vcituvanje AI prompt od agent_prompts.txt
 from ai._kernel.ai_json import parse_ai_json  # AI odgovor -> JSON dict
 from ai._kernel.auth import require_direktor  # samo direktor ima pristap
-from ai._kernel.db_helpers import as_dict, db_cursor  # pomos za MySQL kursor
+from ai._kernel.db_helpers import as_dict, db_cursor, prijaveni_select_sql  # pomos za MySQL kursor
 from ai._kernel.groq_client import ask_ai  # povik kon Groq (Llama)
 
 
@@ -36,12 +36,7 @@ def odgovori_za_aplikanti(prasanje: str, lekar: dict | None) -> str:  # glaven h
 
     try:  # citaj od baza
         with db_cursor() as (_, cur):  # konekcija + kursor (auto close)
-            sql = (  # SQL za site aplikanti
-                "SELECT id, id_oglas, pozicija, ime_lekar, prezime_lekar, "  # koloni
-                "       broj_med_licenca, email, telefon, datum_prijava "  # kontakt i datum
-                "FROM prijaveni_lekari "  # tabela so prijavi
-                "WHERE 1=1"  # osnova za AND uslovi
-            )
+            sql = prijaveni_select_sql(full=True) + " WHERE 1=1"
             params: list = []  # vrednosti za %s
 
             if id_oglas:  # baranje po konkreten oglas

@@ -17,7 +17,15 @@ from datetime import datetime
 
 from database import get_connection
 from ai._kernel.ai_json import parse_ai_json
-from ai._kernel.db_helpers import as_dict, fetch_one, normalize_int
+from ai._kernel.db_helpers import (
+    as_dict,
+    fetch_one,
+    normalize_int,
+    prijaveni_order_desc,
+    prijaveni_pk_column,
+    prijaveni_row_id,
+    prijaveni_select_sql,
+)
 from ai._kernel.groq_client import ask_ai
 from ai._kernel.transliteracija import transliterijaj
 from vrabotuvanje_helpers import fetch_aktivni_oglasi_rows, format_rok_datum
@@ -161,36 +169,256 @@ def _format_datum_prijava(d) -> str:
     return str(d)[:16]
 
 
-def _lista_aplikacii_po_email(email: str) -> list[dict]:
+def _email_kluc_za_uporedba(email: str) -> tuple[str, str] | None:
+    """(local, domain) — Gmail: без точки и +alias."""
+    e = (email or "").strip().lower()
+    if "@" not in e:
+        return None
+    local, domain = e.split("@", 1)
+    domain = domain.replace("googlemail.com", "gmail.com")
+    if domain == "gmail.com":
+        local = local.split("+")[0].replace(".", "")
+    return local, domain
+
+
+def _email_se_sovpaaga(a: str, b: str) -> bool:
+    ka, kb = _email_kluc_za_uporedba(a), _email_kluc_za_uporedba(b)
+    if ka and kb:
+        return ka == kb
+    return (a or "").strip().lower() == (b or "").strip().lower()
+
+
+def _email_iz_baza_po_pacient_id(pacient_id: int) -> str | None:
     conn = None
     try:
         conn = get_connection()
         cur = conn.cursor(dictionary=True)
         cur.execute(
-            """
-            SELECT id, pozicija, datum_prijava, id_oglas
-            FROM prijaveni_lekari
-            WHERE LOWER(TRIM(email)) = LOWER(TRIM(%s))
-            ORDER BY datum_prijava DESC, id DESC
-            """,
-            (email.strip(),),
+            "SELECT email FROM patient WHERE patient_ID = %s LIMIT 1",
+            (pacient_id,),
         )
-        rows = [as_dict(r) for r in cur.fetchall()]
+        row = fetch_one(cur)
         cur.close()
-        return rows
+        if row:
+            return (row.get("email") or "").strip() or None
     except Exception as e:
-        print(f"[apliciraj] lista aplikacii: {e!r}")
+        print(f"[apliciraj] email od patient_ID: {e!r}")
+    finally:
+        if conn:
+            conn.close()
+    return None
+
+
+def _emails_za_prebaruvanje(
+    pacient: dict | None, kontekst: dict | None
+) -> list[str]:
+    """Сите можни email-и (најава, контекст, patient табела)."""
+    seen: set[str] = set()
+    out: list[str] = []
+
+    def add(e: str | None) -> None:
+        e = (e or "").strip()
+        if not e or e.lower() in seen:
+            return
+        seen.add(e.lower())
+        out.append(e)
+
+    add(_email_za_brisenje_aplikacija(pacient, kontekst))
+    if pacient:
+        pid = normalize_int(pacient.get("pacient_ID"))
+        if pid:
+            add(_email_iz_baza_po_pacient_id(pid))
+    return out
+
+
+def _dedupe_aplikacii(rows: list[dict]) -> list[dict]:
+    seen: set[int] = set()
+    out: list[dict] = []
+    for r in rows:
+        try:
+            rid = prijaveni_row_id(r)
+        except ValueError:
+            continue
+        if rid in seen:
+            continue
+        seen.add(rid)
+        if r.get("id") is None:
+            r = {**r, "id": rid}
+        out.append(r)
+    out.sort(
+        key=lambda x: (x.get("datum_prijava") or "", x.get("id") or 0),
+        reverse=True,
+    )
+    return out
+
+
+def _lista_aplikacii_po_id(app_id: int) -> list[dict]:
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        pk = prijaveni_pk_column()
+        cur.execute(
+            prijaveni_select_sql() + f" WHERE {pk} = %s LIMIT 1",
+            (app_id,),
+        )
+        row = fetch_one(cur)
+        cur.close()
+        return [as_dict(row)] if row else []
+    except Exception as e:
+        print(f"[apliciraj] lista po id: {e!r}")
         return []
     finally:
         if conn:
             conn.close()
 
 
+def _lista_aplikacii_po_email_striktno(email: str) -> list[dict]:
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            prijaveni_select_sql()
+            + " WHERE LOWER(TRIM(email)) = LOWER(TRIM(%s))"
+            + prijaveni_order_desc(),
+            (email.strip(),),
+        )
+        rows = [as_dict(r) for r in cur.fetchall()]
+        cur.close()
+        return rows
+    except Exception as e:
+        print(f"[apliciraj] lista po email: {e!r}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+
+def _lista_aplikacii_po_email_fuzzy(email: str) -> list[dict]:
+    """Gmail alias/точки — споредба на local+domain во Python."""
+    kluc = _email_kluc_za_uporedba(email)
+    if not kluc:
+        return []
+    _local, domain = kluc
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            prijaveni_select_sql()
+            + " WHERE LOWER(email) LIKE %s"
+            + prijaveni_order_desc(),
+            (f"%@{domain}",),
+        )
+        rows = [
+            as_dict(r)
+            for r in cur.fetchall()
+            if _email_se_sovpaaga(r.get("email") or "", email)
+        ]
+        cur.close()
+        return rows
+    except Exception as e:
+        print(f"[apliciraj] lista fuzzy email: {e!r}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+
+def _lista_aplikacii_po_ime_prezime(ime: str, prezime: str) -> list[dict]:
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            prijaveni_select_sql()
+            + """
+            WHERE LOWER(TRIM(ime_lekar)) = LOWER(TRIM(%s))
+              AND LOWER(TRIM(prezime_lekar)) = LOWER(TRIM(%s))
+            """
+            + prijaveni_order_desc(),
+            (ime.strip(), prezime.strip()),
+        )
+        rows = [as_dict(r) for r in cur.fetchall()]
+        cur.close()
+        return rows
+    except Exception as e:
+        print(f"[apliciraj] lista po ime: {e!r}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+
+def _filtriraj_aplikacii_po_emails(
+    rows: list[dict], emails: list[str]
+) -> list[dict]:
+    """Само пријави чија е-пошта се совпаѓа со најавената (вкл. Gmail нормализација)."""
+    if not emails:
+        return rows
+    out: list[dict] = []
+    for r in rows:
+        app_em = (r.get("email") or "").strip()
+        if app_em and any(_email_se_sovpaaga(app_em, e) for e in emails):
+            out.append(r)
+    return out
+
+
+def _zemi_site_aplikacii_pacient(
+    pacient: dict | None, kontekst: dict | None
+) -> tuple[list[dict], str]:
+    """
+    Враќа (апликации, начин).
+    Со најавен email → само пријави на таа сметка (не по име/презиме).
+    """
+    rows: list[dict] = []
+    nacin = ""
+    emails = _emails_za_prebaruvanje(pacient, kontekst)
+    ima_email = bool(emails)
+
+    app_id = normalize_int((kontekst or {}).get("last_aplikacija_id"))
+    if app_id:
+        found = _lista_aplikacii_po_id(app_id)
+        if found and ima_email:
+            found = _filtriraj_aplikacii_po_emails(found, emails)
+        if found:
+            rows.extend(found)
+            nacin = "id"
+
+    for email in emails:
+        strict = _lista_aplikacii_po_email_striktno(email)
+        if strict:
+            rows.extend(strict)
+            if not nacin:
+                nacin = "email"
+        fuzzy = _lista_aplikacii_po_email_fuzzy(email)
+        if fuzzy:
+            rows.extend(fuzzy)
+            if not nacin:
+                nacin = "gmail"
+
+    rows = _dedupe_aplikacii(rows)
+    if rows:
+        return rows, nacin
+
+    # По име само ако нема email (ретко — гостин без сметка)
+    if not ima_email and pacient:
+        ime = (pacient.get("ime") or "").strip()
+        prezime = (pacient.get("prezime") or "").strip()
+        if ime and prezime:
+            by_name = _lista_aplikacii_po_ime_prezime(ime, prezime)
+            if by_name:
+                return by_name, "ime_prezime"
+
+    return [], ""
+
+
 def _odgovor_proverka_aplikacija(
     pacient: dict | None, kontekst: dict | None
 ) -> dict:
-    email = _email_za_brisenje_aplikacija(pacient, kontekst)
-    if not email:
+    email_prikaz = _email_za_brisenje_aplikacija(pacient, kontekst)
+    if not email_prikaz and not (pacient and pacient.get("pacient_ID")):
         return {
             "odgovor": (
                 "За да проверам дали имате поднесена апликација за работа, "
@@ -202,22 +430,33 @@ def _odgovor_proverka_aplikacija(
             "kontekst": None,
         }
 
-    apps = _lista_aplikacii_po_email(email)
+    apps, nacin = _zemi_site_aplikacii_pacient(pacient, kontekst)
     if not apps:
+        ref = email_prikaz or "вашата сметка"
         return {
             "odgovor": (
-                "Не — немам пронајдена апликација за работа на вашето име "
-                f"({email}).\n\n"
-                "Ако сакате да аплицирате, наведете ја позицијата, на пример:\n"
+                "Не — немам пронајдена апликација за работа во системот "
+                f"({ref}).\n\n"
+                "Ако сте аплицирале преку формата во „Кариера\", проверете дали "
+                "сте внеле истата е-пошта како при најавата.\n\n"
+                "Ако сакате повторно да аплицирате, наведете ја позицијата, на пример:\n"
                 '„Сакам да аплицирам за Уролог".'
             ),
             "kontekst": None,
             "navigacija": NAV_KARIERA,
         }
 
-    linii = ["Да — имате поднесена апликација за работа:\n"]
+    if len(apps) == 1:
+        naslov = "Да — имате поднесена апликација за работа:\n"
+    else:
+        naslov = f"Да — имате {len(apps)} поднесени апликации за работа (на {email_prikaz or 'вашата сметка'}):\n"
+    linii = [naslov]
+    if nacin == "ime_prezime":
+        linii.append(
+            "(Пронајдено по име и презиме — најавете се со е-поштата од пријавата за поточен преглед.)\n"
+        )
     for a in apps:
-        poz = (a.get("pozicija") or "—").strip()
+        poz = (a.get("pozicija") or "—").strip() or "—"
         app_id = a.get("id")
         linii.append(
             f"• {poz} — пријавено на {_format_datum_prijava(a.get('datum_prijava'))}"
@@ -231,10 +470,11 @@ def _odgovor_proverka_aplikacija(
             'За откажување: „Избриши ја апликацијата".',
         ]
     )
+    store_email = email_prikaz or (apps[0].get("email") or "").strip()
     return {
         "odgovor": "\n".join(linii),
         "kontekst": {
-            "applicant_email": email,
+            "applicant_email": store_email,
             "last_aplikacija_id": apps[0].get("id"),
             "last_aplikacija_pozicija": (apps[0].get("pozicija") or "").strip(),
         },
@@ -436,12 +676,7 @@ def _pozicija_hint_od_brisenje(prasanje: str) -> str | None:
 
 
 def _app_row_id(row: dict) -> int:
-    rid = row.get("id")
-    if rid is None:
-        rid = row.get("ID")
-    if rid is None:
-        raise ValueError(f"Нема id во ред: {row!r}")
-    return int(rid)
+    return prijaveni_row_id(row)
 
 
 def _email_za_brisenje_aplikacija(
@@ -490,41 +725,28 @@ def _najdi_aplikacija_za_brisenje(
     posledna_bilo_koja: bool = False,
 ) -> dict | None:
     """Еден ред од prijaveni_lekari за бришење."""
+    pk = prijaveni_pk_column()
+    sel = prijaveni_select_sql()
+    ord1 = prijaveni_order_desc() + " LIMIT 1"
+
     if app_id is not None:
-        cur.execute(
-            """
-            SELECT id, pozicija, datum_prijava, id_oglas, email
-            FROM prijaveni_lekari WHERE id = %s LIMIT 1
-            """,
-            (app_id,),
-        )
+        cur.execute(sel + f" WHERE {pk} = %s LIMIT 1", (app_id,))
         return fetch_one(cur)
 
     if posledna_bilo_koja:
-        cur.execute(
-            """
-            SELECT id, pozicija, datum_prijava, id_oglas, email
-            FROM prijaveni_lekari
-            ORDER BY datum_prijava DESC, id DESC
-            LIMIT 1
-            """
-        )
+        cur.execute(sel + ord1)
         return fetch_one(cur)
 
     if not email:
         return None
 
     email_n = email.strip().lower()
-    base = """
-        SELECT id, pozicija, datum_prijava, id_oglas, email
-        FROM prijaveni_lekari
-        WHERE LOWER(TRIM(email)) = %s
-    """
+    base = sel + " WHERE LOWER(TRIM(email)) = %s"
     params: list = [email_n]
 
     if id_oglas is not None:
         cur.execute(
-            base + " AND id_oglas = %s ORDER BY datum_prijava DESC, id DESC LIMIT 1",
+            base + " AND id_oglas = %s" + ord1,
             tuple(params + [id_oglas]),
         )
         row = fetch_one(cur)
@@ -534,19 +756,62 @@ def _najdi_aplikacija_za_brisenje(
     if pozicija_hint:
         hint = pozicija_hint.strip().lower()
         cur.execute(
-            base
-            + " AND LOWER(TRIM(pozicija)) LIKE %s ORDER BY datum_prijava DESC, id DESC LIMIT 1",
+            base + " AND LOWER(TRIM(pozicija)) LIKE %s" + ord1,
             tuple(params + [f"%{hint}%"]),
         )
         row = fetch_one(cur)
         if row:
             return row
 
-    cur.execute(
-        base + " ORDER BY datum_prijava DESC, id DESC LIMIT 1",
-        tuple(params),
-    )
-    return fetch_one(cur)
+    cur.execute(base + ord1, tuple(params))
+    row = fetch_one(cur)
+    if row:
+        return row
+
+    kluc = _email_kluc_za_uporedba(email)
+    if kluc:
+        _local, domain = kluc
+        cur.execute(
+            sel + " WHERE LOWER(email) LIKE %s" + prijaveni_order_desc() + " LIMIT 30",
+            (f"%@{domain}",),
+        )
+        for raw in cur.fetchall():
+            cand = as_dict(raw)
+            if not _email_se_sovpaaga(cand.get("email") or "", email):
+                continue
+            if id_oglas is not None and cand.get("id_oglas") != id_oglas:
+                continue
+            if pozicija_hint:
+                hint = pozicija_hint.strip().lower()
+                if hint not in (cand.get("pozicija") or "").lower():
+                    continue
+            return cand
+    return None
+
+
+def _izberi_aplikacija_za_brisenje(
+    apps: list[dict],
+    *,
+    id_oglas: int | None = None,
+    pozicija_hint: str | None = None,
+    app_id: int | None = None,
+) -> dict | None:
+    if not apps:
+        return None
+    if app_id is not None:
+        for a in apps:
+            if int(a.get("id") or 0) == int(app_id):
+                return a
+    if id_oglas is not None:
+        for a in apps:
+            if a.get("id_oglas") == id_oglas:
+                return a
+    if pozicija_hint:
+        hint = pozicija_hint.strip().lower()
+        for a in apps:
+            if hint in (a.get("pozicija") or "").lower():
+                return a
+    return apps[0]
 
 
 def _izbrisi_aplikacija_od_baza(
@@ -556,6 +821,8 @@ def _izbrisi_aplikacija_od_baza(
     pozicija_hint: str | None = None,
     app_id: int | None = None,
     posledna_bilo_koja: bool = False,
+    pacient: dict | None = None,
+    kontekst: dict | None = None,
 ) -> tuple[bool, str]:
     """Брише апликација од prijaveni_lekari (ист пат како INSERT)."""
     conn = None
@@ -570,6 +837,16 @@ def _izbrisi_aplikacija_od_baza(
             pozicija_hint=pozicija_hint,
             posledna_bilo_koja=posledna_bilo_koja,
         )
+        if not row and not posledna_bilo_koja and app_id is None:
+            apps, _ = _zemi_site_aplikacii_pacient(pacient, kontekst)
+            picked = _izberi_aplikacija_za_brisenje(
+                apps,
+                id_oglas=id_oglas,
+                pozicija_hint=pozicija_hint,
+                app_id=normalize_int((kontekst or {}).get("last_aplikacija_id")),
+            )
+            if picked:
+                row = picked
         if not row:
             cur.close()
             if email:
@@ -583,7 +860,8 @@ def _izbrisi_aplikacija_od_baza(
 
         app_id_del = _app_row_id(as_dict(row))
         poz = (row.get("pozicija") or "").strip()
-        cur.execute("DELETE FROM prijaveni_lekari WHERE id = %s", (app_id_del,))
+        pk = prijaveni_pk_column()
+        cur.execute(f"DELETE FROM prijaveni_lekari WHERE {pk} = %s", (app_id_del,))
         conn.commit()
         cur.close()
         return True, (
@@ -615,12 +893,14 @@ def _odgovor_izbrisi_aplikacija(
 
     if app_id and _direktor_e_admin(lekar):
         ok, poraka = _izbrisi_aplikacija_od_baza(app_id=app_id)
-    elif email:
+    elif email or pacient:
         ok, poraka = _izbrisi_aplikacija_od_baza(
             email=email,
             id_oglas=id_oglas,
             pozicija_hint=poz_hint,
             app_id=normalize_int((kontekst or {}).get("last_aplikacija_id")),
+            pacient=pacient,
+            kontekst=kontekst,
         )
     elif _direktor_e_admin(lekar):
         ok, poraka = _izbrisi_aplikacija_od_baza(posledna_bilo_koja=True)
@@ -912,12 +1192,13 @@ def _zapisi_aplikacija(
         if licenca:
             l = re.sub(r"\D", "", str(licenca))
             lic_int = int(l) if l else None
+        email_norm = (email or "").strip().lower()
         cur.execute("""
             INSERT INTO prijaveni_lekari
               (id_oglas, pozicija, ime_lekar, prezime_lekar,
                broj_med_licenca, email, telefon, datum_prijava)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """, (id_oglas, pozicija, ime, prezime, lic_int, email, tel_int, denes))
+        """, (id_oglas, pozicija, ime, prezime, lic_int, email_norm, tel_int, denes))
         conn.commit()
         cur.close()
         return True, ""
@@ -1077,11 +1358,12 @@ def odgovori_za_aplikacija(
         try:
             conn = get_connection()
             cur = conn.cursor()
+            pk = prijaveni_pk_column()
             cur.execute(
-                """
-                SELECT id FROM prijaveni_lekari
+                f"""
+                SELECT {pk} AS id FROM prijaveni_lekari
                 WHERE LOWER(TRIM(email)) = LOWER(TRIM(%s))
-                ORDER BY datum_prijava DESC, id DESC LIMIT 1
+                {prijaveni_order_desc()} LIMIT 1
                 """,
                 (app_email,),
             )
@@ -1089,7 +1371,7 @@ def odgovori_za_aplikacija(
             cur.close()
             conn.close()
             if r:
-                last_id = int(r[0])
+                last_id = int(r[0] if not isinstance(r, dict) else r.get("id") or r[0])
         except Exception as e:
             print(f"[apliciraj] last id po insert: {e!r}")
 

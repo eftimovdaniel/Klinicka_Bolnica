@@ -59,3 +59,65 @@ def ai_error_text(podatoci: dict[str, Any]) -> str | None:
     if err is None:
         return None
     return str(err).strip() or "Привремена грешка од AI."
+
+
+_prijava_pk_col: str | None = None
+
+
+def prijaveni_pk_column() -> str:
+    """
+    PK колона на prijaveni_lekari: `id_prijava` (постоечки DB) или `id` (schema.sql).
+    """
+    global _prijava_pk_col
+    if _prijava_pk_col:
+        return _prijava_pk_col
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        cur.execute("SHOW COLUMNS FROM prijaveni_lekari")
+        fields = [
+            (r.get("Field") or r.get("field") or "")
+            for r in (cur.fetchall() or [])
+        ]
+        cur.close()
+        lower = {f.lower(): f for f in fields if f}
+        if "id_prijava" in lower:
+            _prijava_pk_col = lower["id_prijava"]
+        elif "id" in lower:
+            _prijava_pk_col = lower["id"]
+        else:
+            _prijava_pk_col = "id_prijava"
+    except Exception as e:
+        print(f"[db_helpers] prijaveni_pk_column: {e!r}")
+        _prijava_pk_col = "id_prijava"
+    finally:
+        if conn:
+            conn.close()
+    return _prijava_pk_col
+
+
+def prijaveni_select_sql(*, full: bool = False) -> str:
+    """SELECT со `id` alias за унифициран dict (и со id_prijava во live DB)."""
+    pk = prijaveni_pk_column()
+    id_col = f"{pk} AS id" if pk.lower() != "id" else "id"
+    cols = (
+        f"{id_col}, pozicija, datum_prijava, id_oglas, email, "
+        "ime_lekar, prezime_lekar"
+    )
+    if full:
+        cols += ", broj_med_licenca, telefon"
+    return f"SELECT {cols} FROM prijaveni_lekari"
+
+
+def prijaveni_order_desc() -> str:
+    pk = prijaveni_pk_column()
+    return f" ORDER BY datum_prijava DESC, {pk} DESC"
+
+
+def prijaveni_row_id(row: dict[str, Any]) -> int:
+    for key in ("id", "id_prijava", "ID"):
+        val = row.get(key)
+        if val is not None:
+            return int(val)
+    raise ValueError(f"Нема PK во ред: {row!r}")
