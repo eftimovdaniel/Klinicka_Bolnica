@@ -67,11 +67,19 @@ _ALIAS_KEYWORDS: dict[str, str] = {
     "интерна": "интерна",
     "interna": "intern",
     "интерн": "интерна",
+    "пластична хирургија": "пластич",
+    "пластична": "пластич",
+    "plastichna hirurgija": "plastichn",
+    "plastichna": "plastichn",
+    "кардиохирургија": "кардиохирурги",
+    "kardiohirurgija": "kardiohirurg",
+    "неврохирургија": "неврохирурги",
+    "neurohirurgija": "neurohirurg",
 }
 
 _RE_ODDEL_ZA = re.compile(
-    r"(?:на\s+)?оддел(?:от)?\s+за\s+([^?.!,;]+)|"
-    r"од\s+оддел(?:от)?\s+за\s+([^?.!,;]+)|"
+    r"(?:на\s+)?од(?:ел|дел)(?:от|о)?\s+за\s+([^?.!,;]+)|"
+    r"од\s+од(?:ел|дел)(?:от|о)?\s+за\s+([^?.!,;]+)|"
     r"лекари\s+(?:од|на)\s+([^?.!,;]+)|"
     r"лекарите\s+(?:од|на)\s+([^?.!,;]+)",
     re.IGNORECASE | re.UNICODE,
@@ -144,17 +152,70 @@ def _match_alias_vo_prasanje(p: str, site: tuple[str, ...]) -> str | None:
     return None
 
 
+def _match_fragment_po_zborovi(fragment: str, site: tuple[str, ...]) -> str | None:
+    """
+    Најдобар оддел по заеднички зборови од фрагментот
+    (пр. „пластична хирургија" → Пластична хирургија, не Кардиохирургија).
+    """
+    fn = _normaliziraj(fragment)
+    words = [w for w in fn.split() if len(w) >= 4]
+    if not words:
+        return None
+
+    best_ime: str | None = None
+    best_score = 0
+    for ime in site:
+        inorm = _normaliziraj(ime)
+        score = sum(1 for w in words if w in inorm)
+        if score > best_score:
+            best_score = score
+            best_ime = ime
+
+    if not best_ime or best_score < 2:
+        return None
+    # Ако корисникот кажа „пластична", одделот мора да ја содржи таа ознака
+    for marker in ("plastichn", "пластич", "kardio", "кардио", "невро", "neuro"):
+        if marker in fn and marker not in _normaliziraj(best_ime):
+            alt = _match_po_klucen_zbor(marker, site)
+            if alt:
+                return alt
+            return None
+    return best_ime
+
+
 def _match_hirurgija(p: str, site: tuple[str, ...]) -> str | None:
-    """Хирургија ≠ Неврохирургија освен ако корисникот каже „невро". """
+    """Хирургија — со подтип (пластична, кардио, невро), не најкраткото име."""
     if "неврохирурги" in p or "neurohirurg" in p:
         return _match_po_klucen_zbor("неврохирурги", site)
+    if "кардиохирурги" in p or "kardiohirurg" in p:
+        return _match_po_klucen_zbor("кардиохирурги", site)
+    if "пластич" in p or "plastichn" in p:
+        return _match_po_klucen_zbor("пластич", site)
     if "хирурги" not in p and "hirurg" not in p:
         return None
-    # Точно „Хирургија" ако постои
+
+    # Квалификувана хирургија — не избирај произволен „*хирургија*"
+    if any(
+        q in p
+        for q in (
+            "пластич",
+            "plastichn",
+            "кардио",
+            "kardio",
+            "невро",
+            "neuro",
+            "рекonstrukt",
+            "реконструкт",
+            "торакал",
+            "torakal",
+        )
+    ):
+        return _match_fragment_po_zborovi(p, site)
+
     for ime in site:
         if _normaliziraj(ime) == "хирургија":
             return ime
-    # Други хирургиски без „невро"
+
     kandidati = [
         k
         for k in site
@@ -162,8 +223,6 @@ def _match_hirurgija(p: str, site: tuple[str, ...]) -> str | None:
     ]
     if len(kandidati) == 1:
         return kandidati[0]
-    if kandidati:
-        return min(kandidati, key=len)
     return None
 
 
@@ -188,6 +247,12 @@ def _pravila_izvlechi(prasanje: str, site: tuple[str, ...]) -> tuple[str | None,
             tocno = _match_tocno_ili_blisko(fragment, site)
             if tocno:
                 return tocno, SOURCE_RULES
+            po_zborovi = _match_fragment_po_zborovi(fragment, site)
+            if po_zborovi:
+                return po_zborovi, SOURCE_RULES
+            alias_frag = _match_alias_vo_prasanje(_normaliziraj(fragment), site)
+            if alias_frag:
+                return alias_frag, SOURCE_ALIAS
 
     direktno = _match_ime_vo_prasanje(p, site)
     if direktno:

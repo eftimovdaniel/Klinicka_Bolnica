@@ -17,8 +17,7 @@ from datetime import date, timedelta
 from database import get_connection
 from ai._kernel.auth import require_lekar
 from ai._kernel.napomena import napomena_za_prikaz_lekar
-from ai._kernel.ai_json import parse_ai_json
-from ai._kernel.groq_client import ask_ai
+from ai._kernel.groq_helpers import izvlechi_json_so_ai
 
 
 PROMPT = """
@@ -49,9 +48,7 @@ def _izvlechi(prasanje: str) -> dict:
         date.today().weekday()
     ]
     full = f'Денес: {denes} ({denes_den})\n\nПрашање: „{prasanje}"\nВрати JSON.'
-    odgovor = ask_ai(full, system_prompt=PROMPT)
-    print(f"[moj_raspored] AI: {odgovor!r}")
-    return parse_ai_json(odgovor, log_tag="moj_raspored")
+    return izvlechi_json_so_ai(full, PROMPT, log_tag="moj_raspored")
 
 
 def _period_to_dates(period: str | None) -> tuple[date | None, date | None, str]:
@@ -88,18 +85,37 @@ def _fmt_vreme(t) -> str:
     return str(t)[:5]
 
 
-def odgovori_za_raspored(prasanje: str, lekar: dict | None) -> str:
+def odgovori_za_raspored(
+    prasanje: str, lekar: dict | None, kontekst: dict | None = None
+) -> str | dict:
     """Главна точка - повикана од router-от."""
     if err := require_lekar(lekar):
         return err
 
     doctor_id = lekar["doctor_ID"]
 
-    podatoci = _izvlechi(prasanje)
+    try:
+        from ai.pacient.moi_pregledi import prasanje_e_lista_site_pregledi
+
+        if prasanje_e_lista_site_pregledi(prasanje):
+            podatoci = {"period": "site", "datum": None, "broj": None}
+        else:
+            podatoci = _izvlechi(prasanje)
+    except ImportError:
+        podatoci = _izvlechi(prasanje)
     if podatoci.get("_error"):
         return podatoci["_error"]
 
     konkreten_datum = podatoci.get("datum")
+    if not konkreten_datum:
+        try:
+            from ai.pacient.moi_pregledi import datum_za_pregledi_od_prasanje
+
+            d = datum_za_pregledi_od_prasanje(prasanje)
+            if d:
+                konkreten_datum = d.strftime("%Y-%m-%d")
+        except ImportError:
+            pass
     broj = podatoci.get("broj")
     try:
         broj = int(broj) if broj else None
@@ -148,6 +164,12 @@ def odgovori_za_raspored(prasanje: str, lekar: dict | None) -> str:
     if not rows:
         return f"Немаш закажани или завршени прегледи {label}."
 
+    zakazani_ids = [
+        int(r["termin_ID"])
+        for r in rows
+        if (r.get("status_pregled") or "закажан").strip() == "закажан"
+    ]
+
     linii = [f"Прегледи {label} ({len(rows)} вкупно):", ""]
 
     # Групирај по датум за полесно читање
@@ -171,4 +193,20 @@ def odgovori_za_raspored(prasanje: str, lekar: dict | None) -> str:
             linii.append(linija)
         linii.append("")
 
-    return "\n".join(linii).strip()
+    tekst = "\n".join(linii).strip()
+    if zakazani_ids:
+        hint = (
+            "\n\nЗа завршување со дијагноза и терапија, на пр.:\n"
+            "„Затвори го прегледот со Дијагноза: …, и терапија: …“"
+        )
+        if len(zakazani_ids) == 1:
+            hint = (
+                f"\n\nЗа завршување (ID {zakazani_ids[0]}), на пр.:\n"
+                "„Затвори го прегледот со Дијагноза: …, и терапија: …“"
+            )
+        tekst += hint
+
+    ctx = dict(kontekst) if isinstance(kontekst, dict) else {}
+    if zakazani_ids:
+        ctx["last_raspored_termin_ids"] = zakazani_ids
+    return {"odgovor": tekst, "kontekst": ctx} if zakazani_ids else tekst

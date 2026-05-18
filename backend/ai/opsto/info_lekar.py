@@ -285,7 +285,30 @@ def odgovori_za_info_lekar(prasanje: str, kontekst: dict | None = None) -> str |
     lekar, od_kontekst = _resolviraj_lekar(prasanje, kontekst)
 
     if not lekar:
+        from ai.pacient.moi_pregledi import prasanje_e_pregledi_datum
         from ai.opsto.vest_naslov import pronajdi_vest_po_naslov
+
+        from ai.pacient.moi_pregledi import prasanje_e_lista_site_pregledi
+
+        if prasanje_e_lista_site_pregledi(prasanje):
+            return {
+                "odgovor": (
+                    "За листа на прегледи најавете се како лекар или пациент, па напишете, на пр.:\n"
+                    "„Прикажи ми закажани прегледи“ (лекар) или „Моите прегледи“ / "
+                    "„Прикажи ги сите прегледи“ (пациент)."
+                ),
+                "kontekst": kontekst if isinstance(kontekst, dict) else None,
+            }
+
+        if prasanje_e_pregledi_datum(prasanje):
+            return {
+                "odgovor": (
+                    "За термини на датум најавете се како пациент или лекар, па напишете, на пр.:\n"
+                    "„Прегледи за 19.05“ (пациент) или „Прикажи закажани прегледи“ / "
+                    "„Termini na 25.05“ (лекар)."
+                ),
+                "kontekst": kontekst if isinstance(kontekst, dict) else None,
+            }
 
         vest = pronajdi_vest_po_naslov(prasanje)
         if vest:

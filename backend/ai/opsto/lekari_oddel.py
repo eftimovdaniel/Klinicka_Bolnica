@@ -23,48 +23,98 @@ from ai.pacient.slobodni_termini import (
 )
 
 
+_RE_KOJ_KOI_LEKARI = re.compile(
+    r"\b(кој|кои|koj|koi)\s+лекар",
+    re.UNICODE | re.IGNORECASE,
+)
+_RE_ODELOT_ZA = re.compile(
+    r"(?:оделот|одделот|одел|оддел)(?:от|о)?\s+за",
+    re.UNICODE | re.IGNORECASE,
+)
+
+# Подстрингови за специјалности/оддели (не само 4–5 hardcoded)
+_SPEC_ODDEL_KLUCNI = (
+    "уролог",
+    "кардиолог",
+    "гинеколог",
+    "невролог",
+    "радиолог",
+    "педијатр",
+    "ортопед",
+    "онколог",
+    "дерматолог",
+    "офталмолог",
+    "интерн",
+    "хирург",
+    "анестез",
+    "лаборатор",
+    "оториноларинголог",
+    "пластич",
+    "kardiolog",
+    "urolog",
+    "ginekolog",
+    "nevrolog",
+    "radiolog",
+    "pedijatr",
+    "ortoped",
+    "onkolog",
+    "dermatolog",
+    "oftalmolog",
+    "hirurg",
+    "oddel",
+    "одел",
+    "оддел",
+    "специјалност",
+    "област",
+    "specijalnost",
+    "oblast",
+)
+
+
 def prasanje_e_lekari_po_oddel(prasanje: str) -> bool:
     """
     Листа лекари по оддел/специјалност — не конкретен лекар по име.
-    Пр. „Прикажи ми лекари по урологија", „лекари од урологија".
+    Пр. „Прикажи ми лекари по урологија", „Кој лекари се на оделот за Радиологија".
     """
+    if not prasanje or not prasanje.strip():
+        return False
     p = transliterijaj(prasanje).lower()
     if any(
         x in p
         for x in (
             "кои лекари",
             "кои доктори",
+            "кој лекари",
+            "кој лекар",
             "лекари на",
             "лекари од",
             "лекари по",
             "лекари од областа",
             "лекари од област",
             "на одделот",
+            "на оделот",
             "одделот за",
+            "оделот за",
             "lekari od",
             "lekari po",
             "lekari na",
+            "koi lekari",
+            "koj lekari",
         )
+    ):
+        return True
+    if _RE_KOJ_KOI_LEKARI.search(p):
+        return True
+    if _RE_ODELOT_ZA.search(p) and any(
+        x in p for x in ("лекар", "лекари", "доктор", "доктори", "lekari", "doktori")
     ):
         return True
     if any(
         x in p for x in ("прикажи", "прикази", "покажи", "prikazi", "pokazi", "прикажете")
     ) and any(x in p for x in ("лекари", "lekari", "доктори", "doktori")):
         return True
-    if any(x in p for x in ("лекари", "lekari", "доктори")) and any(
-        x in p
-        for x in (
-            "уролог",
-            "кардиолог",
-            "гинеколог",
-            "невролог",
-            "оддел",
-            "специјалност",
-            "област",
-            "specijalnost",
-            "oblast",
-            "одделот",
-        )
+    if any(x in p for x in ("лекари", "lekari", "доктори", "докторите")) and any(
+        x in p for x in _SPEC_ODDEL_KLUCNI
     ):
         return True
     return False
@@ -278,7 +328,8 @@ def odgovori_za_lekari_oddel(
     redovi.append("")
     sledna = (
         "Следно можете да прашате:\n"
-        "„Кој од нив е слободен на 20.05 во 12:00“ — проверка меѓу лекарите погоре;\n"
+        "„Дали може да провериш слободни термини на 25 мај“ — сите слободни часови;\n"
+        "„Кој од нив е слободен на 20.05 во 12:00“ — проверка за конкретен час;\n"
         "потоа „закажи кај [презиме]“ за закажување (датумот и часот се зачувуваат)."
     )
     redovi.append(sledna)

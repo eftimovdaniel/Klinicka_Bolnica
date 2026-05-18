@@ -88,9 +88,6 @@ def formatiraj_odgovor_so_ai(
         print(f"[odgovor_formatter] fallback tip={tip!r}")
         return fallback
     ai = ai.strip()
-    if tip == "lekari_oddel" and fallback:
-        naslov = str(podatoci.get("naslov") or "")
-        if naslov and naslov not in ai and len(ai) < len(fallback):
-            print(f"[odgovor_formatter] lekari_oddel краток AI → шаблон")
-            return fallback
+    if not ai:
+        return fallback
     return ai

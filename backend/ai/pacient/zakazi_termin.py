@@ -337,10 +337,11 @@ def izvlechi_podatoci_so_ai(prasanje: str) -> dict:
 Извлечи doctor_id, datum, vreme и врати JSON.
 """.strip()
 
-    odgovor = ask_ai(full_prompt, system_prompt=ZAKAZI_EXTRACT_PROMPT)
-    print(f"[zakazi_termin] AI raw: {odgovor!r}")
+    from ai._kernel.groq_helpers import izvlechi_json_so_ai
 
-    podatoci = parse_ai_json(odgovor, log_tag="zakazi_termin")
+    podatoci = izvlechi_json_so_ai(
+        full_prompt, ZAKAZI_EXTRACT_PROMPT, log_tag="zakazi_termin"
+    )
     if podatoci.get("_error"):
         return {
             "doctor_id": None,
@@ -654,6 +655,42 @@ def formatiraj_potvrda(ime_pacient: str, ime_lekar: str, specialty: str, datum_s
     return formatiraj_odgovor_so_ai("zakazi_potvrda", podatoci, sablon)
 
 
+def _vo_zakazi_flow(prasanje: str, kontekst: dict | None) -> bool:
+    """Дали пораката навистина продолжува закажување (не случаен медицински текст)."""
+    if baranje_e_zakazuvanje(prasanje):
+        return True
+    if _kontekst_ceka_napomena(kontekst):
+        return True
+    if not isinstance(kontekst, dict):
+        return False
+    if kontekst.get("zakazi_ceka_napomena"):
+        return True
+    if kontekst.get("zakazi_pending") or kontekst.get("zakazi_od_slobodni"):
+        q = (prasanje or "").lower()
+        if re.search(r"\b\d{1,2}\s*[:.]\s*\d{2}\b", q):
+            return True
+        if any(
+            x in q
+            for x in (
+                "закаж",
+                "zakaz",
+                "термин",
+                "termin",
+                "напомена",
+                "немам",
+                "нема",
+                "не ",
+                "кај ",
+                "kaj ",
+                "утре",
+                "време",
+                "датум",
+            )
+        ):
+            return True
+    return False
+
+
 def odgovori_za_zakazuvanje(
     prasanje: str,
     pacient: dict | None,
@@ -669,6 +706,16 @@ def odgovori_za_zakazuvanje(
 
     Враќа: текст (str) или dict со „odgovor“, опционално „akcija“, опционално „kontekst“ (None = избриши го на фронтот).
     """
+    if not _vo_zakazi_flow(prasanje, kontekst):
+        return {
+            "odgovor": (
+                "Не го препознав ова како барање за закажување термин.\n\n"
+                "За закажување напишете, на пр.: „Закажи кај д-р Петров утре во 10:00“.\n"
+                "За општо прашање опишете го со други зборови."
+            ),
+            "kontekst": kontekst if isinstance(kontekst, dict) else None,
+        }
+
     izvleceno = izvlechi_podatoci_so_ai(prasanje)
     _dopolnuvaj_izvleceno_lokalno(prasanje, izvleceno)
     _spoi_zakazi_so_slobodni_kontekst(prasanje, izvleceno, kontekst)

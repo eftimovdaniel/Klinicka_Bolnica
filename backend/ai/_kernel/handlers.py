@@ -8,7 +8,6 @@
 
 from dataclasses import dataclass
 from typing import Any, Callable
-
 from ai._kernel.groq_client import ask_ai
 
 
@@ -19,15 +18,11 @@ class AiContext:
     pacient: dict | None
     lekar: dict | None
     kontekst: dict | None
-
-
 @dataclass(frozen=True)
 class HandlerSpec:
     fn: Callable[..., Any]
     use_raw_question: bool = False
     kind: str = "str"  # str | dict | dict_nav | dict_full
-
-
 def _build_handlers() -> dict[str, HandlerSpec]:
     from ai import (
         apliciraj_za_rabota,
@@ -99,7 +94,7 @@ def _build_handlers() -> dict[str, HandlerSpec]:
         "istorija_pacient": HandlerSpec(istorija_pacient.odgovori_za_istorija),
         "karton_pacient": HandlerSpec(karton_pacient.odgovori_za_karton),
         "moja_statistika": HandlerSpec(moja_statistika.odgovori_za_moja_statistika),
-        "moj_raspored": HandlerSpec(moj_raspored.odgovori_za_raspored),
+        "moj_raspored": HandlerSpec(moj_raspored.odgovori_za_raspored, kind="dict"),
         "navigacija": HandlerSpec(navigacija.odgovori_za_navigacija, kind="dict_nav"),
         "lekari_oddel": HandlerSpec(lekari_oddel.odgovori_za_lekari_oddel, kind="dict_nav"),
         "apliciraj_za_rabota": HandlerSpec(apliciraj_za_rabota.odgovori_za_aplikacija, kind="dict_full"),
@@ -162,12 +157,15 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
         "postavi_potsetnik",
         "oceni_pregled",
         "trgni_ocena",
-        "moi_pregledi",
     ):
         raw = spec.fn(q, ctx.pacient)
+    elif intent == "moi_pregledi":
+        raw = spec.fn(q, ctx.pacient, ctx.lekar)
     elif intent in ("info_lekar", "preference_lekar"):
         raw = spec.fn(q, ctx.kontekst)
     elif intent in ("pregled_dezurstvo", "promeni_dezurstvo"):
+        raw = spec.fn(q, ctx.lekar, ctx.kontekst)
+    elif intent in ("moj_raspored", "zavrshi_pregled"):
         raw = spec.fn(q, ctx.lekar, ctx.kontekst)
     elif intent in (
         "objavi_vest",
@@ -175,11 +173,9 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
         "izbrisi_vest_oglas",
         "zatvori_oglas",
         "statistika_oddeli",
-        "zavrshi_pregled",
         "istorija_pacient",
         "karton_pacient",
         "moja_statistika",
-        "moj_raspored",
         "aplikanti_oglas",
         "zapishi_terapija",
         "izvestaj_den_nedela",

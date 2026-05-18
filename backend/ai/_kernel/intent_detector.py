@@ -156,9 +156,11 @@ KLUCNI_STATISTIKA = [
 KLUCNI_ZAVRSHI = [
     "заврши преглед", "заврши го прегледот", "заврши го терминот",
     "заврши термин", "заврши го",
+    "затвори преглед", "затвори го прегледот", "затвори го терминот",
     "означи како завршен", "означи го прегледот", "финализирај преглед",
     "пациентот заврши", "прегледот заврши",
     "complete pregled", "zavrshi pregled", "zavrshi termin",
+    "zatvori pregled", "zatvori go pregledot",
 ]
 
 # 00h. ИСТОРИЈА НА ПАЦИЕНТ (лекар)
@@ -222,6 +224,9 @@ KLUCNI_RASPORED = [
     "закажани термини", "закажаните термини",
     "моите прегледи", "моите закажани", "моите термини",
     "прикажи прегледи", "прикажи закажани", "покажи прегледи",
+    "прикажи ги сите прегледи", "прикази ги сите прегледи",
+    "прикажи ги site прегледи", "прикази gi site pregledi",
+    "prikazi gi site pregledi", "prikazi site pregledi",
     "прикажи ги моите", "покажи ги моите",
     "следни прегледи", "следните прегледи",
     "идни прегледи", "идните прегледи",
@@ -424,6 +429,48 @@ _ZBOROVI_NE_SE_IMENA = frozenset(
         "новост",
         "новоста",
         "наслов",
+        "преглед",
+        "прегледи",
+        "прегледите",
+        "pregled",
+        "pregledi",
+        "термин",
+        "термини",
+        "termin",
+        "termini",
+        "site",
+        "сите",
+        "prikazi",
+        "prikaz",
+        "прикажи",
+        "прикази",
+        "pokazi",
+        "покажи",
+        "мај",
+        "maj",
+        "јануари",
+        "февруари",
+        "март",
+        "април",
+        "јуни",
+        "јули",
+        "август",
+        "септември",
+        "октомври",
+        "ноември",
+        "декември",
+        "дијагноза",
+        "dijagnoza",
+        "терапија",
+        "terapija",
+        "мигрена",
+        "migrena",
+        "хипертензија",
+        "hipertenzija",
+        "аналгетик",
+        "analgetik",
+        "затвори",
+        "zatvori",
         "работно",
         "работното",
         "време",
@@ -456,9 +503,11 @@ _ZBOROVI_NE_SE_IMENA = frozenset(
 KLUCNI_MOI_PREGLEDI = [
     "моите прегледи", "моите пргледи", "историја на прегледи",
     "историја на моите", "сите мои прегледи",
+    "прикажи ги сите прегледи", "prikazi gi site pregledi",
     "идни прегледи", "минати прегледи",
     "прикажи ми ги прегледите", "прикажи ми ги моите прегледи",
     "колку прегледи имам", "кои се моите прегледи",
+    "прегледи за", "pregledi za", "преглед за",
     "moite pregledi", "moi pregledi", "istorija na pregledi",
 ]
 
@@ -558,7 +607,12 @@ KLUCNI_LEKARI_ODDEL = [
     "покажи ми лекари",
     "лекари од областа",
     "на одделот",
+    "на оделот",
     "одделот за",
+    "оделот за",
+    "кој лекари",
+    "кој лекар",
+    "koj lekari",
     "lekari po",
     "lekari od",
 ]
@@ -703,13 +757,36 @@ def _prasanje_e_konkreten_lekar(prasanje: str) -> bool:
         return False
     if _ima_zbor(p, KLUCNI_SLOBODNI):
         return False
-    if any(w in p for w in ("кои лекари", "кои доктори", "лекари на", "лекари од")):
+    if any(
+        w in p
+        for w in (
+            "кои лекари",
+            "кои доктори",
+            "кој лекари",
+            "кој лекар",
+            "лекари на",
+            "лекари од",
+            "оделот за",
+            "одделот за",
+            "koi lekari",
+            "koj lekari",
+        )
+    ):
+        return False
+    if re.search(r"\b(кој|кои|koj|koi)\s+лекар", p, re.UNICODE):
+        return False
+    if re.search(r"(?:оделот|одделот|одел|оддел)(?:от|о)?\s+за", p, re.UNICODE):
         return False
     try:
         from ai.opsto.lekari_oddel import prasanje_e_lekari_po_oddel
         from ai.opsto.vest_naslov import (
             prasanje_e_izbrisi_vest_oglas,
             prasanje_e_samo_naslov_vest,
+        )
+        from ai.lekar.zavrshi_pregled import prasanje_e_zavrshi_pregled
+        from ai.pacient.moi_pregledi import (
+            prasanje_e_lista_site_pregledi,
+            prasanje_e_pregledi_datum,
         )
         from ai.pacient.slobodni_termini import prasanje_e_ko_e_sloboden_datum_vreme
 
@@ -718,6 +795,10 @@ def _prasanje_e_konkreten_lekar(prasanje: str) -> bool:
         if prasanje_e_ko_e_sloboden_datum_vreme(prasanje):
             return False
         if prasanje_e_izbrisi_vest_oglas(prasanje) or prasanje_e_samo_naslov_vest(prasanje):
+            return False
+        if prasanje_e_pregledi_datum(prasanje) or prasanje_e_lista_site_pregledi(prasanje):
+            return False
+        if prasanje_e_zavrshi_pregled(prasanje):
             return False
     except ImportError:
         pass
@@ -1065,11 +1146,25 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
     if _ima_zbor(p, KLUCNI_ZAPISHI_TERAPIJA):
         return "zapishi_terapija"
 
-    # ВАЖНО: D1 „заврши преглед" мора пред zakazi/otkazi/prenesi (со „преглед")
+    # ВАЖНО: D1 „заврши/затвори преглед" мора пред zakazi/otkazi/prenesi
+    try:
+        from ai.lekar.zavrshi_pregled import prasanje_e_zavrshi_pregled
+
+        if prasanje_e_zavrshi_pregled(prasanje):
+            return "zavrshi_pregled"
+    except ImportError:
+        pass
     if _ima_zbor(p, KLUCNI_ZAVRSHI):
         return "zavrshi_pregled"
 
     # Моите прегледи (пациент) – има поспецифични варијанти; мора пред moj_raspored
+    try:
+        from ai.pacient.moi_pregledi import prasanje_e_pregledi_datum
+
+        if prasanje_e_pregledi_datum(prasanje):
+            return "moi_pregledi"
+    except ImportError:
+        pass
     if _ima_zbor(p, KLUCNI_MOI_PREGLEDI):
         return "moi_pregledi"
 
@@ -1224,9 +1319,27 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
     if _ima_zbor(p, KLUCNI_LEKARI_ODDEL):
         return "lekari_oddel"
 
-    # Флексибилно: „лекар/доктор/специјалист" + („оддел/Y") во истиот текст
+    # Флексибилно: „лекар/доктор" + оддел/специјалност (вкл. „оделот за")
     if any(w in p for w in ("лекари", "лекарите", "доктори", "докторите")) and any(
-        w in p for w in ("оддел", "одделот", "одделение", "специјалност", "од ")
+        w in p
+        for w in (
+            "оддел",
+            "одделот",
+            "одел",
+            "оделот",
+            "одделение",
+            "специјалност",
+            "радиолог",
+            "уролог",
+            "кардиолог",
+            "гинеколог",
+            "невролог",
+            "ортопед",
+            "педијатр",
+            "онколог",
+            "хирург",
+            "од ",
+        )
     ) and not any(w in p for w in ("каков", "каква", "како е", "опис")):
         return "lekari_oddel"
 
@@ -1260,26 +1373,16 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
 
 def detektiraj_intent(prasanje: str) -> str:
     """
-    Главна функција - хибриден пристап.
+    Хибриден пристап — Groq за поголем дел од прашањата.
 
-    1. Проба со keyword detector (брзо, бесплатно).
-    2. Ако не најде → AI (Groq) за природни варијации.
-    3. Ако и AI не успее → "general".
+    1. Keyword за јасни оперативни наредби (закажи, откажи, заврши, …).
+    2. Groq за general, info_lekar, распоред, навигација и слични варијации.
+    3. Keyword како резерва ако Groq не успее.
     """
     if not prasanje:
         return "general"
 
-    # Чекор 1: keyword detector со транслитерација
-    intent = detektiraj_intent_keyword(prasanje)
-    if intent:
-        return intent
+    from ai._kernel.groq_helpers import intent_so_groq_augment
 
-    # Чекор 2: AI fallback - проба со Groq
-    try:
-        ai_intent = detektiraj_intent_so_ai(prasanje)
-        if ai_intent:
-            return ai_intent
-    except Exception as e:
-        print(f"[intent_detector] AI fallback greska: {e}")
-
-    return "general"
+    keyword_intent = detektiraj_intent_keyword(prasanje)
+    return intent_so_groq_augment(prasanje, keyword_intent)

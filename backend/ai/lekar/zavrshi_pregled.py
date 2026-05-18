@@ -12,13 +12,25 @@
 Лекарот може да заврши САМО свои прегледи.
 """
 
+import re
 from datetime import date, datetime
 
 from database import get_connection
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.auth import require_lekar
-from ai._kernel.groq_client import ask_ai
+from ai._kernel.groq_helpers import izvlechi_json_so_ai
 from ai._kernel.prompt_helpers import today_prompt_line
+from ai._kernel.transliteracija import transliterijaj
+
+_RE_TERMIN_ID = re.compile(r"\bID\s*(\d+)\b", re.IGNORECASE | re.UNICODE)
+_RE_DX = re.compile(
+    r"(?:дијагноза|dijagnoza)\s*:\s*(.+?)(?=(?:терапија|terapija)\s*:|$)",
+    re.IGNORECASE | re.UNICODE | re.DOTALL,
+)
+_RE_TX = re.compile(
+    r"(?:терапија|terapija)\s*:\s*(.+)$",
+    re.IGNORECASE | re.UNICODE | re.DOTALL,
+)
 
 
 PROMPT = """
@@ -43,11 +55,70 @@ PROMPT = """
 """.strip()
 
 
+def prasanje_e_zavrshi_pregled(prasanje: str) -> bool:
+    """Заврши/затвори преглед со дијагноза и терапија — не info_lekar."""
+    if not prasanje or not prasanje.strip():
+        return False
+    p = transliterijaj(prasanje).lower()
+    if re.search(
+        r"\b(заврши|завршете|затвори|затворете|zavrshi|zatvori)\b", p, re.UNICODE
+    ) and re.search(r"\b(преглед|pregled|термин|termin)\b", p, re.UNICODE):
+        return True
+    if _RE_DX.search(prasanje) and _RE_TX.search(prasanje):
+        return True
+    if re.search(r"\b(заврши|затвори|zavrshi|zatvori)\b", p) and _RE_DX.search(prasanje):
+        return True
+    return False
+
+
+def _izvlechi_dx_tx_lokalno(prasanje: str) -> tuple[str | None, str | None]:
+    dx = tx = None
+    m_dx = _RE_DX.search(prasanje)
+    if m_dx:
+        dx = m_dx.group(1).strip().strip(" ,")
+    m_tx = _RE_TX.search(prasanje)
+    if m_tx:
+        tx = m_tx.group(1).strip()
+    return dx or None, tx or None
+
+
+def _termin_id_od_prasanje(prasanje: str) -> int | None:
+    m = _RE_TERMIN_ID.search(prasanje or "")
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except (TypeError, ValueError):
+        return None
+
+
+def _termin_ids_od_kontekst(kontekst: dict | None) -> list[int]:
+    if not isinstance(kontekst, dict):
+        return []
+    raw = kontekst.get("last_raspored_termin_ids")
+    if not isinstance(raw, list):
+        return []
+    ids: list[int] = []
+    for x in raw:
+        try:
+            ids.append(int(x))
+        except (TypeError, ValueError):
+            continue
+    return ids
+
+
 def _izvlechi(prasanje: str) -> dict:
     full = f'{today_prompt_line()}\n\nПрашање: „{prasanje}"\nВрати JSON.'
-    odgovor = ask_ai(full, system_prompt=PROMPT)
-    print(f"[zavrshi_pregled] AI: {odgovor!r}")
-    return parse_ai_json(odgovor, log_tag="zavrshi_pregled")
+    podatoci = izvlechi_json_so_ai(full, PROMPT, log_tag="zavrshi_pregled")
+    tid = _termin_id_od_prasanje(prasanje)
+    if tid is not None and not podatoci.get("termin_ids"):
+        podatoci["termin_ids"] = [tid]
+    dx, tx = _izvlechi_dx_tx_lokalno(prasanje)
+    if dx and not podatoci.get("dijagnoza"):
+        podatoci["dijagnoza"] = dx
+    if tx and not podatoci.get("terapija"):
+        podatoci["terapija"] = tx
+    return podatoci
 
 
 def _najdi_termin(
@@ -177,31 +248,47 @@ def _zavrshi_mnogu(rows: list[dict], dijagnoza: str | None, terapija: str | None
     return "\n".join(linii)
 
 
-def odgovori_za_zavrshi(prasanje: str, lekar: dict | None) -> str:
+def odgovori_za_zavrshi(
+    prasanje: str, lekar: dict | None, kontekst: dict | None = None
+) -> str:
     """Главна точка - повикана од router-от."""
     if err := require_lekar(lekar):
         return err
 
     doctor_id = lekar["doctor_ID"]
 
+    dijagnoza, terapija = _izvlechi_dx_tx_lokalno(prasanje)
+    termin_ids: list[int] = []
+    tid = _termin_id_od_prasanje(prasanje)
+    if tid is not None:
+        termin_ids = [tid]
+
     podatoci = _izvlechi(prasanje)
     if podatoci.get("_error"):
         return podatoci["_error"]
 
-    termin_ids = podatoci.get("termin_ids") or []
-    if isinstance(termin_ids, int):
-        termin_ids = [termin_ids]
-    # пробај да ги претвориш во int
-    try:
-        termin_ids = [int(x) for x in termin_ids if x is not None]
-    except (TypeError, ValueError):
-        termin_ids = []
+    if not dijagnoza:
+        dijagnoza = (podatoci.get("dijagnoza") or "").strip() or None
+    if not terapija:
+        terapija = (podatoci.get("terapija") or "").strip() or None
+
+    if not termin_ids:
+        ai_ids = podatoci.get("termin_ids") or []
+        if isinstance(ai_ids, int):
+            ai_ids = [ai_ids]
+        try:
+            termin_ids = [int(x) for x in ai_ids if x is not None]
+        except (TypeError, ValueError):
+            termin_ids = []
+
+    if not termin_ids:
+        ctx_ids = _termin_ids_od_kontekst(kontekst)
+        if len(ctx_ids) == 1:
+            termin_ids = ctx_ids
 
     ime = (podatoci.get("ime_pacient") or "").strip()
     datum_str = podatoci.get("datum")
     site = bool(podatoci.get("site"))
-    dijagnoza = (podatoci.get("dijagnoza") or "").strip() or None
-    terapija = (podatoci.get("terapija") or "").strip() or None
 
     # СЛУЧАЈ 1: „сите" / „сите денешни"
     if site:

@@ -116,18 +116,38 @@ def _intent_strukturiran_za_lekar(
     pitanje_norm: str,
     aktiven_kontekst: dict | None,
     intent: str,
+    pacient_dict: dict | None = None,
+    lekar_dict: dict | None = None,
 ) -> str:
     """Прашања за конкретен лекар не одат на general/AI — ист handler за сите имиња."""
-    from ai.pacient.slobodni_termini import prasanje_e_otkazuvanje
+    from ai.pacient.slobodni_termini import prasanje_e_otkazuvanje  # noqa: F401 — used below
     from ai._kernel.intent_detector import (
         _bolnica_info_intent,
         _prasanje_e_asistent_opsto,
         _prasanje_e_konkreten_lekar,
     )
     from ai._kernel.transliteracija import transliterijaj
+    from ai.opsto.lekari_oddel import prasanje_e_lekari_po_oddel
 
     if _prasanje_e_asistent_opsto(transliterijaj(pitanje_norm).lower()):
         return "general"
+
+    if prasanje_e_lekari_po_oddel(pitanje_norm):
+        return "lekari_oddel"
+
+    from ai.lekar.zavrshi_pregled import prasanje_e_zavrshi_pregled
+
+    if prasanje_e_zavrshi_pregled(pitanje_norm):
+        return "zavrshi_pregled"
+
+    from ai.pacient.moi_pregledi import prasanje_e_lista_site_pregledi
+
+    if prasanje_e_lista_site_pregledi(pitanje_norm):
+        if lekar_dict:
+            return "moj_raspored"
+        if pacient_dict:
+            return "moi_pregledi"
+        return "moi_pregledi"
 
     if prasanje_e_otkazuvanje(pitanje_norm):
         return "otkazi_termin"
@@ -195,6 +215,39 @@ def _resolve_intent(
 
     if prasanje_e_izbrisi_vest_oglas(pitanje_norm):
         return "izbrisi_vest_oglas"
+
+    from ai.opsto.lekari_oddel import prasanje_e_lekari_po_oddel
+    from ai.pacient.slobodni_termini import prasanje_e_drugi_lekari_specijalnost
+
+    if prasanje_e_lekari_po_oddel(pitanje_norm) or prasanje_e_drugi_lekari_specijalnost(
+        pitanje_norm
+    ):
+        return "lekari_oddel"
+
+    from ai.pacient.moi_pregledi import (
+        prasanje_e_lista_site_pregledi,
+        prasanje_e_pregledi_datum,
+    )
+
+    if prasanje_e_lista_site_pregledi(pitanje_norm):
+        if lekar_dict:
+            return "moj_raspored"
+        if pacient_dict:
+            return "moi_pregledi"
+        return "moj_raspored"
+
+    if prasanje_e_pregledi_datum(pitanje_norm):
+        # Лекар → негови закажани прегледи; пациент → свои термини
+        if lekar_dict:
+            return "moj_raspored"
+        if pacient_dict:
+            return "moi_pregledi"
+        return "moi_pregledi"
+
+    from ai.lekar.zavrshi_pregled import prasanje_e_zavrshi_pregled
+
+    if prasanje_e_zavrshi_pregled(pitanje_norm):
+        return "zavrshi_pregled"
 
     if aktiven_kontekst and aktiven_kontekst.get("intent") == "apliciraj_za_rabota":
         return "apliciraj_za_rabota"
@@ -275,6 +328,26 @@ def _resolve_intent(
 
     if intent == "moj_raspored" and pacient_dict and not lekar_dict:
         intent = "moi_pregledi"
+    if intent == "moi_pregledi" and lekar_dict:
+        intent = "moj_raspored"
+    if prasanje_e_lista_site_pregledi(pitanje_norm) and intent == "info_lekar":
+        intent = "moj_raspored" if lekar_dict else "moi_pregledi"
+    if prasanje_e_lekari_po_oddel(pitanje_norm) and intent in (
+        "info_lekar",
+        "general",
+    ):
+        intent = "lekari_oddel"
+    if prasanje_e_pregledi_datum(pitanje_norm) and intent == "info_lekar":
+        intent = "moj_raspored" if lekar_dict else "moi_pregledi"
+    if lekar_dict and intent in ("info_lekar", "general"):
+        from ai.lekar.zavrshi_pregled import prasanje_e_zavrshi_pregled
+
+        if prasanje_e_zavrshi_pregled(pitanje_norm):
+            intent = "zavrshi_pregled"
+        elif prasanje_e_lista_site_pregledi(pitanje_norm):
+            intent = "moj_raspored"
+        elif prasanje_e_pregledi_datum(pitanje_norm):
+            intent = "moj_raspored"
 
     from ai.pacient.slobodni_termini import (
         baranje_e_zakazuvanje,
@@ -449,7 +522,9 @@ def _resolve_intent(
     if has_zakazi_flow and intent == "preporaka_lekar":
         return "zakazi_termin"
 
-    return _intent_strukturiran_za_lekar(pitanje_norm, aktiven_kontekst, intent)
+    return _intent_strukturiran_za_lekar(
+        pitanje_norm, aktiven_kontekst, intent, pacient_dict, lekar_dict
+    )
 
 
 @router.post("/sessions/import-guest")
