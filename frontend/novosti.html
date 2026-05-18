@@ -310,7 +310,14 @@
         if (!r.ok) throw new Error('Грешка при вчитување');
         return r.json();
       })
-      .then(renderNovosti)
+      .then(function(items) {
+        renderNovosti(items);
+        var openId = new URLSearchParams(window.location.search).get('id');
+        if (openId) {
+          var nid = parseInt(openId, 10);
+          if (!isNaN(nid)) openNovostViewModal(nid);
+        }
+      })
       .catch(function(err) {
         document.getElementById('novosti-list').innerHTML =
           '<div class="loading" style="color:red;">' + (err.message || 'Грешка при вчитување на новости.') + '</div>';

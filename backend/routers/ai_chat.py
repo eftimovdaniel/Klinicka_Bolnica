@@ -128,9 +128,18 @@ def _intent_strukturiran_za_lekar(
     )
     from ai._kernel.transliteracija import transliterijaj
     from ai.opsto.lekari_oddel import prasanje_e_lekari_po_oddel
+    from ai.opsto.vest_naslov import prasanje_e_izbrisi_vest_oglas
 
     if _prasanje_e_asistent_opsto(transliterijaj(pitanje_norm).lower()):
         return "general"
+
+    if prasanje_e_izbrisi_vest_oglas(pitanje_norm, aktiven_kontekst):
+        return "izbrisi_vest_oglas"
+
+    from ai._kernel.intent_detector import _prasanje_e_pregled_dezurstvo
+
+    if _prasanje_e_pregled_dezurstvo(transliterijaj(pitanje_norm).lower()):
+        return "pregled_dezurstvo"
 
     if prasanje_e_lekari_po_oddel(pitanje_norm):
         return "lekari_oddel"
@@ -213,8 +222,14 @@ def _resolve_intent(
 
     from ai.opsto.vest_naslov import prasanje_e_izbrisi_vest_oglas
 
-    if prasanje_e_izbrisi_vest_oglas(pitanje_norm):
+    if prasanje_e_izbrisi_vest_oglas(pitanje_norm, aktiven_kontekst):
         return "izbrisi_vest_oglas"
+
+    from ai._kernel.intent_detector import _prasanje_e_pregled_dezurstvo
+    from ai._kernel.transliteracija import transliterijaj
+
+    if _prasanje_e_pregled_dezurstvo(transliterijaj(pitanje_norm).lower()):
+        return "pregled_dezurstvo"
 
     from ai.opsto.lekari_oddel import prasanje_e_lekari_po_oddel
     from ai.pacient.slobodni_termini import prasanje_e_drugi_lekari_specijalnost
@@ -232,9 +247,7 @@ def _resolve_intent(
     if prasanje_e_lista_site_pregledi(pitanje_norm):
         if lekar_dict:
             return "moj_raspored"
-        if pacient_dict:
-            return "moi_pregledi"
-        return "moj_raspored"
+        return "moi_pregledi"
 
     if prasanje_e_pregledi_datum(pitanje_norm):
         # Лекар → негови закажани прегледи; пациент → свои термини
@@ -386,6 +399,7 @@ def _resolve_intent(
         aktiven_kontekst.get("zakazi_od_slobodni")
         or aktiven_kontekst.get("zakazi_pending")
         or aktiven_kontekst.get("last_doctor_id")
+        or aktiven_kontekst.get("last_oddel_doctor_ids")
     )
     if has_lekar_kontekst and prasanje_e_specijalnost_izbran_lekar(
         pitanje_norm, aktiven_kontekst
@@ -629,6 +643,23 @@ def delete_chat_session(
     if not delete_session(session_id, pacient_id=pacient_id, doctor_id=doctor_id):
         raise HTTPException(status_code=404, detail="Разговорот не е пронајден.")
     return {"ok": True, "session_id": session_id}
+
+
+@router.get("/groq-status")
+def groq_status_endpoint():
+    """Дали Groq е активен или AUTO OFFLINE по 429 (за тест / испит)."""
+    from ai._kernel.groq_client import groq_status
+
+    return groq_status()
+
+
+@router.post("/groq-reset")
+def groq_reset_circuit():
+    """Рачно повторно вклучување на Groq по cooldown."""
+    from ai._kernel.groq_client import reset_groq_circuit
+
+    reset_groq_circuit()
+    return {"ok": True, "message": "Groq circuit reset"}
 
 
 @router.post("/ask")

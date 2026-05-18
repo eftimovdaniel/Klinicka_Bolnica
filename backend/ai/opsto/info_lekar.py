@@ -136,10 +136,12 @@ def _dezuren_status(dezurstva: list[dict]) -> str:
 
 
 def _resolviraj_lekar(prasanje: str, kontekst: dict | None) -> tuple[dict | None, bool]:
+    from ai.pacient.slobodni_termini import lekar_iz_izbran_kontekst
+
     if prasanje_bar_lekar_od_kontekst(prasanje) or prasanje_e_specijalnost_izbran_lekar(
         prasanje, kontekst
     ):
-        lekar = lekar_od_zakazi_kontekst(kontekst)
+        lekar = lekar_iz_izbran_kontekst(kontekst)
         if lekar:
             return lekar, True
     lekar = najdi_lekar_od_prasanje(prasanje)

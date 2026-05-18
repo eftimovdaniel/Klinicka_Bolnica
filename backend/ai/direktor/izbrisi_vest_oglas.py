@@ -1,5 +1,5 @@
 """
-Бришење вест или оглас преку AI - само за директорот.
+Бришење вест или оглас — само за директорот (правила + AI, локално за „истата").
 
 Примери:
 - „Избриши го најновиот оглас"           → DELETE од Vrabotuvanje (последниот)
@@ -9,15 +9,19 @@
 - „Избриши вест 3"                       → DELETE Novosti WHERE id=3
 """
 
+import re
 from typing import Any
 
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.auth import require_direktor
 from ai._kernel.db_helpers import ai_error_text, db_cursor, fetch_one, normalize_int
-from ai._kernel.groq_client import ask_ai
+from ai._kernel.groq_client import ask_ai, groq_e_isklucen
 from ai._kernel.prompt_loader import load_prompt
+from ai._kernel.transliteracija import transliterijaj
 from ai.opsto.vest_naslov import (
+    prasanje_e_izbrisi_po_kontekst,
     prasanje_e_izbrisi_vest_oglas,
+    prasanje_ima_brisenje_marker,
     pronajdi_vest_po_naslov,
 )
 
@@ -90,19 +94,71 @@ def _izbrisi_oglas(target_id: int | None) -> str:
     )
 
 
-def odgovori_za_brisenje(prasanje: str, lekar: dict | None) -> str:
+def _lokalno_izvlechi_brisenje(
+    prasanje: str, kontekst: dict | None
+) -> tuple[str, int | None] | None:
+    """('vest'|'oglas', id|None) без Groq."""
+    if not prasanje_ima_brisenje_marker(prasanje):
+        return None
+    p = transliterijaj(prasanje).lower()
+    e_oglas = any(w in p for w in ("оглас", "oglas")) and not any(
+        w in p for w in ("вест", "новост", "vest", "novost", "наслов")
+    )
+    if e_oglas:
+        m = re.search(r"(?:оглас|oglas)\s*(?:id)?\s*[#:]?\s*(\d+)", p)
+        return ("oglas", int(m.group(1)) if m else None)
+
+    if prasanje_e_izbrisi_po_kontekst(prasanje, kontekst):
+        return ("vest", int(kontekst["last_vest_id"]))  # type: ignore[index]
+
+    m = re.search(r"(?:вест|новост|vest|novost)\s*(?:id)?\s*[#:]?\s*(\d+)", p)
+    if m:
+        return ("vest", int(m.group(1)))
+
+    vest = pronajdi_vest_po_naslov(prasanje)
+    if vest:
+        return ("vest", int(vest["id"]))
+
+    if any(w in p for w in ("најнов", "последн", "najnov", "posledn")):
+        return ("vest", None)
+
+    if prasanje_e_izbrisi_vest_oglas(prasanje, kontekst):
+        return ("vest", None)
+
+    return None
+
+
+def odgovori_za_brisenje(
+    prasanje: str, lekar: dict | None, kontekst: dict | None = None
+) -> str:
     """Главна точка - повикана од router-от."""
     if err := require_direktor(lekar):
         return err
+
+    lokalno = _lokalno_izvlechi_brisenje(prasanje, kontekst)
+    if lokalno:
+        tip, vid = lokalno
+        if tip == "vest":
+            return _izbrisi_vest(vid)
+        return _izbrisi_oglas(vid)
 
     low = prasanje.lower()
     e_oglas = any(w in low for w in ("оглас", "oglas")) and not any(
         w in low for w in ("вест", "новост", "vest", "novost", "наслов")
     )
-    if not e_oglas and prasanje_e_izbrisi_vest_oglas(prasanje):
+    if not e_oglas and prasanje_e_izbrisi_vest_oglas(prasanje, kontekst):
         vest = pronajdi_vest_po_naslov(prasanje)
         if vest:
             return _izbrisi_vest(int(vest["id"]))
+
+    if groq_e_isklucen():
+        return (
+            "Не разбирам што точно да избришам без AI.\n\n"
+            "Пример:\n"
+            "• „Избриши ја најновата вест\"\n"
+            "• „Избриши вест 10\"\n"
+            "• По објава: „Избриши ја истата\""
+        )
 
     podatoci = _izvlechi(prasanje)
     if msg := ai_error_text(podatoci):

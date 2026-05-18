@@ -40,12 +40,41 @@ _STOP_NASLOV = frozenset(
 _BRISI_MARKERS = (
     "избриши",
     "избришете",
+    "избришеш",
+    "избришам",
+    "избриша",
     "избришај",
+    "бришеш",
+    "бришам",
+    "бриши",
     "тргни",
     "отстрани",
     "izbrisi",
     "izbrisete",
     "delete",
+)
+
+_RE_BRISI_GLAGOL = re.compile(
+    r"\b(избриши|избришете|избришеш|избришам|избриша|избришај|"
+    r"бришеш|бришам|бриши|тргни|отстрани|izbrisi|izbrisete|delete)\b",
+    re.UNICODE | re.IGNORECASE,
+)
+
+_PRONOUNI_VEST_KONTEKST = (
+    "истата",
+    "иста",
+    "истиот",
+    "неа",
+    " нејзе",
+    "оваа",
+    "овој",
+    "таа",
+    "тоа",
+    "истата вест",
+    "иста вест",
+    "ja vest",
+    "taa vest",
+    "ova vest",
 )
 
 
@@ -115,15 +144,45 @@ def pronajdi_vest_po_naslov(prasanje: str, min_score: int = 75) -> dict | None:
 
 def prasanje_ima_brisenje_marker(prasanje: str) -> bool:
     p = transliterijaj(prasanje).lower()
+    if _RE_BRISI_GLAGOL.search(p):
+        return True
     return any(m in p for m in _BRISI_MARKERS)
 
 
-def prasanje_e_izbrisi_vest_oglas(prasanje: str) -> bool:
+def prasanje_e_izbrisi_po_kontekst(
+    prasanje: str, kontekst: dict | None = None
+) -> bool:
+    """
+    „Дали може да ја избришеш сега истата" — вест од претходна порака (objavi_vest).
+    """
+    if not prasanje_ima_brisenje_marker(prasanje):
+        return False
+    if not isinstance(kontekst, dict):
+        return False
+    if not kontekst.get("last_vest_id"):
+        return False
+    p = transliterijaj(prasanje).lower()
+    if any(w in p for w in _PRONOUNI_VEST_KONTEKST):
+        return True
+    if re.search(r"\b(ја|го|ги|ja|go|gi)\b", p) and "оглас" not in p:
+        return True
+    if kontekst.get("last_action") == "objavi_vest":
+        return True
+    return False
+
+
+def prasanje_e_izbrisi_vest_oglas(
+    prasanje: str, kontekst: dict | None = None
+) -> bool:
     """Дали пораката е за бришење вест/оглас (вкл. по наслов од базата)."""
     if not prasanje_ima_brisenje_marker(prasanje):
         return False
     p = transliterijaj(prasanje).lower()
     if any(w in p for w in ("вест", "новост", "оглас", "vest", "novost", "oglas", "наслов")):
+        return True
+    if any(w in p for w in ("најнов", "последн", "najnov", "posledn")):
+        return True
+    if prasanje_e_izbrisi_po_kontekst(prasanje, kontekst):
         return True
     if pronajdi_vest_po_naslov(prasanje):
         return True

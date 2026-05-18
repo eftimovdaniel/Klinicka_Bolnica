@@ -79,9 +79,13 @@ def _spoi_zakazi_so_slobodni_kontekst(
 
     from ai._kernel.lekar_lookup import izvlechi_delovi_ime, najdi_lekar_od_prasanje
 
+    from ai._kernel.groq_client import groq_e_isklucen
+
     lekar_od_ime = None
     if izvlechi_delovi_ime(prasanje):
-        lekar_od_ime = najdi_lekar_od_prasanje(prasanje)
+        lekar_od_ime = najdi_lekar_od_prasanje(
+            prasanje, koristi_ai=not groq_e_isklucen()
+        )
     if lekar_od_ime and not izbran:
         izvleceno["doctor_id"] = int(lekar_od_ime["doctor_ID"])
 
@@ -178,11 +182,14 @@ def vreme_od_prasanje_lokalno(prasanje: str) -> str | None:
 
 def _dopolnuvaj_izvleceno_lokalno(prasanje: str, izvleceno: dict) -> None:
     """Датум/време/лекар од правила — без Groq."""
-    if not _normalize_doctor_id(izvleceno.get("doctor_id")):
-        from ai._kernel.lekar_lookup import izvlechi_delovi_ime, najdi_lekar_od_prasanje
+    from ai._kernel.groq_client import groq_e_isklucen
+    from ai._kernel.lekar_lookup import izvlechi_delovi_ime, najdi_lekar_od_prasanje
 
+    if not _normalize_doctor_id(izvleceno.get("doctor_id")):
         if izvlechi_delovi_ime(prasanje):
-            lekar = najdi_lekar_od_prasanje(prasanje)
+            lekar = najdi_lekar_od_prasanje(
+                prasanje, koristi_ai=not groq_e_isklucen()
+            )
             if lekar:
                 izvleceno["doctor_id"] = int(lekar["doctor_ID"])
     if not izvleceno.get("datum"):
@@ -193,6 +200,24 @@ def _dopolnuvaj_izvleceno_lokalno(prasanje: str, izvleceno: dict) -> None:
         v = vreme_od_prasanje_lokalno(prasanje)
         if v:
             izvleceno["vreme"] = v
+
+    # Groq 429 не смее да го блокира закажување ако локално има лекар/датум/време
+    if izvleceno.get("_error") and (
+        _normalize_doctor_id(izvleceno.get("doctor_id"))
+        or izvleceno.get("datum")
+        or izvleceno.get("vreme")
+    ):
+        izvleceno.pop("_error", None)
+
+
+def _ima_dovolno_za_zakaz_flow(izvleceno: dict) -> bool:
+    """Дали после локално+AI извлекување има смисла да продолжи закажување."""
+    return bool(
+        _normalize_doctor_id(izvleceno.get("doctor_id"))
+        or izvleceno.get("datum")
+        or izvleceno.get("vreme")
+        or izvleceno.get("specialty")
+    )
 
 
 def _linii_lekari_specijalnost(oddel: str, lekari: list[dict]) -> list[str]:
@@ -337,11 +362,17 @@ def izvlechi_podatoci_so_ai(prasanje: str) -> dict:
 Извлечи doctor_id, datum, vreme и врати JSON.
 """.strip()
 
+    from ai._kernel.groq_client import groq_e_isklucen
     from ai._kernel.groq_helpers import izvlechi_json_so_ai
+
+    if groq_e_isklucen():
+        print("[zakazi_termin] Groq offline — само локално извлекување")
+        return {"doctor_id": None, "datum": None, "vreme": None}
 
     podatoci = izvlechi_json_so_ai(
         full_prompt, ZAKAZI_EXTRACT_PROMPT, log_tag="zakazi_termin"
     )
+
     if podatoci.get("_error"):
         return {
             "doctor_id": None,
@@ -772,9 +803,10 @@ def odgovori_za_zakazuvanje(
             odgovor["navigacija"] = nav
         return odgovor
 
-    # Ако имало AI грешка (rate limit, timeout) - врати ја директно на корисникот
-    if izvleceno.get("_error"):
-        return izvleceno["_error"]
+    # Groq грешка само ако локално не се извлече ништо корисно
+    if izvleceno.get("_error") and not _ima_dovolno_za_zakaz_flow(izvleceno):
+        err = izvleceno["_error"]
+        return err if isinstance(err, str) else str(err)
 
     doctor_id = _normalize_doctor_id(izvleceno.get("doctor_id"))
     datum_str = izvleceno.get("datum")

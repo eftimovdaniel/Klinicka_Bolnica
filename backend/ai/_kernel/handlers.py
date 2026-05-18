@@ -76,7 +76,9 @@ def _build_handlers() -> dict[str, HandlerSpec]:
         "lokacija": HandlerSpec(bolnica_info.odgovori_za_lokacija),
         "kontakti": HandlerSpec(bolnica_info.odgovori_za_kontakti),
         "uslugi": HandlerSpec(uslugi.odgovori_za_uslugi),
-        "objavi_vest": HandlerSpec(objavi_vest.odgovori_za_objava_vest, use_raw_question=True),
+        "objavi_vest": HandlerSpec(
+            objavi_vest.odgovori_za_objava_vest, use_raw_question=True, kind="dict"
+        ),
         "kreiraj_oglas": HandlerSpec(kreiraj_oglas.odgovori_za_kreiranje_oglas),
         "izbrisi_vest_oglas": HandlerSpec(izbrisi_vest_oglas.odgovori_za_brisenje),
         "zatvori_oglas": HandlerSpec(zatvori_oglas.odgovori_za_zatvoranje_oglas),
@@ -135,6 +137,23 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
 
         if _prasanje_e_asistent_opsto(transliterijaj(ctx.pitanje_norm).lower()):
             return {"odgovor": odgovori_za_asistent_opsto(ctx.pitanje_norm)}
+
+        from ai.opsto.lekari_oddel import (
+            odgovori_za_lekari_oddel,
+            prasanje_e_lekari_po_oddel,
+        )
+
+        if prasanje_e_lekari_po_oddel(ctx.pitanje_norm):
+            raw = odgovori_za_lekari_oddel(ctx.pitanje_norm, ctx.kontekst)
+            if isinstance(raw, dict):
+                out: dict[str, Any] = {"odgovor": raw.get("odgovor", "")}
+                if raw.get("kontekst") is not None:
+                    out["kontekst"] = raw["kontekst"]
+                if raw.get("navigacija"):
+                    out["navigacija"] = raw["navigacija"]
+                return out
+            return {"odgovor": raw or ""}
+
         return {"odgovor": ask_ai(ctx.pitanje_norm)}
 
     q = ctx.pitanje if spec.use_raw_question else ctx.pitanje_norm
@@ -145,11 +164,10 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
         raw = spec.fn(q, ctx.kontekst)
     elif intent == "otvori_admin_panel":
         raw = spec.fn(q, ctx.lekar, ctx.kontekst)
-    elif intent in (
-        "zakazi_termin",
-        "apliciraj_za_rabota",
-    ):
+    elif intent == "zakazi_termin":
         raw = spec.fn(q, ctx.pacient, ctx.kontekst)
+    elif intent == "apliciraj_za_rabota":
+        raw = spec.fn(q, ctx.pacient, ctx.kontekst, ctx.lekar)
     elif intent == "otkazi_termin":
         raw = spec.fn(q, ctx.pacient, ctx.kontekst)
     elif intent in (
@@ -167,10 +185,11 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
         raw = spec.fn(q, ctx.lekar, ctx.kontekst)
     elif intent in ("moj_raspored", "zavrshi_pregled"):
         raw = spec.fn(q, ctx.lekar, ctx.kontekst)
+    elif intent == "izbrisi_vest_oglas":
+        raw = spec.fn(q, ctx.lekar, ctx.kontekst)
     elif intent in (
         "objavi_vest",
         "kreiraj_oglas",
-        "izbrisi_vest_oglas",
         "zatvori_oglas",
         "statistika_oddeli",
         "istorija_pacient",

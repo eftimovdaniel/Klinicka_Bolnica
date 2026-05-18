@@ -5,15 +5,15 @@ Tek: Корисник пишува „Објави вест: https://youtube.com
 → Земи transcript од YouTube → AI генерира наслов + текст → INSERT во Novosti.
 """
 
+import html
 import re
-import json
+
 import requests
-from urllib.parse import urlparse, parse_qs
 
 from database import get_connection
 from ai._kernel.auth import require_direktor
 from ai._kernel.ai_json import parse_ai_json
-from ai._kernel.groq_client import ask_ai
+from ai._kernel.groq_client import GROQ_OFFLINE_MSG, ask_ai, groq_e_isklucen
 
 
 PROMPT = """
@@ -66,20 +66,94 @@ def _zimi_naslov(video_id: str) -> str | None:
         return None
 
 
+def _paragrafi_od_transcript(transcript: str, *, max_para: int = 4) -> list[str]:
+    """Подели transcript во 2–4 параграфи (без AI)."""
+    text = re.sub(r"\s+", " ", (transcript or "").strip())
+    if not text:
+        return ["Видете го прикаченото видео за повеќе информации."]
+
+    delovi = re.split(r"(?<=[.!?])\s+", text)
+    paras: list[str] = []
+    buf: list[str] = []
+    buf_len = 0
+    for rec in delovi:
+        rec = rec.strip()
+        if not rec:
+            continue
+        if buf_len + len(rec) > 480 and buf:
+            paras.append(" ".join(buf))
+            buf = []
+            buf_len = 0
+            if len(paras) >= max_para:
+                break
+        buf.append(rec)
+        buf_len += len(rec)
+    if buf and len(paras) < max_para:
+        paras.append(" ".join(buf))
+
+    if not paras:
+        paras = [text[:800]]
+    return paras[:max_para]
+
+
+def _generiraj_vest_lokalno(transcript: str, naslov_yt: str | None) -> dict:
+    """
+    Вест од transcript + YouTube наслов — без Groq.
+    Користи се кога AI е offline или врати грешка.
+    """
+    naslov = (naslov_yt or "Вест од видео").strip()
+    if len(naslov) > 100:
+        naslov = naslov[:97].rstrip() + "…"
+
+    paras = _paragrafi_od_transcript(transcript)
+    html_delovi: list[str] = []
+    if naslov_yt:
+        html_delovi.append(
+            "<p>"
+            f"Клиничката болница објавува видео: "
+            f"<strong>{html.escape(naslov_yt)}</strong>."
+            "</p>"
+        )
+    for p in paras:
+        html_delovi.append(f"<p>{html.escape(p)}</p>")
+
+    return {
+        "naslov": naslov,
+        "sodrzina": "".join(html_delovi),
+        "_lokalno": True,
+    }
+
+
 def _generiraj_vest(transcript: str, naslov_yt: str | None) -> dict:
-    """AI генерира naslov + sodrzina од transcript."""
-    kontekst = (f"Оригинален наслов: „{naslov_yt}\"\n\n" if naslov_yt else "") + f"Transcript:\n{transcript}"
+    """AI генерира naslov + sodrzina; локален fallback ако Groq е недостапен."""
+    if groq_e_isklucen():
+        print("[objavi_vest] Groq offline → локален шаблон од transcript")
+        return _generiraj_vest_lokalno(transcript, naslov_yt)
+
+    kontekst = (
+        (f"Оригинален наслов: „{naslov_yt}\"\n\n" if naslov_yt else "")
+        + f"Transcript:\n{transcript}"
+    )
     odgovor = ask_ai(kontekst, system_prompt=PROMPT)
+
+    if (odgovor or "").strip() == GROQ_OFFLINE_MSG or "преоптоварен" in (odgovor or ""):
+        print("[objavi_vest] Groq 429/overload → локален шаблон")
+        return _generiraj_vest_lokalno(transcript, naslov_yt)
 
     data = parse_ai_json(odgovor, log_tag="objavi_vest")
     if data.get("_error"):
+        err = str(data["_error"])
+        if "преоптоварен" in err or "GROQ" in err.upper():
+            return _generiraj_vest_lokalno(transcript, naslov_yt)
         return data
     if data.get("naslov") and data.get("sodrzina"):
         return data
-    return {"_error": "AI врати неочекуван формат."}
+
+    print("[objavi_vest] неочекуван AI формат → локален шаблон")
+    return _generiraj_vest_lokalno(transcript, naslov_yt)
 
 
-def odgovori_za_objava_vest(prasanje: str, lekar: dict | None) -> str:
+def odgovori_za_objava_vest(prasanje: str, lekar: dict | None) -> str | dict:
     """Главна точка - повикана од router-от."""
     if err := require_direktor(lekar):
         return err
@@ -103,6 +177,8 @@ def odgovori_za_objava_vest(prasanje: str, lekar: dict | None) -> str:
     if vest.get("_error"):
         return f"Грешка: {vest['_error']}"
 
+    lokalno = bool(vest.pop("_lokalno", False))
+
     # INSERT во Novosti
     thumbnail = f"https://img.youtube.com/vi/{vid}/hqdefault.jpg"
     embed = f"https://www.youtube-nocookie.com/embed/{vid}"
@@ -119,9 +195,21 @@ def odgovori_za_objava_vest(prasanje: str, lekar: dict | None) -> str:
     cur.close()
     conn.close()
 
-    return (
-        f"Веста е објавена!\n\n"
-        f"Наслов: {vest['naslov']}\n"
-        f"ID: {new_id}\n\n"
-        f"Може да ја видиш на страната „Новости\"."
-    )
+    if lokalno:
+        print(
+            "[objavi_vest] објавена локално од титлови (AI недостапен), id=",
+            new_id,
+        )
+
+    link = f"[[Новости|novosti.html?id={new_id}]]"
+    return {
+        "odgovor": (
+            "Веста е објавена!\n\n"
+            f"Можете да ја погледнете во делот за {link} на сајтот!"
+        ),
+        "kontekst": {
+            "last_vest_id": int(new_id),
+            "last_vest_naslov": vest["naslov"],
+            "last_action": "objavi_vest",
+        },
+    }

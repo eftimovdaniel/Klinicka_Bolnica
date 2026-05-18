@@ -17,7 +17,7 @@ from datetime import datetime
 
 from database import get_connection
 from ai._kernel.ai_json import parse_ai_json
-from ai._kernel.db_helpers import as_dict
+from ai._kernel.db_helpers import as_dict, fetch_one, normalize_int
 from ai._kernel.groq_client import ask_ai
 from ai._kernel.transliteracija import transliterijaj
 from vrabotuvanje_helpers import fetch_aktivni_oglasi_rows, format_rok_datum
@@ -153,8 +153,99 @@ def _odgovor_bara_pacient_login(kontekst_za_po_login: dict | None, prikaz_pozici
     return out
 
 
+def _format_datum_prijava(d) -> str:
+    if not d:
+        return "—"
+    if hasattr(d, "strftime"):
+        return d.strftime("%d.%m.%Y %H:%M")
+    return str(d)[:16]
+
+
+def _lista_aplikacii_po_email(email: str) -> list[dict]:
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        cur.execute(
+            """
+            SELECT id, pozicija, datum_prijava, id_oglas
+            FROM prijaveni_lekari
+            WHERE LOWER(TRIM(email)) = LOWER(TRIM(%s))
+            ORDER BY datum_prijava DESC, id DESC
+            """,
+            (email.strip(),),
+        )
+        rows = [as_dict(r) for r in cur.fetchall()]
+        cur.close()
+        return rows
+    except Exception as e:
+        print(f"[apliciraj] lista aplikacii: {e!r}")
+        return []
+    finally:
+        if conn:
+            conn.close()
+
+
+def _odgovor_proverka_aplikacija(
+    pacient: dict | None, kontekst: dict | None
+) -> dict:
+    email = _email_za_brisenje_aplikacija(pacient, kontekst)
+    if not email:
+        return {
+            "odgovor": (
+                "За да проверам дали имате поднесена апликација за работа, "
+                "најавете се како пациент со истата сметка со која сте аплицирале.\n\n"
+                "Потоа повторете: „Дали имам аплицирано за работа\"."
+            ),
+            "akcija": "otvori_pacient_login",
+            "navigacija": NAV_KARIERA,
+            "kontekst": None,
+        }
+
+    apps = _lista_aplikacii_po_email(email)
+    if not apps:
+        return {
+            "odgovor": (
+                "Не — немам пронајдена апликација за работа на вашето име "
+                f"({email}).\n\n"
+                "Ако сакате да аплицирате, наведете ја позицијата, на пример:\n"
+                '„Сакам да аплицирам за Уролог".'
+            ),
+            "kontekst": None,
+            "navigacija": NAV_KARIERA,
+        }
+
+    linii = ["Да — имате поднесена апликација за работа:\n"]
+    for a in apps:
+        poz = (a.get("pozicija") or "—").strip()
+        app_id = a.get("id")
+        linii.append(
+            f"• {poz} — пријавено на {_format_datum_prijava(a.get('datum_prijava'))}"
+            + (f" (ID: {app_id})" if app_id is not None else "")
+        )
+    linii.extend(
+        [
+            "",
+            "Тимот за човечки ресурси ќе ве контактира за следните чекори.",
+            "",
+            'За откажување: „Избриши ја апликацијата".',
+        ]
+    )
+    return {
+        "odgovor": "\n".join(linii),
+        "kontekst": {
+            "applicant_email": email,
+            "last_aplikacija_id": apps[0].get("id"),
+            "last_aplikacija_pozicija": (apps[0].get("pozicija") or "").strip(),
+        },
+        "navigacija": NAV_KARIERA,
+    }
+
+
 def _prasanje_e_opsto_za_rabota(prasanje: str) -> bool:
     """„Аплицирам за работа" без конкретна позиција/специјалност."""
+    if prasanje_e_proverka_aplikacija_rabota(prasanje):
+        return False
     p = transliterijaj(prasanje).lower()
     if not any(
         w in p
@@ -232,6 +323,325 @@ def _format_pozicija_oglas(oglas: dict) -> str:
     if odd and odd.lower() not in poz.lower():
         return f'„{poz}" ({odd})'
     return f'„{poz}"'
+
+
+def prasanje_e_proverka_aplikacija_rabota(prasanje: str) -> bool:
+    """„Дали имам аплицирано", „имам ли апликација" — статус, не нов flow."""
+    p = transliterijaj(prasanje).lower()
+    if prasanje_e_izbrisi_aplikacija_rabota(prasanje):
+        return False
+    if any(
+        w in p
+        for w in (
+            "сакам да аплицирам",
+            "sakam da apliciram",
+            "аплицирај ме",
+            "apliciraj me",
+            "како да аплицирам",
+            "kako da apliciram",
+        )
+    ):
+        return False
+
+    if any(
+        x in p
+        for x in (
+            "дали имам",
+            "dali imam",
+            "дали сум аплицирал",
+            "dali sum apliciral",
+            "имам ли апликаци",
+            "imam li aplikaci",
+            "моја апликаци",
+            "moja aplikaci",
+            "статус на апликаци",
+            "status na aplikaci",
+            "поднесов ли",
+            "podnesov li",
+            "провери ја апликаци",
+            "proveri ja aplikaci",
+            "дали постои апликаци",
+            "која апликација имам",
+            "koja aplikacija imam",
+        )
+    ):
+        return True
+
+    if ("дали" in p or "dali" in p) and any(
+        w in p for w in ("аплицир", "aplicir", "апликаци", "aplikaci", "пријав", "prijav")
+    ):
+        return True
+    return False
+
+
+def prasanje_e_izbrisi_aplikacija_rabota(prasanje: str) -> bool:
+    """„Избриши ја апликацијата", „откажи аплицирање" — не лиценца."""
+    p = transliterijaj(prasanje).lower()
+    if not any(
+        w in p
+        for w in (
+            "избриши",
+            "избришете",
+            "тргни",
+            "отстрани",
+            "откажи",
+            "откажете",
+            "повлечи",
+            "izbrisi",
+            "otkazi",
+            "delete",
+            "cancel",
+        )
+    ):
+        return False
+    return any(w in p for w in ("апликаци", "aplikaci", "аплиц", "aplic", "пријав"))
+
+
+def _otkazi_aplikacija_flow(kontekst: dict | None) -> dict:
+    return {
+        "odgovor": (
+            "Го прекинав процесот на аплицирање.\n\n"
+            "Ако сакате повторно да аплицирате, наведете ја позицијата "
+            '(на пр. „Сакам да аплицирам за медицинска сестра").'
+        ),
+        "kontekst": None,
+        "navigacija": NAV_KARIERA,
+    }
+
+
+def _pozicija_hint_od_brisenje(prasanje: str) -> str | None:
+    """„… за медицинска сестра" → hint за пребарување."""
+    p = transliterijaj(prasanje).lower()
+    m = re.search(
+        r"\bза\s+(.+?)(?:\s*$)",
+        p,
+        flags=re.UNICODE | re.IGNORECASE,
+    )
+    if m:
+        hint = m.group(1).strip()
+        for stop in (
+            "апликаци",
+            "aplikaci",
+            "мојата",
+            "мојот",
+            "моето",
+        ):
+            if stop in hint:
+                hint = hint.split(stop)[0].strip()
+        if len(hint) >= 4:
+            return hint
+    if "медицинск" in p and "сестр" in p:
+        return "медицинск"
+    return None
+
+
+def _app_row_id(row: dict) -> int:
+    rid = row.get("id")
+    if rid is None:
+        rid = row.get("ID")
+    if rid is None:
+        raise ValueError(f"Нема id во ред: {row!r}")
+    return int(rid)
+
+
+def _email_za_brisenje_aplikacija(
+    pacient: dict | None, kontekst: dict | None
+) -> str | None:
+    """Email од најава или од контекст по успешна апликација."""
+    if pacient and (pacient.get("email") or "").strip():
+        return str(pacient["email"]).strip()
+    if isinstance(kontekst, dict):
+        for key in ("applicant_email", "email", "pacient_email"):
+            e = (kontekst.get(key) or "").strip()
+            if e:
+                return e
+    return None
+
+
+def _izvlechi_app_id_od_prasanje(prasanje: str) -> int | None:
+    p = transliterijaj(prasanje).lower()
+    m = re.search(r"апликаци[јj][аи]?\s*(?:id)?\s*#?:?\s*(\d+)", p)
+    if m:
+        return int(m.group(1))
+    m = re.search(r"\bid\s*(\d+)\b", p)
+    if m:
+        return int(m.group(1))
+    return None
+
+
+def _direktor_e_admin(lekar: dict | None) -> bool:
+    if not lekar or not lekar.get("doctor_ID"):
+        return False
+    try:
+        from routers.admin import check_admin_access
+
+        return bool(check_admin_access(int(lekar["doctor_ID"])))
+    except Exception:
+        return False
+
+
+def _najdi_aplikacija_za_brisenje(
+    cur: object,
+    *,
+    email: str | None = None,
+    app_id: int | None = None,
+    id_oglas: int | None = None,
+    pozicija_hint: str | None = None,
+    posledna_bilo_koja: bool = False,
+) -> dict | None:
+    """Еден ред од prijaveni_lekari за бришење."""
+    if app_id is not None:
+        cur.execute(
+            """
+            SELECT id, pozicija, datum_prijava, id_oglas, email
+            FROM prijaveni_lekari WHERE id = %s LIMIT 1
+            """,
+            (app_id,),
+        )
+        return fetch_one(cur)
+
+    if posledna_bilo_koja:
+        cur.execute(
+            """
+            SELECT id, pozicija, datum_prijava, id_oglas, email
+            FROM prijaveni_lekari
+            ORDER BY datum_prijava DESC, id DESC
+            LIMIT 1
+            """
+        )
+        return fetch_one(cur)
+
+    if not email:
+        return None
+
+    email_n = email.strip().lower()
+    base = """
+        SELECT id, pozicija, datum_prijava, id_oglas, email
+        FROM prijaveni_lekari
+        WHERE LOWER(TRIM(email)) = %s
+    """
+    params: list = [email_n]
+
+    if id_oglas is not None:
+        cur.execute(
+            base + " AND id_oglas = %s ORDER BY datum_prijava DESC, id DESC LIMIT 1",
+            tuple(params + [id_oglas]),
+        )
+        row = fetch_one(cur)
+        if row:
+            return row
+
+    if pozicija_hint:
+        hint = pozicija_hint.strip().lower()
+        cur.execute(
+            base
+            + " AND LOWER(TRIM(pozicija)) LIKE %s ORDER BY datum_prijava DESC, id DESC LIMIT 1",
+            tuple(params + [f"%{hint}%"]),
+        )
+        row = fetch_one(cur)
+        if row:
+            return row
+
+    cur.execute(
+        base + " ORDER BY datum_prijava DESC, id DESC LIMIT 1",
+        tuple(params),
+    )
+    return fetch_one(cur)
+
+
+def _izbrisi_aplikacija_od_baza(
+    *,
+    email: str | None = None,
+    id_oglas: int | None = None,
+    pozicija_hint: str | None = None,
+    app_id: int | None = None,
+    posledna_bilo_koja: bool = False,
+) -> tuple[bool, str]:
+    """Брише апликација од prijaveni_lekari (ист пат како INSERT)."""
+    conn = None
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        row = _najdi_aplikacija_za_brisenje(
+            cur,
+            email=email,
+            app_id=app_id,
+            id_oglas=id_oglas,
+            pozicija_hint=pozicija_hint,
+            posledna_bilo_koja=posledna_bilo_koja,
+        )
+        if not row:
+            cur.close()
+            if email:
+                return False, (
+                    "Немам пронајдена поднесена апликација за работа на вашето име "
+                    f"({email}).\n\n"
+                    "Најавете се како пациент со истата сметка со која ја "
+                    "поднесовте апликацијата, па повторете „Избриши ја апликацијата\"."
+                )
+            return False, "Немам пронајдена апликација за бришење."
+
+        app_id_del = _app_row_id(as_dict(row))
+        poz = (row.get("pozicija") or "").strip()
+        cur.execute("DELETE FROM prijaveni_lekari WHERE id = %s", (app_id_del,))
+        conn.commit()
+        cur.close()
+        return True, (
+            "Апликацијата е избришана.\n\n"
+            f"Позиција: {poz or '—'}\n"
+            f"ID: {app_id_del}\n\n"
+            'Можете повторно да аплицирате преку „Кариера" ако сакате.'
+        )
+    except Exception as e:
+        print(f"[apliciraj] DELETE aplikacija: {e!r}")
+        return False, (
+            "Се случи грешка при бришењето на апликацијата. Обидете се повторно."
+        )
+    finally:
+        if conn:
+            conn.close()
+
+
+def _odgovor_izbrisi_aplikacija(
+    pacient: dict | None,
+    kontekst: dict | None,
+    prasanje: str = "",
+    lekar: dict | None = None,
+) -> dict:
+    app_id = _izvlechi_app_id_od_prasanje(prasanje)
+    email = _email_za_brisenje_aplikacija(pacient, kontekst)
+    id_oglas = normalize_int((kontekst or {}).get("id_oglas"))
+    poz_hint = _pozicija_hint_od_brisenje(prasanje)
+
+    if app_id and _direktor_e_admin(lekar):
+        ok, poraka = _izbrisi_aplikacija_od_baza(app_id=app_id)
+    elif email:
+        ok, poraka = _izbrisi_aplikacija_od_baza(
+            email=email,
+            id_oglas=id_oglas,
+            pozicija_hint=poz_hint,
+            app_id=normalize_int((kontekst or {}).get("last_aplikacija_id")),
+        )
+    elif _direktor_e_admin(lekar):
+        ok, poraka = _izbrisi_aplikacija_od_baza(posledna_bilo_koja=True)
+    else:
+        return {
+            "odgovor": (
+                "За бришење на апликација треба да сте најавени како пациент "
+                "(истата сметка со која ја поднесовте апликацијата).\n\n"
+                "Гостинскиот режим и најавата како лекар не можат да ја избришат "
+                "вашата пријава — само вие или директорот (преку админ) може.\n\n"
+                "Најавете се како пациент и пишете: „Избриши ја апликацијата\"."
+            ),
+            "kontekst": None,
+            "navigacija": NAV_KARIERA,
+        }
+
+    return {
+        "odgovor": poraka,
+        "kontekst": None,
+        "navigacija": NAV_KARIERA,
+    }
 
 
 def _parse_da_ne(prasanje: str) -> str | None:
@@ -326,6 +736,7 @@ def _pocni_licenca_flow(oglas: dict, pacient: dict) -> dict:
             "ceka": "licenca",
             "pozicija": pozicija_naslov,
             "id_oglas": id_o,
+            "applicant_email": (pacient.get("email") or "").strip(),
         },
         "navigacija": NAV_KARIERA,
     }
@@ -397,8 +808,40 @@ def _izvlechi_pozicija(prasanje: str) -> str | None:
     return str(val).strip() if val else None
 
 
+def _izvlechi_licenca_lokalno(prasanje: str) -> tuple[str | None, bool] | None:
+    """
+    Брзо: само цифри или „немам". None = користи AI.
+    """
+    p = transliterijaj(prasanje).lower().strip()
+    if prasanje_e_izbrisi_aplikacija_rabota(prasanje):
+        return None  # повикувачот треба прво да провери бришење
+    if any(
+        x in p
+        for x in (
+            "немам",
+            "нема лиценц",
+            "прескок",
+            "preskok",
+            "пропушти",
+            "не сакам",
+            "ne sakam",
+        )
+    ):
+        return None, True
+    broj = re.search(r"\d{4,}", p)
+    if broj:
+        return broj.group(0), False
+    if re.fullmatch(r"\d+", p):
+        return p, False
+    return None
+
+
 def _izvlechi_licenca(prasanje: str) -> tuple[str | None, bool]:
     """Враќа (licenca, preskoki)."""
+    lokalno = _izvlechi_licenca_lokalno(prasanje)
+    if lokalno is not None:
+        return lokalno
+
     odgovor = ask_ai(f"Одговор: „{prasanje}\"", system_prompt=PROMPT_LICENCA)
     print(f"[apliciraj] licenca AI: {odgovor!r}")
     data = parse_ai_json(odgovor, log_tag="apliciraj_licenca")
@@ -490,6 +933,7 @@ def odgovori_za_aplikacija(
     prasanje: str,
     pacient: dict | None,
     kontekst: dict | None,
+    lekar: dict | None = None,
 ) -> dict:
     """
     Враќа: { "odgovor": str, "kontekst": dict|None }
@@ -502,6 +946,14 @@ def odgovori_za_aplikacija(
     """
 
     ceka = (kontekst or {}).get("ceka")
+
+    if prasanje_e_izbrisi_aplikacija_rabota(prasanje):
+        if _email_za_brisenje_aplikacija(pacient, kontekst) or _direktor_e_admin(lekar):
+            return _odgovor_izbrisi_aplikacija(pacient, kontekst, prasanje, lekar)
+        return _otkazi_aplikacija_flow(kontekst)
+
+    if prasanje_e_proverka_aplikacija_rabota(prasanje):
+        return _odgovor_proverka_aplikacija(pacient, kontekst)
 
     # По најава: продолжи од зачуваниот оглас
     if ceka == "login" and pacient and pacient.get("email"):
@@ -587,6 +1039,9 @@ def odgovori_za_aplikacija(
 
     # === Чекор 3: лиценца ===
     if ceka == "licenca":
+        if prasanje_e_izbrisi_aplikacija_rabota(prasanje):
+            return _odgovor_izbrisi_aplikacija(pacient, kontekst, prasanje, lekar)
+
         licenca, preskoki = _izvlechi_licenca(prasanje)
         if licenca is None and not preskoki:
             return {
@@ -617,16 +1072,42 @@ def odgovori_za_aplikacija(
             }
 
         lic_info = f"Лиценца: {licenca}" if licenca else "Лиценца: (без)"
+        app_email = (pacient.get("email") or "").strip()
+        last_id = None
+        try:
+            conn = get_connection()
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT id FROM prijaveni_lekari
+                WHERE LOWER(TRIM(email)) = LOWER(TRIM(%s))
+                ORDER BY datum_prijava DESC, id DESC LIMIT 1
+                """,
+                (app_email,),
+            )
+            r = cur.fetchone()
+            cur.close()
+            conn.close()
+            if r:
+                last_id = int(r[0])
+        except Exception as e:
+            print(f"[apliciraj] last id po insert: {e!r}")
+
         return {
             "odgovor": (
                 'Готово! Апликацијата е успешно испратена.\n\n'
                 f'Позиција: {pozicija}\n'
                 f'Кандидат: {pacient.get("ime","")} {pacient.get("prezime","")}\n'
-                f'Email: {pacient.get("email","")}\n'
+                f'Email: {app_email}\n'
                 f'{lic_info}\n\n'
-                'Тимот за човечки ресурси ќе те контактира за следните чекори. Среќно!'
+                'Тимот за човечки ресурси ќе те контактира за следните чекори. Среќно!\n\n'
+                'За откажување: „Избриши ја апликацијата" (најавени како пациент).'
             ),
-            "kontekst": None,
+            "kontekst": {
+                "applicant_email": app_email,
+                "last_aplikacija_id": last_id,
+                "last_aplikacija_pozicija": pozicija,
+            },
         }
 
     # Безбедност: непознат ceka – чисти го контекстот

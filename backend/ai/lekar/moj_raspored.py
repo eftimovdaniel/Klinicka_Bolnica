@@ -42,13 +42,46 @@ PROMPT = """
 """.strip()
 
 
+def _izvlechi_lokalno_raspored(prasanje: str) -> dict:
+    from ai._kernel.transliteracija import transliterijaj
+    from ai.pacient.moi_pregledi import datum_za_pregledi_od_prasanje
+
+    p = transliterijaj(prasanje).lower()
+    out: dict = {"period": None, "datum": None, "broj": None}
+    if any(x in p for x in ("сите", "site", "all", "комплетн", "celosn")):
+        out["period"] = "site"
+    elif "утре" in p or "utre" in p:
+        out["period"] = "utre"
+    elif "денес" in p or "denes" in p:
+        out["period"] = "denes"
+    elif "недел" in p or "nedel" in p:
+        out["period"] = "nedela"
+    elif "месец" in p or "mesec" in p:
+        out["period"] = "mesec"
+    d = datum_za_pregledi_od_prasanje(prasanje)
+    if d:
+        out["datum"] = d.isoformat()
+    return out
+
+
 def _izvlechi(prasanje: str) -> dict:
+    from ai._kernel.groq_client import groq_e_isklucen
+    from ai.pacient.moi_pregledi import prasanje_e_lista_site_pregledi
+
+    if prasanje_e_lista_site_pregledi(prasanje):
+        return {"period": "site", "datum": None, "broj": None}
+    if groq_e_isklucen():
+        return _izvlechi_lokalno_raspored(prasanje)
+
     denes = date.today().strftime("%Y-%m-%d")
     denes_den = ["понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"][
         date.today().weekday()
     ]
     full = f'Денес: {denes} ({denes_den})\n\nПрашање: „{prasanje}"\nВрати JSON.'
-    return izvlechi_json_so_ai(full, PROMPT, log_tag="moj_raspored")
+    podatoci = izvlechi_json_so_ai(full, PROMPT, log_tag="moj_raspored")
+    if podatoci.get("_error"):
+        return _izvlechi_lokalno_raspored(prasanje)
+    return podatoci
 
 
 def _period_to_dates(period: str | None) -> tuple[date | None, date | None, str]:
@@ -97,14 +130,9 @@ def odgovori_za_raspored(
     try:
         from ai.pacient.moi_pregledi import prasanje_e_lista_site_pregledi
 
-        if prasanje_e_lista_site_pregledi(prasanje):
-            podatoci = {"period": "site", "datum": None, "broj": None}
-        else:
-            podatoci = _izvlechi(prasanje)
+        podatoci = _izvlechi(prasanje)
     except ImportError:
         podatoci = _izvlechi(prasanje)
-    if podatoci.get("_error"):
-        return podatoci["_error"]
 
     konkreten_datum = podatoci.get("datum")
     if not konkreten_datum:

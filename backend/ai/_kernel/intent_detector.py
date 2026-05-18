@@ -504,11 +504,14 @@ KLUCNI_MOI_PREGLEDI = [
     "моите прегледи", "моите пргледи", "историја на прегледи",
     "историја на моите", "сите мои прегледи",
     "прикажи ги сите прегледи", "prikazi gi site pregledi",
+    "prikazes site moj pregledi", "gi prikazes site",
+    "site moj pregledi", "site moite pregledi",
     "идни прегледи", "минати прегледи",
     "прикажи ми ги прегледите", "прикажи ми ги моите прегледи",
     "колку прегледи имам", "кои се моите прегледи",
     "прегледи за", "pregledi za", "преглед за",
-    "moite pregledi", "moi pregledi", "istorija na pregledi",
+    "moite pregledi", "moi pregledi", "moj pregledi",
+    "istorija na pregledi",
 ]
 
 # 8c2. РЕЗИМЕ НА НОВОСТИ (краток текст од база, не навигација)
@@ -615,6 +618,10 @@ KLUCNI_LEKARI_ODDEL = [
     "koj lekari",
     "lekari po",
     "lekari od",
+    "општа хирургија",
+    "opsta hirurgija",
+    "на општа",
+    "na opsta",
 ]
 
 # 9. СЛОБОДНИ ТЕРМИНИ (исто прашање — различни начини)
@@ -782,6 +789,7 @@ def _prasanje_e_konkreten_lekar(prasanje: str) -> bool:
         from ai.opsto.vest_naslov import (
             prasanje_e_izbrisi_vest_oglas,
             prasanje_e_samo_naslov_vest,
+            prasanje_ima_brisenje_marker,
         )
         from ai.lekar.zavrshi_pregled import prasanje_e_zavrshi_pregled
         from ai.pacient.moi_pregledi import (
@@ -794,7 +802,11 @@ def _prasanje_e_konkreten_lekar(prasanje: str) -> bool:
             return False
         if prasanje_e_ko_e_sloboden_datum_vreme(prasanje):
             return False
-        if prasanje_e_izbrisi_vest_oglas(prasanje) or prasanje_e_samo_naslov_vest(prasanje):
+        if prasanje_e_izbrisi_vest_oglas(prasanje, None) or prasanje_e_samo_naslov_vest(
+            prasanje
+        ):
+            return False
+        if prasanje_ima_brisenje_marker(prasanje):
             return False
         if prasanje_e_pregledi_datum(prasanje) or prasanje_e_lista_site_pregledi(prasanje):
             return False
@@ -912,6 +924,27 @@ def _prasanje_e_pregled_dezurstvo(p: str) -> bool:
         w in p for w in ("кога", "koga", "дали", "dali", "кој ден", "koj den")
     ):
         return True
+    if "дежур" in p and any(
+        w in p
+        for w in (
+            "прикажи",
+            "прикази",
+            "покажи",
+            "prikazi",
+            "pokazi",
+            "листа",
+            "list",
+            "ги ",
+            "ги,",
+            "сите",
+            "site",
+            "на лекар",
+            "лекарите",
+            "lekari",
+            "докторите",
+        )
+    ):
+        return True
     return False
 
 
@@ -988,7 +1021,7 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
     try:
         from ai.opsto.vest_naslov import prasanje_e_izbrisi_vest_oglas
 
-        if prasanje_e_izbrisi_vest_oglas(prasanje) and "оцен" not in p:
+        if prasanje_e_izbrisi_vest_oglas(prasanje, None) and "оцен" not in p:
             return "izbrisi_vest_oglas"
     except ImportError:
         ima_brisi = any(
@@ -1069,6 +1102,19 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
         and any(w in p for w in ("денес", "denes", "недела", "nedela", "термини", "termini"))
     ):
         return "izvestaj_den_nedela"
+
+    try:
+        from ai.pacient.apliciraj_za_rabota import (
+            prasanje_e_izbrisi_aplikacija_rabota,
+            prasanje_e_proverka_aplikacija_rabota,
+        )
+
+        if prasanje_e_izbrisi_aplikacija_rabota(prasanje):
+            return "apliciraj_za_rabota"
+        if prasanje_e_proverka_aplikacija_rabota(prasanje):
+            return "apliciraj_za_rabota"
+    except ImportError:
+        pass
 
     # „Аплицирам / пријавувам за работа за X" – пациент аплицира (не текст на оглас)
     if not ima_kreiraj and not _tekst_e_oglas_za_objava(p) and any(w in p for w in (
@@ -1159,9 +1205,12 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
 
     # Моите прегледи (пациент) – има поспецифични варијанти; мора пред moj_raspored
     try:
-        from ai.pacient.moi_pregledi import prasanje_e_pregledi_datum
+        from ai.pacient.moi_pregledi import (
+            prasanje_e_lista_site_pregledi,
+            prasanje_e_pregledi_datum,
+        )
 
-        if prasanje_e_pregledi_datum(prasanje):
+        if prasanje_e_lista_site_pregledi(prasanje) or prasanje_e_pregledi_datum(prasanje):
             return "moi_pregledi"
     except ImportError:
         pass

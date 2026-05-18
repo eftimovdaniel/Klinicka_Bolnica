@@ -75,6 +75,8 @@ _ALIAS_KEYWORDS: dict[str, str] = {
     "kardiohirurgija": "kardiohirurg",
     "неврохирургија": "неврохирурги",
     "neurohirurgija": "neurohirurg",
+    "општа хирургија": "хирурги",
+    "opsta hirurgija": "hirurg",
 }
 
 _RE_ODDEL_ZA = re.compile(
@@ -103,6 +105,14 @@ def _normaliziraj(s: str) -> str:
     return re.sub(r"\s+", " ", s)
 
 
+def _ocisti_na_opsta_prefiks(p: str) -> str:
+    """„На општа хирургија" → „хирургија". """
+    s = _normaliziraj(p)
+    s = re.sub(r"^на\s+", "", s)
+    s = re.sub(r"^општа\s+", "", s)
+    return s.strip()
+
+
 @lru_cache(maxsize=1)
 def zimi_site_oddeli() -> tuple[str, ...]:
     """Сите уникатни имиња од Doctors.specialty + Oddeli.ime_na_oddel."""
@@ -127,9 +137,20 @@ def zimi_site_oddeli() -> tuple[str, ...]:
     return tuple(sorted({*speci, *oddeli}, key=lambda x: (len(x), x)))
 
 
-def _match_po_klucen_zbor(klucen: str, site: tuple[str, ...]) -> str | None:
+def _match_po_klucen_zbor(
+    klucen: str, site: tuple[str, ...], *, samo_celosno: bool = False
+) -> str | None:
+    """
+    samo_celosno=True: само целосно име (не „хирургија" во „неврохирургија").
+    """
+    kn = _normaliziraj(klucen)
     for ime in site:
-        if klucen in _normaliziraj(ime):
+        inorm = _normaliziraj(ime)
+        if samo_celosno:
+            if inorm == kn:
+                return ime
+            continue
+        if kn in inorm:
             return ime
     return None
 
@@ -227,30 +248,70 @@ def _match_hirurgija(p: str, site: tuple[str, ...]) -> str | None:
 
 
 def _match_tocno_ili_blisko(baran: str, site: tuple[str, ...]) -> str | None:
+    """Само целосно совпаѓање на името од база (без подниз)."""
     bn = _normaliziraj(baran)
     for ime in site:
         if _normaliziraj(ime) == bn:
             return ime
-    found = _match_po_klucen_zbor(bn, site)
-    if found:
-        return found
     return None
+
+
+def _baranje_e_opsta_hirurgija(p: str) -> bool:
+    """„Хирургија" без невро/кардио/пластич/торакал."""
+    if "неврохирурги" in p or "neurohirurg" in p:
+        return False
+    if "кардиохирурги" in p or "kardiohirurg" in p:
+        return False
+    if "пластич" in p or "plastichn" in p:
+        return False
+    if "торакал" in p or "torakal" in p:
+        return False
+    return bool(re.search(r"(?<![\w])хирургија(?![\w])", p, re.UNICODE))
+
+
+def _hirurgiski_pododdeli(site: tuple[str, ...]) -> tuple[str, ...]:
+    """Сите *хирурги* освен точно „Хирургија"."""
+    out: list[str] = []
+    for ime in site:
+        n = _normaliziraj(ime)
+        if "хирурги" in n and n != "хирургија":
+            out.append(ime)
+    return tuple(sorted(out, key=lambda x: (len(x), x)))
 
 
 def _pravila_izvlechi(prasanje: str, site: tuple[str, ...]) -> tuple[str | None, str]:
     p = _normaliziraj(prasanje)
+    p_core = _ocisti_na_opsta_prefiks(prasanje)
+    if p_core and p_core != p:
+        tocno = _match_tocno_ili_blisko(p_core, site)
+        if tocno:
+            return tocno, SOURCE_RULES
+        hir = _match_hirurgija(p_core, site)
+        if hir:
+            return hir, SOURCE_RULES
+        frag_match = _match_fragment_po_zborovi(p_core, site)
+        if frag_match:
+            return frag_match, SOURCE_RULES
+        alias_core = _match_alias_vo_prasanje(p_core, site)
+        if alias_core:
+            return alias_core, SOURCE_ALIAS
 
     m = _RE_ODDEL_ZA.search(prasanje)
     if m:
         fragment = next((g.strip() for g in m.groups() if g), "")
         if fragment:
+            frag_n = _normaliziraj(fragment)
             tocno = _match_tocno_ili_blisko(fragment, site)
             if tocno:
                 return tocno, SOURCE_RULES
+            if "хирурги" in frag_n or "hirurg" in frag_n:
+                hir = _match_hirurgija(frag_n, site)
+                if hir:
+                    return hir, SOURCE_RULES
             po_zborovi = _match_fragment_po_zborovi(fragment, site)
             if po_zborovi:
                 return po_zborovi, SOURCE_RULES
-            alias_frag = _match_alias_vo_prasanje(_normaliziraj(fragment), site)
+            alias_frag = _match_alias_vo_prasanje(frag_n, site)
             if alias_frag:
                 return alias_frag, SOURCE_ALIAS
 
@@ -270,7 +331,9 @@ def _pravila_izvlechi(prasanje: str, site: tuple[str, ...]) -> tuple[str | None,
 
 
 def _ai_izberi_od_lista(prasanje: str, site: tuple[str, ...]) -> str | None:
-    if not site:
+    from ai._kernel.groq_client import groq_e_isklucen
+
+    if groq_e_isklucen() or not site:
         return None
     lista = json.dumps(list(site), ensure_ascii=False)
     from ai._kernel.prompt_loader import load_prompt_template
@@ -309,6 +372,7 @@ def resolve_oddel(prasanje: str) -> OddelResolveResult:
             poraka_greska="Нема регистрирани оддели во системот.",
         )
 
+    p = _normaliziraj(prasanje)
     oddel, method = _pravila_izvlechi(prasanje, site)
     if oddel:
         return OddelResolveResult(
@@ -319,8 +383,42 @@ def resolve_oddel(prasanje: str) -> OddelResolveResult:
             method=method,
         )
 
+    # „Хирургија" без подтип — не прикажувај Неврохирургија наместо општ оддел
+    if _baranje_e_opsta_hirurgija(p):
+        ima_opsta = any(_normaliziraj(x) == "хирургија" for x in site)
+        pod = _hirurgiski_pododdeli(site)
+        if not ima_opsta and pod:
+            return OddelResolveResult(
+                ok=False,
+                oddel=None,
+                site_oddeli=site,
+                barano="Хирургија",
+                method=SOURCE_RULES,
+                poraka_greska="_hirurgija_pododdeli",
+            )
+
     ai_val = _ai_izberi_od_lista(prasanje, site)
     if ai_val == "_error":
+        oddel_retry, method_retry = _pravila_izvlechi(prasanje, site)
+        if oddel_retry:
+            return OddelResolveResult(
+                ok=True,
+                oddel=oddel_retry,
+                site_oddeli=site,
+                barano=oddel_retry,
+                method=method_retry,
+            )
+        if _baranje_e_opsta_hirurgija(_ocisti_na_opsta_prefiks(prasanje)):
+            pod = _hirurgiski_pododdeli(site)
+            if pod:
+                return OddelResolveResult(
+                    ok=False,
+                    oddel=None,
+                    site_oddeli=site,
+                    barano="Хирургија",
+                    method=SOURCE_RULES,
+                    poraka_greska="_hirurgija_pododdeli",
+                )
         return OddelResolveResult(
             ok=False,
             oddel=None,

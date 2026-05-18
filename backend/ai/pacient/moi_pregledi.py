@@ -83,7 +83,17 @@ def prasanje_e_lista_site_pregledi(prasanje: str) -> bool:
         return False
     if "закажани преглед" in p or "zakazani pregled" in p:
         return True
-    if "моите преглед" in p or "moite pregled" in p or "moi pregled" in p:
+    if any(
+        x in p
+        for x in (
+            "моите преглед",
+            "moite pregled",
+            "moi pregled",
+            "мој преглед",
+            "moj pregled",
+            "мојот преглед",
+        )
+    ):
         return True
     ima_site = any(
         x in p for x in ("сите", "site", "all", "целосн", "celosn", "комплетн", "kompletn")
@@ -135,12 +145,71 @@ def prasanje_e_pregledi_datum(prasanje: str) -> bool:
     return datum_za_pregledi_od_prasanje(prasanje) is not None
 
 
+def _izvlechi_lokalno(prasanje: str) -> dict:
+    """Филтри за листа прегледи — без Groq."""
+    p = transliterijaj(prasanje).lower()
+    out: dict = {
+        "status": None,
+        "kategorija": None,
+        "broj": None,
+        "datum": None,
+    }
+
+    if prasanje_e_lista_site_pregledi(prasanje):
+        out["status"] = "сите"
+        out["kategorija"] = "сите"
+    elif "идн" in p and re.search(r"\b(преглед|pregled|термин|termin)\w*\b", p):
+        out["kategorija"] = "идни"
+    elif "минат" in p and re.search(r"\b(преглед|pregled|термин|termin)\w*\b", p):
+        out["kategorija"] = "минати"
+    elif any(x in p for x in ("завршен", "zavrshen", "завршени", "zavrseni")):
+        out["status"] = "завршен"
+    elif any(x in p for x in ("закажан", "zakazan", "zakazani")):
+        out["status"] = "закажан"
+    elif any(x in p for x in ("откажан", "otkazan", "otkazani")):
+        out["status"] = "откажан"
+    elif any(
+        x in p
+        for x in (
+            "моите преглед",
+            "moite pregled",
+            "moi pregled",
+            "мој преглед",
+            "moj pregled",
+        )
+    ):
+        out["status"] = "сите"
+        out["kategorija"] = "сите"
+
+    m = re.search(r"\b(последн|posledn|last)\w*\s+(\d{1,2})\b", p)
+    if m:
+        try:
+            out["broj"] = int(m.group(2))
+        except (TypeError, ValueError):
+            pass
+
+    d = datum_za_pregledi_od_prasanje(prasanje)
+    if d:
+        out["datum"] = d.isoformat()
+
+    return out
+
+
 def _izvlechi(prasanje: str) -> dict:
-    return izvlechi_json_so_ai(
+    from ai._kernel.groq_client import groq_e_isklucen
+
+    lokalno = _izvlechi_lokalno(prasanje)
+    if groq_e_isklucen() or prasanje_e_lista_site_pregledi(prasanje):
+        return lokalno
+
+    podatoci = izvlechi_json_so_ai(
         f'Прашање: „{prasanje}"',
         load_prompt("pacient_moi_pregledi"),
         log_tag="moi_pregledi",
     )
+    if podatoci.get("_error"):
+        return lokalno
+    return podatoci
 
 
 def _format_datum(d) -> str:
@@ -186,8 +255,6 @@ def odgovori_za_moi_pregledi(
         )
 
     podatoci = _izvlechi(prasanje)
-    if podatoci.get("_error"):
-        return podatoci["_error"]
 
     status_filter = (podatoci.get("status") or "").strip().lower() or None
     if status_filter == "сите":
@@ -277,11 +344,11 @@ def odgovori_za_moi_pregledi(
     for r in rows:
         dat = _format_datum(r.get("datum_pregled"))
         vrm = _format_vreme(r.get("vreme_pregled"))
-        lekar = (r.get("ime_lekar") or "—").strip() or "—"
+        ime_lekar = (r.get("ime_lekar") or "—").strip() or "—"
         status = r.get("status_pregled") or "—"
         oznaka = STATUS_OZNAKI.get(status, "")
 
-        red = f"- {dat} {vrm} – {lekar} {oznaka}".rstrip()
+        red = f"- {dat} {vrm} – {ime_lekar} {oznaka}".rstrip()
         # Дополнителни инфо за завршени
         if r.get("status_pregled") == "завршен":
             dij = (r.get("dijagnoza") or "").strip()

@@ -14,6 +14,8 @@ _INTENTI_KLUCNI_BEZ_GROQ = frozenset(
         "otkazi_termin",
         "prenesi_termin",
         "postavi_potsetnik",
+        "prenesi_termin",
+        "postavi_potsetnik",
         "oceni_pregled",
         "trgni_ocena",
         "zavrshi_pregled",
@@ -27,6 +29,11 @@ _INTENTI_KLUCNI_BEZ_GROQ = frozenset(
         "aplikanti_oglas",
         "apliciraj_za_rabota",
         "preference_lekar",
+        "moi_pregledi",
+        "moj_raspored",
+        "lekari_oddel",
+        "slobodni_termini",
+        "info_lekar",
     }
 )
 

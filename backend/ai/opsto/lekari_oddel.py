@@ -31,6 +31,10 @@ _RE_ODELOT_ZA = re.compile(
     r"(?:оделот|одделот|одел|оддел)(?:от|о)?\s+за",
     re.UNICODE | re.IGNORECASE,
 )
+_RE_NA_SPECIALTY = re.compile(
+    r"^на\s+(.+)$",
+    re.UNICODE | re.IGNORECASE,
+)
 
 # Подстрингови за специјалности/оддели (не само 4–5 hardcoded)
 _SPEC_ODDEL_KLUCNI = (
@@ -71,6 +75,42 @@ _SPEC_ODDEL_KLUCNI = (
 )
 
 
+def _e_prasanje_za_oddel_kratko(p: str) -> bool:
+    """
+    Кратко наведување на оддел без збор „лекари".
+    Пр. „На општа хирургија", „На урологија", „Општа хирургија".
+    """
+    p = re.sub(r"^[?!.\s]+|[?!.\s]+$", "", (p or "").strip())
+    if not p:
+        return False
+    if any(
+        x in p
+        for x in (
+            "закажи",
+            "закажување",
+            "термин",
+            "слободен",
+            "слободна",
+            "преглед кај",
+            "otkazi",
+            "zakazi",
+        )
+    ):
+        return False
+    if any(x in p for x in ("општа", "opsta")) and any(x in p for x in _SPEC_ODDEL_KLUCNI):
+        return True
+    m = _RE_NA_SPECIALTY.match(p)
+    if m:
+        frag = m.group(1).strip()
+        if any(x in frag for x in _SPEC_ODDEL_KLUCNI):
+            return True
+        if any(x in frag for x in ("општа", "opsta")) and len(frag.split()) <= 4:
+            return True
+    if len(p.split()) <= 4 and any(x in p for x in _SPEC_ODDEL_KLUCNI):
+        return True
+    return False
+
+
 def prasanje_e_lekari_po_oddel(prasanje: str) -> bool:
     """
     Листа лекари по оддел/специјалност — не конкретен лекар по име.
@@ -79,6 +119,8 @@ def prasanje_e_lekari_po_oddel(prasanje: str) -> bool:
     if not prasanje or not prasanje.strip():
         return False
     p = transliterijaj(prasanje).lower()
+    if "дежур" in p or "dezur" in p:
+        return False
     if any(
         x in p
         for x in (
@@ -116,6 +158,8 @@ def prasanje_e_lekari_po_oddel(prasanje: str) -> bool:
     if any(x in p for x in ("лекари", "lekari", "доктори", "докторите")) and any(
         x in p for x in _SPEC_ODDEL_KLUCNI
     ):
+        return True
+    if _e_prasanje_za_oddel_kratko(p):
         return True
     return False
 
@@ -231,6 +275,29 @@ def _naslov_lista_lekari(
     return f'На одделот за „{oddel}" работат ({len(lekari)} лекари):'
 
 
+def _sledna_poraka_lekari_oddel(oddel_ime: str, lekari: list[dict]) -> str:
+    """Затворање по листа — без насоки за слободни термини / закажување."""
+    oddel = (oddel_ime or "").strip()
+    if len(lekari) == 1:
+        l = lekari[0]
+        ime = f"Д-р {l.get('name', '').strip()} {l.get('surname', '').strip()}".strip()
+        return (
+            f"{ime} работи на одделот за „{oddel}\".\n"
+            "За повеќе информации (работно време, слободни термини, закажување) "
+            "прашајте — Ви стојам на располагање."
+        )
+    iminja = ", ".join(
+        f"д-р {l.get('name', '').strip()} {l.get('surname', '').strip()}".strip()
+        for l in lekari[:4]
+    )
+    if len(lekari) > 4:
+        iminja += f" и уште {len(lekari) - 4}"
+    return (
+        f"Лекарите ({iminja}) работат на одделот за „{oddel}\".\n"
+        "За повеќе информации за конкретен лекар прашајте — Ви стојам на располагање."
+    )
+
+
 def _zimi_lekari_od_oddel(oddel: str) -> list[dict]:
     try:
         with db_cursor() as (_, cur):
@@ -273,6 +340,23 @@ def odgovori_za_lekari_oddel(
         site_oddeli = resolved.site_oddeli
         if resolved.poraka_greska == "_ai_busy":
             return "Привремено сум зафатен. Те молам обиди се повторно за неколку секунди."
+        if resolved.poraka_greska == "_hirurgija_pododdeli":
+            from ai._kernel.oddel_resolver import _hirurgiski_pododdeli
+
+            pod = _hirurgiski_pododdeli(resolved.site_oddeli)
+            linii = pod[:12] if pod else []
+            return (
+                'Немам оддел со точно име „Хирургија" (општа хирургија).\n\n'
+                "Во системот се регистрирани овие хируршки специјалности:\n"
+                + "\n".join(f"- {o}" for o in linii)
+                + (
+                    f"\n- … и уште {len(pod) - len(linii)}" if len(pod) > len(linii) else ""
+                )
+                + "\n\n"
+                'Прашајте конкретно, на пр.:\n'
+                '„Кои лекари се на одделот за Неврохирургија?"\n'
+                '„Кои лекари се на одделот за Пластична хирургија?"'
+            )
         if resolved.ok and resolved.oddel:
             oddel_ime = resolved.oddel
     elif not site_oddeli:
@@ -326,12 +410,7 @@ def odgovori_za_lekari_oddel(
         redovi.append(_linija_lekar(l))
 
     redovi.append("")
-    sledna = (
-        "Следно можете да прашате:\n"
-        "„Дали може да провериш слободни термини на 25 мај“ — сите слободни часови;\n"
-        "„Кој од нив е слободен на 20.05 во 12:00“ — проверка за конкретен час;\n"
-        "потоа „закажи кај [презиме]“ за закажување (датумот и часот се зачувуваат)."
-    )
+    sledna = _sledna_poraka_lekari_oddel(oddel_ime or "", lekari)
     redovi.append(sledna)
     sablon = "\n".join(redovi)
 
@@ -361,6 +440,8 @@ def odgovori_za_lekari_oddel(
     ctx = dict(kontekst) if isinstance(kontekst, dict) else {}
     ctx["last_oddel"] = oddel_ime
     ctx["last_oddel_doctor_ids"] = [int(l["doctor_ID"]) for l in lekari]
+    if len(lekari) == 1:
+        ctx["last_doctor_id"] = int(lekari[0]["doctor_ID"])
 
     return {
         "odgovor": odgovor_tekst,

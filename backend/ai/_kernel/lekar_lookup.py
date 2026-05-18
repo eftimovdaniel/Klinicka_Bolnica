@@ -196,7 +196,44 @@ _STOP_IME = frozenset(
         "slobodno",
         "slobodna",
         "slobodni",
+        "утре",
+        "utre",
+        "денес",
+        "denes",
+        "вчера",
+        "vchera",
+        "задутре",
+        "zautre",
+        "задутра",
+        "наредниот",
+        "наредна",
+        "нареден",
+        "следниот",
+        "следна",
+        "следен",
+        "идни",
+        "утрешниот",
+        "утрешна",
+        "утрешно",
+        "utreshniot",
+        "utreshna",
+        "избришеш",
+        "избришам",
+        "избриша",
+        "бришеш",
+        "бришам",
+        "бриши",
+        "истата",
+        "иста",
+        "сега",
     }
+)
+
+_RE_PREZIME_POCETOK = re.compile(
+    r"^([a-zа-яёїієґ\-]{2,})\s+"
+    r"(?:кога|дали|има|е\s+слобод|слободен|слободна|слободни|"
+    r"koga|dali|ima|e\s+slobod|sloboden|slobodna|slobodni)",
+    re.UNICODE | re.IGNORECASE,
 )
 
 # Unicode букви (кирилица + латиница) за имиња
@@ -232,8 +269,43 @@ def _delovi_od_fragment(fragment: str) -> list[str]:
     return delovi[:3]
 
 
+def prezime_na_pocetok_od_prasanje(prasanje: str) -> str | None:
+    """
+    „Здравев кога е слободен утре" → „здравев" (презиме на почеток, пред прашање).
+    """
+    p = transliterijaj(prasanje or "").strip().lower()
+    m = _RE_PREZIME_POCETOK.match(p)
+    if not m:
+        return None
+    token = _cist_ime_zbor(m.group(1))
+    if len(token) < 3 or token in _STOP_IME:
+        return None
+    return token
+
+
+def prasanje_ukazuva_kon_konkreten_lekar(prasanje: str) -> bool:
+    """Дали прашањето наведува конкретен лекар (не „кој од нив" / цел оддел)."""
+    if not (prasanje or "").strip():
+        return False
+    if prezime_na_pocetok_od_prasanje(prasanje):
+        return True
+    p = transliterijaj(prasanje).lower()
+    if _RE_POSLE_DR.search(p) or _RE_POSLE_KAJ.search(p):
+        return True
+    delovi = izvlechi_delovi_ime(prasanje)
+    if not delovi:
+        return False
+    if len(delovi) == 1:
+        return len(najdi_lekari_po_prezime(delovi[0])) > 0
+    return najdi_lekar_od_delovi(delovi) is not None
+
+
 def izvlechi_delovi_ime(prasanje: str) -> list[str]:
     p = transliterijaj(prasanje).lower()
+
+    poc = prezime_na_pocetok_od_prasanje(prasanje)
+    if poc:
+        return [poc]
 
     # Најсигурно: текст веднаш после д-р / др (не мешај со „слободен понеделник“)
     m = _RE_POSLE_DR.search(p)
@@ -375,6 +447,7 @@ def _lekari_od_rows(rows: list[dict]) -> list[dict]:
 
 def najdi_lekari_po_delovi(delovi: list[str]) -> list[dict]:
     """0, 1 или повеќе лекари — без AI."""
+    delovi = [d for d in delovi if d and d not in _STOP_IME]
     if len(delovi) >= 2:
         lekar = najdi_lekar_od_delovi(delovi)
         return [lekar] if lekar else []
