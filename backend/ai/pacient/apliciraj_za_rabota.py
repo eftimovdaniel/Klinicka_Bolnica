@@ -18,6 +18,7 @@ from ai._kernel.db_helpers import ( # pomosna funkcija za interakcija so bazata,
 )
 from ai._kernel.groq_client import ask_ai   # so ovaa funkcija isprakam poraki do LLM modelot sto go koristam (Groq) za da dobijam nekoj odgovor
 from ai._kernel.transliteracija import transliterijaj   # latinica -> kirilica, agento sekogas dava odgovor na kirilica
+from ai._kernel.utils import format_datum_vreme
 from vrabotuvanje_helpers import fetch_aktivni_oglasi_rows, format_rok_datum   
 # ai agento moze da gi prenasoce korisnikot na delot kade imame aktivni oglasi za rabota,
 # tuka gi prenosocuva na index.html delot kade imame kariera 
@@ -140,14 +141,6 @@ def _odgovor_bara_pacient_login(kontekst_za_po_login: dict | None, prikaz_pozici
     else:
         out["kontekst"] = None
     return out
-
-
-def _format_datum_prijava(d) -> str:
-    if not d:
-        return "—"
-    if hasattr(d, "strftime"):
-        return d.strftime("%d.%m.%Y %H:%M")
-    return str(d)[:16]
 
 
 def _email_kluc_za_sporedba(email: str) -> tuple[str, str] | None:
@@ -440,7 +433,7 @@ def _odgovor_proverka_aplikacija(
         poz = (a.get("pozicija") or "—").strip() or "—"
         app_id = a.get("id")
         linii.append(
-            f"• {poz} — пријавено на {_format_datum_prijava(a.get('datum_prijava'))}"
+            f"• {poz} — пријавено на {format_datum_vreme(a.get('datum_prijava'))}"
             + (f" (ID: {app_id})" if app_id is not None else "")
         )
     linii.extend(

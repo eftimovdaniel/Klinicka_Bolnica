@@ -3,20 +3,13 @@ from ai._kernel.ai_json import parse_ai_json  # AI odgovor -> JSON dict
 from ai._kernel.auth import require_direktor  # samo direktor ima pristap
 from ai._kernel.db_helpers import as_dict, db_cursor, prijaveni_select_sql  # pomos za MySQL kursor
 from ai._kernel.groq_client import ask_ai  # povik kon Groq (Llama)
+from ai._kernel.utils import format_datum_vreme
 
 
 def _izvlechi(prasanje: str) -> dict:  # izvleci pozicija ili id_oglas od prasanjeto
     odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=load_prompt("direktor_aplikanti_oglas"))  # AI analiza
     print(f"[aplikanti] AI: {odgovor!r}")  # log za debug
     return parse_ai_json(odgovor, log_tag="aplikanti_oglas")  # dict ili _error
-
-
-def _format_datum(d) -> str:  # lep format na datum_prijava
-    if not d:  # nema datum
-        return "—"  # prazno
-    if hasattr(d, "strftime"):  # datetime objekt
-        return d.strftime("%d.%m.%Y %H:%M")  # den.mesec.godina cas:min
-    return str(d)[:16]  # string skraten
 
 
 def odgovori_za_aplikanti(prasanje: str, lekar: dict | None) -> str:  # glaven handler (intent aplikanti_oglas)
@@ -78,7 +71,7 @@ def odgovori_za_aplikanti(prasanje: str, lekar: dict | None) -> str:  # glaven h
         email = (r.get("email") or "").strip() or "—"  # email
         tel = r.get("telefon") or "—"  # telefon
         lic = r.get("broj_med_licenca") or "—"  # licenca
-        kogo = _format_datum(r.get("datum_prijava"))  # datum na prijava
+        kogo = format_datum_vreme(r.get("datum_prijava"))  # datum na prijava
         oglas_ref = r.get("id_oglas")  # id na oglasot
         oglas_str = f" | оглас #{oglas_ref}" if oglas_ref else ""  # dopolnitelen tekst
 

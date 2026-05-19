@@ -1,51 +1,18 @@
-"""
-Брз медицински картон на пациент - за најавени лекари.
-
-Разлика од „истории" (D2):
-- D2 = броење + кратка листа на прегледи кај овој лекар.
-- D3 = детален картон: контакт-податоци + сите прегледи (кај било кој лекар)
-       со дијагнози и терапии.
-
-Примери:
-- „Дај ми картон на Петар Иванов"
-- „Картон Иванов"
-- „Покажи ми ги сите прегледи на пациент Иванов"
-"""
-
 import re
-
 from database import get_connection
 from ai._kernel.auth import require_lekar
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
-
-
-PROMPT = """
-Ти си систем што извлекува име на пациент.
-
-Корисникот е лекар и сака медицински картон на пациент. Врати САМО JSON:
+from ai._kernel.utils import format_datum, format_vreme
+# sistemski promt koj go uci modelot da dava samo ime i prezime
+PROMPT = """ Ти си систем што извлекува име на пациент. Корисникот е лекар и сака медицински картон на пациент. Врати САМО JSON:
 {"ime_pacient": "Име Презиме" | null}
-
-БЕЗ markdown, БЕЗ објаснувања. Само JSON.
-""".strip()
-
-
+БЕЗ markdown, БЕЗ објаснувања. Само JSON. """.strip()
+# pomosna funkcija koja go povikuva ai modelot za da go analizira baranjeto na lekarot
 def _izvlechi(prasanje: str) -> dict:
-    odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=PROMPT)
+    odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=PROMPT) # se praka prasanje do groq so soodvetno formiran promt
     print(f"[karton] AI: {odgovor!r}")
-    return parse_ai_json(odgovor, log_tag="karton_pacient")
-
-
-def _fmt_datum(d) -> str:
-    if hasattr(d, "strftime"):
-        return d.strftime("%d.%m.%Y")
-    return str(d)
-
-
-def _fmt_vreme(t) -> str:
-    if hasattr(t, "strftime"):
-        return t.strftime("%H:%M")
-    return str(t)[:5]
+    return parse_ai_json(odgovor, log_tag="karton_pacient") #odgovorot se parsira vo python recnik
 
 
 def odgovori_za_karton(prasanje: str, lekar: dict | None) -> str:
@@ -134,7 +101,7 @@ def odgovori_za_karton(prasanje: str, lekar: dict | None) -> str:
     linii.append("Последни прегледи:")
     for r in pregledi[:6]:
         linija = (
-            f"\n• {_fmt_datum(r['datum_pregled'])} {_fmt_vreme(r['vreme_pregled'])}"
+            f"\n• {format_datum(r['datum_pregled'])} {format_vreme(r['vreme_pregled'])}"
             f" — {r['status_pregled']} (ID {r['termin_ID']})"
         )
         if r.get("ime_lekar"):

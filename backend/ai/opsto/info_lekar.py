@@ -12,7 +12,7 @@ from database import get_connection
 from ai._kernel.lekar_lookup import najdi_lekar_od_prasanje
 from ai._kernel.transliteracija import transliterijaj
 from ai._kernel.odgovor_formatter import formatiraj_odgovor_so_ai
-from ai._kernel.utils import format_vreme
+from ai._kernel.utils import format_datum, format_vreme
 from ai.pacient.slobodni_termini import (
     lekar_od_zakazi_kontekst,
     prasanje_bar_lekar_od_kontekst,
@@ -65,10 +65,6 @@ def _as_time(v) -> time | None:
     return None
 
 
-def _format_datum(datum: date) -> str:
-    return datum.strftime("%d.%m.%Y")
-
-
 def _dezurstvo_datum_vreme(d: dict) -> tuple[date | None, time | None, time | None]:
     datum = d.get("datum")
     if isinstance(datum, datetime):
@@ -101,7 +97,7 @@ def _linija_za_dezurstvo(d: dict, prefiks: str) -> str:
     datum, vreme_od, _ = _dezurstvo_datum_vreme(d)
     if not datum:
         return prefiks
-    return f"{prefiks}\nДатум: {_format_datum(datum)}\nПочеток на дежурство: {format_vreme(vreme_od)}"
+    return f"{prefiks}\nДатум: {format_datum(datum)}\nПочеток на дежурство: {format_vreme(vreme_od)}"
 
 
 def _dezuren_status(dezurstva: list[dict]) -> str:
@@ -209,7 +205,7 @@ def _dezurstvo_za_fakti(dezurstva: list[dict]) -> dict[str, str]:
             datum, vreme_od, _ = _dezurstvo_datum_vreme(d)
             return {
                 "status": "da_sega",
-                "datum": _format_datum(datum) if datum else "",
+                "datum": format_datum(datum) if datum else "",
                 "pocetok": format_vreme(vreme_od),
             }
     sledno = _sledno_dezurstvo(dezurstva, sega)
@@ -217,7 +213,7 @@ def _dezurstvo_za_fakti(dezurstva: list[dict]) -> dict[str, str]:
         datum, vreme_od, _ = _dezurstvo_datum_vreme(sledno)
         return {
             "status": "ne_so_idno",
-            "datum": _format_datum(datum) if datum else "",
+            "datum": format_datum(datum) if datum else "",
             "pocetok": format_vreme(vreme_od),
         }
     return {"status": "ne", "datum": "", "pocetok": ""}

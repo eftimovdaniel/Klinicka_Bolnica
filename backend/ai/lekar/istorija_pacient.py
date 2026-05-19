@@ -3,6 +3,7 @@ from database import get_connection
 from ai._kernel.auth import require_lekar
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
+from ai._kernel.utils import format_datum, format_vreme
 
 
 PROMPT = """ Ти си систем што извлекува име на пациент од прашање. Корисникот е лекар и сака историја/преглед на свој пациент. Врати САМО JSON:
@@ -17,15 +18,6 @@ def _izvlechi(prasanje: str) -> dict:
     odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=PROMPT)   # se povikuva llm so prasanje i idefiniraniot sistemski prompt
     print(f"[istorija] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="istorija_pacient")   # se dava odgovor od ai agento vo forma na pyrhon recnik
-# funkcija za formatiranje na objekti od tip na data vo citliv mkd
-def _fmt_datum(d) -> str:
-    if hasattr(d, "strftime"):  # se proverkuva dali funkcijata e validen datatime ili data objekt
-        return d.strftime("%d.%m.%Y")   # ako e datum go pretvata vo strig so soodvetna forma definiran vo zagradata
-    return str(d)   # ako e vejke string ili drug tip na podatok go pretvara vo obicen sting i go dava
-def _fmt_vreme(t) -> str:   # formatiranje na vremeto vo 24 casoven format
-    if hasattr(t, "strftime"):  # ako e soodveten objket gi zema cas i minuti i istite gi vraka
-        return t.strftime("%H:%M")
-    return str(t)[:5] # dokolku e obicen string od bazata gi zema prvite 5 elemeti (HH:MM)
 # funkcija koja vraka odgovor na lekarot
 def odgovori_za_istorija(prasanje: str, lekar: dict | None) -> str:
     if err := require_lekar(lekar): # se pravi proveka dali e najaven lekar toj ima pristap
@@ -81,7 +73,7 @@ def odgovori_za_istorija(prasanje: str, lekar: dict | None) -> str:
     ] 
     for r in rows[:5]:  # pravi loop na prvite 5 reda
         linija = (
-            f"• {_fmt_datum(r['datum_pregled'])} {_fmt_vreme(r['vreme_pregled'])}"  # format na linijata za datum vreme status i id na terminot
+            f"• {format_datum(r['datum_pregled'])} {format_vreme(r['vreme_pregled'])}"  # format na linijata za datum vreme status i id na terminot
             f" — {r['status_pregled']} (ID {r['termin_ID']})"   
         )
         # proverka dali vo bazata ima postaveno i dijagnoza, dokolku ima se pacati i soodvetnata dijagnoza

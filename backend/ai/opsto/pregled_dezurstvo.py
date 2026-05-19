@@ -11,8 +11,8 @@ from collections import defaultdict
 from database import get_connection
 from ai._kernel.lekar_lookup import najdi_lekar_od_prasanje
 from ai._kernel.transliteracija import transliterijaj
-from ai._kernel.utils import format_vreme
-from ai.opsto.info_lekar import _as_time, _format_datum
+from ai._kernel.utils import format_datum, format_vreme
+from ai.opsto.info_lekar import _as_time
 from ai.direktor.dezurstvo_kontekst import izgradi_kontekst
 
 _DENOVI_MK = (
@@ -126,7 +126,7 @@ def _linija_dezurstvo(d: dict, *, so_lekar: bool = False) -> str:
         lekar_del = f"{ime} ({spec})" if spec else ime
         return f"• {lekar_del} — {oddel} — {od}–{do}"
     if datum:
-        return f"• {_format_datum(datum)}, {oddel} — {od}–{do}"
+        return f"• {format_datum(datum)}, {oddel} — {od}–{do}"
     return f"• {oddel} — {od}–{do}"
 
 

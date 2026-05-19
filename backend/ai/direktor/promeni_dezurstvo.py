@@ -13,7 +13,7 @@ from ai._kernel.auth import require_direktor
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 from ai._kernel.transliteracija import transliterijaj
-from ai._kernel.utils import format_vreme
+from ai._kernel.utils import format_datum, format_vreme
 from ai.direktor.dezurstvo_kontekst import izgradi_kontekst, lekar_od_kontekst
 
 
@@ -292,12 +292,6 @@ def _ima_preklop(
     return row is not None
 
 
-def _format_datum(d) -> str:
-    if hasattr(d, "strftime"):
-        return d.strftime("%d.%m.%Y")
-    return str(d)
-
-
 def _as_date(d) -> date:
     if isinstance(d, date) and not isinstance(d, datetime):
         return d
@@ -557,7 +551,7 @@ def odgovori_za_dezurstvo(
         f"Дежурството е променето.\n\n"
         f"Лекар: д-р {found['name']} {found['surname']}\n"
         f"Оддел: {dez['oddel']}\n"
-        f"Датум: {_format_datum(d_show)}\n"
+        f"Датум: {format_datum(d_show)}\n"
         f"Време: {novo_od}–{novo_do}"
     )
     return _odgovor(msg, found, dez)

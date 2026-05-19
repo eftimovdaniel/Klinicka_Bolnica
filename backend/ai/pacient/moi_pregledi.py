@@ -1,5 +1,5 @@
 from ai._kernel.prompt_loader import load_prompt
-from ai._kernel.utils import format_vreme
+from ai._kernel.utils import format_datum, format_vreme
 import re
 from datetime import date
 from database import get_connection
@@ -214,14 +214,6 @@ def _izvlechi(prasanje: str) -> dict:
     return podatoci
 
 
-def _format_datum(d) -> str:
-    if not d:
-        return "—"
-    if hasattr(d, "strftime"):
-        return d.strftime("%d.%m.%Y")
-    return str(d)[:10]
-
-
 STATUS_OZNAKI = {
     "закажан": "[закажан]",
     "завршен": "[завршен]",
@@ -335,7 +327,7 @@ def odgovori_za_moi_pregledi(
     redovi = [naslov, summary, ""]
 
     for r in rows:
-        dat = _format_datum(r.get("datum_pregled"))
+        dat = format_datum(r.get("datum_pregled"))
         vrm = format_vreme(r.get("vreme_pregled"))
         ime_lekar = (r.get("ime_lekar") or "—").strip() or "—"
         status = r.get("status_pregled") or "—"

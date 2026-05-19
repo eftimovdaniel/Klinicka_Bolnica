@@ -19,6 +19,7 @@ from ai._kernel.auth import require_lekar
 from ai._kernel.napomena import napomena_za_prikaz_lekar
 from ai._kernel.groq_helpers import izvlechi_json_so_ai
 from ai.lekar.lekar_panel_nav import dopuni_so_lekar_panel
+from ai._kernel.utils import format_datum_so_den, format_vreme
 
 
 PROMPT = """
@@ -104,20 +105,6 @@ def _period_to_dates(period: str | None) -> tuple[date | None, date | None, str]
     if period == "site":
         return None, None, "сите"
     return denes, None, "од денес"
-
-
-def _fmt_datum(d) -> str:
-    if hasattr(d, "strftime"):
-        return d.strftime("%d.%m.%Y (%a)").replace("Mon", "пон").replace("Tue", "втo").replace(
-            "Wed", "сре"
-        ).replace("Thu", "чет").replace("Fri", "пет").replace("Sat", "саб").replace("Sun", "нед")
-    return str(d)
-
-
-def _fmt_vreme(t) -> str:
-    if hasattr(t, "strftime"):
-        return t.strftime("%H:%M")
-    return str(t)[:5]
 
 
 def odgovori_za_raspored(
@@ -218,12 +205,12 @@ def odgovori_za_raspored(
         po_datum.setdefault(d, []).append(r)
 
     for d in sorted(po_datum.keys()):
-        linii.append(f"━━ {_fmt_datum(d)} ━━")
+        linii.append(f"━━ {format_datum_so_den(d)} ━━")
         for r in po_datum[d]:
             st = (r.get("status_pregled") or "закажан").strip()
             st_oznaka = f" [{st}]" if st != "закажан" else ""
             linija = (
-                f"• {_fmt_vreme(r['vreme_pregled'])} — {r['ime_pacient']}"
+                f"• {format_vreme(r['vreme_pregled'])} — {r['ime_pacient']}"
                 f" (ID {r['termin_ID']}){st_oznaka}"
             )
             nap = napomena_za_prikaz_lekar(r.get("napomena"))

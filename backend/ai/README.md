@@ -55,7 +55,7 @@ GROQ_API_KEY=gsk_...
 
 ## Заеднички помошници (`ai/_kernel/`)
 
-- `utils.py` — `format_vreme`, итн.
+- `utils.py` — `format_vreme`, `format_datum`, `format_datum_so_den`, `format_datum_vreme`, `format_datum_i_vreme`
 - `groq_client.py` — единствен Groq повик
 - `lekar_lookup.py` — наоѓање лекар по име
 - `db_helpers.py` — повторливи SQL шаблони

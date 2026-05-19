@@ -23,7 +23,7 @@ import re
 from database import get_connection
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
-from ai._kernel.utils import format_vreme
+from ai._kernel.utils import format_datum, format_vreme
 
 
 PROMPT = """
@@ -153,14 +153,6 @@ def _update_terapija(
             conn.close()
 
 
-def _format_datum(d) -> str:
-    if not d:
-        return "—"
-    if hasattr(d, "strftime"):
-        return d.strftime("%d.%m.%Y")
-    return str(d)[:10]
-
-
 def odgovori_za_terapija(prasanje: str, lekar: dict | None) -> str:
     if not lekar or not lekar.get("doctor_ID"):
         return (
@@ -258,7 +250,7 @@ def odgovori_za_terapija(prasanje: str, lekar: dict | None) -> str:
         ]
         for t in relevantni[:5]:
             redovi.append(
-                f'• ID {t["termin_ID"]} – {_format_datum(t.get("datum_pregled"))} '
+                f'• ID {t["termin_ID"]} – {format_datum(t.get("datum_pregled"))} '
                 f'{format_vreme(t.get("vreme_pregled"))} ({t.get("status_pregled")})'
             )
         redovi.append("")
@@ -276,7 +268,7 @@ def odgovori_za_terapija(prasanje: str, lekar: dict | None) -> str:
 def _ispisi_po_uspesno(termin: dict, dijagnoza: str | None, terapija: str | None,
                    avtomatski_zavrshi: bool) -> str:
     pac = (termin.get("ime_pacient") or "").strip() or "—"
-    dat = _format_datum(termin.get("datum_pregled"))
+    dat = format_datum(termin.get("datum_pregled"))
     vrm = format_vreme(termin.get("vreme_pregled"))
     delovi = [
         "Записот е сочуван!",

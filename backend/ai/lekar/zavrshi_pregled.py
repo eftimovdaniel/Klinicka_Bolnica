@@ -21,6 +21,7 @@ from ai._kernel.auth import require_lekar
 from ai._kernel.groq_helpers import izvlechi_json_so_ai
 from ai._kernel.prompt_helpers import today_prompt_line
 from ai._kernel.transliteracija import transliterijaj
+from ai._kernel.utils import format_datum_i_vreme
 
 _RE_TERMIN_ID = re.compile(r"\bID\s*(\d+)\b", re.IGNORECASE | re.UNICODE)
 _RE_ZAVRSI_ZATVORI = re.compile(
@@ -356,7 +357,7 @@ def _poraka_ne_najden_termin(doctor_id: int, ime: str | None) -> str:
         st = (r.get("status_pregled") or "—").strip()
         linii.append(
             f"• ID {r['termin_ID']}: {r['ime_pacient']} — "
-            f"{_fmt_dt(r['datum_pregled'], r['vreme_pregled'])} (статус: {st})"
+            f"{format_datum_i_vreme(r['datum_pregled'], r['vreme_pregled'])} (статус: {st})"
         )
     linii.append(
         "\nАко сакате да го ажурирате, наведете ID или контактирајте админ."
@@ -391,12 +392,6 @@ def _zavrshi(termin_id: int, dijagnoza: str | None, terapija: str | None) -> Non
     conn.commit()
     cur.close()
     conn.close()
-
-
-def _fmt_dt(d, t) -> str:
-    d_s = d.strftime("%d.%m.%Y") if hasattr(d, "strftime") else str(d)
-    t_s = t.strftime("%H:%M") if hasattr(t, "strftime") else str(t)[:5]
-    return f"{d_s} {t_s}"
 
 
 def _najdi_site_zakazani(doctor_id: int, datum_str: str | None) -> list[dict]:
@@ -443,7 +438,7 @@ def _zavrshi_mnogu(rows: list[dict], dijagnoza: str | None, terapija: str | None
         if r["status_pregled"] != "закажан":
             continue
         linii.append(
-            f"• ID {r['termin_ID']}: {r['ime_pacient']} ({_fmt_dt(r['datum_pregled'], r['vreme_pregled'])})"
+            f"• ID {r['termin_ID']}: {r['ime_pacient']} ({format_datum_i_vreme(r['datum_pregled'], r['vreme_pregled'])})"
         )
     return "\n".join(linii)
 
@@ -572,7 +567,7 @@ def odgovori_za_zavrshi(
 
     if len(rows) > 1:
         lista = "\n".join(
-            f"• ID {r['termin_ID']}: {r['ime_pacient']} — {_fmt_dt(r['datum_pregled'], r['vreme_pregled'])}"
+            f"• ID {r['termin_ID']}: {r['ime_pacient']} — {format_datum_i_vreme(r['datum_pregled'], r['vreme_pregled'])}"
             for r in rows[:6]
         )
         prv_id = rows[0]['termin_ID']
@@ -599,6 +594,6 @@ def _format_uspeh(t: dict, dijagnoza: str | None, terapija: str | None) -> str:
         f"Прегледот е означен како завршен.\n\n"
         f"ID: {t['termin_ID']}\n"
         f"Пациент: {t['ime_pacient']}\n"
-        f"Кога: {_fmt_dt(t['datum_pregled'], t['vreme_pregled'])}"
+        f"Кога: {format_datum_i_vreme(t['datum_pregled'], t['vreme_pregled'])}"
         f"{extra}"
     )
