@@ -89,33 +89,16 @@ _FOLLOWUP_MARKERS = (
 )
 
 
-def _izvlechi_pravila(prasanje: str) -> dict:
-    p = transliterijaj(prasanje).lower()
-    pol = None
-    if any(x in p for x in ("женск", "zensk", "докторк")):
-        pol = "zenski"
-    elif any(x in p for x in ("машк", "maski")):
-        pol = "muski"
-    return {
-        "pol": pol,
-        "jazik": None,
-        "iskustvo": None,
-        "specialnost": prasanje,
-    }
-
-
 def _izvlechi(prasanje: str) -> dict:
-    try:
-        odgovor = ask_ai(
-            f"Прашање: {prasanje!r}",
-            system_prompt=load_prompt("preference_lekar_extract"),
-        )
-        pod = parse_ai_json(odgovor, log_tag="preference_lekar")
-        if not pod.get("_error"):
-            return pod
-    except Exception as e:
-        print(f"[preference_lekar] AI extract: {e}")
-    return _izvlechi_pravila(prasanje)
+    from ai._kernel.groq_helpers import groq_zadolzhitelen
+
+    if msg := groq_zadolzhitelen():
+        return {"_error": msg}
+    odgovor = ask_ai(
+        f"Прашање: {prasanje!r}",
+        system_prompt=load_prompt("preference_lekar_extract"),
+    )
+    return parse_ai_json(odgovor, log_tag="preference_lekar")
 
 
 def _verojatno_zenski(ime: str) -> bool:
@@ -224,7 +207,7 @@ def odgovori_za_preference(prasanje: str, kontekst: dict | None = None) -> dict:
     pod = _izvlechi(prasanje)
     pol = (pod.get("pol") or "").strip().lower() or None
     if pol not in ("zenski", "muski"):
-        pol = _izvlechi_pravila(prasanje).get("pol")
+        pol = _izvlechi(prasanje).get("pol")
     if pol not in ("zenski", "muski"):
         pol = None
     jazik = (pod.get("jazik") or "").strip() or None

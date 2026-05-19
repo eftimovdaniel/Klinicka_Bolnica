@@ -106,19 +106,13 @@ def odgovori_za_brisenje(
 
     tip = (podatoci.get("tip") or "").strip().lower()   # go zema tipot na objektot (vest ili novost) go trgna praznoto mesto i gi pretvara site vo malku bukvi
     target_id = normalize_int(podatoci.get("id"))   # go pretvara i go cisti id to 
-    if tip not in ("vest", "oglas"):    # dokolku ne moze da se vide dali e vest oglas, ai ne moze da poznae
-        low = prasanje.lower()  
-        if any(w in low for w in ("оглас", "oglas")):
-            tip = "oglas"
-        elif any(w in low for w in ("вест", "новост", "vest", "novost")):
-            tip = "vest"
-        else:
-            return (
-                "Не разбирам што да избришам. Пример:\n"
-                "• „Избриши го најновиот оглас\"\n"
-                "• „Избриши ја најновата вест\"\n"
-                "• „Избриши оглас ID 5\""
-            )
+    if tip not in ("vest", "oglas"):
+        return (
+            "Не разбирам што да избришам. Пример:\n"
+            "• „Избриши го најновиот оглас\"\n"
+            "• „Избриши ја најновата вест\"\n"
+            "• „Избриши оглас ID 5\""
+        )
 
     if tip == "vest":       # ako tipot e vest
         kriterium = (podatoci.get("kriterium") or "").strip().lower()   # se proveruva dali kriteriumot za brisenje od ai e po naslov

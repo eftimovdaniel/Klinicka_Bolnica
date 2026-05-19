@@ -138,64 +138,6 @@ def _lekari_po_oddel(oddel: str) -> list[dict]:
         return []
 
 
-def vreme_od_prasanje_lokalno(prasanje: str) -> str | None:
-    """Час од „во 11“, „11:30“, „11 часот“ — без Groq."""
-    import re
-
-    from ai._kernel.transliteracija import transliterijaj
-
-    p = transliterijaj(prasanje or "").lower().strip()
-    if not p:
-        return None
-
-    m = re.search(r"\b(\d{1,2})\s*[:.]\s*(\d{2})\b", p)
-    if m:
-        h, mi = int(m.group(1)), int(m.group(2))
-        if 0 <= h <= 23 and 0 <= mi <= 59:
-            return f"{h:02d}:{mi:02d}"
-
-    m = re.search(
-        r"(?:во|vo|at)\s+(\d{1,2})(?:\s*(?:час|часот|cas|casot))?\b",
-        p,
-    )
-    if m:
-        h = int(m.group(1))
-        if 0 <= h <= 23:
-            return f"{h:02d}:00"
-
-    m = re.search(r"\b(\d{1,2})\s*(?:час|часот|cas|casot)\b", p)
-    if m:
-        h = int(m.group(1))
-        if 0 <= h <= 23:
-            return f"{h:02d}:00"
-
-    if re.fullmatch(r"\d{1,2}", p):
-        h = int(p)
-        if 0 <= h <= 23:
-            return f"{h:02d}:00"
-
-    return None
-
-
-def _dopolnuvaj_izvleceno_lokalno(prasanje: str, izvleceno: dict) -> None:
-    """Датум/време/лекар од правила — без Groq."""
-    from ai._kernel.groq_client import groq_e_isklucen
-    from ai._kernel.lekar_lookup import izvlechi_delovi_ime, najdi_lekar_od_prasanje
-
-    if not _normalize_doctor_id(izvleceno.get("doctor_id")):
-        if izvlechi_delovi_ime(prasanje):
-            lekar = najdi_lekar_od_prasanje(prasanje, koristi_ai=True)
-            if lekar:
-                izvleceno["doctor_id"] = int(lekar["doctor_ID"])
-    if not izvleceno.get("datum"):
-        d = datum_od_prasanje_lokalno(prasanje)
-        if d is not None:
-            izvleceno["datum"] = d.isoformat()
-    if not izvleceno.get("vreme"):
-        v = vreme_od_prasanje_lokalno(prasanje)
-        if v:
-            izvleceno["vreme"] = v
-
 def _ima_dovolno_za_zakaz_flow(izvleceno: dict) -> bool:
     """Дали после локално+AI извлекување има смисла да продолжи закажување."""
     return bool(

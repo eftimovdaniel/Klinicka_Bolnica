@@ -1,5 +1,4 @@
 from datetime import date, timedelta
-
 from database import get_connection
 from ai._kernel.auth import require_lekar
 from ai._kernel.groq_helpers import groq_zadolzhitelen, izvlechi_json_so_ai
@@ -10,14 +9,11 @@ from ai.pacient.moi_pregledi import (
     datum_za_pregledi_od_prasanje,
     prasanje_e_lista_site_pregledi,
 )
-
-
 PROMPT = """
 Ти си систем што извлекува параметри за распоред на лекар. Корисникот е лекар и сака да види свои закажани прегледи. Врати САМО JSON:
 {"period": "denes" | "utre" | "nedela" | "mesec" | "site" | null,
  "datum": "YYYY-MM-DD" | null,
  "broj": число | null}
-
 Правила:
 - „денес" / „за денеска" → "period"="denes"
 - „утре" / „за утре" → "period"="utre"
@@ -28,74 +24,67 @@ PROMPT = """
 - ако корисникот спомне број (пр. „следните 5", „топ 3") → "broj"=число
 - ако нема ништо јасно → сите вредности null БЕЗ markdown, БЕЗ објаснувања. Само JSON.
 """.strip()
-from ai.lekar.lekar_intent import prasanje_e_moj_raspored_lekar  # noqa: F401 — re-export
-
-
+from ai.lekar.lekar_intent import prasanje_e_moj_raspored_lekar  
+# funkcija koja go povikuva llm modelot za strukturiranje na branjeto
 def _izvlechi(prasanje: str) -> dict:
-    """Само Groq JSON: period, datum, broj."""
-    if prasanje_e_lista_site_pregledi(prasanje):
-        return {"period": "site", "datum": None, "broj": None}
-    if msg := groq_zadolzhitelen():
-        return {"_error": msg}
+    if prasanje_e_lista_site_pregledi(prasanje):    #ako baranjeto se sovpaga so tekstot za site pregledi
+        return {"period": "site", "datum": None, "broj": None}  # vrati predefinirani objekti bez ai 
+    if msg := groq_zadolzhitelen():     # proveka dali groq e dostapen za rabota i online
+        return {"_error": msg}  #ako e offline ili e nastanata promena se pecati poraka za greska
 
-    denes = date.today().strftime("%Y-%m-%d")
+    denes = date.today().strftime("%Y-%m-%d")   # se zema denesnata data kako string
     denes_den = ["понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"][
         date.today().weekday()
-    ]
+    ]   # se pravi presmetka na dekovnite denovi
+    # se sozdava celosniot kontekst na llm modelot za polesno da sraboti krelativni datumi kko ute ili naredniot vtornik
     full = f'Денес: {denes} ({denes_den})\n\nПрашање: „{prasanje}"\nВрати JSON.'
-    podatoci = izvlechi_json_so_ai(full, PROMPT, log_tag="moj_raspored")
-    if podatoci.get("_error"):
-        return podatoci
-    return podatoci
+    podatoci = izvlechi_json_so_ai(full, PROMPT, log_tag="moj_raspored")    # povik do groq api i parsiranje na baranjeto
+    if podatoci.get("_error"):  # ako nastane nekoja greska error
+        return podatoci # se vraka objektot so greska
+    return podatoci #vraka gi izvlecenite podaotoci
 
-
+# funkcija koja detektira period od do 
 def _period_to_dates(period: str | None) -> tuple[date | None, date | None, str]:
-    """Враќа (od, do, label). None значи без горна граница."""
-    denes = date.today()
+    denes = date.today()    # za pocetna vrednost se zema denesnata data
     if not period:
-        # Default: од денес па наваму
-        return denes, None, "од денес"
-    if period == "denes":
-        return denes, denes, "за денес"
-    if period == "utre":
-        utre = denes + timedelta(days=1)
+        return denes, None, "од денес"  # se podrazbira opseg od do 
+    if period == "denes":   # ako e vneseno denes
+        return denes, denes, "за денес" # tocno za denesniot den
+    if period == "utre":    # vneseno utre
+        utre = denes + timedelta(days=1)    # se kalkulira itresniot den
         return utre, utre, "за утре"
     if period == "nedela":
         return denes, denes + timedelta(days=7), "за следните 7 дена"
     if period == "mesec":
         return denes, denes + timedelta(days=30), "за следните 30 дена"
     if period == "site":
-        return None, None, "сите"
+        return None, None, "сите"   # gi vraka site bez vremenski opseg
     return denes, None, "од денес"
-
-
+#glavna funkcija
 def odgovori_za_raspored(
     prasanje: str, lekar: dict | None, kontekst: dict | None = None
 ) -> str | dict:
-    """Главна точка - повикана од router-от."""
-    if err := require_lekar(lekar):
-        return err
+    if err := require_lekar(lekar): # proverka koj e najven dali e lekar samo toj moze da gleda
+        return err # ako ne e lekar dava error
+    doctor_id = lekar["doctor_ID"]  # se prezema id na lekarot koj e najaven
+    podatoci = _izvlechi(prasanje)  # povik na ai funkcijata za izvlekuvanje na json parametri
+    if podatoci.get("_error"):  # ako ai dade greska    
+        return str(podatoci["_error"])  # greskata se pretvara vo string i se vrka kon korisnikot
 
-    doctor_id = lekar["doctor_ID"]
-    podatoci = _izvlechi(prasanje)
-
-    if podatoci.get("_error"):
-        return str(podatoci["_error"])
-
-    konkreten_datum = podatoci.get("datum")
-    if not konkreten_datum:
-        d = datum_za_pregledi_od_prasanje(prasanje)
+    konkreten_datum = podatoci.get("datum") # se proveruva dali modelot uspeal da pronajde konkreten datum
+    if not konkreten_datum: # ako ne e pronajden se pravi lokalno
+        d = datum_za_pregledi_od_prasanje(prasanje) 
         if d:
-            konkreten_datum = d.strftime("%Y-%m-%d")
-    broj = podatoci.get("broj")
+            konkreten_datum = d.strftime("%Y-%m-%d")    # formatiranje na vremeto vo iso format
+    broj = podatoci.get("broj") # se proveruva dali lekarot pobaral limit na rezultato
     try:
         broj = int(broj) if broj else None
     except (TypeError, ValueError):
-        broj = None
-
+        broj = None 
+# konekcija so bazata na podatoci
     conn = get_connection()
     cur = conn.cursor(dictionary=True)
-
+# upiti za bazata za izvlekuvanje na pregledi za doktorite koi nemaat satus otkazan
     sql = (
         "SELECT termin_ID, ime_pacient, email_pacient, telefon_pacient,"
         "       datum_pregled, vreme_pregled, status_pregled, napomena"
@@ -104,17 +93,17 @@ def odgovori_za_raspored(
         "   AND COALESCE(NULLIF(TRIM(status_pregled), ''), 'закажан')"
         " NOT IN ('откажан', 'отказан')"
     )
-    params: list = [doctor_id]
+    params: list = [doctor_id]  # postavuvanje na doctor id kako prv parametar
     label = ""
-
+# dokolku lekarot ima konkreten datum, se izveduva sql upitot so where uslovot
     if konkreten_datum:
-        sql += " AND datum_pregled = %s"
+        sql += " AND datum_pregled = %s" # dodananje na datumot 
         params.append(konkreten_datum)
         label = f"за {konkreten_datum}"
-    else:
+    else:   # ako nema tocen datum, se kalkulira  spored period
         od, do, label = _period_to_dates(podatoci.get("period"))
         if od:
-            sql += " AND datum_pregled >= %s"
+            sql += " AND datum_pregled >= %s"   
             params.append(od)
         if do:
             sql += " AND datum_pregled <= %s"

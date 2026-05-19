@@ -1,18 +1,10 @@
-"""
-FAQ за подготовка за преглед — прво JSON (брзо), потоа AI од agent_prompts (faq_pregled).
-
-Податоци: backend/data/faq_pregled.json
-"""
-
+""" FAQ за подготовка за преглед — прво JSON (брзо), потоа AI од agent_prompts (faq_pregled). Податоци: backend/data/faq_pregled.json"""
 import json
 from pathlib import Path
-
 from ai._kernel.groq_client import ask_ai
 from ai._kernel.prompt_loader import load_prompt
 
 _JSON_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "faq_pregled.json"
-
-
 def _load() -> dict:
     try:
         with open(_JSON_PATH, "r", encoding="utf-8") as f:
@@ -20,13 +12,10 @@ def _load() -> dict:
     except Exception as e:
         print(f"[faq_pregled] читање JSON: {e}")
         return {}
-
-
 def odgovori_za_faq_pregled(prasanje: str) -> str:
     p = (prasanje or "").lower().strip()
     if not p:
         return "Напиши го прашањето (на пр. дали на гладно, што да понесам на преглед)."
-
     data = _load()
     stavki_raw = data.get("stavki")
     stavki: list = stavki_raw if isinstance(stavki_raw, list) else []

@@ -1074,34 +1074,6 @@ def _izvlechi_pozicija(prasanje: str) -> str | None:
     return str(val).strip() if val else None
 
 
-def _izvlechi_licenca_lokalno(prasanje: str) -> tuple[str | None, bool] | None:
-    """
-    Брзо: само цифри или „немам". None = користи AI.
-    """
-    p = transliterijaj(prasanje).lower().strip()
-    if prasanje_e_izbrisi_aplikacija_rabota(prasanje):
-        return None  # повикувачот треба прво да провери бришење
-    if any(
-        x in p
-        for x in (
-            "немам",
-            "нема лиценц",
-            "прескок",
-            "preskok",
-            "пропушти",
-            "не сакам",
-            "ne sakam",
-        )
-    ):
-        return None, True
-    broj = re.search(r"\d{4,}", p)
-    if broj:
-        return broj.group(0), False
-    if re.fullmatch(r"\d+", p):
-        return p, False
-    return None
-
-
 def _izvlechi_licenca(prasanje: str) -> tuple[str | None, bool]:
     """Враќа (licenca, preskoki) — само преку Groq."""
     from ai._kernel.groq_client import groq_e_isklucen, GROQ_OFFLINE_MSG
