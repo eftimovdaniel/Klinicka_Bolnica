@@ -1,10 +1,5 @@
-"""
-Отворање на административниот панел (само директор) — frontend навигација + акција.
-"""
-
 from ai._kernel.auth import require_direktor, require_lekar
 from ai._kernel.transliteracija import transliterijaj
-
 
 def _baranje_e_prikazi_dezurstvo_vo_admin(prasanje: str) -> bool:
     """„Прикажи го во админ" по преглед на дежурство."""
@@ -12,11 +7,7 @@ def _baranje_e_prikazi_dezurstvo_vo_admin(prasanje: str) -> bool:
     ima_admin = any(
         x in p
         for x in (
-            "админ",
-            "административ",
-            "admin",
-            "панел",
-        )
+            "админ","административ","admin","панел",)
     )
     if not ima_admin:
         return False
