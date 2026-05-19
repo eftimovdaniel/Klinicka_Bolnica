@@ -13,8 +13,6 @@
 3. UPDATE на Termin_pregled.dijagnoza/terapija
 4. Ако терминот е „закажан" → автоматски го преместува на „завршен"
 """
-import json  
-import re  
 from database import get_connection  
 from ai._kernel.ai_json import parse_ai_json  
 from ai._kernel.groq_client import ask_ai  

@@ -8,7 +8,6 @@
 - „Колку прегледи имав оваа недела?"
 - „Колку прегледи имав минатиот месец?"
 """
-import re  
 from datetime import date, timedelta 
 from database import get_connection  
 from ai._kernel.auth import require_lekar  

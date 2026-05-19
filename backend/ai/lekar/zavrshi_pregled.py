@@ -6,9 +6,8 @@
 - „Заврши го прегледот на Иванов со дијагноза: грип, терапија: парацетамол 3x"
 Лекарот може да заврши САМО свои прегледи."""
 import re  
-from datetime import date, datetime  
+from datetime import date  
 from database import get_connection  
-from ai._kernel.ai_json import parse_ai_json  
 from ai._kernel.auth import require_lekar  
 from ai._kernel.groq_helpers import izvlechi_json_so_ai  
 from ai._kernel.prompt_helpers import today_prompt_line  
@@ -36,12 +35,6 @@ _RE_TX_SO = re.compile(  # regex za prepoznavanje na terapija vmetnata so vrznic
     r"(?:и\s+)?терапија\s*[:/]?\s*(.+?)\s*$",  # izvlekuvanje na cistiot tekst za terapijata na samiot kraj
     re.IGNORECASE | re.UNICODE | re.DOTALL,  # osiguruvanje deka ke bide faten celiot preostanat string
 )  # kraj na regexot za tx so uslov
-_RE_PACIENT_POSLE_NA = re.compile(  # regex za detekcija na imeto na pacientot po zborot na
-    r"(?:термин(?:от)?|преглед(?:от)?)\s+на\s+"  # baranje fraza kako terminot na ili pregledot na
-    r"([A-Za-zА-Яа-яЁёІіЇїЈјЉљЊњЋћЏџ][\w\-']+(?:\s+[A-Za-zА-Яа-яЁёІіЇїЈјЉљЊњЋћЏџ][\w\-']+){0,2})"  # zemanje na imeto i prezimeto na pacientot
-    r"\s+(?:со|за|на\s)",  # stopiranje na prebaruvaniot string pred slednite gramaticki vrznici
-    re.IGNORECASE | re.UNICODE,  # vklucena poddrshka za unkod i golemina na bukvite
-)  # kraj na regexot za pacient po predlogot na
 
 
 PROMPT = """
