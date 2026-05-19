@@ -1,31 +1,19 @@
-"""
-Распоред на лекар - листа на закажани прегледи.
-
-Достапно за СЕКОЈ најавен лекар.
-
-Примери:
-- „Прикажи ги закажаните прегледи"
-- „Што имам утре?"
-- „Мојот распоред за оваа недела"
-- „Закажани прегледи денес"
-- „Кои се моите следни 5 прегледи?"
-"""
-
-import re
 from datetime import date, timedelta
 
 from database import get_connection
 from ai._kernel.auth import require_lekar
+from ai._kernel.groq_helpers import groq_zadolzhitelen, izvlechi_json_so_ai
 from ai._kernel.napomena import napomena_za_prikaz_lekar
-from ai._kernel.groq_helpers import izvlechi_json_so_ai
-from ai.lekar.lekar_panel_nav import dopuni_so_lekar_panel
 from ai._kernel.utils import format_datum_so_den, format_vreme
+from ai.lekar.lekar_panel_nav import dopuni_so_lekar_panel
+from ai.pacient.moi_pregledi import (
+    datum_za_pregledi_od_prasanje,
+    prasanje_e_lista_site_pregledi,
+)
 
 
 PROMPT = """
-Ти си систем што извлекува параметри за распоред на лекар.
-
-Корисникот е лекар и сака да види свои закажани прегледи. Врати САМО JSON:
+Ти си систем што извлекува параметри за распоред на лекар. Корисникот е лекар и сака да види свои закажани прегледи. Врати САМО JSON:
 {"period": "denes" | "utre" | "nedela" | "mesec" | "site" | null,
  "datum": "YYYY-MM-DD" | null,
  "broj": число | null}
@@ -38,39 +26,13 @@ PROMPT = """
 - „сите" / „воопшто" → "period"="site"
 - ако корисникот спомне конкретен датум (пр. „15.05" или „понеделник") → "datum"=YYYY-MM-DD
 - ако корисникот спомне број (пр. „следните 5", „топ 3") → "broj"=число
-- ако нема ништо јасно → сите вредности null
-
-БЕЗ markdown, БЕЗ објаснувања. Само JSON.
+- ако нема ништо јасно → сите вредности null БЕЗ markdown, БЕЗ објаснувања. Само JSON.
 """.strip()
-
 from ai.lekar.lekar_intent import prasanje_e_moj_raspored_lekar  # noqa: F401 — re-export
-
-def _izvlechi_lokalno_raspored(prasanje: str) -> dict:
-    from ai._kernel.transliteracija import transliterijaj
-    from ai.pacient.moi_pregledi import datum_za_pregledi_od_prasanje
-
-    p = transliterijaj(prasanje).lower()
-    out: dict = {"period": None, "datum": None, "broj": None}
-    if any(x in p for x in ("сите", "site", "all", "комплетн", "celosn")):
-        out["period"] = "site"
-    elif "утре" in p or "utre" in p:
-        out["period"] = "utre"
-    elif "денес" in p or "denes" in p:
-        out["period"] = "denes"
-    elif "недел" in p or "nedel" in p:
-        out["period"] = "nedela"
-    elif "месец" in p or "mesec" in p:
-        out["period"] = "mesec"
-    d = datum_za_pregledi_od_prasanje(prasanje)
-    if d:
-        out["datum"] = d.isoformat()
-    return out
 
 
 def _izvlechi(prasanje: str) -> dict:
-    from ai._kernel.groq_helpers import groq_zadolzhitelen
-    from ai.pacient.moi_pregledi import prasanje_e_lista_site_pregledi
-
+    """Само Groq JSON: period, datum, broj."""
     if prasanje_e_lista_site_pregledi(prasanje):
         return {"period": "site", "datum": None, "broj": None}
     if msg := groq_zadolzhitelen():
@@ -115,27 +77,16 @@ def odgovori_za_raspored(
         return err
 
     doctor_id = lekar["doctor_ID"]
-
-    try:
-        from ai.pacient.moi_pregledi import prasanje_e_lista_site_pregledi
-
-        podatoci = _izvlechi(prasanje)
-    except ImportError:
-        podatoci = _izvlechi(prasanje)
+    podatoci = _izvlechi(prasanje)
 
     if podatoci.get("_error"):
         return str(podatoci["_error"])
 
     konkreten_datum = podatoci.get("datum")
     if not konkreten_datum:
-        try:
-            from ai.pacient.moi_pregledi import datum_za_pregledi_od_prasanje
-
-            d = datum_za_pregledi_od_prasanje(prasanje)
-            if d:
-                konkreten_datum = d.strftime("%Y-%m-%d")
-        except ImportError:
-            pass
+        d = datum_za_pregledi_od_prasanje(prasanje)
+        if d:
+            konkreten_datum = d.strftime("%Y-%m-%d")
     broj = podatoci.get("broj")
     try:
         broj = int(broj) if broj else None
@@ -178,8 +129,6 @@ def odgovori_za_raspored(
     rows = cur.fetchall()
     cur.close()
     conn.close()
-
-    ime_lekar = f"{lekar.get('name','')} {lekar.get('surname','')}".strip() or "тебе"
 
     if not rows:
         termini_mode = "date" if konkreten_datum else "all"
