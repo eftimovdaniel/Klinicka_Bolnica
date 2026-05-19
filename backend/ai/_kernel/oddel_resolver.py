@@ -331,9 +331,11 @@ def _pravila_izvlechi(prasanje: str, site: tuple[str, ...]) -> tuple[str | None,
 
 
 def _ai_izberi_od_lista(prasanje: str, site: tuple[str, ...]) -> str | None:
-    from ai._kernel.groq_client import groq_e_isklucen
+    from ai._kernel.groq_helpers import groq_zadolzhitelen
 
-    if groq_e_isklucen() or not site:
+    if groq_zadolzhitelen():
+        return "_error"
+    if not site:
         return None
     lista = json.dumps(list(site), ensure_ascii=False)
     from ai._kernel.prompt_loader import load_prompt_template
@@ -373,52 +375,9 @@ def resolve_oddel(prasanje: str) -> OddelResolveResult:
         )
 
     p = _normaliziraj(prasanje)
-    oddel, method = _pravila_izvlechi(prasanje, site)
-    if oddel:
-        return OddelResolveResult(
-            ok=True,
-            oddel=oddel,
-            site_oddeli=site,
-            barano=oddel,
-            method=method,
-        )
-
-    # „Хирургија" без подтип — не прикажувај Неврохирургија наместо општ оддел
-    if _baranje_e_opsta_hirurgija(p):
-        ima_opsta = any(_normaliziraj(x) == "хирургија" for x in site)
-        pod = _hirurgiski_pododdeli(site)
-        if not ima_opsta and pod:
-            return OddelResolveResult(
-                ok=False,
-                oddel=None,
-                site_oddeli=site,
-                barano="Хирургија",
-                method=SOURCE_RULES,
-                poraka_greska="_hirurgija_pododdeli",
-            )
 
     ai_val = _ai_izberi_od_lista(prasanje, site)
     if ai_val == "_error":
-        oddel_retry, method_retry = _pravila_izvlechi(prasanje, site)
-        if oddel_retry:
-            return OddelResolveResult(
-                ok=True,
-                oddel=oddel_retry,
-                site_oddeli=site,
-                barano=oddel_retry,
-                method=method_retry,
-            )
-        if _baranje_e_opsta_hirurgija(_ocisti_na_opsta_prefiks(prasanje)):
-            pod = _hirurgiski_pododdeli(site)
-            if pod:
-                return OddelResolveResult(
-                    ok=False,
-                    oddel=None,
-                    site_oddeli=site,
-                    barano="Хирургија",
-                    method=SOURCE_RULES,
-                    poraka_greska="_hirurgija_pododdeli",
-                )
         return OddelResolveResult(
             ok=False,
             oddel=None,

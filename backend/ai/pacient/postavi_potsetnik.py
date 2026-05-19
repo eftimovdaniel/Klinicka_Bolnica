@@ -13,6 +13,7 @@
 """
 
 from ai._kernel.prompt_loader import load_prompt
+from ai._kernel.utils import format_vreme
 import json
 import re
 from datetime import datetime, date, timedelta
@@ -89,17 +90,6 @@ def vmetni_potsetnik(termin_id: int, pacient_email: str, vreme_potsetuvanje: dat
     finally:
         if conn:
             conn.close()
-
-
-def format_vreme(v) -> str:
-    if v is None:
-        return "—"
-    if hasattr(v, "strftime"):
-        return v.strftime("%H:%M")
-    if hasattr(v, "total_seconds"):
-        s = int(v.total_seconds())
-        return f"{s // 3600:02d}:{(s % 3600) // 60:02d}"
-    return str(v)[:5]
 
 
 def format_offset(minuti: int) -> str:

@@ -67,13 +67,13 @@ def _izvlechi_lokalno_raspored(prasanje: str) -> dict:
 
 
 def _izvlechi(prasanje: str) -> dict:
-    from ai._kernel.groq_client import groq_e_isklucen
+    from ai._kernel.groq_helpers import groq_zadolzhitelen
     from ai.pacient.moi_pregledi import prasanje_e_lista_site_pregledi
 
     if prasanje_e_lista_site_pregledi(prasanje):
         return {"period": "site", "datum": None, "broj": None}
-    if groq_e_isklucen():
-        return _izvlechi_lokalno_raspored(prasanje)
+    if msg := groq_zadolzhitelen():
+        return {"_error": msg}
 
     denes = date.today().strftime("%Y-%m-%d")
     denes_den = ["понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"][
@@ -82,7 +82,7 @@ def _izvlechi(prasanje: str) -> dict:
     full = f'Денес: {denes} ({denes_den})\n\nПрашање: „{prasanje}"\nВрати JSON.'
     podatoci = izvlechi_json_so_ai(full, PROMPT, log_tag="moj_raspored")
     if podatoci.get("_error"):
-        return _izvlechi_lokalno_raspored(prasanje)
+        return podatoci
     return podatoci
 
 
@@ -135,6 +135,9 @@ def odgovori_za_raspored(
         podatoci = _izvlechi(prasanje)
     except ImportError:
         podatoci = _izvlechi(prasanje)
+
+    if podatoci.get("_error"):
+        return str(podatoci["_error"])
 
     konkreten_datum = podatoci.get("datum")
     if not konkreten_datum:

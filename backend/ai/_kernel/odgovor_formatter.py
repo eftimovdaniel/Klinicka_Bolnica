@@ -1,7 +1,6 @@
 """
 Groq форматирање на одговори од структурирани факти (база/JSON).
-
-Handler-ите градат факти + шаблон fallback; овој модул ги претвора во природен македонски текст.
+Без шаблон fallback — само AI или јасна Groq грешка.
 """
 
 from __future__ import annotations
@@ -10,11 +9,8 @@ import json
 from datetime import date, datetime, time
 from typing import Any
 
-from ai._kernel.groq_client import ask_ai
+from ai._kernel.groq_client import GROQ_OFFLINE_MSG, ask_ai, groq_e_isklucen
 from ai._kernel.prompt_loader import load_prompt
-
-# Типови каде локалниот шаблон е подобар од LLM (структурирани часови, периоди)
-_TIPOVI_SAMO_SABLON = frozenset({"zakazi_potvrda", "slobodni_termini"})
 
 _GRESKA_POCETOCI = (
     "Не е поставен GROQ_API_KEY",
@@ -52,19 +48,17 @@ def formatiraj_odgovor_so_ai(
     """
     tip: info_lekar | zakazi_potvrda | lekari_oddel | uslugi | novosti_rezime
     podatoci: структурирани факти од handler
-    sablon_fallback: текст ако Groq не успее (или единствен излез за slobodni_termini)
+    sablon_fallback: задржан за компатибилност со повици; не се користи како fallback.
     """
-    fallback = (sablon_fallback or "").strip()
-    if not fallback:
-        return ""
+    _ = sablon_fallback  # API compat — AI-only режим
 
-    if tip in _TIPOVI_SAMO_SABLON:
-        return fallback
+    if groq_e_isklucen():
+        return GROQ_OFFLINE_MSG
 
     try:
         system = load_prompt("formatiraj_odgovor")
     except KeyError:
-        return fallback
+        return "Недостасува prompt formatiraj_odgovor."
 
     facts_json = json.dumps(podatoci, ensure_ascii=False, indent=2, default=_json_default)
     user_parts = [
@@ -84,9 +78,9 @@ def formatiraj_odgovor_so_ai(
 
     ai = ask_ai("\n".join(user_parts), system_prompt=system)
     if _e_groq_greska(ai):
-        print(f"[odgovor_formatter] fallback tip={tip!r}")
-        return fallback
+        print(f"[odgovor_formatter] AI fail tip={tip!r}")
+        return (ai or "").strip() or GROQ_OFFLINE_MSG
     ai = ai.strip()
     if not ai:
-        return fallback
+        return GROQ_OFFLINE_MSG
     return ai

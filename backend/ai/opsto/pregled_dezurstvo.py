@@ -11,8 +11,9 @@ from collections import defaultdict
 from database import get_connection
 from ai._kernel.lekar_lookup import najdi_lekar_od_prasanje
 from ai._kernel.transliteracija import transliterijaj
-from ai.opsto.info_lekar import format_vreme, _as_time, _format_datum
-from ai.direktor.dezurstvo_kontekst import izgradи_kontekst
+from ai._kernel.utils import format_vreme
+from ai.opsto.info_lekar import _as_time, _format_datum
+from ai.direktor.dezurstvo_kontekst import izgradi_kontekst
 
 _DENOVI_MK = (
     "Понеделник",
@@ -56,7 +57,7 @@ def prasanje_e_site_dezurstva(prasanje: str) -> bool:
     p = transliterijaj(prasanje).lower()
     if "дежур" not in p and "dezur" not in p:
         return False
-    if najdi_lekar_od_prasanje(prasanje, koristi_ai=False):
+    if najdi_lekar_od_prasanje(prasanje, koristi_ai=True):
         return False
     if any(
         w in p
@@ -211,5 +212,5 @@ def odgovori_za_pregled_dezurstvo(
     prv = dezurstva[0] if dezurstva else None
     return {
         "odgovor": "\n".join(delovi),
-        "kontekst": izgradи_kontekst(found, prv),
+        "kontekst": izgradi_kontekst(found, prv),
     }

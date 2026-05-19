@@ -1,42 +1,19 @@
 """
-Заеднички помошници за Groq — intent, JSON извлекување, проверка на грешки.
+Заеднички помошници за Groq — intent, JSON извлекување.
+Без keyword/локални fallback патеки (AI-only).
 """
 
 from __future__ import annotations
 
 from ai._kernel.ai_json import parse_ai_json
-from ai._kernel.groq_client import ask_ai, groq_e_isklucen
+from ai._kernel.groq_client import GROQ_OFFLINE_MSG, ask_ai, groq_e_isklucen
 
-# Интенти што keyword детекторот ги дава доволно точно — не трошиме Groq повторно
-_INTENTI_KLUCNI_BEZ_GROQ = frozenset(
-    {
-        "zakazi_termin",
-        "otkazi_termin",
-        "prenesi_termin",
-        "postavi_potsetnik",
-        "prenesi_termin",
-        "postavi_potsetnik",
-        "oceni_pregled",
-        "trgni_ocena",
-        "zavrshi_pregled",
-        "izbrisi_vest_oglas",
-        "objavi_vest",
-        "kreiraj_oglas",
-        "zatvori_oglas",
-        "promeni_dezurstvo",
-        "pregled_dezurstvo",
-        "otvori_admin_panel",
-        "aplikanti_oglas",
-        "apliciraj_za_rabota",
-        "preference_lekar",
-        "moi_pregledi",
-        "moj_raspored",
-        "otvori_lekar_panel",
-        "lekari_oddel",
-        "slobodni_termini",
-        "info_lekar",
-    }
-)
+
+def groq_zadolzhitelen() -> str | None:
+    """None ако Groq е достапен; инаку порака за корисник."""
+    if groq_e_isklucen():
+        return GROQ_OFFLINE_MSG
+    return None
 
 
 def izvlechi_json_so_ai(
@@ -47,33 +24,21 @@ def izvlechi_json_so_ai(
     user_prefix: str = "",
 ) -> dict:
     """Groq → JSON dict; при грешка/429 → {"_error": "..."}."""
+    if msg := groq_zadolzhitelen():
+        return {"_error": msg}
     user = f"{user_prefix}{prasanje}".strip() if user_prefix else prasanje
     raw = ask_ai(user, system_prompt=system_prompt)
     print(f"[{log_tag}] AI raw: {raw!r}")
     return parse_ai_json(raw, log_tag=log_tag)
 
 
-def intent_so_groq_augment(prasanje: str, keyword_intent: str | None) -> str:
-    """
-    Keyword прво; Groq кога е нејасно (general, info_lekar) или нема keyword match.
-    """
+def detektiraj_intent_ai_only(prasanje: str) -> str:
+    """Само Groq класификација на интент (без keyword листи)."""
     from ai._kernel.ai_intent_detector import detektiraj_intent_so_ai
 
-    kw = (keyword_intent or "").strip().lower() or None
-    if groq_e_isklucen():
-        return kw or "general"
-    if kw and kw in _INTENTI_KLUCNI_BEZ_GROQ:
-        return kw
-    # Доверба на keyword за познати интенти (распоред, оддел, слободни, …)
-    if kw and kw not in ("general", "info_lekar"):
-        return kw
-
-    try:
-        ai_intent = detektiraj_intent_so_ai(prasanje)
-    except Exception as e:
-        print(f"[groq_helpers] intent AI greska: {e}")
-        ai_intent = None
-
-    if ai_intent and ai_intent != "general":
-        return ai_intent
-    return kw or "general"
+    if not (prasanje or "").strip():
+        return "general"
+    if msg := groq_zadolzhitelen():
+        print(f"[groq_helpers] intent blocked: {msg}")
+        return "general"
+    return detektiraj_intent_so_ai(prasanje)

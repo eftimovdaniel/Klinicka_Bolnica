@@ -13,7 +13,8 @@ from ai._kernel.auth import require_direktor
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
 from ai._kernel.transliteracija import transliterijaj
-from ai.direktor.dezurstvo_kontekst import izgradи_kontekst, lekar_od_kontekst
+from ai._kernel.utils import format_vreme
+from ai.direktor.dezurstvo_kontekst import izgradi_kontekst, lekar_od_kontekst
 
 
 PROMPT = """
@@ -297,13 +298,6 @@ def _format_datum(d) -> str:
     return str(d)
 
 
-def _format_vreme(t) -> str:
-    if hasattr(t, "strftime"):
-        return t.strftime("%H:%M")
-    s = str(t)
-    return s[:5] if len(s) >= 5 else s
-
-
 def _as_date(d) -> date:
     if isinstance(d, date) and not isinstance(d, datetime):
         return d
@@ -368,7 +362,7 @@ def _prasanje_e_samo_pregled(prasanje: str) -> bool:
 def _odgovor(tekst: str, found: dict | None, dez: dict | None) -> dict:
     out: dict = {"odgovor": tekst}
     if found:
-        out["kontekst"] = izgradи_kontekst(found, dez)
+        out["kontekst"] = izgradi_kontekst(found, dez)
     if "е додадено" in tekst or "е променето" in tekst:
         out["akcija"] = "osvezi_admin_dezurstva"
     return out
@@ -511,7 +505,7 @@ def odgovori_za_dezurstvo(
                 f"Д-р {found['name']} {found['surname']} нема дежурство на "
                 f"{nov_datum.strftime('%d.%m.%Y')} за промена."
             ),
-            "kontekst": izgradи_kontekst(found, None),
+            "kontekst": izgradi_kontekst(found, None),
         }
 
     if ista:
@@ -520,7 +514,7 @@ def odgovori_za_dezurstvo(
     if not vreme_od and dk and dk.get("vreme_od"):
         vreme_od = dk["vreme_od"]
     if not vreme_od and dez.get("vreme_od"):
-        vreme_od = _format_vreme(dez["vreme_od"])
+        vreme_od = format_vreme(dez["vreme_od"])
 
     sets: list[str] = []
     params: list = []
@@ -540,7 +534,7 @@ def odgovori_za_dezurstvo(
                 "Што точно да сменам? На пр. «на иста дата, да е до 03:00» "
                 "или «премести за 25 мај»."
             ),
-            "kontekst": izgradи_kontekst(found, dez),
+            "kontekst": izgradi_kontekst(found, dez),
         }
 
     params.append(dez["dezurstvo_ID"])
@@ -555,8 +549,8 @@ def odgovori_za_dezurstvo(
     conn.close()
 
     dez = _najdi_dezurstvo(found["doctor_ID"], dez["dezurstvo_ID"], None)
-    novo_do = vreme_do or _format_vreme(dez.get("vreme_do"))
-    novo_od = vreme_od or _format_vreme(dez.get("vreme_od"))
+    novo_do = vreme_do or format_vreme(dez.get("vreme_do"))
+    novo_od = vreme_od or format_vreme(dez.get("vreme_od"))
     d_show = nov_datum if isinstance(nov_datum, date) else dez["datum"]
 
     msg = (

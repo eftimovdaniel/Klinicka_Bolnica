@@ -10,6 +10,7 @@
 """
 
 from ai._kernel.prompt_loader import load_prompt
+from ai._kernel.utils import format_vreme
 import json
 import re
 from datetime import datetime, date, time
@@ -112,17 +113,6 @@ def izvrsi_prenesuvanje(termin_id: int, nov_datum: str, novo_vreme: str) -> bool
     finally:
         if conn:
             conn.close()
-
-
-def format_vreme(v) -> str:
-    if v is None:
-        return "—"
-    if hasattr(v, "strftime"):
-        return v.strftime("%H:%M")
-    if hasattr(v, "total_seconds"):
-        s = int(v.total_seconds())
-        return f"{s // 3600:02d}:{(s % 3600) // 60:02d}"
-    return str(v)[:5]
 
 
 def odgovori_za_prenesuvanje(prasanje: str, pacient: dict | None) -> str:

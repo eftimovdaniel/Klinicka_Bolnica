@@ -15,7 +15,7 @@ from typing import Any
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.auth import require_direktor
 from ai._kernel.db_helpers import ai_error_text, db_cursor, fetch_one, normalize_int
-from ai._kernel.groq_client import ask_ai, groq_e_isklucen
+from ai._kernel.groq_client import GROQ_OFFLINE_MSG, ask_ai, groq_e_isklucen
 from ai._kernel.prompt_loader import load_prompt
 from ai._kernel.transliteracija import transliterijaj
 from ai.opsto.vest_naslov import (
@@ -135,30 +135,13 @@ def odgovori_za_brisenje(
     if err := require_direktor(lekar):
         return err
 
-    lokalno = _lokalno_izvlechi_brisenje(prasanje, kontekst)
-    if lokalno:
-        tip, vid = lokalno
-        if tip == "vest":
-            return _izbrisi_vest(vid)
-        return _izbrisi_oglas(vid)
-
-    low = prasanje.lower()
-    e_oglas = any(w in low for w in ("оглас", "oglas")) and not any(
-        w in low for w in ("вест", "новост", "vest", "novost", "наслов")
-    )
-    if not e_oglas and prasanje_e_izbrisi_vest_oglas(prasanje, kontekst):
-        vest = pronajdi_vest_po_naslov(prasanje)
-        if vest:
-            return _izbrisi_vest(int(vest["id"]))
+    if prasanje_e_izbrisi_po_kontekst(prasanje, kontekst) and kontekst:
+        vid = kontekst.get("last_vest_id")
+        if vid:
+            return _izbrisi_vest(int(vid))
 
     if groq_e_isklucen():
-        return (
-            "Не разбирам што точно да избришам без AI.\n\n"
-            "Пример:\n"
-            "• „Избриши ја најновата вест\"\n"
-            "• „Избриши вест 10\"\n"
-            "• По објава: „Избриши ја истата\""
-        )
+        return GROQ_OFFLINE_MSG
 
     podatoci = _izvlechi(prasanje)
     if msg := ai_error_text(podatoci):

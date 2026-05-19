@@ -1,47 +1,33 @@
 """
-Аплицирање за оглас за работа преку AI агент.
-
-Flow:
-1) Корисник: „Сакам да аплицирам за кардиолог"
-2) Ако не е логиран како пациент → бара логин.
-3) Се бара совпаѓање со активен оглас (Vrabotuvanje).
-4) Се прашува за број на медицинска лиценца (опционален но препорачлив).
-5) Се запишува во `prijaveni_lekari`.
-
-Сите чекори се водат преку `kontekst` dict кој фронтендот го паметИ.
+Korisnikot moze da aplicira za nekoja rabota pozicija so pomos na ai agento, se najavuva kako pacient, se bara broj na medicinska 
+licena i so zapisuvanje na istata podatocite se obrabotuvaat i negovoto ime se smestuva vo the database kako kandidat koj ima podneseno baranje za rabota
 """
-
-import json
-import re
-from datetime import datetime
-
-from database import get_connection
-from ai._kernel.ai_json import parse_ai_json
-from ai._kernel.db_helpers import (
-    as_dict,
-    fetch_one,
-    normalize_int,
-    prijaveni_order_desc,
-    prijaveni_pk_column,
-    prijaveni_row_id,
-    prijaveni_select_sql,
+import json         # rabotime so json formati 
+import re           # sabloni kako ai da mi gi dava odgovorite
+from datetime import datetime       # rabota o datum i vreme, koristam gi koga apliciram za rabota i koga gi prikazuvam aplikaciite na korisnikot
+from database import get_connection # konekcija so the database
+from ai._kernel.ai_json import parse_ai_json    # funkcija koja go cita i parsira ai odgovorot vo Python recnik
+from ai._kernel.db_helpers import ( # pomosna funkcija za interakcija so bazata, kako da gi zemam aplikaciite, da gi brisam, da gi prikazuvam i sl.
+    as_dict,        # go pretvarame sql redot vo Python recnik 
+    fetch_one,      # vlecam samo eden rezlutat od izvedenata akcija 
+    normalize_int,  # normalizacija na integer vrednosti, za da se osiguram deka ID-to e validno
+    prijaveni_order_desc,   # se sortiraat aplikaciite za rabota po datumi 
+    prijaveni_pk_column,    
+    prijaveni_row_id,       # id od aplikacijata, od redot vo bazata
+    prijaveni_select_sql,   # Select za da moze da se vidat lekarite koj aplicirale za rabota
 )
-from ai._kernel.groq_client import ask_ai
-from ai._kernel.transliteracija import transliterijaj
-from vrabotuvanje_helpers import fetch_aktivni_oglasi_rows, format_rok_datum
-
+from ai._kernel.groq_client import ask_ai   # so ovaa funkcija isprakam poraki do LLM modelot sto go koristam (Groq) za da dobijam nekoj odgovor
+from ai._kernel.transliteracija import transliterijaj   # latinica -> kirilica, agento sekogas dava odgovor na kirilica
+from vrabotuvanje_helpers import fetch_aktivni_oglasi_rows, format_rok_datum   
+# ai agento moze da gi prenasoce korisnikot na delot kade imame aktivni oglasi za rabota,
+# tuka gi prenosocuva na index.html delot kade imame kariera 
 NAV_KARIERA = {"target": "index.html#kariera", "label": "Кариера"}
-
-
+# promtovi so koj ai agento (LLM) modelot go na nekoj nacin treniram da moze od kontekst na porakite da gi izvlece poziciite
 PROMPT_POZICIJA = """
 Ти си систем што извлекува позиција за работа од прашање.
-
-Корисникот сака да аплицира за работа во болница. Извлечи го името на
-позицијата за која аплицира.
-
+Корисникот сака да аплицира за работа во болница. Извлечи го името на позицијата за која аплицира.
 Врати САМО JSON:
 {"pozicija": "<име на позицијата>" | null}
-
 Правила:
 - Корисникот пишува на македонски (можно е и латиница).
 - Прифатени примери: „кардиолог", „хирург", „анестезиолог", „медицинска сестра",
@@ -52,32 +38,26 @@ PROMPT_POZICIJA = """
   конкретна специјалност/оддел → null (не „работа" како позиција).
 - Ако корисникот залепи цел **оглас за работа** (на пр. „Се вработува медицинска сестра…"),
   извлечи ја позицијата од текстот (на пр. „Медицинска сестра").
-
 БЕЗ markdown, БЕЗ објаснувања.
-""".strip()
-
-
+""".strip() # gi trgame site nepotrebni prazni mesta od vnesenata poraka, za da e se osigurame deka agento ne gleda nekoja zborovi plus
+# promtovi za medicinska licena, treba da poznaa dali e vnesena brojak ili ne, 
+# bidejki licencata mora da e broj, a ne tekst, i da znae da prepoznae zborovi kako „немам", „преска", „пропушти" за да znae deka korisnikot ne saka da vnesi licenca и da se preskoci toj del od procesot
 PROMPT_LICENCA = """
 Ти си систем што извлекува број на медицинска лиценца од одговор.
-
 Корисникот ти прати порака која може да содржи број на лиценца.
 Врати САМО JSON:
 {"licenca": "<број (само цифри)>" | null, "preskoki": true/false}
-
 Правила:
 - Извлечи го бројот (само цифрите). Пр. „Бројот ми е 12345" → "12345".
 - Ако корисникот напише „немам", „преска", „пропушти", „не сакам" → preskoki: true, licenca: null.
 - Ако не е јасно → licenca: null, preskoki: false.
-
-БЕЗ markdown.
-""".strip()
-
-
+БЕЗ markdown. """.strip() # trgame praznite mesta kaj agento
+# funkcija koja proveriva dali korsnikot ima staveno teskt od nadvoresen oglas za rabota, bidejki ako ima, treba da se obideme da izvlece pozicija direktno od toj tekst, namesto da se obiduvame da ja izvlece od prasanje
 def _tekst_e_zalepen_oglas(prasanje: str) -> bool:
     """Цел текст на оглас (копиран од сајт/FB), не само „сакам да аплицирам“."""
-    p = transliterijaj(prasanje).lower()
-    ima_oglas = any(
-        x in p
+    p = transliterijaj(prasanje).lower()  # ako e na latinica baranjeto go pretvara na kirilica i site mali bukvi
+    ima_oglas = any(    # proverka dali vo vnesenta sodrzina imam bareme eden klucen zbor koj ke detektira dali korisnikot saka da aplicira za rabota ili imam nekoe drugo baranje
+        x in p  # od vnesenito tekt (p) se prebaruva dali e venseno nekoj od zboroviet podolu i ako e smestuvame go vo x za obrabotka
         for x in (
             "оглас за работа",
             "oglas za rabota",
@@ -88,6 +68,7 @@ def _tekst_e_zalepen_oglas(prasanje: str) -> bool:
             "рок за пријавување",
         )
     )
+    # proverka dali vo vnesot e vnesen nekoj od klucnite zborovi za pozicija ili oddel 
     ima_pozicija = any(
         x in p
         for x in (
@@ -103,14 +84,15 @@ def _tekst_e_zalepen_oglas(prasanje: str) -> bool:
             "одделот",
         )
     )
-    return ima_oglas and ima_pozicija
-
-
+    return ima_oglas and ima_pozicija   # na kraj se vraka true ako korsnikot ima vneseno deka e kandidat za rabota i ima nekoja aktivna pozicija za koja istiot saka da aplicira, vo sprotivno e false
+# ako e vensen pogolem tekst se obiduvame da ja izvleceme rabotnata pozcija pobrzo
+# voa go koristam koga groq tokenite ke mi se istroseni, i ja vlecam od kontekst na imputot
 def _izvlechi_pozicija_od_oglas_pravila(prasanje: str) -> str | None:
     """Брзо извлекување од типичен текст на оглас (без Groq)."""
+    # prasanjeto se pretvara vo mali kirilicno bukvi ode vo proces na obrabotka
     p = transliterijaj(prasanje).lower()
-    if "медицинск" in p and "сестр" in p:
-        return "Медицинска сестра"
+    if "медицинск" in p and "сестр" in p:   # ako nekade ima vnesenо медицинска, se prepoznava i vraka dokolku ima oglas za medicinska sestra
+        return "Медицинска сестра"          # vraka dokolku imame aktivni oglasi
     if "гинекол" in p or "гиникол" in p:
         if "сестр" in p:
             return "Медицинска сестра"
@@ -125,13 +107,12 @@ def _izvlechi_pozicija_od_oglas_pravila(prasanje: str) -> str | None:
         return "Уролог"
     if "анестез" in p:
         return "Анестезиолог"
-    m = re.search(r"\(([^)]+)\)", prasanje)
+    m = re.search(r"\(([^)]+)\)", prasanje)     # voa go koristi koa go testira i ako ne najde pozicija vo teksto pregleduva dali imam nekade () i ni gi cita
     if m:
-        inner = m.group(1).strip()
-        if len(inner) > 3 and len(inner) < 80:
-            return inner[0].upper() + inner[1:] if inner else None
-    return None
-
+        inner = m.group(1).strip()  # dokolku ima () go cita i trga prazni mesta
+        if len(inner) > 3 and len(inner) < 80:  # dali iimame dovolno bukvi za da moze da bide pozicija 0<pozicija<80
+            return inner[0].upper() + inner[1:] if inner else None  # ako ime go vrakame stringo so golema bukva na pocetok
+    return None # dokolku nema vneseno vo tekstot nekoja pozicija ili nema aktiven oglas none
 
 def _baraj_pozicija_za_aplikacija(prasanje: str) -> str | None:
     """Позиција од оглас (правила) или преку AI."""
@@ -169,7 +150,7 @@ def _format_datum_prijava(d) -> str:
     return str(d)[:16]
 
 
-def _email_kluc_za_uporedba(email: str) -> tuple[str, str] | None:
+def _email_kluc_za_sporedba(email: str) -> tuple[str, str] | None:
     """(local, domain) — Gmail: без точки и +alias."""
     e = (email or "").strip().lower()
     if "@" not in e:
@@ -182,7 +163,7 @@ def _email_kluc_za_uporedba(email: str) -> tuple[str, str] | None:
 
 
 def _email_se_sovpaaga(a: str, b: str) -> bool:
-    ka, kb = _email_kluc_za_uporedba(a), _email_kluc_za_uporedba(b)
+    ka, kb = _email_kluc_za_sporedba(a), _email_kluc_za_sporedba(b)
     if ka and kb:
         return ka == kb
     return (a or "").strip().lower() == (b or "").strip().lower()
@@ -297,7 +278,7 @@ def _lista_aplikacii_po_email_striktno(email: str) -> list[dict]:
 
 def _lista_aplikacii_po_email_fuzzy(email: str) -> list[dict]:
     """Gmail alias/точки — споредба на local+domain во Python."""
-    kluc = _email_kluc_za_uporedba(email)
+    kluc = _email_kluc_za_sporedba(email)
     if not kluc:
         return []
     _local, domain = kluc
@@ -780,7 +761,7 @@ def _najdi_aplikacija_za_brisenje(
     if row:
         return row
 
-    kluc = _email_kluc_za_uporedba(email)
+    kluc = _email_kluc_za_sporedba(email)
     if kluc:
         _local, domain = kluc
         cur.execute(
@@ -1129,10 +1110,12 @@ def _izvlechi_licenca_lokalno(prasanje: str) -> tuple[str | None, bool] | None:
 
 
 def _izvlechi_licenca(prasanje: str) -> tuple[str | None, bool]:
-    """Враќа (licenca, preskoki)."""
-    lokalno = _izvlechi_licenca_lokalno(prasanje)
-    if lokalno is not None:
-        return lokalno
+    """Враќа (licenca, preskoki) — само преку Groq."""
+    from ai._kernel.groq_client import groq_e_isklucen, GROQ_OFFLINE_MSG
+
+    if groq_e_isklucen():
+        print(f"[apliciraj] licenca blocked: {GROQ_OFFLINE_MSG}")
+        return None, False
 
     odgovor = ask_ai(f"Одговор: „{prasanje}\"", system_prompt=PROMPT_LICENCA)
     print(f"[apliciraj] licenca AI: {odgovor!r}")

@@ -1117,12 +1117,12 @@ def zimi_site_lekari() -> list[dict[str, Any]]:
 #funkcija koja so pomos na ai gi zima lekarite
 # koristam Groq AI i on g gleda lekarite od bazata
 def najdi_lekar_so_ai(prasanje: str) -> dict | None:
-    from ai._kernel.groq_client import groq_e_isklucen
+    from ai._kernel.groq_helpers import groq_zadolzhitelen
 
-    if groq_e_isklucen():
+    if groq_zadolzhitelen():
         return None
 
-    site_lekari = zimi_site_lekari()    # vo site_lekari se smesteni lekarite od the database
+    site_lekari = zimi_site_lekari()
     if not site_lekari:
         return None
 

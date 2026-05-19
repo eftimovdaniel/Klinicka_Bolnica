@@ -1,12 +1,8 @@
 """
-Детектор на интент - хибриден пристап:
+Детектор на интент — AI-only (Groq).
 
-1. ПРВО: проверка преку клучни зборови (брзо, бесплатно, локално)
-2. ФАЛБЕК: ако не најде совпаѓање → праша AI (Groq)
-
-Зашто хибрид?
-- 80% од прашањата се на „стандардни" фрази → keyword се справува моментално
-- 20% природни варијации ("Dali možeš da mi...") → AI ги препознава
+`detektiraj_intent()` → `detektiraj_intent_so_ai()` (без keyword fallback).
+`detektiraj_intent_keyword()` е задржан само за тестови/референца.
 
 Сите прашања прво се транслитираат латиница → кирилица.
 
@@ -1440,17 +1436,7 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
 
 
 def detektiraj_intent(prasanje: str) -> str:
-    """
-    Хибриден пристап — Groq за поголем дел од прашањата.
+    """AI-only: Groq класифицира интент (без keyword fallback)."""
+    from ai._kernel.groq_helpers import detektiraj_intent_ai_only
 
-    1. Keyword за јасни оперативни наредби (закажи, откажи, заврши, …).
-    2. Groq за general, info_lekar, распоред, навигација и слични варијации.
-    3. Keyword како резерва ако Groq не успее.
-    """
-    if not prasanje:
-        return "general"
-
-    from ai._kernel.groq_helpers import intent_so_groq_augment
-
-    keyword_intent = detektiraj_intent_keyword(prasanje)
-    return intent_so_groq_augment(prasanje, keyword_intent)
+    return detektiraj_intent_ai_only(prasanje)

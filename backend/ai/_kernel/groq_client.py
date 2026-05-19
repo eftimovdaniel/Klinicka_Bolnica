@@ -81,7 +81,7 @@ def _aktiviraj_auto_offline() -> None:
     _circuit_logged = False
     print(
         f"[groq_client] 429 → AUTO OFFLINE за {GROQ_OFFLINE_COOLDOWN_SEC}s "
-        f"(keyword + база; без Groq API)"
+        f"(AI-only режим; без Groq API)"
     )
 
 

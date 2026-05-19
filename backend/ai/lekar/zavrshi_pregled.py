@@ -254,23 +254,18 @@ def _izvlechi_lokalno(prasanje: str) -> dict:
 
 
 def _izvlechi(prasanje: str) -> dict:
-    dx, tx = _izvlechi_dx_tx_lokalno(prasanje)
-    from ai._kernel.groq_client import groq_e_isklucen
+    from ai._kernel.groq_helpers import groq_zadolzhitelen
 
-    if groq_e_isklucen():
-        return _izvlechi_lokalno(prasanje)
+    if msg := groq_zadolzhitelen():
+        return {"_error": msg}
 
     full = f'{today_prompt_line()}\n\nПрашање: "{prasanje}"\nВрати JSON.'
     podatoci = izvlechi_json_so_ai(full, PROMPT, log_tag="zavrshi_pregled")
     if podatoci.get("_error"):
-        podatoci = _izvlechi_lokalno(prasanje)
+        return podatoci
     tid = _termin_id_od_prasanje(prasanje)
     if tid is not None and not podatoci.get("termin_ids"):
         podatoci["termin_ids"] = [tid]
-    if dx and not podatoci.get("dijagnoza"):
-        podatoci["dijagnoza"] = dx
-    if tx and not podatoci.get("terapija"):
-        podatoci["terapija"] = tx
     return podatoci
 
 
@@ -462,7 +457,6 @@ def odgovori_za_zavrshi(
 
     doctor_id = lekar["doctor_ID"]
 
-    dijagnoza, terapija = _izvlechi_dx_tx_lokalno(prasanje)
     termin_ids: list[int] = []
     tid = _termin_id_od_prasanje(prasanje)
     if tid is not None:
@@ -472,10 +466,8 @@ def odgovori_za_zavrshi(
     if podatoci.get("_error"):
         return str(podatoci["_error"])
 
-    if not dijagnoza:
-        dijagnoza = (podatoci.get("dijagnoza") or "").strip() or None
-    if not terapija:
-        terapija = (podatoci.get("terapija") or "").strip() or None
+    dijagnoza = (podatoci.get("dijagnoza") or "").strip() or None
+    terapija = (podatoci.get("terapija") or "").strip() or None
 
     if termin_ids and (_prazna_dx_tx(dijagnoza) or _prazna_dx_tx(terapija)):
         parts = []
@@ -505,8 +497,6 @@ def odgovori_za_zavrshi(
             termin_ids = ctx_ids
 
     ime = (podatoci.get("ime_pacient") or "").strip()
-    if not ime:
-        ime = (_izvlechi_ime_pacient_lokalno(prasanje) or "").strip()
     datum_str = podatoci.get("datum")
     site = bool(podatoci.get("site"))
 

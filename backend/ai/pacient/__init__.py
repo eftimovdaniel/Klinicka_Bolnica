@@ -1,12 +1,15 @@
 """
-AI функции наменети за логиран пациент:
-- slobodni_termini   - барање слободни термини
-- zakazi_termin      - закажување термин
-- otkazi_termin      - откажување термин
-- prenesi_termin     - префрлање термин
-- postavi_potsetnik  - потсетник за термин
-- oceni_pregled      - оценување завршен преглед
-- trgni_ocena        - тргање оцена
-- moi_pregledi       - историја и идни прегледи
-- apliciraj_za_rabota - повеќестепен flow за апликација за оглас
+AI функции наменети за логиран пациент.
 """
+
+from ai.pacient import (  # noqa: F401
+    apliciraj_za_rabota,
+    moi_pregledi,
+    oceni_pregled,
+    otkazi_termin,
+    postavi_potsetnik,
+    prenesi_termin,
+    slobodni_termini,
+    trgni_ocena,
+    zakazi_termin,
+)

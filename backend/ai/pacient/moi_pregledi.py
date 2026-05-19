@@ -1,16 +1,16 @@
 from ai._kernel.prompt_loader import load_prompt
+from ai._kernel.utils import format_vreme
 import re
 from datetime import date
-
 from database import get_connection
 from ai._kernel.groq_helpers import izvlechi_json_so_ai
 from ai._kernel.transliteracija import transliterijaj
 
+# Koga se startuva se prebaruva tekstot za frazi kako pregled ili pregled za.
 _RE_PREGLEDI_ZA = re.compile(
     r"\b(прегледи|прегледите|pregledi|pregledite)\s+за\b",
-    re.IGNORECASE | re.UNICODE,
+    re.IGNORECASE | re.UNICODE, # so igone case ne e vazno dali e vneseno golema ili mala bukva a so Unicode se ovozmozuva vnesot da bide na kirilica
 )
-
 
 def datum_za_pregledi_od_prasanje(prasanje: str) -> date | None:
     """Датум од прашање за листа прегледи (дозволен и минат ден)."""
@@ -196,11 +196,13 @@ def _izvlechi_lokalno(prasanje: str) -> dict:
 
 
 def _izvlechi(prasanje: str) -> dict:
-    from ai._kernel.groq_client import groq_e_isklucen
+    from ai._kernel.groq_helpers import groq_zadolzhitelen, izvlechi_json_so_ai
 
-    lokalno = _izvlechi_lokalno(prasanje)
-    if groq_e_isklucen() or prasanje_e_lista_site_pregledi(prasanje):
-        return lokalno
+    if prasanje_e_lista_site_pregledi(prasanje):
+        return {"period": "site", "datum": None, "broj": None}
+
+    if msg := groq_zadolzhitelen():
+        return {"_error": msg}
 
     podatoci = izvlechi_json_so_ai(
         f'Прашање: „{prasanje}"',
@@ -208,7 +210,7 @@ def _izvlechi(prasanje: str) -> dict:
         log_tag="moi_pregledi",
     )
     if podatoci.get("_error"):
-        return lokalno
+        return podatoci
     return podatoci
 
 
@@ -218,17 +220,6 @@ def _format_datum(d) -> str:
     if hasattr(d, "strftime"):
         return d.strftime("%d.%m.%Y")
     return str(d)[:10]
-
-
-def _format_vreme(v) -> str:
-    if not v:
-        return "—"
-    if hasattr(v, "strftime"):
-        return v.strftime("%H:%M")
-    if hasattr(v, "total_seconds"):
-        s = int(v.total_seconds())
-        return f"{s // 3600:02d}:{(s % 3600) // 60:02d}"
-    return str(v)[:5]
 
 
 STATUS_OZNAKI = {
@@ -255,6 +246,8 @@ def odgovori_za_moi_pregledi(
         )
 
     podatoci = _izvlechi(prasanje)
+    if podatoci.get("_error"):
+        return str(podatoci["_error"])
 
     status_filter = (podatoci.get("status") or "").strip().lower() or None
     if status_filter == "сите":
@@ -343,7 +336,7 @@ def odgovori_za_moi_pregledi(
 
     for r in rows:
         dat = _format_datum(r.get("datum_pregled"))
-        vrm = _format_vreme(r.get("vreme_pregled"))
+        vrm = format_vreme(r.get("vreme_pregled"))
         ime_lekar = (r.get("ime_lekar") or "—").strip() or "—"
         status = r.get("status_pregled") or "—"
         oznaka = STATUS_OZNAKI.get(status, "")

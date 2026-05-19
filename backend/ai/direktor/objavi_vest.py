@@ -125,10 +125,9 @@ def _generiraj_vest_lokalno(transcript: str, naslov_yt: str | None) -> dict:
 
 
 def _generiraj_vest(transcript: str, naslov_yt: str | None) -> dict:
-    """AI генерира naslov + sodrzina; локален fallback ако Groq е недостапен."""
+    """AI генерира naslov + sodrzina (без локален шаблон fallback)."""
     if groq_e_isklucen():
-        print("[objavi_vest] Groq offline → локален шаблон од transcript")
-        return _generiraj_vest_lokalno(transcript, naslov_yt)
+        return {"_error": GROQ_OFFLINE_MSG}
 
     kontekst = (
         (f"Оригинален наслов: „{naslov_yt}\"\n\n" if naslov_yt else "")
@@ -137,20 +136,15 @@ def _generiraj_vest(transcript: str, naslov_yt: str | None) -> dict:
     odgovor = ask_ai(kontekst, system_prompt=PROMPT)
 
     if (odgovor or "").strip() == GROQ_OFFLINE_MSG or "преоптоварен" in (odgovor or ""):
-        print("[objavi_vest] Groq 429/overload → локален шаблон")
-        return _generiraj_vest_lokalno(transcript, naslov_yt)
+        return {"_error": GROQ_OFFLINE_MSG}
 
     data = parse_ai_json(odgovor, log_tag="objavi_vest")
     if data.get("_error"):
-        err = str(data["_error"])
-        if "преоптоварен" in err or "GROQ" in err.upper():
-            return _generiraj_vest_lokalno(transcript, naslov_yt)
         return data
     if data.get("naslov") and data.get("sodrzina"):
         return data
 
-    print("[objavi_vest] неочекуван AI формат → локален шаблон")
-    return _generiraj_vest_lokalno(transcript, naslov_yt)
+    return {"_error": "AI врати неочекуван формат за вест."}
 
 
 def odgovori_za_objava_vest(prasanje: str, lekar: dict | None) -> str | dict:

@@ -12,6 +12,7 @@ from database import get_connection
 from ai._kernel.lekar_lookup import najdi_lekar_od_prasanje
 from ai._kernel.transliteracija import transliterijaj
 from ai._kernel.odgovor_formatter import formatiraj_odgovor_so_ai
+from ai._kernel.utils import format_vreme
 from ai.pacient.slobodni_termini import (
     lekar_od_zakazi_kontekst,
     prasanje_bar_lekar_od_kontekst,
@@ -43,18 +44,6 @@ def zimi_dezurstva_za_lekar(doctor_id: int, denovi_napred: int = 7) -> list[dict
     finally:
         if conn:
             conn.close()
-
-
-def format_vreme(v) -> str:
-    """Претвора time/timedelta во HH:MM string."""
-    if v is None:
-        return "—"
-    if hasattr(v, "strftime"):
-        return v.strftime("%H:%M")
-    if hasattr(v, "total_seconds"):
-        s = int(v.total_seconds())
-        return f"{s // 3600:02d}:{(s % 3600) // 60:02d}"
-    return str(v)[:5]
 
 
 def _as_time(v) -> time | None:

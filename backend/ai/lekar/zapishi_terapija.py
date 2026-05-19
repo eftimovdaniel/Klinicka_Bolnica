@@ -23,6 +23,7 @@ import re
 from database import get_connection
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
+from ai._kernel.utils import format_vreme
 
 
 PROMPT = """
@@ -160,17 +161,6 @@ def _format_datum(d) -> str:
     return str(d)[:10]
 
 
-def _format_vreme(v) -> str:
-    if not v:
-        return "—"
-    if hasattr(v, "strftime"):
-        return v.strftime("%H:%M")
-    if hasattr(v, "total_seconds"):
-        s = int(v.total_seconds())
-        return f"{s // 3600:02d}:{(s % 3600) // 60:02d}"
-    return str(v)[:5]
-
-
 def odgovori_za_terapija(prasanje: str, lekar: dict | None) -> str:
     if not lekar or not lekar.get("doctor_ID"):
         return (
@@ -269,7 +259,7 @@ def odgovori_za_terapija(prasanje: str, lekar: dict | None) -> str:
         for t in relevantni[:5]:
             redovi.append(
                 f'• ID {t["termin_ID"]} – {_format_datum(t.get("datum_pregled"))} '
-                f'{_format_vreme(t.get("vreme_pregled"))} ({t.get("status_pregled")})'
+                f'{format_vreme(t.get("vreme_pregled"))} ({t.get("status_pregled")})'
             )
         redovi.append("")
         redovi.append('Пр.: „за термин 42 запиши терапија ..."')
@@ -287,7 +277,7 @@ def _ispisi_po_uspesno(termin: dict, dijagnoza: str | None, terapija: str | None
                    avtomatski_zavrshi: bool) -> str:
     pac = (termin.get("ime_pacient") or "").strip() or "—"
     dat = _format_datum(termin.get("datum_pregled"))
-    vrm = _format_vreme(termin.get("vreme_pregled"))
+    vrm = format_vreme(termin.get("vreme_pregled"))
     delovi = [
         "Записот е сочуван!",
         "",

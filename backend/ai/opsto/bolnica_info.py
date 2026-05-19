@@ -134,9 +134,7 @@ def odgovori_za_lokacija(prasanje: str) -> str:
         return "Нема расположливи податоци за локации."
 
     oddeli = list(lokacii.keys())
-    izbran_oddel = _najdi_oddel_lokalno(prasanje, oddeli) or _najdi_oddel_so_ai(
-        prasanje, oddeli
-    )
+    izbran_oddel = _najdi_oddel_so_ai(prasanje, oddeli)
 
     if izbran_oddel:
         lokacija = lokacii.get(izbran_oddel, "—")
