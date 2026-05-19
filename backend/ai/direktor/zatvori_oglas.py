@@ -1,42 +1,21 @@
-"""
-Затворање оглас како „истечен" преку AI - само за директорот.
-
-Примери:
-- „Затвори го огласот за кардиолог"          → status='истечен' за најден оглас
-- „Затвори оглас ID 5"                       → status='истечен' WHERE id=5
-- „Истечен е огласот за гинеколог"           → status='истечен' за најден оглас
-- „Затвори ги сите огласи"                   → status='истечен' за сите активни
-"""
-
 import re
-
 from database import get_connection
 from ai._kernel.auth import require_direktor
 from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import ask_ai
-
-
 PROMPT = """
-Ти си систем што извлекува податоци за затворање оглас за работа.
-
-Корисникот е директор и сака да затвори оглас (status → „истечен"). Врати САМО JSON:
+Ти си систем што извлекува податоци за затворање оглас за работа. Корисникот е директор и сака да затвори оглас (status → „истечен"). Врати САМО JSON:
 {"id": число | null, "pozicija": "текст" | null, "site": true | false}
-
 Правила:
 - Ако корисникот спомне ID на оглас → "id"=число.
 - Ако корисникот спомне позиција (пр. „кардиолог", „медицинска сестра") → "pozicija"=текст.
 - Ако корисникот вели „сите огласи", „сите" → "site"=true.
-- Ако нема ништо јасно → сите вредности null/false.
-
-БЕЗ markdown, БЕЗ објаснувања. Само JSON.
-""".strip()
-
+- Ако нема ништо јасно → сите вредности null/false. БЕЗ markdown, БЕЗ објаснувања. Само JSON. """.strip()
 
 def _izvlechi(prasanje: str) -> dict:
     odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=PROMPT)
     print(f"[zatvori_oglas] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="zatvori_oglas")
-
 
 def _zatvori_po_id(target_id: int) -> str:
     conn = get_connection()
@@ -72,8 +51,6 @@ def _zatvori_po_id(target_id: int) -> str:
         f"Позиција: {oglas['pozicija']}\n"
         f"Оддел: {oglas['oddel']}"
     )
-
-
 def _zatvori_po_pozicija(pozicija: str) -> str:
     """Барај активен оглас со таа позиција (или близок match)."""
     conn = get_connection()
@@ -99,7 +76,6 @@ def _zatvori_po_pozicija(pozicija: str) -> str:
             f'Најдов повеќе огласи за „{pozicija}":\n{lista}\n\n'
             f'Те молам прецизирај, пр. „Затвори оглас ID {rows[0]["id_oglas"]}".'
         )
-
     oglas = rows[0]
     cur2 = conn.cursor()
     cur2.execute(
@@ -117,8 +93,6 @@ def _zatvori_po_pozicija(pozicija: str) -> str:
         f"Позиција: {oglas['pozicija']}\n"
         f"Оддел: {oglas['oddel']}"
     )
-
-
 def _zatvori_site() -> str:
     conn = get_connection()
     cur = conn.cursor()
@@ -134,30 +108,24 @@ def _zatvori_site() -> str:
         return "Нема активни огласи за затворање."
     return f"Затворени се {promeneti} огласи (статус: истечен)."
 
-
 def odgovori_za_zatvoranje_oglas(prasanje: str, lekar: dict | None) -> str:
     """Главна точка - повикана од router-от."""
     if err := require_direktor(lekar):
         return err
-
     podatoci = _izvlechi(prasanje)
     if podatoci.get("_error"):
         return podatoci["_error"]
-
     if podatoci.get("site"):
         return _zatvori_site()
-
     target_id = podatoci.get("id")
     if target_id:
         try:
             return _zatvori_po_id(int(target_id))
         except (TypeError, ValueError):
             pass
-
     pozicija = (podatoci.get("pozicija") or "").strip()
     if pozicija:
         return _zatvori_po_pozicija(pozicija)
-
     return (
         'Не разбирам кој оглас да го затворам. Пример:\n'
         '• „Затвори го огласот за кардиолог"\n'
