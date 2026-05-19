@@ -22,6 +22,7 @@ from ai._kernel.db_helpers import db_cursor, fetch_all, normalize_int
 from ai._kernel.groq_client import ask_ai
 from ai._kernel.prompts import LEKAR_EXTRACT_PROMPT
 from ai._kernel.transliteracija import transliterijaj
+from ai._kernel.utils import format_datum, format_vreme
 
 
 # Работно време (може да го менуваш)
@@ -966,8 +967,7 @@ def odgovor_slobodni_za_den_oddel(
         pool = [l for l in zimi_site_lekari() if int(l["doctor_ID"]) in id_set]
 
     den_ime = _IMENA_DEN[na_datum.weekday()].lower()
-    datum_fmt = na_datum.strftime("%d.%m.%Y")
-
+    datum_fmt = format_datum(na_datum)
     if na_datum.weekday() >= 5:
         naslov = (
             f"На {den_ime}, {datum_fmt} е викенд — прегледи се само во работни денови."
@@ -993,7 +993,7 @@ def odgovor_slobodni_za_den_oddel(
         if slobodni:
             if prv_so_termini is None:
                 prv_so_termini = lekar
-            casovi = [dt.strftime("%H:%M") for dt in slobodni[:12]]
+            casovi = [format_vreme(dt) for dt in slobodni[:12]]
             extra = f" (+{len(slobodni) - 12} уште)" if len(slobodni) > 12 else ""
             linii.append(f"• {ime}: {', '.join(casovi)}{extra}")
         else:
@@ -1028,7 +1028,7 @@ def odgovor_ko_e_sloboden_na_termin(
 ) -> str:
     """Листа лекари слободни на конкретен датум и час."""
     den_ime = _IMENA_DEN[na_datum.weekday()].lower()
-    datum_fmt = na_datum.strftime("%d.%m.%Y")
+    datum_fmt = format_datum(na_datum)
     pool, oddel = lekari_pool_za_ko_sloboden(prasanje, kontekst)
     lekari = najdi_lekari_slobodni_na(na_datum, vreme_str, lekari_pool=pool)
 
@@ -1040,8 +1040,8 @@ def odgovor_ko_e_sloboden_na_termin(
         prazen_den = (
             f"На {den_ime}, {datum_fmt} во {vreme_str} "
             f'на одделот „{oddel}" нема слободен лекар.\n\n'
-            f"Работно време: {RABOTNO_VREME_OD.strftime('%H:%M')}–"
-            f"{RABOTNO_VREME_DO.strftime('%H:%M')}, понеделник–петок.\n\n"
+            f"Работно време: {format_vreme(RABOTNO_VREME_OD)}–"
+            f"{format_vreme(RABOTNO_VREME_DO)}, понеделник–петок.\n\n"
             "Пробајте друг час, друг лекар од листата погоре, или "
             "„Кога е слободен д-р [презиме]?“."
         )
@@ -1049,8 +1049,8 @@ def odgovor_ko_e_sloboden_na_termin(
         naslov_den = f"На {den_ime}, {datum_fmt} во {vreme_str} слободни се:"
         prazen_den = (
             f"На {den_ime}, {datum_fmt} во {vreme_str} нема слободен лекар за закажување.\n\n"
-            f"Работно време: {RABOTNO_VREME_OD.strftime('%H:%M')}–"
-            f"{RABOTNO_VREME_DO.strftime('%H:%M')}, понеделник–петок.\n\n"
+            f"Работно време: {format_vreme(RABOTNO_VREME_OD)}–"
+            f"{format_vreme(RABOTNO_VREME_DO)}, понеделник–петок.\n\n"
             "Пробајте друг час или „Кога е слободен д-р [презиме]?“ за конкретен лекар."
         )
 
@@ -1494,7 +1494,7 @@ def _formatiraj_den_lekar(
 ) -> str:
     """Еден ден: вовед + групирани часови."""
     den_ime = denovi[weekday].lower()
-    datum_fmt = datum.strftime("%d.%m.%Y")
+    datum_fmt = format_datum(datum)
     ime_lekar = f"{lekar['name']} {lekar['surname']}"
     specialnost = lekar.get("specialty") or "Општа пракса"
     raspon = _opis_raspon_termini(casovi)
@@ -1530,14 +1530,14 @@ def formatiraj_odgovor(
     if not slobodni:
         if na_datum is not None and na_datum.weekday() >= 5:
             return (
-                f"Кај {zaglavie_lekar}, {na_datum.strftime('%d.%m.%Y')} е викенд — "
+                f"Кај {zaglavie_lekar}, {format_datum(na_datum)} е викенд — "
                 "прегледи се само во работни денови.\n\n"
                 "Наведете работен ден (на пр. „следниот понеделник“) или прашајте без датум."
             )
         if na_datum is not None:
             den = DENOVI[na_datum.weekday()].lower()
             return (
-                f"За {den} ({na_datum.strftime('%d.%m.%Y')}), кај {zaglavie_lekar} "
+                f"За {den} ({format_datum(na_datum)}), кај {zaglavie_lekar} "
                 "нема слободни термини.\n\n"
                 "Наведете друга дата за нова проверка или прашајте без конкретен датум."
             )
@@ -1549,7 +1549,7 @@ def formatiraj_odgovor(
     po_den: dict[tuple[date, int], list[str]] = {}
     for dt in slobodni:
         kluc = (dt.date(), dt.weekday())
-        po_den.setdefault(kluc, []).append(dt.strftime("%H:%M"))
+        po_den.setdefault(kluc, []).append(format_vreme(dt))
 
     eden_den = len(po_den) == 1
 
@@ -1584,7 +1584,7 @@ def odgovori_za_slobodni_termini(
     if prasanje_e_sleden_raboten_den(prasanje):
         sleden = sleden_raboten_datum()
         den_ime = _IMENA_DEN[sleden.weekday()]
-        datum_fmt = sleden.strftime("%d.%m.%Y")
+        datum_fmt = format_datum(sleden)
         lekar, _, nejasno = resolviraj_lekar_za_slobodni(prasanje, kontekst)
         if nejasno:
             return {"odgovor": nejasno, "kontekst": kontekst}
@@ -1606,7 +1606,7 @@ def odgovori_za_slobodni_termini(
             "odgovor": (
                 f"Следниот работен ден за закажување прегледи е {den_ime}, {datum_fmt}.\n\n"
                 f"Термини се закажуваат од понеделник до петок, "
-                f"{RABOTNO_VREME_OD.strftime('%H:%M')}–{RABOTNO_VREME_DO.strftime('%H:%M')}. "
+                f"{format_vreme(RABOTNO_VREME_OD)}–{format_vreme(RABOTNO_VREME_DO)}. "
                 "Во сабота и недела не се закажуваат прегледи.\n\n"
                 "Кажи кај кој лекар сакаш термин (на пр. „следен работен ден кај Петров“) "
                 "или повтори го името на лекарот од претходното барање."
@@ -1637,11 +1637,11 @@ def odgovori_za_slobodni_termini(
             primer = (
                 "„Кој од нив е слободен во 12:00“"
                 if oddel_ctx
-                else f"„Кој е слободен на {baran_datum.strftime('%d.%m.%Y')} во 12:00“"
+                else f"„Кој е слободен на {format_datum(baran_datum)} во 12:00“"
             )
             return {
                 "odgovor": (
-                    f"За {baran_datum.strftime('%d.%m.%Y')} наведете и час.\n\n"
+                    f"За {format_datum(baran_datum)} наведете и час.\n\n"
                     f"Пример: {primer}."
                 ),
                 "kontekst": kontekst,

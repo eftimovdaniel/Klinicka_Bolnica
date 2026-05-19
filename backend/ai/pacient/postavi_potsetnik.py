@@ -13,7 +13,7 @@
 """
 
 from ai._kernel.prompt_loader import load_prompt
-from ai._kernel.utils import format_vreme
+from ai._kernel.utils import format_datum, format_datum_vreme, format_vreme
 import json
 import re
 from datetime import datetime, date, timedelta
@@ -141,7 +141,7 @@ def odgovori_za_potsetnik(prasanje: str, pacient: dict | None) -> str:
     DENOVI = ["Понеделник", "Вторник", "Среда", "Четврток", "Петок", "Сабота", "Недела"]
     poraka = (
         f"Потсетник: имаш преглед {DENOVI[datum_pregled.weekday()]} "
-        f"{datum_pregled.strftime('%d.%m.%Y')} во {format_vreme(vreme_pregled)} "
+        f"{format_datum(datum_pregled)} во {format_vreme(vreme_pregled)} "
         f"кај Д-р {termin['ime_lekar']}."
     )
 
@@ -150,8 +150,8 @@ def odgovori_za_potsetnik(prasanje: str, pacient: dict | None) -> str:
 
     return (
         f"Потсетникот е поставен!\n\n"
-        f"Термин: {DENOVI[datum_pregled.weekday()]}, {datum_pregled.strftime('%d.%m.%Y')} во {format_vreme(vreme_pregled)}\n"
+        f"Термин: {DENOVI[datum_pregled.weekday()]}, {format_datum(datum_pregled)} во {format_vreme(vreme_pregled)}\n"
         f"Лекар: Д-р {termin['ime_lekar']}\n"
         f"Кога: {format_offset(offset_min)} пред терминот\n"
-        f"Точно време на потсетник: {moment_na_potsetnik.strftime('%d.%m.%Y %H:%M')}"
+        f"Точно време на потсетник: {format_datum_vreme(moment_na_potsetnik)}"
     )

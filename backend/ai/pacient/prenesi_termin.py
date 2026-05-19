@@ -10,7 +10,7 @@
 """
 
 from ai._kernel.prompt_loader import load_prompt
-from ai._kernel.utils import format_vreme
+from ai._kernel.utils import format_datum, format_vreme
 import json
 import re
 from datetime import datetime, date, time
@@ -163,7 +163,7 @@ def odgovori_za_prenesuvanje(prasanje: str, pacient: dict | None) -> str:
         for t in termini:
             d = t["datum_pregled"]
             v = format_vreme(t["vreme_pregled"])
-            delovi.append(f"- {DENOVI[d.weekday()]} {d.strftime('%d.%m.%Y')} во {v} кај Д-р {t['ime_lekar']}")
+            delovi.append(f"- {DENOVI[d.weekday()]} {format_datum(d)} во {v} кај Д-р {t['ime_lekar']}")
         delovi.append("")
         delovi.append('Биди поточен: "Префрли го прегледот на [стар датум] за [нов датум] [време]"')
         return "\n".join(delovi)
@@ -179,6 +179,6 @@ def odgovori_za_prenesuvanje(prasanje: str, pacient: dict | None) -> str:
     return (
         f"Терминот е пренесен!\n\n"
         f"Лекар: Д-р {t['ime_lekar']}\n"
-        f"Нов датум: {DENOVI[nov_dt.weekday()]}, {nov_dt.strftime('%d.%m.%Y')}\n"
+        f"Нов датум: {DENOVI[nov_dt.weekday()]}, {format_datum(nov_dt)}\n"
         f"Ново време: {novo_vreme}"
     )

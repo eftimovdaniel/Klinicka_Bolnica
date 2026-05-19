@@ -32,14 +32,12 @@ class PacientModel(BaseModel):
     telefon: str | None = None
     embg: str | None = None
 
-
 class LekarModel(BaseModel):
     doctor_ID: int | None = None
     name: str | None = None
     surname: str | None = None
     email: str | None = None
     specialty: str | None = None
-
 
 class PitanjeModel(BaseModel):
     prasanje: str = Field(..., max_length=MAX_PRASANJE_LEN)
@@ -48,18 +46,15 @@ class PitanjeModel(BaseModel):
     kontekst: dict | None = None
     session_id: int | None = None
 
-
 class GuestChatMessage(BaseModel):
     uloga: str
     sodrzina: str = Field(..., max_length=MAX_PRASANJE_LEN)
-
 
 class GuestImportModel(BaseModel):
     pacient: PacientModel | None = None
     lekar: LekarModel | None = None
     messages: list[GuestChatMessage] = Field(default_factory=list)
     kontekst: dict | None = None
-
 
 def _pacient_dict(p: PacientModel | None) -> dict | None:
     if not p or not p.email:
@@ -84,15 +79,6 @@ def _lekar_dict(l: LekarModel | None) -> dict | None:
         "email": l.email or "",
         "specialty": l.specialty or "",
     }
-
-
-def _lekar_bara_raspored(pitanje: str, lekar_dict: dict | None) -> bool:
-    """Лекар: мои термини/прегледи или UI панел → moj_raspored."""
-    if not lekar_dict:
-        return False
-    from ai.lekar.lekar_intent import prasanje_bara_lekar_panel
-
-    return prasanje_bara_lekar_panel(pitanje)
 
 
 def _owner_ids(
@@ -125,50 +111,18 @@ def _intent_strukturiran_za_lekar(
     pitanje_norm: str,
     aktiven_kontekst: dict | None,
     intent: str,
-    pacient_dict: dict | None = None,
-    lekar_dict: dict | None = None,
 ) -> str:
     """Прашања за конкретен лекар не одат на general/AI — ист handler за сите имиња."""
-    from ai.pacient.slobodni_termini import prasanje_e_otkazuvanje  # noqa: F401 — used below
+    from ai.pacient.slobodni_termini import prasanje_e_otkazuvanje
     from ai._kernel.intent_detector import (
         _bolnica_info_intent,
         _prasanje_e_asistent_opsto,
         _prasanje_e_konkreten_lekar,
     )
     from ai._kernel.transliteracija import transliterijaj
-    from ai.opsto.lekari_oddel import prasanje_e_lekari_po_oddel
-    from ai.opsto.vest_naslov import prasanje_e_izbrisi_vest_oglas
 
     if _prasanje_e_asistent_opsto(transliterijaj(pitanje_norm).lower()):
         return "general"
-
-    if prasanje_e_izbrisi_vest_oglas(pitanje_norm, aktiven_kontekst):
-        return "izbrisi_vest_oglas"
-
-    from ai._kernel.intent_detector import _prasanje_e_pregled_dezurstvo
-
-    if _prasanje_e_pregled_dezurstvo(transliterijaj(pitanje_norm).lower()):
-        return "pregled_dezurstvo"
-
-    if _lekar_bara_raspored(pitanje_norm, lekar_dict):
-        return "moj_raspored"
-
-    if prasanje_e_lekari_po_oddel(pitanje_norm):
-        return "lekari_oddel"
-
-    from ai.lekar.zavrshi_pregled import prasanje_e_zavrshi_pregled
-
-    if prasanje_e_zavrshi_pregled(pitanje_norm):
-        return "zavrshi_pregled"
-
-    from ai.pacient.moi_pregledi import prasanje_e_lista_site_pregledi
-
-    if prasanje_e_lista_site_pregledi(pitanje_norm):
-        if lekar_dict:
-            return "moj_raspored"
-        if pacient_dict:
-            return "moi_pregledi"
-        return "moi_pregledi"
 
     if prasanje_e_otkazuvanje(pitanje_norm):
         return "otkazi_termin"
@@ -224,59 +178,7 @@ def _resolve_intent(
     aktiven_kontekst: dict | None,
     pacient_dict: dict | None,
     lekar_dict: dict | None,
-    pitanje_raw: str | None = None,
 ) -> str:
-    from ai._kernel.intent_detector import prasanje_ima_youtube_link
-
-    raw = (pitanje_raw or pitanje_norm or "").strip()
-    if prasanje_ima_youtube_link(raw):
-        return "objavi_vest"
-
-    from ai.opsto.vest_naslov import prasanje_e_izbrisi_vest_oglas
-
-    if prasanje_e_izbrisi_vest_oglas(pitanje_norm, aktiven_kontekst):
-        return "izbrisi_vest_oglas"
-
-    from ai._kernel.intent_detector import _prasanje_e_pregled_dezurstvo
-    from ai._kernel.transliteracija import transliterijaj
-
-    if _prasanje_e_pregled_dezurstvo(transliterijaj(pitanje_norm).lower()):
-        return "pregled_dezurstvo"
-
-    if _lekar_bara_raspored(pitanje_norm, lekar_dict):
-        return "moj_raspored"
-
-    from ai.opsto.lekari_oddel import prasanje_e_lekari_po_oddel
-    from ai.pacient.slobodni_termini import prasanje_e_drugi_lekari_specijalnost
-
-    if prasanje_e_lekari_po_oddel(pitanje_norm) or prasanje_e_drugi_lekari_specijalnost(
-        pitanje_norm
-    ):
-        return "lekari_oddel"
-
-    from ai.pacient.moi_pregledi import (
-        prasanje_e_lista_site_pregledi,
-        prasanje_e_pregledi_datum,
-    )
-
-    if prasanje_e_lista_site_pregledi(pitanje_norm):
-        if lekar_dict:
-            return "moj_raspored"
-        return "moi_pregledi"
-
-    if prasanje_e_pregledi_datum(pitanje_norm):
-        # Лекар → негови закажани прегледи; пациент → свои термини
-        if lekar_dict:
-            return "moj_raspored"
-        if pacient_dict:
-            return "moi_pregledi"
-        return "moi_pregledi"
-
-    from ai.lekar.zavrshi_pregled import prasanje_e_zavrshi_pregled
-
-    if prasanje_e_zavrshi_pregled(pitanje_norm):
-        return "zavrshi_pregled"
-
     if aktiven_kontekst and aktiven_kontekst.get("intent") == "apliciraj_za_rabota":
         return "apliciraj_za_rabota"
 
@@ -356,30 +258,6 @@ def _resolve_intent(
 
     if intent == "moj_raspored" and pacient_dict and not lekar_dict:
         intent = "moi_pregledi"
-    if intent == "moi_pregledi" and lekar_dict:
-        intent = "moj_raspored"
-    if intent == "otvori_lekar_panel" and pacient_dict and not lekar_dict:
-        intent = "moi_pregledi"
-    if prasanje_e_lista_site_pregledi(pitanje_norm) and intent == "info_lekar":
-        intent = "moj_raspored" if lekar_dict else "moi_pregledi"
-    if prasanje_e_lekari_po_oddel(pitanje_norm) and intent in (
-        "info_lekar",
-        "general",
-    ):
-        intent = "lekari_oddel"
-    if prasanje_e_pregledi_datum(pitanje_norm) and intent == "info_lekar":
-        intent = "moj_raspored" if lekar_dict else "moi_pregledi"
-    if lekar_dict and intent in ("info_lekar", "general"):
-        from ai.lekar.zavrshi_pregled import prasanje_e_zavrshi_pregled
-
-        if prasanje_e_zavrshi_pregled(pitanje_norm):
-            intent = "zavrshi_pregled"
-        elif prasanje_e_lista_site_pregledi(pitanje_norm):
-            intent = "moj_raspored"
-        elif prasanje_e_pregledi_datum(pitanje_norm):
-            intent = "moj_raspored"
-        elif _lekar_bara_raspored(pitanje_norm, lekar_dict):
-            intent = "moj_raspored"
 
     from ai.pacient.slobodni_termini import (
         baranje_e_zakazuvanje,
@@ -390,27 +268,8 @@ def _resolve_intent(
         prasanje_e_drugi_lekari_specijalnost,
         prasanje_e_sleden_raboten_den,
         prasanje_e_specijalnost_izbran_lekar,
-        prasanje_e_slobodni_za_den,
     )
 
-    if intent == "info_lekar" and baranje_e_zakazuvanje(pitanje_norm):
-        if isinstance(aktiven_kontekst, dict) and (
-            aktiven_kontekst.get("zakazi_od_slobodni")
-            or aktiven_kontekst.get("zakazi_pending")
-        ):
-            intent = "zakazi_termin"
-
-    from ai.pacient.slobodni_termini import prasanje_e_ko_e_sloboden_datum_vreme
-
-    if prasanje_e_ko_e_sloboden_datum_vreme(pitanje_norm, aktiven_kontekst):
-        return "slobodni_termini"
-    if prasanje_e_slobodni_za_den(pitanje_norm, aktiven_kontekst):
-        return "slobodni_termini"
-
-    from ai.opsto.lekari_oddel import prasanje_e_lekari_po_oddel
-
-    if prasanje_e_lekari_po_oddel(pitanje_norm):
-        return "lekari_oddel"
     if prasanje_e_drugi_lekari_specijalnost(pitanje_norm):
         return "lekari_oddel"
 
@@ -418,7 +277,6 @@ def _resolve_intent(
         aktiven_kontekst.get("zakazi_od_slobodni")
         or aktiven_kontekst.get("zakazi_pending")
         or aktiven_kontekst.get("last_doctor_id")
-        or aktiven_kontekst.get("last_oddel_doctor_ids")
     )
     if has_lekar_kontekst and prasanje_e_specijalnost_izbran_lekar(
         pitanje_norm, aktiven_kontekst
@@ -437,31 +295,9 @@ def _resolve_intent(
         if aktiven_kontekst.get("zakazi_ceka_napomena"):
             return "zakazi_termin"
         q = pitanje_norm.lower()
-        pending = aktiven_kontekst.get("zakazi_pending") or {}
-        zos = aktiven_kontekst.get("zakazi_od_slobodni") or {}
-        ima_lekar_ctx = bool(
-            pending.get("doctor_id")
-            or zos.get("doctor_id")
-            or aktiven_kontekst.get("last_doctor_id")
-        )
         if prasanje_e_otkazuvanje(pitanje_norm):
             return "otkazi_termin"
         if baranje_e_zakazuvanje(pitanje_norm):
-            return "zakazi_termin"
-        if prasanje_e_slobodni_za_den(pitanje_norm, aktiven_kontekst):
-            return "slobodni_termini"
-        if ima_lekar_ctx and re.search(r"\b\d{1,2}\s*[:.]\s*\d{2}\b", q) and (
-            datum_od_prasanje_lokalno(pitanje_norm)
-            or "за " in q
-            or "za " in q
-        ):
-            return "zakazi_termin"
-        if (
-            ima_lekar_ctx
-            and pending.get("vreme")
-            and datum_od_prasanje_lokalno(pitanje_norm)
-            and not prasanje_e_slobodni_za_den(pitanje_norm, aktiven_kontekst)
-        ):
             return "zakazi_termin"
         if prasanje_bar_datum_od_kontekst(pitanje_norm) and datum_od_zakazi_kontekst(
             aktiven_kontekst
@@ -513,18 +349,9 @@ def _resolve_intent(
         ):
             intent = "zakazi_termin"
         # Следна порака: друг ден / „наредниот петок“ кај истиот лекар
-        elif intent in ("general", "zakazi_termin", "preporaka_lekar") and not baranje_e_zakazuvanje(
+        elif intent in ("general", "zakazi_termin") and not baranje_e_zakazuvanje(
             pitanje_norm
         ):
-            if prasanje_e_slobodni_za_den(pitanje_norm, aktiven_kontekst):
-                return "slobodni_termini"
-            if (
-                ima_lekar_ctx
-                and pending.get("vreme")
-                and len(q.split()) <= 4
-                and datum_od_prasanje_lokalno(pitanje_norm)
-            ):
-                return "zakazi_termin"
             if datum_od_prasanje_lokalno(pitanje_norm) or any(
                 w in q
                 for w in (
@@ -552,12 +379,7 @@ def _resolve_intent(
             ):
                 intent = "slobodni_termini"
 
-    if has_zakazi_flow and intent == "preporaka_lekar":
-        return "zakazi_termin"
-
-    return _intent_strukturiran_za_lekar(
-        pitanje_norm, aktiven_kontekst, intent, pacient_dict, lekar_dict
-    )
+    return _intent_strukturiran_za_lekar(pitanje_norm, aktiven_kontekst, intent)
 
 
 @router.post("/sessions/import-guest")
@@ -664,23 +486,6 @@ def delete_chat_session(
     return {"ok": True, "session_id": session_id}
 
 
-@router.get("/groq-status")
-def groq_status_endpoint():
-    """Дали Groq е активен или AUTO OFFLINE по 429 (за тест / испит)."""
-    from ai._kernel.groq_client import groq_status
-
-    return groq_status()
-
-
-@router.post("/groq-reset")
-def groq_reset_circuit():
-    """Рачно повторно вклучување на Groq по cooldown."""
-    from ai._kernel.groq_client import reset_groq_circuit
-
-    reset_groq_circuit()
-    return {"ok": True, "message": "Groq circuit reset"}
-
-
 @router.post("/ask")
 def ask(data: PitanjeModel):
     pitanje = (data.prasanje or "").strip()
@@ -714,9 +519,7 @@ def ask(data: PitanjeModel):
             session_id = create_session(pacient_id=pacient_id, doctor_id=doctor_id)
             is_new_session = bool(session_id)
 
-    intent = _resolve_intent(
-        pitanje_norm, aktiven_kontekst, pacient_dict, lekar_dict, pitanje_raw=pitanje
-    )
+    intent = _resolve_intent(pitanje_norm, aktiven_kontekst, pacient_dict, lekar_dict)
     print(f"[ai_chat] {pitanje_norm!r} -> {intent}")
 
     ctx = AiContext(

@@ -2,6 +2,14 @@
   "venvPath": ".",
   "venv": "venv",
   "include": ["backend"],
+  "extraPaths": ["backend"],
+  "executionEnvironments": [
+    {
+      "root": "backend",
+      "extraPaths": ["backend"],
+      "pythonVersion": "3.12"
+    }
+  ],
   "stubPath": "typings",
   "pythonVersion": "3.12",
   "typeCheckingMode": "basic",

@@ -321,7 +321,7 @@ def _dodadi_dezurstvo(
     if _ima_preklop(found["doctor_ID"], datum, vreme_od, vreme_do):
         return (
             f"Д-р {found['name']} {found['surname']} веќе има дежурство на "
-            f"{datum.strftime('%d.%m.%Y')} во тој временски период."
+            f"{format_datum(datum)} во тој временски период."
         )
 
     conn = get_connection()
@@ -341,7 +341,7 @@ def _dodadi_dezurstvo(
         f"Дежурството е додадено.\n\n"
         f"Лекар: д-р {found['name']} {found['surname']}\n"
         f"Оддел: {oddel}\n"
-        f"Датум: {datum.strftime('%d.%m.%Y')}\n"
+        f"Датум: {format_datum(datum)}\n"
         f"Време: {vreme_od}–{vreme_do}"
     )
 
@@ -497,7 +497,7 @@ def odgovori_za_dezurstvo(
         return {
             "odgovor": (
                 f"Д-р {found['name']} {found['surname']} нема дежурство на "
-                f"{nov_datum.strftime('%d.%m.%Y')} за промена."
+                f"{nov_format_datum(datum)} за промена."
             ),
             "kontekst": izgradi_kontekst(found, None),
         }

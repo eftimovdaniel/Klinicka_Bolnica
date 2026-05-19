@@ -1,5 +1,5 @@
 from ai._kernel.prompt_loader import load_prompt
-from ai._kernel.utils import format_vreme
+from ai._kernel.utils import format_datum, format_vreme
 import re
 from datetime import date
 from database import get_connection
@@ -66,28 +66,34 @@ def izvlechi_otkazi_lokalno(prasanje: str) -> dict:
     m_ime = _RE_IME_ZAKAZAN.search(prasanje or "")
     if m_ime:
         ref = f"д-р {m_ime.group(1)} {m_ime.group(2)}"
-        lekar = najdi_lekar_od_prasanje(ref, koristi_ai=True)
+        lekar = najdi_lekar_od_prasanje(ref, koristi_ai=False) # se bara lekarot vo bazata so vnesenoto ime
         if lekar:
             out["doctor_id"] = int(lekar["doctor_ID"])
         out["prezime_filter"] = m_ime.group(2).strip().lower()
 
     delovi = izvlechi_delovi_ime(prasanje)  # se vlecat delovi od imeto na lekarot
     if delovi and not out.get("doctor_id"): # ako se najde lekar so imeto a nemame definirano tocen negov id
-        lekar = najdi_lekar_od_prasanje(prasanje, koristi_ai=True)
+        lekar = najdi_lekar_od_prasanje(    # se bara lekarot od bazata 
+            prasanje, koristi_ai=not groq_e_isklucen()
+        )
         if lekar:
             out["doctor_id"] = int(lekar["doctor_ID"])
         if len(delovi) >= 1:
             out["prezime_filter"] = delovi[-1].lower()
 
     return out
+# kombinacija na lokalno i ai 
 def izvlechi_otkazi_podatoci(prasanje: str) -> dict:
-    """Лекар + датум + време — само преку Groq JSON."""
-    from ai._kernel.groq_helpers import groq_zadolzhitelen, izvlechi_json_so_ai
-
-    if msg := groq_zadolzhitelen():
-        return {"_error": msg, "doctor_id": None, "datum": None, "vreme": None}
-
-    site_lekari = zimi_site_lekari()
+    """Лекар + датум + време — локално прво, Groq само ако е достапен."""
+    from ai._kernel.groq_client import groq_e_isklucen
+    from ai._kernel.groq_helpers import izvlechi_json_so_ai
+    lokalno = izvlechi_otkazi_lokalno(prasanje) # se izvlekkuva prasanje lokalno
+    if groq_e_isklucen():   # ako gorq e isklucen se vraka lokalno izvlecenite podatoci без da se probuva so ai da se izvlecat podatoci od prasanje na korisnikot
+        return lokalno
+    # ako podatocite se najdeni lokalno ne se aktivira ai za podetalno prebaruvanje
+    if lokalno.get("doctor_id") and lokalno.get("datum") and lokalno.get("vreme"):
+        return lokalno
+    site_lekari = zimi_site_lekari()    # gi zema site lekari od bazata
     lista_text = ""
     for lekar in site_lekari:
         spec = lekar.get("specialty") or "Општа пракса"
@@ -108,20 +114,20 @@ def izvlechi_otkazi_podatoci(prasanje: str) -> dict:
     podatoci = izvlechi_json_so_ai(
         full_prompt, load_prompt("otkazi_extract"), log_tag="otkazi_termin"
     )
+    # ako nastane greska se vrakame lokalno
     if podatoci.get("_error"):
-        return {
-            "_error": podatoci["_error"],
-            "doctor_id": None,
-            "datum": None,
-            "vreme": None,
-        }
-    return {
-        "doctor_id": podatoci.get("doctor_id"),
-        "datum": podatoci.get("datum"),
-        "vreme": str(podatoci.get("vreme")).strip()[:5] if podatoci.get("vreme") else None,
-    }
+        return lokalno
+    # se spojuvaat lokalno i ai 
+    spoen = dict(lokalno)
+    if podatoci.get("doctor_id") is not None:
+        spoen["doctor_id"] = podatoci.get("doctor_id")
+    if podatoci.get("datum"):
+        spoen["datum"] = podatoci.get("datum")
+    if podatoci.get("vreme"):
+        spoen["vreme"] = str(podatoci.get("vreme")).strip()[:5]
+    return spoen
 
-
+# funkcija koja ja prebaruva bazata za da najde termin koi treba da go otkaze
 def najdi_termini_za_otkazuvanje(
     pacient_email: str,
     doctor_id: int | None,
@@ -260,14 +266,16 @@ def odgovori_za_otkazuvanje(
         )
 
     izvleceno = izvlechi_otkazi_podatoci(prasanje)
-    if izvleceno.get("_error"):
-        return str(izvleceno["_error"])
-
     _spoi_otkazi_so_kontekst(prasanje, izvleceno, kontekst)
     doctor_id = _normalize_doctor_id(izvleceno.get("doctor_id"))
     datum_str = (izvleceno.get("datum") or "").strip()[:10] or None
     vreme_str = (izvleceno.get("vreme") or "").strip()[:5] or None
     prezime_filter = (izvleceno.get("prezime_filter") or "").strip() or None
+
+    if not datum_str:
+        datum_str = _datum_od_tekst_otkazi(prasanje)
+    if not vreme_str:
+        vreme_str = vreme_od_prasanje_lokalno(prasanje)
 
     termini = najdi_termini_za_otkazuvanje(
         pacient["email"],
@@ -303,7 +311,7 @@ def odgovori_za_otkazuvanje(
             den_ime = DENOVI[datum.weekday()]
             vreme = format_vreme(t["vreme_pregled"])
             delovi.append(
-                f"- {den_ime} {datum.strftime('%d.%m.%Y')} во {vreme} "
+                f"- {den_ime} {format_datum(datum)} во {vreme} "
                 f"кај Д-р {t['ime_lekar']} ({t['specijalnost_termin']})"
             )
         delovi.append("")
@@ -318,7 +326,7 @@ def odgovori_za_otkazuvanje(
     datum = t["datum_pregled"]
     den_ime = DENOVI[datum.weekday()]
     vreme = format_vreme(t["vreme_pregled"])
-    datum_lep = datum.strftime("%d.%m.%Y")
+    datum_lep = format_datum(datum)
 
     ime_pacient = (
         (pacient.get("ime") or "") + " " + (pacient.get("prezime") or "")

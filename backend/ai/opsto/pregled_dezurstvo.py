@@ -149,7 +149,7 @@ def _formatiraj_site_dezurstva(rows: list[dict]) -> str:
     delovi = ["Идни дежурства на лекарите:", ""]
     for datum in sorted(po_datum.keys()):
         den = _DENOVI_MK[datum.weekday()].lower()
-        delovi.append(f"{den.capitalize()}, {datum.strftime('%d.%m.%Y')}:")
+        delovi.append(f"{den.capitalize()}, {format_datum(datum)}:")
         for d in po_datum[datum]:
             linija = _linija_dezurstvo(d, so_lekar=True)
             if _e_na_dezurstvo_sega(d, sega):

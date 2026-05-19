@@ -14,7 +14,7 @@
 """
 
 from ai._kernel.prompt_loader import load_prompt
-from ai._kernel.utils import format_vreme
+from ai._kernel.utils import format_datum, format_vreme
 import json
 import re
 from datetime import date
@@ -151,7 +151,7 @@ def odgovori_za_trgni_ocena(prasanje: str, pacient: dict | None) -> str:
             ocena = t.get("ocena") or 0
             zvezdi = "★" * ocena + "☆" * (5 - ocena)
             delovi.append(
-                f"- {den_ime} {datum.strftime('%d.%m.%Y')} во {vreme} "
+                f"- {den_ime} {format_datum(datum)} во {vreme} "
                 f"кај Д-р {t['ime_lekar']} - {zvezdi} ({ocena}/5)"
             )
         delovi.append("")
@@ -173,7 +173,7 @@ def odgovori_za_trgni_ocena(prasanje: str, pacient: dict | None) -> str:
         f"Оцената е избришана!\n\n"
         f"Лекар: Д-р {ime_lekar}\n"
         f"Специјалност: {t['specijalnost_termin']}\n"
-        f"Датум: {den_ime}, {datum.strftime('%d.%m.%Y')} во {vreme}\n"
+        f"Датум: {den_ime}, {format_datum(datum)} во {vreme}\n"
         f"Избришана оцена: {stara_ocena}/5\n\n"
         'Можеш повторно да оцениш ако сакаш: „Оцена [1-5] за прегледот кај д-р '
         + str(ime_lekar) + '".'

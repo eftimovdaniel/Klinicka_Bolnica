@@ -9,6 +9,7 @@ from ai._kernel.groq_helpers import groq_zadolzhitelen
 from ai._kernel.prompt_loader import load_prompt
 from ai._kernel.prompt_helpers import today_prompt_line
 from ai._kernel.transliteracija import transliterijaj
+from ai._kernel.utils import format_datum
 # funkcija koja gi vlece site oddeli od bazata na podatoci i gi vraka kako lista vo tip na string
 def _zimi_oddeli() -> list[str]:
     conn = get_connection() # se pravi konekcija so bazata na podatoci
@@ -44,7 +45,7 @@ def _izvlechi_so_ai(prasanje: str, denes: date, site_oddeli: list[str]) -> dict:
         return {"_error": msg}  # ako nemam ili ne e dostapen vraka poraka za greska
 # formiranje na promto sto ke se prati do groq
     prompt = (
-        f"{today_prompt_line()} ({denes.strftime('%d.%m.%Y')}).\n\n"    # se dava denesniot datumo dokolku e potrebno da ja presmeta datata
+        f"{today_prompt_line()} ({format_datum(denes)}).\n\n"    # se dava denesniot datumo dokolku e potrebno da ja presmeta datata
         f"Оддели во базата: {', '.join(site_oddeli)}\n\n"   # se davaat lista na site oddeli koj bolnicata gi ima vo bazata
         f"Текст од корисникот:\n{prasanje}\n\nВрати JSON."  # se zema teksto od direktorot i se praka vo json format za obrabotka
     )
@@ -94,7 +95,7 @@ def odgovori_za_kreiranje_oglas(prasanje: str, lekar: dict | None) -> str:
         elif oddel:
             delumno.append(f"оддел: {oddel}")
         if rok:
-            delumno.append(f"рок: {rok.strftime('%d.%m.%Y')}")
+            delumno.append(f"рок: {format_datum(rok)}")
         uvod = (
             f"Го разбирам делумно ({'; '.join(delumno)})."
             if delumno
@@ -126,6 +127,6 @@ def odgovori_za_kreiranje_oglas(prasanje: str, lekar: dict | None) -> str:
         f"Огласот е креиран!\n\n"
         f"Позиција: {pozicija}\n"
         f"Оддел: {oddel}\n"
-        f"Рок за пријава: {rok.strftime('%d.%m.%Y')}\n\n"
+        f"Рок за пријава: {format_datum(rok)}\n\n"
         "Проверете го на делот Кариера на сајтот."
     )

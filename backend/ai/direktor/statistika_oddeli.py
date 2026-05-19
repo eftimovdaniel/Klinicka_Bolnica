@@ -86,7 +86,7 @@ def odgovori_za_statistika(prasanje: str, lekar: dict | None) -> str:
 
     # formatiranje na odgovorot
     linii = [f"Најпопуларни оддели {label} (вкупно {total} прегледи):\n"]   # inicijalizacija so naslov i kupen broj na napraveni pregledi
-    for i, r in enumerate(redovi, start=1):
+    for i, r in enumerate(redovi, start=1):     
         broj = r["broj_prevegledi"] or 0
         procent = (broj / total * 100) if total else 0
         linii.append(f"{i}. {r['oddel']}: {broj} ({procent:.1f}%)")

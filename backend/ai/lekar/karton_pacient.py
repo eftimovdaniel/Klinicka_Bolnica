@@ -13,8 +13,6 @@ def _izvlechi(prasanje: str) -> dict:
     odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=PROMPT) # se praka prasanje do groq so soodvetno formiran promt
     print(f"[karton] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="karton_pacient") #odgovorot se parsira vo python recnik
-
-
 def odgovori_za_karton(prasanje: str, lekar: dict | None) -> str:
     """Главна точка - повикана од router-от."""
     if err := require_lekar(lekar):

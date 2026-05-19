@@ -11,6 +11,7 @@ from typing import Any
 
 from ai._kernel.groq_client import GROQ_OFFLINE_MSG, ask_ai, groq_e_isklucen
 from ai._kernel.prompt_loader import load_prompt
+from ai._kernel.utils import format_vreme
 
 _GRESKA_POCETOCI = (
     "Не е поставен GROQ_API_KEY",
@@ -28,7 +29,7 @@ def _json_default(obj: Any) -> Any:
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
     if isinstance(obj, time):
-        return obj.strftime("%H:%M")
+        return format_vreme(obj)
     return str(obj)
 
 

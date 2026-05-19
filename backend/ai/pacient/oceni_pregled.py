@@ -1,6 +1,6 @@
 """ Oceni zavrshen pregled preku AI — samo za logiran pacient. Pacient pisuva ocena 1-5 + komentar, Groq izvlekuva podatoci, bara zavrshen termin vo baza, INSERT/UPDATE vo Pregled_feedback. """
 from ai._kernel.prompt_loader import load_prompt
-from ai._kernel.utils import format_vreme
+from ai._kernel.utils import format_datum, format_vreme
 from datetime import date
 from database import get_connection
 from ai._kernel.groq_helpers import groq_zadolzhitelen, izvlechi_json_so_ai
@@ -134,7 +134,7 @@ def odgovori_za_ocenuvanje(prasanje: str, pacient: dict | None) -> str:
             vreme = format_vreme(t["vreme_pregled"]) # formatirano vreme
             oznaka = " (веќе оценет)" if t.get("postoecka_ocena") else "" # dali veke ima ocena
             delovi.append(
-                f"- {den_ime} {datum.strftime('%d.%m.%Y')} во {vreme} "
+                f"- {den_ime} {format_datum(datum)} во {vreme} "
                 f"кај Д-р {t['ime_lekar']} ({t['specijalnost_termin']}){oznaka}"
             ) # eden red vo listata za pacientot
         delovi.append("") # prazen red
@@ -154,7 +154,7 @@ def odgovori_za_ocenuvanje(prasanje: str, pacient: dict | None) -> str:
         "",
         f"Лекар: Д-р {t['ime_lekar']}",
         f"Специјалност: {t['specijalnost_termin']}",
-        f"Датум: {den_ime}, {datum.strftime('%d.%m.%Y')} во {vreme}",
+        f"Датум: {den_ime}, {format_datum(datum)} во {vreme}",
         f"Оцена: {zvezdi} ({ocena}/5)",
     ] # linii za finalniot odgovor
     if komentar:

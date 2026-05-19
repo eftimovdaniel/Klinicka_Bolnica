@@ -303,7 +303,7 @@ def odgovori_za_moi_pregledi(
         if datum_str:
             try:
                 d = date.fromisoformat(datum_str[:10])
-                return f"Немаш прегледи на {d.strftime('%d.%m.%Y')}."
+                return f"Немаш прегледи на {format_datum(d)}."
             except ValueError:
                 pass
         return "Немаш прегледи кои одговараат на твоето барање."
@@ -316,7 +316,7 @@ def odgovori_za_moi_pregledi(
     if datum_str:
         try:
             d = date.fromisoformat(datum_str[:10])
-            naslov = f"Твои прегледи за {d.strftime('%d.%m.%Y')} ({len(rows)})"
+            naslov = f"Твои прегледи за {format_datum(d)} ({len(rows)})"
         except ValueError:
             naslov = f"Твои прегледи ({len(rows)})"
     else:

@@ -31,6 +31,7 @@ from ai.pacient.slobodni_termini import (
     zimi_site_lekari,
 )
 from ai._kernel.db_helpers import db_cursor
+from ai._kernel.utils import format_datum, format_vreme
 
 
 # Работно време - не дозволуваме закажување надвор
@@ -229,7 +230,7 @@ def _poraka_izberi_lekar_specijalnost(
         try:
             dt = datetime.strptime(str(datum_str)[:10], "%Y-%m-%d").date()
             linii.append(
-                f"\nЗа датумот: {DENOVI[dt.weekday()]}, {dt.strftime('%d.%m.%Y')}."
+                f"\nЗа датумот: {DENOVI[dt.weekday()]}, {format_datum(dt)}."
             )
         except ValueError:
             linii.append(f"\nЗа датумот: {datum_str}.")
@@ -637,7 +638,7 @@ def formatiraj_potvrda(ime_pacient: str, ime_lekar: str, specialty: str, datum_s
     DENOVI = ["Понеделник", "Вторник", "Среда", "Четврток", "Петок", "Сабота", "Недела"]
     dt = datetime.strptime(datum_str, "%Y-%m-%d").date()
     den_ime = DENOVI[dt.weekday()]
-    datum_lep = dt.strftime("%d.%m.%Y")
+    datum_lep = format_datum(dt)
 
     sablon = (
         "Задачата за закажување е успешно завршена. Еве што е направено во системот.\n\n"
@@ -848,7 +849,7 @@ def odgovori_za_zakazuvanje(
         lekar_text = ime_lekar_za_poraka or "лекарот"
         try:
             dt = datetime.strptime(str(datum_str)[:10], "%Y-%m-%d").date()
-            datum_lepo = dt.strftime("%d.%m.%Y")
+            datum_lepo = format_datum(dt)
         except ValueError:
             datum_lepo = datum_str
         pret = (
@@ -858,8 +859,8 @@ def odgovori_za_zakazuvanje(
         )
         return _vrati_zakazi_poraka(
             f"Во кое време сакаш термин кај {lekar_text} на {datum_lepo}{pret}?\n\n"
-            f"Работно време: {RABOTNO_OD.strftime('%H:%M')} – "
-            f"{RABOTNO_DO.strftime('%H:%M')}\n"
+            f"Работно време: {format_vreme(RABOTNO_OD)} – "
+            f"{format_vreme(RABOTNO_DO)}\n"
             'Пример: „во 10:00“ или „закажи во 10:30“.',
             kontekst,
             izvleceno,
@@ -908,7 +909,7 @@ def odgovori_za_zakazuvanje(
             if datum_str:
                 try:
                     dt = datetime.strptime(str(datum_str)[:10], "%Y-%m-%d").date()
-                    extra = f" Датумот {dt.strftime('%d.%m.%Y')} е зачуван."
+                    extra = f" Датумот {format_datum(dt)} е зачуван."
                 except ValueError:
                     extra = f" Датумот {datum_str} е зачуван."
             return {
@@ -972,7 +973,7 @@ def odgovori_za_zakazuvanje(
     if vreme_obj < RABOTNO_OD or vreme_obj > RABOTNO_DO:
         return {
             "odgovor": (
-                f"Работно време е од {RABOTNO_OD.strftime('%H:%M')} до {RABOTNO_DO.strftime('%H:%M')}."
+                f"Работно време е од {format_vreme(RABOTNO_OD)} до {format_vreme(RABOTNO_DO)}."
             ),
             "kontekst": kontekst,
         }
@@ -990,7 +991,7 @@ def odgovori_za_zakazuvanje(
     lekar_text = ime_lekar_za_poraka or "избраниот лекар"
     try:
         dt = datetime.strptime(ds, "%Y-%m-%d").date()
-        datum_lepo = dt.strftime("%d.%m.%Y")
+        datum_lepo = format_datum(dt)
     except ValueError:
         datum_lepo = ds
 

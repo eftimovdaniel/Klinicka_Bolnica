@@ -1,11 +1,8 @@
-"""
-Дневен / неделен извештај за администратор: термини (закажани/откажани/завршени) и нови апликации за работа.
-Користи: Termin_pregled, prijaveni_lekari.
-Само за корисник со check_admin_access (директор).
-"""
+
 from datetime import date, timedelta
 from ai._kernel.auth import require_direktor
 from ai._kernel.db_helpers import as_dict, db_cursor
+from ai._kernel.utils import format_datum
 
 # funkcija koja se koriste koga se odreduva vremenski oseg na prasanjeto
 # mu se dozvoluva na korisnikot da prasuva prasanje kako naredniot vtornik sreda i slicno da ne so data
@@ -24,9 +21,9 @@ def _period_od_prasanje(prasanje: str) -> tuple[date, date, str]:
     ):
         start = denes - timedelta(days=denes.weekday()) # go presmetuva ponedelnikot od denesniot datum za poslesno presmetuvanje 
         end = start + timedelta(days=6) # dodavanje na 6 dena na ponedelnikot za da stigne do kraj na nedelata
-        return start, end, f"календарска недела {start.strftime('%d.%m.')}–{end.strftime('%d.%m.%Y')}"  # vraka pocetok i kraj na nadelta
+        return start, end, f"календарска недела {format_datum(start)[:-5]}–{format_datum(end)}"  # vraka pocetok i kraj na nadelta
 
-    return denes, denes, f"денес ({denes.strftime('%d.%m.%Y')})"    # ako ne se spomene nedela, se vraka denesniot datum
+    return denes, denes, f"денес ({format_datum(denes)})"    # ako ne se spomene nedela, se vraka denesniot datum
 
 # funkcija koja se povikuva za generiranje na izvestaj
 def odgovori_za_izvestaj(prasanje: str, lekar: dict | None) -> str:
