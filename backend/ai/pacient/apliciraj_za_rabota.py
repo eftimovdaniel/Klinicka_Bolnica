@@ -609,25 +609,24 @@ def _otkazi_aplikacija_flow(kontekst: dict | None) -> dict:
         "navigacija": NAV_KARIERA,
     }
 
-
 # hint za pozicija od tekst pri brisenje
 def _pozicija_hint_od_brisenje(prasanje: str) -> str | None:
     """„… за медицинска сестра" / „апликацијата за …" → hint за пребарување."""
-    p = transliterijaj(prasanje).lower()    # pretvori vo kirilica mali bukvi
-    m = re.search(                          # baraj „aplikacija za ..."
+    p = transliterijaj(prasanje).lower()
+    m = re.search(
         r"апликаци\w*\s+за\s+(.+?)\s*$",
         p,
         flags=re.UNICODE | re.IGNORECASE,
     )
-    if not m:                               # ako ne uspea
-        m = re.search(                      # poednostaven „za ..." na kraj
+    if not m:
+        m = re.search(
             r"\bза\s+(.+?)\s*$",
             p,
             flags=re.UNICODE | re.IGNORECASE,
         )
-    if m:                                   # ako ima poklopuvanje
-        hint = m.group(1).strip()           # zemi go tekstot
-        for stop in (                       # iscisti nepotrebni zborovi
+    if m:
+        hint = m.group(1).strip()
+        for stop in (
             "апликаци",
             "aplikaci",
             "мојата",
@@ -636,16 +635,16 @@ def _pozicija_hint_od_brisenje(prasanje: str) -> str | None:
         ):
             if stop in hint:
                 hint = hint.split(stop)[0].strip()
-        if len(hint) >= 4:                  # dovolno dolg hint
+        if len(hint) >= 4:
             return hint
-    if "медицинск" in p and "сестр" in p:   # najcest slucaj
+    if "медицинск" in p and "сестр" in p:
         return "медицинск"
-    return None                             # nema hint
+    return None
 
 
 # id na red vo prijaveni_lekari
 def _app_row_id(row: dict) -> int:
-    return prijaveni_row_id(row)            # id od redot
+    return prijaveni_row_id(row)
 
 
 # email od najava ili kontekst za brisenje
@@ -653,38 +652,38 @@ def _email_za_brisenje_aplikacija(
     pacient: dict | None, kontekst: dict | None
 ) -> str | None:
     """Email од најава или од контекст по успешна апликација."""
-    if pacient and (pacient.get("email") or "").strip(): # email od sesijata
+    if pacient and (pacient.get("email") or "").strip():
         return str(pacient["email"]).strip()
-    if isinstance(kontekst, dict):          # probaj od kontekst
+    if isinstance(kontekst, dict):
         for key in ("applicant_email", "email", "pacient_email"):
             e = (kontekst.get(key) or "").strip()
-            if e:                           # najden email
+            if e:
                 return e
-    return None                             # nema email
+    return None
 
 
 # izvleci broj na aplikacija od tekstot
 def _izvlechi_app_id_od_prasanje(prasanje: str) -> int | None:
-    p = transliterijaj(prasanje).lower()    # normaliziraj
+    p = transliterijaj(prasanje).lower()
     m = re.search(r"апликаци[јj][аи]?\s*(?:id)?\s*#?:?\s*(\d+)", p)
-    if m:                                   # najden broj
-        return int(m.group(1))
-    m = re.search(r"\bid\s*(\d+)\b", p)     # izoliran id 123
     if m:
         return int(m.group(1))
-    return None                             # nema broj
+    m = re.search(r"\bid\s*(\d+)\b", p)
+    if m:
+        return int(m.group(1))
+    return None
 
 
 # dali najaveniot lekar e direktor/admin
 def _direktor_e_admin(lekar: dict | None) -> bool:
-    if not lekar or not lekar.get("doctor_ID"): # nema lekar id
+    if not lekar or not lekar.get("doctor_ID"):
         return False
     try:
-        from routers.admin import check_admin_access # admin proverka
+        from routers.admin import check_admin_access
 
-        return bool(check_admin_access(int(lekar["doctor_ID"]))) # ima admin prava
+        return bool(check_admin_access(int(lekar["doctor_ID"])))
     except Exception:
-        return False                        # greska — ne e admin
+        return False
 
 
 # najdi eden red od prijaveni_lekari za brisenje
@@ -698,26 +697,26 @@ def _najdi_aplikacija_za_brisenje(
     posledna_bilo_koja: bool = False,
 ) -> dict | None:
     """Еден ред од prijaveni_lekari за бришење."""
-    pk = prijaveni_pk_column()          # primarna kolona
-    sel = prijaveni_select_sql()            # bazen SELECT
-    ord1 = prijaveni_order_desc() + " LIMIT 1" # najnova edna
+    pk = prijaveni_pk_column()
+    sel = prijaveni_select_sql()
+    ord1 = prijaveni_order_desc() + " LIMIT 1"
 
-    if app_id is not None:                  # direktno po id
+    if app_id is not None:
         cur.execute(sel + f" WHERE {pk} = %s LIMIT 1", (app_id,))
         return fetch_one(cur)
 
-    if posledna_bilo_koja:                  # admin — posledna vo sistemot
+    if posledna_bilo_koja:
         cur.execute(sel + ord1)
         return fetch_one(cur)
 
-    if not email:                           # nema email za prebaruvanje
+    if not email:
         return None
 
-    email_n = email.strip().lower()         # normaliziran email
+    email_n = email.strip().lower()
     base = sel + " WHERE LOWER(TRIM(email)) = %s"
     params: list = [email_n]
 
-    if id_oglas is not None:                # email + id na oglas
+    if id_oglas is not None:
         cur.execute(
             base + " AND id_oglas = %s" + ord1,
             tuple(params + [id_oglas]),
@@ -726,7 +725,7 @@ def _najdi_aplikacija_za_brisenje(
         if row:
             return row
 
-    if pozicija_hint:                       # email + LIKE pozicija
+    if pozicija_hint:
         hint = pozicija_hint.strip().lower()
         cur.execute(
             base + " AND LOWER(TRIM(pozicija)) LIKE %s" + ord1,
@@ -736,19 +735,19 @@ def _najdi_aplikacija_za_brisenje(
         if row:
             return row
 
-    cur.execute(base + ord1, tuple(params)) # najnova na toj email
+    cur.execute(base + ord1, tuple(params))
     row = fetch_one(cur)
     if row:
         return row
 
-    kluc = _email_kluc_za_sporedba(email)   # gmail normalizacija
+    kluc = _email_kluc_za_sporedba(email)
     if kluc:
         _local, domain = kluc
         cur.execute(
             sel + " WHERE LOWER(email) LIKE %s" + prijaveni_order_desc() + " LIMIT 30",
             (f"%@{domain}",),
         )
-        for raw in cur.fetchall():          # filtriraj vo python
+        for raw in cur.fetchall():
             cand = as_dict(raw)
             if not _email_se_sovpaaga(cand.get("email") or "", email):
                 continue
@@ -770,22 +769,22 @@ def _izberi_aplikacija_za_brisenje(
     pozicija_hint: str | None = None,
     app_id: int | None = None,
 ) -> dict | None:
-    if not apps:                            # prazna lista
+    if not apps:
         return None
-    if app_id is not None:                  # po tocno id
+    if app_id is not None:
         for a in apps:
             if int(a.get("id") or 0) == int(app_id):
                 return a
-    if id_oglas is not None:                # po id na oglas
+    if id_oglas is not None:
         for a in apps:
             if a.get("id_oglas") == id_oglas:
                 return a
-    if pozicija_hint:                       # po tekst na pozicija
+    if pozicija_hint:
         hint = pozicija_hint.strip().lower()
         for a in apps:
             if hint in (a.get("pozicija") or "").lower():
                 return a
-    return apps[0]                          # najnovata (prva vo lista)
+    return apps[0]
 
 
 # brisi aplikacija od prijaveni_lekari vo baza

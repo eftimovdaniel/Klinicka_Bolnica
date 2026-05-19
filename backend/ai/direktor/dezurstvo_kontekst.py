@@ -1,45 +1,45 @@
-"""Заеднички контекст за преглед/промена на дежурства во AI разговор."""
+"""Заеднички контекст за преглед/промена на дежурства во AI разговор.""" # dokumentacija za modulot — memorija vo chat za dezurstva
 
-from datetime import date, datetime
+from datetime import date, datetime # vcituvame klasa date za datum i datetime od mysql
+from ai._kernel.utils import format_vreme # vcituvame funkcija koja vreme od baza go pravi vo HH:MM tekst
 
-from ai._kernel.utils import format_vreme
-# funkcija koja go pakuva kontekstot za dezurstvo za ai agento koga se menuva dezurstvoto, vo found imam podatocit za lekarot a vo dez site podatoci koga daden lekar e dezuren,
-# dokolku istiojt toj lekar nema postaveno dezurstvo se postavuva vrednot none
-def izgradi_kontekst(found: dict, dez: dict | None) -> dict:
-    datum = dez.get("datum") if dez else None   # go zemame datumot od dezurstvo ako e postaven, dokolku nema se zema none, lekarot moze da se stave dezuren 
-    if isinstance(datum, datetime): # proveka adli datumot e zemen od bazata 
-        datum = datum.date()    # go izolirame datumot, vremeto ne ni e potrebno 
-    datum_s = datum.isoformat() if isinstance(datum, date) else None    #datumot go pretvarame vo tekst i go smestuvame vo datum_s za da moze da se obrabote od ai
 
-    dez_id = dez.get("dezurstvo_ID") if dez else None   # go zema id to na dezurstvoto za da znaeme koj podatok se mene vo bazata
-    vreme_od = format_vreme(dez.get("vreme_od")) if dez and dez.get("vreme_od") is not None else None   # se zema pocetokot na dezurstviti i go formatirame vo tekst za ai 
-    vreme_do = format_vreme(dez.get("vreme_do")) if dez and dez.get("vreme_do") is not None else None   # se zema krajot na dezurstvoto
+def izgradi_kontekst(found: dict, dez: dict | None) -> dict: # funkcija koja go gradи kontekstot posle pregled na dezurstvo
+    """Го пакува лекарот и дежурството за контекст во разговор.""" # dokumentacija — found e lekar, dez e red od Dezurstva ili None
+    datum = dez.get("datum") if dez else None # go zemame datumot od dez ako lekarot veke ima dezurstvo vo baza
+    if isinstance(datum, datetime): # proveruvame dali od bazata doagja datetime (so vreme)
+        datum = datum.date() # go zemame samo delot datum — vremeto ne ni treba za kontekst
+    datum_s = datum.isoformat() if isinstance(datum, date) else None # go pretvorame vo tekst YYYY-MM-DD za ai i za zacuvuvanje
 
-    return {    # vraka recnik koj sluzi kako memorija za ai agento
-        "intent": "promeni_dezurstvo",  # definiranje na toa sto sakame da izvrsime -> promena na dezurstvoto ako go ima 
-        "dezurstvo_kontekst": {     # pod recnik so site informacii za dezurstvoto da moze da se promeni
-            "doctor_id": found["doctor_ID"],    # go zema id na lekarot koj e pronajde 
-            "name": found["name"],  # go zema imeto na lekarot
-            "surname": found["surname"],    # go zema prezimeto na lekarots
-            "dezurstvo_id": dez_id, # go zacuvuva id na dezurstvoto 
-            "datum": datum_s,       # go zacuvuva datumot na dezurstvot za koja e napravena promena
-            "vreme_od": vreme_od,   # pocetok od koga e lekarot treba da pocne so rabota
-            "vreme_do": vreme_do,   # kraj do koga lekarot treba da raboti
-            # so ovie podatoci ai agento moze da go prepoznae dezurstvoto i da go promeni so novite podatoci koi ke mu se dadat, 
-            # dokolku nema dezurstvo se postavuva none i ai agento ke znae deka treba da go postavi lekarot kako dezuren so novite podatoci, 
-            # dokolku ima dezurstvo ke znae deka treba da go promeni postoeckoto dezurstvo
-        },
-    }
-# funkcija koja od kontekst na zacuvanite poraki vadi kontekst
-def lekar_od_kontekst(kontekst: dict | None) -> dict | None:
-    if not kontekst:        # dokolku ne postoi kontekst vo porakite 
-        return None         # ne se vrakaat nikakvi infromacii ili none
-    dk = kontekst.get("dezurstvo_kontekst") # go vleceme glavniot kontekst so podatoci za dezurstvoto od porakite
-    if not dk or not dk.get("doctor_id"):   # dokolku ne postoi takov blok ili nema id na lekarot koj e dezuren 
-        return None # se vraka none, nema informacii za lekarot koj e zdezuren
-    return {    # dokolku postojat site ovie podatoci se prefrlaat 
-        "doctor_ID": dk["doctor_id"],       # id na lekarot za koj se pravi promena vo dezurstvoto
-        "name": dk.get("name", ""),         # imeto na lekarot za koj se pravi promena vo dezurstvoto i go zemam od kontekstot na porakite
-        "surname": dk.get("surname", ""),   # isto kako i imeto se pravi i za prezimeto
-        "specialty": dk.get("specialty"),   # ja zemame specijalnost od kontekstot kako prezimeto i imeto
-    }
+    dez_id = dez.get("dezurstvo_ID") if dez else None # go zemame id na dezurstvoto za UPDATE vo baza podocna
+    vreme_od = format_vreme(dez.get("vreme_od")) if dez and dez.get("vreme_od") is not None else None # pocetok na dezurstvoto formatiran
+    vreme_do = format_vreme(dez.get("vreme_do")) if dez and dez.get("vreme_do") is not None else None # kraj na dezurstvoto formatiran
+
+    return { # vrakame recnik koj routerot go zacuvuva vo memorijata na razgovorot
+        "intent": "promeni_dezurstvo", # kazuvame deka slednite poraki se za promena/dodavanje dezurstvo
+        "dezurstvo_kontekst": { # pod-recnik so site podatoci za edno konkretno dezurstvo
+            "doctor_id": found["doctor_ID"], # id na lekarot koj go gledame ili menuvame
+            "name": found["name"], # ime na lekarot za prikaz i za ai
+            "surname": found["surname"], # prezime na lekarot za prikaz i za ai
+            "specialty": found.get("specialty"), # specijalnost — ja koristi lekar_od_kontekst koga nema ime vo poraka
+            "dezurstvo_id": dez_id, # koj red vo tabela Dezurstva (None = uste nema dezurstvo, ke se dodade)
+            "datum": datum_s, # na koj datum e dezurstvoto kako tekst
+            "vreme_od": vreme_od, # od koi casovi pocnuva dezurstvoto
+            "vreme_do": vreme_do, # do koi casovi trae dezurstvoto
+        }, # kraj na blokot dezurstvo_kontekst
+    } # kraj na glavniot return — ova odi vo kontekst na sledna poraka
+
+
+def lekar_od_kontekst(kontekst: dict | None) -> dict | None: # funkcija koja od zacuvan kontekst go vrakame lekarot
+    """Враќа податоци за лекар од претходен контекст.""" # dokumentacija — za „промени да е до 03:00" bez povtorno ime
+    if not kontekst: # proveruvame dali ima kontekst od pretodna ai poraka
+        return None # nema kontekst — ne moze da se najde lekar
+    dk = kontekst.get("dezurstvo_kontekst") # go zemame vnatresniot blok so podatoci za dezurstvo
+    if not dk or not dk.get("doctor_id"): # proveruvame dali blokot postoi i dali ima doctor_id
+        return None # nevaliden kontekst — nema lekar
+    return { # vrakame lekar vo format koj go koristi promeni_dezurstvo i lekar_lookup
+        "doctor_ID": dk["doctor_id"], # id na lekarot (vo kontekst e doctor_id, vo baza doctor_ID)
+        "name": dk.get("name", ""), # ime — prazen string ako nedostasuva
+        "surname": dk.get("surname", ""), # prezime — prazen string ako nedostasuva
+        "specialty": dk.get("specialty"), # specijalnost za oddel i prikaz
+    } # kraj na return — lekar za baranje ili update dezurstvo

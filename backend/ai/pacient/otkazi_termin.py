@@ -11,164 +11,165 @@ from ai.pacient.slobodni_termini import (                  # Pomosnici od zakazu
     lekar_od_zakazi_kontekst,                              # Lekar od pretoden razgovor
     zimi_site_lekari,                                      # Site lekari za zatvorena lista vo prompt
 )
-
-
 # Pretvori doctor_id od AI vo int; None ako nedostasuva ili e nevaliden
 def _normalize_doctor_id(v) -> int | None:
-    if v is None:                                          # AI ne vrati id
-        return None                                        # Nema sto da se filtrira po lekar
-    try:
-        return int(v)                                      # Standarden int od broj ili string
-    except (TypeError, ValueError):                        # Pogresen tip ili tekst
-        return None                                        # Ignoriraj nevaliden id
-
+    if v is None:                                          # dokolku ai ne vrati id
+        return None             # kako izlez imame none
+    try:    # vo sportivno 
+        return int(v)          # standarden int od broj ili string
+    except (TypeError, ValueError):  # dokolku imame greska
+        return None
 
 # Groq izvlekuva lekar, datum, vreme i prezime_filter od porakata na pacientot
 def izvlechi_otkazi_podatoci(prasanje: str) -> dict:
-    prazno = {                                             # Defolt vrednosti ako AI ne uspee
-        "doctor_id": None,                                 # Bez id na lekar
-        "datum": None,                                     # Bez datum
-        "vreme": None,                                     # Bez vreme
-        "prezime_filter": None,                              # Bez filter po prezime
+    prazno = {                                             # Defolt vrednosti ako AI ne uspee da vrati nekoja vrednost
+        "doctor_id": None,
+        "datum": None,
+        "vreme": None,
+        "prezime_filter": None,
     }
     if msg := groq_zadolzhitelen():                        # Proverka dali Groq API e dostapen
         return {**prazno, "_error": msg}                   # Vrati greska + prazni polinja
+
     site_lekari = zimi_site_lekari()                       # Site lekari od baza
     lista_text = ""                                        # Tekst za prompt — eden red po lekar
     for lekar in site_lekari:                              # Loop niz site lekari
         spec = lekar.get("specialty") or "Општа пракса"   # Specijalnost ili defolt
-        lista_text += (                                    # Dodaj eden red vo listata
+        lista_text += (
             f"ID {lekar['doctor_ID']}: Д-р {lekar['name']} {lekar['surname']} - {spec}\n"
-        )                                                  # Format: ID, ime, prezime, spec
+        )
+
     denes = date.today().strftime("%Y-%m-%d")              # Denesen datum YYYY-MM-DD
-    den_vo_nedela = [                                      # Lista denovi na makedonski
+    den_vo_nedela = [                                      # Den vo nedelata na makedonski
         "понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"
-    ][date.today().weekday()]                              # Denes koj den e (0=pon)
-    full_prompt = f"""
-Денес: {denes} ({den_vo_nedela})
-
-Лекари:
-{lista_text}
-
-Корисник: „{prasanje}"
-
-Извлечи doctor_id, datum (YYYY-MM-DD), vreme (HH:MM), prezime_filter.
-""".strip()                                            # Cel prompt za AI (bez prazni kraevi)
-    podatoci = izvlechi_json_so_ai(                      # Povikaj Groq
+    ][date.today().weekday()]
+    full_prompt = f""" Денес: {denes} ({den_vo_nedela}) Лекари: {lista_text} Корисник: „{prasanje}" Извлечи doctor_id, datum (YYYY-MM-DD), vreme (HH:MM), prezime_filter.""".strip()                                            # Cel prompt za AI
+    podatoci = izvlechi_json_so_ai(
         full_prompt, load_prompt("otkazi_extract"), log_tag="otkazi_termin"
-    )                                                      # Sistemski prompt od fajl otkazi_extract
+    ) # Povikaj Groq so sistemski prompt od fajl
     if podatoci.get("_error"):                             # Greska od AI servisot
-        return {**prazno, "_error": podatoci["_error"]}   # Vrati prazno + poraka za greska
+        return {**prazno, "_error": podatoci["_error"]}
+
     vreme = podatoci.get("vreme")                          # Sirovo vreme od JSON
-    return {                                               # Normaliziran recnik za handler
+    return {
         "doctor_id": podatoci.get("doctor_id"),            # ID na lekarot (moze string)
         "datum": podatoci.get("datum"),                    # Datum pregled YYYY-MM-DD
         "vreme": str(vreme).strip()[:5] if vreme else None, # HH:MM — max 5 karakteri
         "prezime_filter": podatoci.get("prezime_filter"),  # Del od prezime ako nema doctor_id
     }
 
-
 # Bara aktivni (zakazani) termini na pacientot so opcionalni filtri
 def najdi_termini_za_otkazuvanje(
-    pacient_email: str,                                    # Email na najaven pacient
-    doctor_id: int | None,                                 # Opcionalen filter po lekar
-    datum: str | None,                                     # Opcionalen filter po datum
-    vreme: str | None = None,                              # Opcionalen filter po vreme
-    prezime_filter: str | None = None,                     # Opcionalen del od ime_lekar
+    pacient_email: str,
+    doctor_id: int | None,
+    datum: str | None,
+    vreme: str | None = None,
+    prezime_filter: str | None = None,
 ) -> list[dict]:
     conn = None                                            # Konekcija — zatvora se vo finally
     try:
         conn = get_connection()                            # Otvori MySQL
-        cur = conn.cursor(dictionary=True)                 # Redovi kako recnici (ne tuple)
+        cur = conn.cursor(dictionary=True)                 # Redovi kako recnici
+
         query = """
             SELECT t.termin_ID, t.datum_pregled, t.vreme_pregled,
                    t.ime_lekar, t.specijalnost_termin, t.doctor_ID
             FROM Termin_pregled t
             WHERE LOWER(TRIM(t.email_pacient)) = LOWER(TRIM(%s))
               AND t.status_pregled = 'закажан'
-        """                                                # Samo zakazani — kirilica kako vo baza
+        """ # Samo zakazani — kirilica kako vo baza; ne zavrshen/otkazan
         params: list[object] = [pacient_email]             # Prv parametar: email pacient
+
         if not datum:                                      # Bez datum vo poraka
             query += " AND t.datum_pregled >= CURDATE()"   # Samo denes i idnina — ne minato
+
         if doctor_id:                                      # Filtar po tocen lekar
-            query += " AND t.doctor_ID = %s"               # Dodaj uslov vo SQL
-            params.append(doctor_id)                       # Vtor parametar: doctor_id
+            query += " AND t.doctor_ID = %s"
+            params.append(doctor_id)
+
         if datum:                                          # Filtar po konkreten datum
-            query += " AND t.datum_pregled = %s"           # Tacen datum
-            params.append(datum)                           # Parametar za datum
+            query += " AND t.datum_pregled = %s"
+            params.append(datum)
+
         if prezime_filter and not doctor_id:               # Prezime samo ako nema doctor_id
-            query += " AND LOWER(COALESCE(t.ime_lekar, '')) LIKE %s" # LIKE po ime_lekar
-            params.append(f"%{prezime_filter.strip().lower()}%") # Del od ime — case insensitive
+            query += " AND LOWER(COALESCE(t.ime_lekar, '')) LIKE %s"
+            params.append(f"%{prezime_filter.strip().lower()}%") # Del od ime_lekar
+
         if vreme:                                          # Filtar po vreme (SQL TIME)
-            query += " AND TIME(t.vreme_pregled) = %s"     # Sporedba na vreme
-            params.append(vreme)                           # HH:MM parametar
+            query += " AND TIME(t.vreme_pregled) = %s"
+            params.append(vreme)
+
         query += " ORDER BY t.datum_pregled, t.vreme_pregled" # Najblisku vo vremeto prvi
-        cur.execute(query, params)                         # Izvrsi SELECT so parametri
-        rezultati = list(cur.fetchall() or [])             # Site redovi; [] ako None
-        cur.close()                                        # Zatvori kursor
+
+        cur.execute(query, params)                         # Izvrsi SELECT
+        rezultati = list(cur.fetchall() or [])             # Site redovi; prazna lista ako None
+        cur.close()
+
         if vreme and rezultati:                            # Dopolnitelno filtriranje vo Python
             vf = vreme.strip()[:5]                         # Normalizirano HH:MM
-            filtrirani = [                                 # Lista samo so tocno vreme
-                t                                          # Eden red od baza
-                for t in rezultati                         # Loop niz SQL rezultati
+            filtrirani = [
+                t
+                for t in rezultati
                 if format_vreme(t.get("vreme_pregled")) == vf  # Sporedba so format od utils
             ]
             if filtrirani:                                 # Ako ima tocno poklopuvanje
-                return filtrirani                          # Vrati gi filtriranite
+                return filtrirani
+
         return rezultati                                   # Site od SQL ili prazno
+
     except Exception as e:
         print(f"[otkazi_termin] greska: {e}")              # Log za debug
         return []                                          # Bez termin = poraka do pacient
     finally:
-        if conn:                                           # Ako konekcijata e otvorena
+        if conn:
             conn.close()                                   # Sekogas zatvori konekcija
 
 
 # Vo baza postavi status na terminot na otkazan (kirilica)
 def otkazi_termin_vo_baza(termin_id: int) -> bool:
-    conn = None                                            # Pocetno nema konekcija
+    conn = None
     try:
-        conn = get_connection()                            # Otvori MySQL
-        cur = conn.cursor()                                # Obicen kursor za UPDATE
+        conn = get_connection()
+        cur = conn.cursor()
         cur.execute(
             """
             UPDATE Termin_pregled
             SET status_pregled = 'откажан'
             WHERE termin_ID = %s
             """,
-            (termin_id,),                                  # Samo ovoj termin
-        )                                                  # Soft delete — termin ostava vo tabela
-        conn.commit()                                      # Zacuvaj promena vo baza
-        cur.close()                                        # Zatvori kursor
+            (termin_id,),
+        ) # Soft delete — termin ostava vo tabela so nov status
+        conn.commit()                                      # Zacuvaj promena
+        cur.close()
         return True                                        # Uspesno otkazuvanje
     except Exception as e:
-        print(f"[otkazi_termin] update greska: {e}")       # Logiraj greska pri UPDATE
-        return False                                       # Neuspesno — handler kazuva poraka
+        print(f"[otkazi_termin] update greska: {e}")
+        return False
     finally:
-        if conn:                                           # Ako ima otvorena konekcija
-            conn.close()                                   # Zatvori ja
+        if conn:
+            conn.close()
 
 
 # Dopolni izvleceno so lekar/datum od chat kontekst (posle zakazuvanje / slobodni termini)
 def _spoi_otkazi_so_kontekst(
-    prasanje: str,                                         # Tekstualna poraka od pacient
-    izvleceno: dict,                                       # Recnik sto go menuva funkcijata
-    kontekst: dict | None,                                 # Kontekst od router (pretoden chat)
+    prasanje: str,
+    izvleceno: dict,
+    kontekst: dict | None,
 ) -> None:
     if not isinstance(kontekst, dict):                     # Nema kontekst od router
-        return                                             # Nisto ne dopolnuvaj
+        return
     lekar = lekar_od_zakazi_kontekst(kontekst)             # Posleden izbran lekar
     if lekar and not izvleceno.get("doctor_id"):           # AI ne dade id — zemi od kontekst
-        izvleceno["doctor_id"] = lekar["doctor_ID"]        # Postavi id od kontekst
+        izvleceno["doctor_id"] = lekar["doctor_ID"]
     if izvleceno.get("datum"):                             # Datum veke e jasen
-        return                                             # Ne prepisuvaj datum
+        return
     baran = datum_od_zakazi_kontekst(kontekst)             # Datum od pretoden cekor vo chat
-    if not baran:                                          # Nema datum vo kontekst
-        return                                             # Izlez bez promena
-    p = (prasanje or "").lower()                           # Poraka — mali bukvi za klucni zborovi
-    if any(                                                # Dali pacientot referencira „toj“ termin
-        x in p                                             # Klucen zbor vo porakata
-        for x in (                                         # Lista mozni frazi
+    if not baran:
+        return
+    p = (prasanje or "").lower()                           # Poraka za klucni zborovi
+    if any(                                                # Referenca na „тој“ термин без датум
+        x in p
+        for x in (
             "терминот",
             "термин",
             "прегледот",
@@ -185,83 +186,94 @@ def _spoi_otkazi_so_kontekst(
 
 # Glaven handler — intent otkazi_termin; router ja povikuva so pacient i kontekst
 def odgovori_za_otkazuvanje(
-    prasanje: str,                                         # Poraka od pacientot
-    pacient: dict | None,                                  # Podatoci za najaven pacient
-    kontekst: dict | None = None,                          # Opcionalen chat kontekst
+    prasanje: str, pacient: dict | None, kontekst: dict | None = None
 ) -> str:
     if not pacient or not pacient.get("email"):            # Mora najava kako pacient
-        return (                                           # Poraka za najava
+        return (
             'За да откажеш термин, прво најави се како пациент. '
             'Кликни „Најави се!" горе десно.'
         )
+
     izvleceno = izvlechi_otkazi_podatoci(prasanje)         # AI: lekar, datum, vreme, prezime
     _spoi_otkazi_so_kontekst(prasanje, izvleceno, kontekst) # Dopolni od pretoden razgovor
+
     doctor_id = _normalize_doctor_id(izvleceno.get("doctor_id")) # int ili None
     datum_str = (izvleceno.get("datum") or "").strip()[:10] or None  # Max 10 za YYYY-MM-DD
     vreme_str = (izvleceno.get("vreme") or "").strip()[:5] or None   # HH:MM
-    prezime_filter = (izvleceno.get("prezime_filter") or "").strip() or None # Tekst ili None
+    prezime_filter = (izvleceno.get("prezime_filter") or "").strip() or None
+
     if izvleceno.get("_error"):                            # Groq nedostapen ili greska
-        return str(izvleceno["_error"])                    # Vrati poraka od AI servisot
+        return str(izvleceno["_error"])
+
     termini = najdi_termini_za_otkazuvanje(                # Baranje vo Termin_pregled
-        pacient["email"],                                  # Email na pacientot
-        doctor_id,                                         # Filter lekar
-        datum_str,                                         # Filter datum
-        vreme_str,                                         # Filter vreme
-        prezime_filter,                                    # Filter prezime
+        pacient["email"],
+        doctor_id,
+        datum_str,
+        vreme_str,
+        prezime_filter,
     )
+
     DENOVI = [                                             # Za lep prikaz vo chat
         "Понеделник", "Вторник", "Среда", "Четврток", "Петок", "Сабота", "Недела"
     ]
+
     if not termini:                                        # Nema poklopuvanje vo baza
         detali = []                                        # Lista sto barase korisnikot
-        if datum_str:                                      # Ako imase datum vo poraka
-            detali.append(f"датум {datum_str}")            # Dodaj vo detali
-        if vreme_str:                                      # Ako imase vreme
-            detali.append(f"време {vreme_str}")            # Dodaj vo detali
-        if doctor_id or prezime_filter:                    # Ako imase lekar ili prezime
-            detali.append("лекар од пораката")             # Opis vo detali
-        extra = f" (барано: {', '.join(detali)})" if detali else "" # Tekst za poraka
-        return (                                           # Poraka — nema termin
+        if datum_str:
+            detali.append(f"датум {datum_str}")
+        if vreme_str:
+            detali.append(f"време {vreme_str}")
+        if doctor_id or prezime_filter:
+            detali.append("лекар од пораката")
+        extra = f" (барано: {', '.join(detali)})" if detali else ""
+        return (
             f"Не најдов активен термин со статус „закажан“ што одговара{extra}.\n\n"
             'Проверете со „Моите прегледи“ или „Прикажи ги сите мои прегледи“, '
             'па повторете, на пр.:\n'
             '„Откажи го прегледот на 02.02.2026 во 09:30 кај Серафимов“.'
         )
+
     if len(termini) > 1:                                   # Nejasno koj termin — lista
-        delovi = ["Имаш повеќе термини. Кој точно сакаш да го откажеш?", ""] # Naslov + prazen red
-        for t in termini:                                  # Site poklopuvanja
-            datum = t["datum_pregled"]                     # Datum od redot
-            den_ime = DENOVI[datum.weekday()]              # Den vo nedelata
-            vreme = format_vreme(t["vreme_pregled"])       # Formatirano vreme
-            delovi.append(                                 # Eden red vo listata
+        delovi = ["Имаш повеќе термини. Кој точно сакаш да го откажеш?", ""]
+        for t in termini:                                  # Site poklopuvanja (bez limit 10)
+            datum = t["datum_pregled"]
+            den_ime = DENOVI[datum.weekday()]
+            vreme = format_vreme(t["vreme_pregled"])
+            delovi.append(
                 f"- {den_ime} {format_datum(datum)} во {vreme} "
                 f"кај Д-р {t['ime_lekar']} ({t['specijalnost_termin']})"
             )
-        delovi.append("")                                  # Prazen red pred instrukcija
+        delovi.append("")
         delovi.append('Биди поточен: „Откажи го прегледот кај д-р [презиме] на [датум]"')
-        return "\n".join(delovi)                           # Spoj gi linii vo eden string
+        return "\n".join(delovi)
+
     t = termini[0]                                         # Tocno eden termin za otkaz
     if not otkazi_termin_vo_baza(t["termin_ID"]):          # UPDATE status = откажан
-        return "Не успеа да го откажам терминот. Пробај пак." # Greska pri zacuvuvanje
-    datum = t["datum_pregled"]                             # Datum na otkazaniot termin
-    den_ime = DENOVI[datum.weekday()]                      # Ime na denot
-    vreme = format_vreme(t["vreme_pregled"])               # Vreme za prikaz
+        return "Не успеа да го откажам терминот. Пробај пак."
+
+    datum = t["datum_pregled"]
+    den_ime = DENOVI[datum.weekday()]
+    vreme = format_vreme(t["vreme_pregled"])
     datum_lep = format_datum(datum)                        # Datum za prikaz i email
+
     ime_pacient = (                                        # Ime za email potvrda
         (pacient.get("ime") or "") + " " + (pacient.get("prezime") or "")
-    ).strip() or (t.get("ime_pacient") or pacient.get("email", "")) # Fallback na email
+    ).strip() or (t.get("ime_pacient") or pacient.get("email", ""))
+
     try:
         from routers.termini import _poslati_otkaz_na_email  # Lazy import — izbegni ciklus
+
         _poslati_otkaz_na_email(                           # SMTP potvrda (ako e podeseno)
-            to_email=pacient["email"],                     # Na koj email
-            ime_pacient=ime_pacient,                       # Ime na pacient
-            ime_lekar=f"Д-р {t['ime_lekar']}",             # Ime na lekar
-            datum=f"{den_ime}, {datum_lep}",               # Datum so den
-            vreme=vreme,                                   # Vreme na pregled
-            specialnost=t.get("specijalnost_termin") or "", # Specijalnost ili prazno
+            to_email=pacient["email"],
+            ime_pacient=ime_pacient,
+            ime_lekar=f"Д-р {t['ime_lekar']}",
+            datum=f"{den_ime}, {datum_lep}",
+            vreme=vreme,
+            specialnost=t.get("specijalnost_termin") or "",
         )
     except Exception as e:
         print(f"[otkazi_termin] email greska: {e}")        # Otkazuvanje uspee i bez email
+
     return (                                               # Tekstualen odgovor vo chat
         f"Терминот е откажан!\n\n"
         f"Лекар: Д-р {t['ime_lekar']}\n"

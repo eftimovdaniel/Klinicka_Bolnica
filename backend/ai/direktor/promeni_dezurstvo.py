@@ -497,7 +497,7 @@ def odgovori_za_dezurstvo(
         return {
             "odgovor": (
                 f"Д-р {found['name']} {found['surname']} нема дежурство на "
-                f"{nov_format_datum(datum)} за промена."
+                f"{format_datum(nov_datum)} за промена."
             ),
             "kontekst": izgradi_kontekst(found, None),
         }
