@@ -13,6 +13,7 @@ from ai._kernel.groq_client import GROQ_OFFLINE_MSG, ask_ai, groq_e_isklucen
 from ai._kernel.prompt_loader import load_prompt
 from ai._kernel.utils import format_vreme
 
+# Pocetoci na poznati Groq greshki - za prepoznavanje deka AI ne raboti
 _GRESKA_POCETOCI = (
     "Не е поставен GROQ_API_KEY",
     "Те молам внеси прашање",
@@ -28,16 +29,21 @@ _GRESKA_POCETOCI = (
 def _json_default(obj: Any) -> Any:
     if isinstance(obj, (datetime, date)):
         return obj.isoformat()
+        # ISO format: 2026-05-20 ili 2026-05-20T14:30:00
     if isinstance(obj, time):
         return format_vreme(obj)
+        # Vreme vo format HH:MM (bez sekundi)
     return str(obj)
+    # Fallback - konverzija vo string
 
 
 def _e_groq_greska(tekst: str) -> bool:
     t = (tekst or "").strip()
     if not t:
         return True
+    # Prazen tekst e greshka
     return any(t.startswith(p) for p in _GRESKA_POCETOCI)
+    # Proverka dali pocnuva so nekoj od poznatite markeri
 
 
 def formatiraj_odgovor_so_ai(
@@ -52,21 +58,26 @@ def formatiraj_odgovor_so_ai(
     sablon_fallback: задржан за компатибилност со повици; не се користи како fallback.
     """
     _ = sablon_fallback  # API compat — AI-only режим
+    # Parametar samo za nazadna kompatibilnost - se ignorira
 
     if groq_e_isklucen():
         return GROQ_OFFLINE_MSG
+    # Ako e isklucheno Groq - vrati standardna offline poraka
 
     try:
         system = load_prompt("formatiraj_odgovor")
     except KeyError:
         return "Недостасува prompt formatiraj_odgovor."
+    # Ako fali promptot vo bundle - vrati greshka korisnichka
 
     facts_json = json.dumps(podatoci, ensure_ascii=False, indent=2, default=_json_default)
+    # ensure_ascii=False - kirilica direktno, indent=2 za chitlivost
     user_parts = [
         f"Тип одговор: {tip}",
     ]
     if prasanje and prasanje.strip():
         user_parts.append(f'Прашање на корисникот: „{prasanje.strip()}"')
+        # Originalnoto prasanje pomaga na AI da formira sootveten odgovor
     user_parts.extend(
         [
             "",
@@ -74,13 +85,16 @@ def formatiraj_odgovor_so_ai(
             facts_json,
         ]
     )
+    # Klucna instrukcija - AI da ne izmisluva fakti shto gi nema vo JSON
     if podatoci.get("sledna_akcija"):
         user_parts.append(f"\nСледна акција (задржи ја смислата): {podatoci['sledna_akcija']}")
+        # Akciska poraka - shto sledno korisnikot treba da pravi
 
     ai = ask_ai("\n".join(user_parts), system_prompt=system)
     if _e_groq_greska(ai):
         print(f"[odgovor_formatter] AI fail tip={tip!r}")
         return (ai or "").strip() or GROQ_OFFLINE_MSG
+        # Pri greshka - vrati ja greshkata ili offline porakata
     ai = ai.strip()
     if not ai:
         return GROQ_OFFLINE_MSG

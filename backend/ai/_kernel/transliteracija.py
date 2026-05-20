@@ -90,6 +90,7 @@ ZADRZUVAJ = {
 def _ima_kirilica(zbor: str) -> bool:
     """Проверка дали зборот веќе содржи кирилица."""
     return any('\u0400' <= ch <= '\u04FF' for ch in zbor)
+    # Unicode opseg na kirilica - od \u0400 do \u04FF
 
 
 def _konvertiraj_zbor(zbor: str) -> str:
@@ -98,6 +99,7 @@ def _konvertiraj_zbor(zbor: str) -> str:
         return zbor
     if zbor in ZADRZUVAJ:
         return zbor
+    # Tehnichki termini ostanuvaat nepromeneti
     if _ima_kirilica(zbor):
         # Веќе на кирилица - не допирај (или мешан, мала шанса)
         return zbor
@@ -106,6 +108,7 @@ def _konvertiraj_zbor(zbor: str) -> str:
     # 1. Прво: специјални знаци (š → sh, ž → zh, итн.)
     for sp, ascii_eq in SPECIJALNI.items():
         rezultat = rezultat.replace(sp, ascii_eq)
+    # Vazno - bez ova checkers digrames ke fati nepravilni
     # 2. Потоа: латиница → кирилица
     for lat, kir in PRESLIKUVANJA:
         rezultat = rezultat.replace(lat, kir)
@@ -128,6 +131,7 @@ def transliterijaj(tekst: str) -> str:
 
     # Разбиј по не-алфанумерички знаци, конвертирај секој збор поединечно
     delovi = re.split(r'(\W+)', tekst)
+    # `\W+` so zagrada zachuvuva razdvojuvachi vo rezultatot
     rezultat = []
     for d in delovi:
         # Ако делот содржи букви - конвертирај, инаку остави го
@@ -135,9 +139,11 @@ def transliterijaj(tekst: str) -> str:
             rezultat.append(_konvertiraj_zbor(d))
         else:
             rezultat.append(d)
+            # Brojki, prazno mesto, interpunkcija - ne se menuvaat
     return "".join(rezultat)
 
 
+# Regex za prepoznavanje na URL-i - tie ne treba da se transliteriraat
 _URL_ZAČUVAJ_RE = re.compile(
     r"https?://[^\s<>\"']+|www\.[^\s<>\"']+",
     re.IGNORECASE,
@@ -158,8 +164,12 @@ def normaliziraj_prasanje(tekst: str) -> str:
     for m in _URL_ZAČUVAJ_RE.finditer(t):
         if m.start() > pos:
             delovi.append(transliterijaj(t[pos : m.start()]))
+            # Tekstot pred URL-ot - se transliterira normalno
         delovi.append(m.group(0))
+        # URL-ot ostanuva kako shto e (linkovite ne se prevedeni)
         pos = m.end()
     if pos < len(t):
         delovi.append(transliterijaj(t[pos:]))
+        # Tekstot po posledniot URL
     return "".join(delovi) if delovi else transliterijaj(t)
+    # Ako nema URL-i - transliteriraj cela rechenica

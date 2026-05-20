@@ -1,6 +1,4 @@
-"""
-Тргни (избриши) оцена за завршен преглед.
-
+"""Тргни (избриши) оцена за завршен преглед.
 Како работи:
 1. Пациент пишува: „Избриши ја оцената за вчерашниот преглед"
    или „Тргни ја оцената за д-р Петров"
@@ -9,7 +7,6 @@
 4. Ако има точно еден → DELETE од Pregled_feedback
 5. Ако има повеќе → прашаме кој
 6. Ако нема → грешка
-
 Бара логиран пациент.
 """
 
@@ -32,23 +29,10 @@ def izvlechi_trgni_podatoci(prasanje: str) -> dict:  # ja analizira korisnickata
     for lekar in site_lekari:  # iterirame niz lekarite
         spec = lekar.get("specialty") or "Општа пракса"  # zemame specijalnost ili default
         lista_text += f"ID {lekar['doctor_ID']}: Д-р {lekar['name']} {lekar['surname']} - {spec}\n"  # go gradime stringot so doktori
-
     denes = date.today().strftime("%Y-%m-%d")  # go zemame denesniot datum vo format yyyy-mm-dd
     den_vo_nedela = ["понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"][date.today().weekday()]  # go naogame imeto na denot
-
-    full_prompt = f"""
-Денес: {denes} ({den_vo_nedela})
-
-Лекари:
-{lista_text}
-
-Корисник: „{prasanje}"
-
-Извлечи doctor_id и datum.
-""".strip()  # sostavuvame kompleten prompt so kontekst za ai
-
+    full_prompt = f"""Денес: {denes} ({den_vo_nedela}) Лекари: {lista_text} Корисник: „{prasanje}" Извлечи doctor_id и datum. """.strip()  # sostavuvame kompleten prompt so kontekst za ai
     odgovor = ask_ai(full_prompt, system_prompt=load_prompt("trgni_ocena_extract"))  # go prasuva ai da izvlece podatoci spored promptot
-
     podatoci = parse_ai_json(odgovor, log_tag="trgni_ocena")  # go parsira odgovorot od ai vo json recnik
     return {  # go vrakame recnikot so izvlechenite id na lekar i datum
         "doctor_id": podatoci.get("doctor_id"),
@@ -71,22 +55,17 @@ def najdi_oceneti_termini(pacient_email: str, doctor_id: int | None, datum: str 
               AND t.status_pregled = 'завршен'
         """  # sql upit sto gi spoi terminite so nivnite ocenki za toj pacient
         params: list[object] = [pacient_email]  # go stavame emailot vo parametri
-
         if doctor_id:  # ako ai izvlekol id na doktor
             query += " AND t.doctor_ID = %s"  # go dodavame id-to vo sql
             params.append(doctor_id)
-
         if datum:  # ako ai izvlekol datum
             query += " AND t.datum_pregled = %s"  # go dodavame datumot vo sql
             params.append(datum)
-
         query += " ORDER BY t.datum_pregled DESC, t.vreme_pregled DESC"  # gi sortira od najnovite kon postarite
-
         cur.execute(query, params)  # go izvrsuva upitot
         rezultati = cur.fetchall()  # gi zema site rezultati
         cur.close()  # go zatvara kursorot
         return rezultati  # vrakame lista so najdeni oceneti termini
-
     except Exception as e:  # ako nastane greska vo bazata
         print(f"[trgni_ocena] greska: {e}")  # pecetime greska
         return []  # vrakame prazna lista
@@ -96,7 +75,6 @@ def najdi_oceneti_termini(pacient_email: str, doctor_id: int | None, datum: str 
 
 
 def izbrisi_ocena(feedback_id: int) -> bool:  # funkcija za fizicko brisenje na ocenata
-    """DELETE од Pregled_feedback."""
     conn = None
     try:
         conn = get_connection()  # konekcija
@@ -123,21 +101,16 @@ def odgovori_za_trgni_ocena(prasanje: str, pacient: dict | None) -> str:  # glav
             'За да избришеш оцена, прво најави се како пациент. '
             'Кликни „Најави се!" горе десно.'
         )
-
     izvleceno = izvlechi_trgni_podatoci(prasanje)  # povikuvame ai za izvlekuvanje na doctor_id i datum
     doctor_id = izvleceno.get("doctor_id")  # gi zemame izvlechenite podatoci
     datum_str = izvleceno.get("datum")
-
     termini = najdi_oceneti_termini(pacient["email"], doctor_id, datum_str)  # bara termini so ocenki vo baza
-
     DENOVI = ["Понеделник", "Вторник", "Среда", "Четврток", "Петок", "Сабота", "Недела"]  # lista za prikaz na denovite
-
     if not termini:  # ako ne sme nasle nisto
         return (
             'Не најдов оценети прегледи што одговараат. Прашај „Кои се моите оценети прегледи?" '
             'или биди поспецифичен (лекар + датум).'
         )
-
     if len(termini) > 1:  # ako ima poveke od eden termin
         delovi = ["Имаш повеќе оценети прегледи. Кој точно сакаш да го избришеш?", ""]  # prasanje do korisnikot
         for t in termini[:10]:  # iterirame do prvite 10 rezultati
@@ -154,16 +127,14 @@ def odgovori_za_trgni_ocena(prasanje: str, pacient: dict | None) -> str:  # glav
         delovi.append('Биди поточен: „Тргни ја оцената за прегледот кај д-р [презиме] на [датум]"')  # upatstvo
         return "\n".join(delovi)  # ja vrakame listata kako eden tekst
 
-    # Точно еден термин
+    # tocno eden termin
     t = termini[0]  # go zemame prviot (i edinstven) termin
     if not izbrisi_ocena(t["feedback_ID"]):  # go povikuvame brisenjeto vo baza
         return "Не успеа да ја избришам оцената. Пробај пак."
-
     datum = t["datum_pregled"]  # zemame datum
     den_ime = DENOVI[datum.weekday()]  # zemame ime na den
     vreme = format_vreme(t["vreme_pregled"])  # zemame vreme
     stara_ocena = t.get("ocena") or 0  # ja zemame starata ocena za info
-
     ime_lekar = t['ime_lekar']  # ime na lekar
     return (  # vrakame potvrda za brisenjeto
         f"Оцената е избришана!\n\n"

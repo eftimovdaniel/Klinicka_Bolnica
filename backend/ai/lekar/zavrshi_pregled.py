@@ -365,9 +365,57 @@ def odgovori_za_zavrshi(  # mojata glavna hendler funkcija koja ja povikuva rute
     if tid is not None:  # ako mojot regularen izraz uspesno pronashel tochen id broj vo prasanjeto
         termin_ids = [tid]  # go stavam toj pronajden broj kako edinstven element vo listata za obrabotka
 
-    podatoci = _izvlechi(prasanje)  # ja povikuvam funkcijata za kompletna analiza na prasanjeto so pomosh na ai modelot
-    if podatoci.get("_error"):  # ako pri analizata ili komunikacijata so ai modelot se pojavila nekakva greshka
-        return str(podatoci["_error"])  # vednas ja vrakjam porakata za greshka kako odgovor na interfejsot
+    # BUG FIX: brz tek bez AI ako veke imame ID + dx/tx (ili gi nema)
+    # mozhe da se izvlechat regex-no. Sprechuva 429 da go blokira korisnikot.
+    dx_match = _RE_DX.search(prasanje)
+    dx_so_match = _RE_DX_SO.search(prasanje)
+    tx_match = _RE_TX.search(prasanje)
+    dijagnoza_regex = (
+        (dx_match.group(1).strip() if dx_match else None)
+        or (dx_so_match.group(1).strip() if dx_so_match else None)
+    )
+    terapija_regex = tx_match.group(1).strip() if tx_match else None
+
+    # Proverka dali prasanjeto voopshto mentionira dx/tx kluc
+    _p_low_check = prasanje.lower()
+    ima_kluc_dx = "дијагноз" in _p_low_check or "dijagnoz" in _p_low_check
+    ima_kluc_tx = "терапиј" in _p_low_check or "terapij" in _p_low_check
+
+    # Ako imame ID i ne ni treba AI - prejdi vo brz tek
+    skip_ai = bool(termin_ids) and bool(
+        # Ako voopshto ne se spomenati dx/tx vo prasanjeto
+        (not ima_kluc_dx and not ima_kluc_tx)
+        # Ili gi imame i dvete od regex
+        or (
+            (not ima_kluc_dx or dijagnoza_regex)
+            and (not ima_kluc_tx or terapija_regex)
+        )
+    )
+
+    if skip_ai:
+        podatoci = {
+            "termin_ids": termin_ids,
+            "dijagnoza": dijagnoza_regex,
+            "terapija": terapija_regex,
+            "ime_pacient": None,
+            "datum": None,
+            "site": False,
+        }
+    else:
+        podatoci = _izvlechi(prasanje)  # ja povikuvam funkcijata za kompletna analiza na prasanjeto so pomosh na ai modelot
+        if podatoci.get("_error"):  # ako pri analizata ili komunikacijata so ai modelot se pojavila nekakva greshka
+            # FALLBACK: ako imame ID iako AI ne raboti - prodolzi so toa shto go imame
+            if termin_ids:
+                podatoci = {
+                    "termin_ids": termin_ids,
+                    "dijagnoza": dijagnoza_regex,
+                    "terapija": terapija_regex,
+                    "ime_pacient": None,
+                    "datum": None,
+                    "site": False,
+                }
+            else:
+                return str(podatoci["_error"])  # vednas ja vrakjam porakata za greshka kako odgovor na interfejsot
 
     dijagnoza = (podatoci.get("dijagnoza") or "").strip() or None  # ja zemam izvlecenata dijagnoza ja chistam i ja postavuvam na nane ako e prazna
     terapija = (podatoci.get("terapija") or "").strip() or None  # go zemam tekstot za terapijata i go formatiram bez prazni mesta na kraevite

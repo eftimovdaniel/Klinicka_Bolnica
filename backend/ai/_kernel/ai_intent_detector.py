@@ -25,7 +25,8 @@ from ai._kernel.prompt_loader import load_prompt
 
 
 
-# Множество валидни интенти за валидација на одговорот
+# Mnozhestvo validni intenti - sluzhi za validacija deka AI vratil poznata vrednost
+# (kako safelist - ako AI izmisli neshto, ne se prifaka)
 VALIDNI_INTENTI = {
     "zakazi_termin",
     "otkazi_termin",
@@ -75,30 +76,40 @@ def detektiraj_intent_so_ai(prasanje: str) -> str:
     """
     if not prasanje or not prasanje.strip():
         return "general"
+    # Prazno prasanje - generichen fallback
 
     try:
         odgovor = ask_ai(prasanje.strip(), system_prompt=load_prompt("intent_classifier"))
+        # intent_classifier promptot dava lista na validni intenti i kako da gi vrati
     except Exception as e:
         print(f"[ai_intent] greska pri AI: {e}")
         return "general"
+        # Pri greshka - safe fallback na opshti odgovor
 
-    # Исчисти го одговорот
+    # ISCISTUVANJE NA ODGOVOROT
     cist = (odgovor or "").strip().lower()
+    # Mali bukvi za polesno sporeduvanje
     # Тргни markdown ``` или објаснувања
     cist = re.sub(r"^```\w*\s*", "", cist)
     cist = re.sub(r"\s*```$", "", cist)
+    # Cisti pochetna i krajna markdown fence (AI ponekade ja zatvara takka)
     # Земи само првиот „збор" (intent_name)
     prv_red = cist.split("\n")[0].strip()
+    # Prva linija - vo slucaj AI da napisha objasnuvanje vo slednite redovi
     prv_zbor = re.split(r"[\s,.!?:;()\"]+", prv_red)[0] if prv_red else ""
+    # Razdeluvanje na zborovi - prvi zbor e intent imeto
 
-    # Валидирај
+    # VALIDACIJA
     if prv_zbor in VALIDNI_INTENTI:
         return prv_zbor
+    # Tochno sovpaganje vo safelist - vrati direktno
 
     # Ако AI врати нешто слично - barаj подниз
     for v in VALIDNI_INTENTI:
         if v in cist:
             return v
+    # Fallback - mozhebi AI go vrati intent imeto vnatre vo dolg tekst
 
     print(f"[ai_intent] nevaliden odgovor: '{odgovor}' -> general")
     return "general"
+    # Posleden fallback - ako AI vrati neshto sosema nepoznato

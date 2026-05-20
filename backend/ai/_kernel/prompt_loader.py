@@ -14,8 +14,11 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
+# Patekata do bundle fajlot - relativno na ovoj fajl, parents[2] = backend/
 _BUNDLE_PATH = Path(__file__).resolve().parents[2] / "data" / "agent_prompts.txt"
+# Stara struktura - posebni .txt fajlovi po prompt (kako fallback)
 _LEGACY_DIR = Path(__file__).resolve().parents[2] / "data" / "prompts"
+# Regex za prepoznavanje na zaglavija na sekcii: "@@@ ime @@@"
 _SECTION_RE = re.compile(r"^@@@\s*([a-zA-Z0-9_]+)\s*@@@\s*$", re.MULTILINE)
 
 
@@ -24,18 +27,22 @@ def _parse_bundle(text: str) -> dict[str, str]:
     matches = list(_SECTION_RE.finditer(text))
     if not matches:
         return parts
+    # Bez sekcii nema shto da se vrati
     for i, m in enumerate(matches):
         name = m.group(1)
         start = m.end()
+        # Krajot na sekcijata e pochetokot na slednata (ili kraj na fajlot)
         end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         body = text[start:end].strip()
         if body:
             parts[name] = body
+            # Prazni sekcii se ignoriraat
     return parts
 
 
 @lru_cache(maxsize=1)
 def _all_prompts() -> dict[str, str]:
+    # lru_cache so maxsize=1 - cita gi promptite samo ednash
     if not _BUNDLE_PATH.is_file():
         raise FileNotFoundError(f"Нема bundle фајл: {_BUNDLE_PATH}")
     return _parse_bundle(_BUNDLE_PATH.read_text(encoding="utf-8"))
@@ -50,7 +57,9 @@ def load_prompt(name: str) -> str:
     legacy = _LEGACY_DIR / f"{name}.txt"
     if legacy.is_file():
         return legacy.read_text(encoding="utf-8").strip()
+        # Kompatibilnost so star sistem - posebni fajlovi po prompt
     known = ", ".join(sorted(prompts.keys())[:8])
+    # Prvi 8 imiata za debug pomosh
     raise KeyError(
         f"Prompt '{name}' не постои во {_BUNDLE_PATH.name}. "
         f"Додај секција: @@@ {name} @@@\n"
@@ -61,6 +70,7 @@ def load_prompt(name: str) -> str:
 def load_prompt_template(name: str, **kwargs: str) -> str:
     """Шаблон со {{placeholders}} — за {lista} во JSON користи двојни {{ }} во текстот."""
     return load_prompt(name).format(**kwargs)
+    # str.format() - zameni gi {placeholders} so vrednostite od kwargs
 
 
 def list_prompt_names() -> list[str]:
@@ -75,3 +85,4 @@ def prompts_bundle_path() -> Path:
 def reload_prompts() -> None:
     """По уредување на agent_prompts.txt во развој (рестартирај или повикај reload)."""
     _all_prompts.cache_clear()
+    # Brishi go cache-ot - slednoto povikuvanje ke procheta od disk

@@ -538,15 +538,23 @@ def prasanje_e_proverka_aplikacija_rabota(prasanje: str) -> bool:
     ):
         return False                        # nov protok, ne proverka
 
-    if any(                                 # klasicni frazi za status
+    # BUG FIX: "дали имам" / "dali imam" goli (bez kontekst) gi fakaa
+    # i prashanja kako „Дали имам прегледи за денес", „Дали имам термини".
+    # Sega se baraat zaedno so аплицир/апликаци kluchen zbor.
+    if any(                                 # klasicni frazi za status (so kontekst)
         x in p
         for x in (
-            "дали имам",
-            "dali imam",
+            "дали имам аплициран",
+            "dali imam apliciran",
+            "дали имам апликаци",
+            "dali imam aplikaci",
+            "дали имам поднесено",
+            "dali imam podneseno",
             "дали сум аплицирал",
             "dali sum apliciral",
             "имам ли апликаци",
             "imam li aplikaci",
+            "имам ли аплициран",
             "моја апликаци",
             "moja aplikaci",
             "статус на апликаци",
@@ -562,8 +570,11 @@ def prasanje_e_proverka_aplikacija_rabota(prasanje: str) -> bool:
     ):
         return True                         # prepoznato kako proverka
 
+    # Kombinacija dali + work-app keyword. „пријав" namerno NE e tuka -
+    # mozhe da znachi i prijava za pregled (pacient check-in). Za jobs
+    # baraj aplicir/aplikaci kako sigurno-pozitivni kluchni zborovi.
     if ("дали" in p or "dali" in p) and any( # kombinacija dali + aplikacija
-        w in p for w in ("аплицир", "aplicir", "апликаци", "aplikaci", "пријав", "prijav")
+        w in p for w in ("аплицир", "aplicir", "апликаци", "aplikaci")
     ):
         return True
     return False                            # ne e proverka

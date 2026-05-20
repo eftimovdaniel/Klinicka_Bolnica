@@ -31,7 +31,11 @@
 """
 
 # Типови на извор за логирање / debug
+# Determiniran rezultat od pravila (regex, lookup)
 SOURCE_RULES = "rules"
+# Najden preku alias (na pr. "ORL" -> "Otorinolaringologija")
 SOURCE_ALIAS = "alias"
+# AI izbral od zatvorena lista (ne slobodno generiranje)
 SOURCE_AI_LIST = "ai_closed_list"
+# Tochno sovpaganje vo bazata (bez fuzzy match)
 SOURCE_EXACT = "exact_db"
