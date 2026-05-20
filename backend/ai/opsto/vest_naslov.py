@@ -155,20 +155,30 @@ def prasanje_e_izbrisi_po_kontekst(
     """
     „Дали може да ја избришеш сега истата" — вест од претходна порака (objavi_vest).
     """
-    if not prasanje_ima_brisenje_marker(prasanje):
-        return False
-    if not isinstance(kontekst, dict):
-        return False
-    if not kontekst.get("last_vest_id"):
-        return False
-    p = transliterijaj(prasanje).lower()
-    if any(w in p for w in _PRONOUNI_VEST_KONTEKST):
-        return True
-    if re.search(r"\b(ја|го|ги|ja|go|gi)\b", p) and "оглас" not in p:
-        return True
-    if kontekst.get("last_action") == "objavi_vest":
-        return True
-    return False
+    if not prasanje_ima_brisenje_marker(prasanje):  # mora prvo da ima glagol za brisenje vo prasanjeto
+        return False    # ako nema glagol ne se obiduva da brise
+    if not isinstance(kontekst, dict):  # bez memorija na poraka ne mozeme da znaeme za koja vest se zboruva
+        return False    # vrakja false ako nema kontekst
+    if not kontekst.get("last_vest_id"):    # potreben e zacuvan id na posledna vest od prethodna poraka
+        return False    # ako nema id ne mozeme da brisame po memorija
+    p = transliterijaj(prasanje).lower()    # normaliziran tekst za prebaruvanje na klucni zborovi
+
+    # AKO PRASANJETO IMA REALEN KANDIDAT NA NASLOV - prefer title lookup, ne kontekst
+    kand = izvleci_naslov_kandidat(prasanje)    # se izvlekuva mozen naslov od pranjeto
+    if len(_normaliziraj_naslov(kand)) >= 6 and pronajdi_vest_po_naslov(prasanje):  # ako naslovot e dolg i ima validna vest
+        return False    # vrakja false za da se brise po naslov a ne po memorija
+
+    if any(w in p for w in _PRONOUNI_VEST_KONTEKST):    # ako e koristen jasen pronoun istata, neа i sl.
+        return True # toa e tocna situacija za brisenje po memorija
+    if kontekst.get("last_action") == "objavi_vest":    # ako prethodno bila objavena vest vo istata sesija
+        return True # toa znaci deka korisnikot najverojatno saka da ja izbrise taa vest
+
+    # samo „izbrisi ja", „izbrisi go" — kratki bez naslov, bez konkreten oglas
+    if "оглас" in p:    # ako se pomenuva oglas toa ne e za vest
+        return False    # ne brisi vest ako se zboruva za oglas
+    if re.search(r"\b(ја|го|ги|ja|go|gi)\b", p, re.UNICODE) and len(p.split()) <= 5: # samo kratki naredbi so ja/go/gi
+        return True # vrakja true samo za kratki nedvosmisleni naredbi
+    return False    # vo sprotivno ne se koristi memorijata
 
 
 def prasanje_e_izbrisi_vest_oglas(

@@ -347,6 +347,77 @@ def vreme_od_prasanje_lokalno(prasanje: str) -> str | None:  # Izvlekuvanje na v
         h = int(m.group(1))
         if 0 <= h <= 23: return f"{h:02d}:00"  # Vrati polen cas
     return None  # Ako ne e najdeno vreme, vrati None
+
+
+def vreme_iz_kontekst(kontekst: dict | None) -> str | None:
+    """Зачуван час од претходна порака (кој е слободен во X)."""
+    if not isinstance(kontekst, dict):
+        return None
+    v = (kontekst.get("last_slobodni_vreme") or "").strip()
+    if v:
+        return v
+    z = kontekst.get("zakazi_od_slobodni")
+    if isinstance(z, dict):
+        v = (z.get("vreme") or "").strip()
+        if v:
+            return v
+    return None
+
+
+def prasanje_e_utochnuvanje_datum(prasanje: str) -> bool:
+    """
+    Само уточнување на датум/ден (на пр. «наредниот петок») по претходно «кој е слободен … во 13:00».
+    """
+    p = transliterijaj(prasanje).lower().strip()
+    if not p or len(p) > 70:
+        return False
+    if not datum_od_prasanje_lokalno(prasanje):
+        return False
+    if baranje_e_zakazuvanje(prasanje):
+        return False
+    from ai._kernel.lekar_lookup import prasanje_ukazuva_kon_konkreten_lekar
+
+    if prasanje_ukazuva_kon_konkreten_lekar(prasanje):
+        return False
+    if _KO_PRASANJE_RE.search(p):
+        return False
+    if "слобод" in p or "slobod" in p:
+        return False
+    if re.search(r"\b(?:кај|kaj)\s+", p, re.UNICODE):
+        return False
+    return True
+
+
+def _azuriraj_kontekst_ko_sloboden(
+    kontekst: dict | None,
+    baran_datum: date,
+    barano_vreme: str | None,
+    lekari: list[dict],
+    oddel: str | None,
+    pool: list[dict] | None,
+) -> dict:
+    ctx = dict(kontekst) if isinstance(kontekst, dict) else {}
+    if oddel:
+        ctx["last_oddel"] = oddel
+        if pool:
+            ctx["last_oddel_doctor_ids"] = [int(l["doctor_ID"]) for l in pool]
+    ctx["last_slobodni_datum"] = baran_datum.strftime("%Y-%m-%d")
+    if barano_vreme:
+        ctx["last_slobodni_vreme"] = barano_vreme
+    if lekari:
+        ctx["last_slobodni_doctor_ids"] = [int(l["doctor_ID"]) for l in lekari]
+        pr = lekari[0]
+        z: dict = {
+            "doctor_id": int(pr["doctor_ID"]),
+            "datum": baran_datum.strftime("%Y-%m-%d"),
+        }
+        if barano_vreme:
+            z["vreme"] = barano_vreme
+        ctx["zakazi_od_slobodni"] = z
+        ctx["last_doctor_id"] = int(pr["doctor_ID"])
+    return ctx
+
+
 #Regex za prepoznavanje na prashalni zborovi (koj/koja/koi)
 _KO_PRASANJE_RE = re.compile(
     r"\b(кој|која|кои|koj|koja|koi)\b",
@@ -1365,10 +1436,30 @@ def odgovori_za_slobodni_termini(
             "kontekst": kontekst,
         }
 
+    # SLUCAJ 1b: само нов датум/ден — зачувано време и оддел од претходната порака
+    if prasanje_e_utochnuvanje_datum(prasanje):
+        baran_datum = izvleci_datum_za_slobodni(prasanje, kontekst)
+        if baran_datum:
+            zacuvano_vreme = vreme_iz_kontekst(kontekst)
+            if zacuvano_vreme:
+                pool, oddel = lekari_pool_za_ko_sloboden(prasanje, kontekst)
+                tekst = odgovor_ko_e_sloboden_na_termin(
+                    prasanje, baran_datum, zacuvano_vreme, kontekst
+                )
+                lekari = najdi_lekari_slobodni_na(
+                    baran_datum, zacuvano_vreme, lekari_pool=pool
+                )
+                ctx = _azuriraj_kontekst_ko_sloboden(
+                    kontekst, baran_datum, zacuvano_vreme, lekari, oddel, pool
+                )
+                return {"odgovor": tekst, "kontekst": ctx}
+            if _ima_oddel_lekari_kontekst(kontekst) or _oddel_od_kontekst(kontekst):
+                return odgovor_slobodni_za_den_oddel(prasanje, baran_datum, kontekst)
+
     # SLUCAJ 2: "KOJ E SLOBODEN VO X CHAS?"
     if prasanje_e_ko_e_sloboden_datum_vreme(prasanje, kontekst):
         baran_datum = izvleci_datum_za_slobodni(prasanje, kontekst)
-        barano_vreme = vreme_od_prasanje_lokalno(prasanje)
+        barano_vreme = vreme_od_prasanje_lokalno(prasanje) or vreme_iz_kontekst(kontekst)
         oddel_ctx = _oddel_od_kontekst(kontekst)
         # Trojkata e: datum, vreme, oddel - se proveruva po red
 
@@ -1412,27 +1503,9 @@ def odgovori_za_slobodni_termini(
             prasanje, baran_datum, barano_vreme, kontekst
         )
         lekari = najdi_lekari_slobodni_na(baran_datum, barano_vreme, lekari_pool=pool)
-        # Lista na lekari slobodni na toa vreme - za kontekst
-
-        # AZURIRANJE NA KONTEKST
-        ctx = dict(kontekst) if isinstance(kontekst, dict) else {}
-        if oddel:
-            ctx["last_oddel"] = oddel
-            if pool:
-                ctx["last_oddel_doctor_ids"] = [int(l["doctor_ID"]) for l in pool]
-        ctx["last_slobodni_datum"] = baran_datum.strftime("%Y-%m-%d")
-        ctx["last_slobodni_vreme"] = barano_vreme
-        if lekari:
-            ids_slob = [int(l["doctor_ID"]) for l in lekari]
-            ctx["last_slobodni_doctor_ids"] = ids_slob
-            pr = lekari[0]
-            ctx["zakazi_od_slobodni"] = {
-                "doctor_id": int(pr["doctor_ID"]),
-                "datum": baran_datum.strftime("%Y-%m-%d"),
-                "vreme": barano_vreme,
-            }
-            # Prviot lekar se zachuvuva za polesno "zakazhi" prodolzhuvanje
-            ctx["last_doctor_id"] = int(pr["doctor_ID"])
+        ctx = _azuriraj_kontekst_ko_sloboden(
+            kontekst, baran_datum, barano_vreme, lekari, oddel, pool
+        )
         return {"odgovor": tekst, "kontekst": ctx}
 
     # SLUCAJ 3: "SLOBODNI NA DATUM" PO ODDEL (BEZ KONKRETEN LEKAR)

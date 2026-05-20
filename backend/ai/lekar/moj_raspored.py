@@ -24,24 +24,71 @@ PROMPT = """
 - ако корисникот спомне број (пр. „следните 5", „топ 3") → "broj"=число
 - ако нема ништо јасно → сите вредности null БЕЗ markdown, БЕЗ објаснувања. Само JSON.
 """.strip()
-from ai.lekar.lekar_intent import prasanje_e_moj_raspored_lekar  
+from ai.lekar.lekar_intent import prasanje_e_moj_raspored_lekar
+from ai._kernel.transliteracija import transliterijaj
+
+
+def _lokalno_izvlechi(prasanje: str) -> dict | None:
+    """Брза локална детекција без Groq за чести форми."""
+    p = transliterijaj(prasanje or "").lower().strip()
+    if not p:
+        return None
+    if prasanje_e_lista_site_pregledi(prasanje):
+        return {"period": "site", "datum": None, "broj": None}
+    if any(x in p for x in ("денес", "denes", "за денеска", "za deneska")):
+        return {"period": "denes", "datum": None, "broj": None}
+    if any(x in p for x in ("утре", "utre", "za utre", "за утре")):
+        return {"period": "utre", "datum": None, "broj": None}
+    if any(
+        x in p
+        for x in (
+            "оваа недела", "ovaa nedela",
+            "следната недела", "slednata nedela",
+            "наредната недела", "narednata nedela",
+            "наредните 7 дена", "narednite 7 dena",
+            "7 дена", "7 dena",
+        )
+    ):
+        return {"period": "nedela", "datum": None, "broj": None}
+    if any(
+        x in p
+        for x in (
+            "овој месец", "ovoj mesec",
+            "наредните 30 дена", "narednite 30 dena",
+            "30 дена", "30 dena",
+        )
+    ):
+        return {"period": "mesec", "datum": None, "broj": None}
+    # „Мој распоред“ / „распоред“ без друг детал → од денес натаму
+    if re.fullmatch(r"(?:мој\s+)?распоред\.?", p) or re.fullmatch(r"(?:moj\s+)?raspored\.?", p):
+        return {"period": None, "datum": None, "broj": None}
+    return None
+
+
+import re  # за локалниот parser
+
 # funkcija koja go povikuva llm modelot za strukturiranje na branjeto
 def _izvlechi(prasanje: str) -> dict:
-    if prasanje_e_lista_site_pregledi(prasanje):    #ako baranjeto se sovpaga so tekstot za site pregledi
-        return {"period": "site", "datum": None, "broj": None}  # vrati predefinirani objekti bez ai 
-    if msg := groq_zadolzhitelen():     # proveka dali groq e dostapen za rabota i online
-        return {"_error": msg}  #ako e offline ili e nastanata promena se pecati poraka za greska
+    lok = _lokalno_izvlechi(prasanje)
+    if lok is not None:
+        return lok
+    if datum_za_pregledi_od_prasanje(prasanje):
+        # Конкретен ден ќе се извлече локално подоцна — нема потреба од Groq
+        return {"period": None, "datum": None, "broj": None}
+    if groq_zadolzhitelen():
+        # Groq недостапен → разумен default наместо грешка
+        return {"period": None, "datum": None, "broj": None}
 
     denes = date.today().strftime("%Y-%m-%d")   # se zema denesnata data kako string
     denes_den = ["понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"][
         date.today().weekday()
     ]   # se pravi presmetka na dekovnite denovi
-    # se sozdava celosniot kontekst na llm modelot za polesno da sraboti krelativni datumi kko ute ili naredniot vtornik
     full = f'Денес: {denes} ({denes_den})\n\nПрашање: „{prasanje}"\nВрати JSON.'
     podatoci = izvlechi_json_so_ai(full, PROMPT, log_tag="moj_raspored")    # povik do groq api i parsiranje na baranjeto
-    if podatoci.get("_error"):  # ako nastane nekoja greska error
-        return podatoci # se vraka objektot so greska
-    return podatoci #vraka gi izvlecenite podaotoci
+    if podatoci.get("_error"):
+        # Тивок fallback за rate-limit / 429 — не блокирај го корисникот
+        return {"period": None, "datum": None, "broj": None}
+    return podatoci
 
 # funkcija koja detektira period od do 
 def _period_to_dates(period: str | None) -> tuple[date | None, date | None, str]:
@@ -65,7 +112,14 @@ def odgovori_za_raspored(
     prasanje: str, lekar: dict | None, kontekst: dict | None = None
 ) -> str | dict:
     if err := require_lekar(lekar): # proverka koj e najven dali e lekar samo toj moze da gleda
-        return err # ako ne e lekar dava error
+        return {
+            "odgovor": (
+                f"{err}\n\n"
+                "Најавете се преку «Најава за лекар» — потоа ќе го отворим панелот "
+                "со вашите закажани прегледи."
+            ),
+            "akcija": "otvori_lekar_login",
+        }
     doctor_id = lekar["doctor_ID"]  # se prezema id na lekarot koj e najaven
     podatoci = _izvlechi(prasanje)  # povik na ai funkcijata za izvlekuvanje na json parametri
     if podatoci.get("_error"):  # ako ai dade greska    

@@ -182,23 +182,57 @@ STATUS_OZNAKI = {
 }
 
 
+def _baranje_e_lekarski_raspored(prasanje: str) -> bool:
+    """Дали барањето е за лекарски распоред (не за лични прегледи на пациент)."""
+    try:
+        from ai.lekar.lekar_intent import prasanje_e_moj_raspored_lekar
+
+        if prasanje_e_moj_raspored_lekar(prasanje):
+            return True
+    except ImportError:
+        pass
+    p = transliterijaj(prasanje).lower()
+    if "закажан" in p and re.search(r"\b(преглед|pregled|термин|termin)\w*\b", p, re.UNICODE):
+        if not any(x in p for x in ("мои", "moite", "moi ", "твои", "tvoi ")):
+            return True
+    return prasanje_e_pregledi_datum(prasanje) and not any(
+        x in p for x in ("мои", "moite", "moi ", "твои", "tvoi ")
+    )
+
+
 # Glaven handler za lista na pregledi za najaven pacient
 def odgovori_za_moi_pregledi(
-    prasanje: str, pacient: dict | None, lekar: dict | None = None
-) -> str:
+    prasanje: str,
+    pacient: dict | None,
+    lekar: dict | None = None,
+    kontekst: dict | None = None,
+) -> str | dict:
+    # Најавен лекар → ист flow како moj_raspored (отвора таб на панелот)
+    if lekar and lekar.get("doctor_ID"):
+        from ai.lekar.moj_raspored import odgovori_za_raspored
+
+        return odgovori_za_raspored(prasanje, lekar, kontekst)
+
     # Validacija: pacientot mora da e najaven
     if not pacient or not pacient.get("email"):
-        if lekar and lekar.get("doctor_ID"):
-            return (
-                "За прегледи на датум како лекар (ваши закажани термини) напишете, на пр.:\n"
-                '„Прикажи ми закажани прегледи" или „Прегледи за 19.05“.'
-            )
-        return (
-            'За да ги видиш своите прегледи преку AI асистентот, прво најави '
-            'се како пациент (горе десно копчето „Најави се").\n\n'
-            "Ако сте лекар, најавете се со лекарски профил — тогаш „Прегледи за [датум]“ "
-            "ги прикажува вашите закажани прегледи."
-        )
+        if _baranje_e_lekarski_raspored(prasanje):
+            return {
+                "odgovor": (
+                    "За да ги видите закажаните прегледи на панелот, најавете се како лекар "
+                    "(«Најава за лекар» на сајтот).\n\n"
+                    'Потоа напишете, на пр.: „Прикажи ми закажани прегледи" или „Прегледи за 19.05".'
+                ),
+                "akcija": "otvori_lekar_login",
+            }
+        return {
+            "odgovor": (
+                'За да ги видиш своите прегледи преку AI асистентот, прво најави '
+                'се како пациент (горе десно копчето „Најави се").\n\n'
+                "Ако сте лекар, најавете се со лекарски профил — тогаш „Прегледи за [датум]“ "
+                "ги прикажува вашите закажани прегледи на панелот."
+            ),
+            "akcija": "otvori_pacient_login",
+        }
 
     podatoci = _izvlechi(prasanje) # Izvleci filteri od prasanje
     if podatoci.get("_error"):

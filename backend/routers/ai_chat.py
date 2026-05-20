@@ -259,6 +259,18 @@ def _resolve_intent(
     if intent == "moj_raspored" and pacient_dict and not lekar_dict:
         intent = "moi_pregledi"
 
+    # Лекар: „Прегледи за …“ / закажани прегледи → панел (не patient-only handler)
+    if intent == "moi_pregledi" and lekar_dict and lekar_dict.get("doctor_ID"):
+        intent = "moj_raspored"
+    else:
+        try:
+            from ai.lekar.lekar_intent import prasanje_e_moj_raspored_lekar
+
+            if intent == "moi_pregledi" and prasanje_e_moj_raspored_lekar(pitanje_norm):
+                intent = "moj_raspored"
+        except ImportError:
+            pass
+
     from ai.pacient.slobodni_termini import (
         baranje_e_zakazuvanje,
         datum_od_prasanje_lokalno,
@@ -297,6 +309,16 @@ def _resolve_intent(
         q = pitanje_norm.lower()
         if prasanje_e_otkazuvanje(pitanje_norm):
             return "otkazi_termin"
+        # „кој е слободен … во 13:30“ — секогаш слободни термини, не закажување
+        from ai.pacient.slobodni_termini import prasanje_e_ko_e_sloboden_datum_vreme
+
+        ima_ko_prasanje = bool(re.search(r"\b(кој|која|кои|koj|koja|koi)\b", q, re.UNICODE))
+        ima_slobod = "слобод" in q or "slobod" in q
+        ima_provera = any(w in q for w in ("провери", "провер", "има ли", "кога"))
+        if (
+            ima_ko_prasanje and (ima_slobod or ima_provera)
+        ) or prasanje_e_ko_e_sloboden_datum_vreme(pitanje_norm, aktiven_kontekst):
+            return "slobodni_termini"
         if baranje_e_zakazuvanje(pitanje_norm):
             return "zakazi_termin"
         if prasanje_bar_datum_od_kontekst(pitanje_norm) and datum_od_zakazi_kontekst(

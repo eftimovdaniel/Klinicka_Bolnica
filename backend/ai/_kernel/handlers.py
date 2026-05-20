@@ -104,7 +104,7 @@ def _build_handlers() -> dict[str, HandlerSpec]:
         "navigacija": HandlerSpec(navigacija.odgovori_za_navigacija, kind="dict_nav"),
         "lekari_oddel": HandlerSpec(lekari_oddel.odgovori_za_lekari_oddel, kind="dict_nav"),
         "apliciraj_za_rabota": HandlerSpec(apliciraj_za_rabota.odgovori_za_aplikacija, kind="dict_full"),
-        "moi_pregledi": HandlerSpec(moi_pregledi.odgovori_za_moi_pregledi),
+        "moi_pregledi": HandlerSpec(moi_pregledi.odgovori_za_moi_pregledi, kind="dict_full"),
         "aplikanti_oglas": HandlerSpec(aplikanti_oglas.odgovori_za_aplikanti),
         "zapishi_terapija": HandlerSpec(zapishi_terapija.odgovori_za_terapija),
         "novosti_rezime": HandlerSpec(novosti_rezime.odgovori_za_novosti_rezime, kind="none"),
@@ -182,7 +182,7 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
     ):
         raw = spec.fn(q, ctx.pacient)
     elif intent == "moi_pregledi":
-        raw = spec.fn(q, ctx.pacient, ctx.lekar)
+        raw = spec.fn(q, ctx.pacient, ctx.lekar, ctx.kontekst)
     elif intent in ("info_lekar", "preference_lekar"):
         raw = spec.fn(q, ctx.kontekst)
     elif intent in ("pregled_dezurstvo", "promeni_dezurstvo"):

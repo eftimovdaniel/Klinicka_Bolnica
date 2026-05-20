@@ -16,7 +16,7 @@ from ai._kernel.utils import format_datum_i_vreme
 
 _RE_TERMIN_ID = re.compile(r"\bID\s*(\d+)\b", re.IGNORECASE | re.UNICODE)  # regex za naogjanje na id brojot vo tekstot
 _RE_ZAVRSI_ZATVORI = re.compile(  # regex so koj gi baram klucnite zborovi za zavrshuvanje na pregledot
-    r"\b(заврш\w*|zavrsh\w*|затвор\w*|zatvor\w*|затвот\w*)\b",  # razlicni varijanti na zborovite na kirilica i latinica
+    r"\b(заврш\w*|zavrsh\w*|затвор\w*|zatvor\w*|затвот\w*|додад\w*|додаj\w*|dodad\w*|dodaj\w*|ажурир\w*|azurir\w*|обнов\w*|обнoви\w*|update)\b",  # razlicni varijanti na zborovite na kirilica i latinica plus update
     re.IGNORECASE | re.UNICODE,  # ignoriranje na mali i golemi bukvi i poddrshka za unikod
 )  # kraj na regexot za klucni zborovi za zatvoranje
 _RE_DX = re.compile(  # regex za izvlekuvanje na tekstot na dijagnozata od tekstot
@@ -302,6 +302,31 @@ def _zavrshi(termin_id: int, dijagnoza: str | None, terapija: str | None) -> Non
     conn.close()  # ja zatvoram konekcijata za da go oslobodam konekcikiot pul
 
 
+def _azuriraj_dx_tx(termin_id: int, dijagnoza: str | None, terapija: str | None) -> bool:  # funkcija za partialen apdejt na medicinski beleshki bez izmena na statusot
+    """UPDATE dx/tx БЕЗ менување на статусот (за пр. ажурирање на веќе завршен преглед)."""
+    sets: list[str] = []  # lokalna lista vo koja ke gi sobiram delovite od set delot na sql upitot
+    params: list = []  # parallel lista vo koja ke gi chuvam vrednostite za sekoja sql klauzula
+    if dijagnoza and not _prazna_dx_tx(dijagnoza):  # ako ima validna dijagnoza koja ne e prazen simbol kako kosi crti
+        sets.append("dijagnoza = %s")  # go dodavam delot za dijagnoza vo gradeniot sql upit
+        params.append(dijagnoza)  # ja prikachuvam realnata vrednost na dijagnozata vo parametrite
+    if terapija and not _prazna_dx_tx(terapija):  # ako lekarot pripishal validna terapija a ne samo prazen znak
+        sets.append("terapija = %s")  # go dopolnuvam upitot so polenoto za propishanata terapija
+        params.append(terapija)  # ja stavam vrednosta na terapijata vo listata so sql parametri
+    if not sets:  # ako po site proverki ne se sobrala nikakva validna izmena za zacuvuvanje
+        return False  # vrakjam false bidejki nema sto da apdejtiram vo bazata
+    params.append(termin_id)  # go dodavam id brojot na terminot kako posleden parametar za where uslovot
+    conn = get_connection()  # otvoram nova konekcija kon mysql bazata na podatoci
+    cur = conn.cursor()  # kreiram klasichen kursor za izvrshuvanje na izmenata
+    cur.execute(  # ja izvrshuvam dinamichki sklopena update naredba so site zashtiteni parametri
+        f"UPDATE Termin_pregled SET {', '.join(sets)} WHERE termin_ID = %s",  # gi spojuvam delovite od set delot so zapirka megju niv
+        params,  # bezbedno ja prenesuvam listata so vrednosti kako tupla parametri
+    )  # kraj na izvrshuvanjeto na konkretniot update upit
+    conn.commit()  # gi potvrduvam i trajno gi snimam izmenite vo postojnata baza
+    cur.close()  # go zatvoram aktivniot kursor za da oslobodam memorija od mysql konektorot
+    conn.close()  # ja zatvoram vrskata so mysql serverot za da oslobodam konekciski resurs
+    return True  # vrakjam true kako potvrda deka apdejtot e uspeshno izvrshen vo bazata
+
+
 def _najdi_site_zakazani(doctor_id: int, datum_str: str | None) -> list[dict]:  # funkcija za povlekuvanje na apsolutno site zakazani termini odednas
     """Site zakazani pregledi na lekarot (opciono filtrirani po datum)."""
     conn = get_connection()  # otvoram aktivna vrska do mysql databazata
@@ -476,8 +501,29 @@ def odgovori_za_zavrshi(  # mojata glavna hendler funkcija koja ja povikuva rute
         # ako samo eden - daj obicen format
         if len(rows) == 1:  # ako vo listata na potvrdeni termini za izmena ima tocno eden pregled
             t = rows[0]  # go izoliram toj edinstven pregled od listata za direktna i poedinecna obrabotka
-            if t["status_pregled"] != "закажан":  # ako terminot veke bil zatvoren ili otkazan prethodno vo sistemot
-                return f'Терминот ID {t["termin_ID"]} веќе има статус „{t["status_pregled"]}".'  # ja vrakjam momentalnata sostojba bez izmena
+            status_t = (t.get("status_pregled") or "").strip()  # go zemam statusot na terminot vo cista forma bez prazni mesta
+            if status_t == "откажан":  # ako terminot e otkazan pred toa ne mozeme nisto da menuvame
+                return f'Терминот ID {t["termin_ID"]} е откажан, не може да се ажурира.'  # vrakjam jasna poraka za blokiranata akcija
+            if status_t == "завршен":  # specijalen tek za veke zavrshen pregled kade samo dx/tx mozat da se ajzuriraat
+                ima_dx_tx_vnos = (dijagnoza and not _prazna_dx_tx(dijagnoza)) or (  # proverka dali lekarot vnel barem edno od poliata
+                    terapija and not _prazna_dx_tx(terapija)  # ili dijagnoza ili terapija mora da bide validna i ne prazna
+                )  # kraj na bulovata proverka za prisustvo na medicinski podatoci
+                if not ima_dx_tx_vnos:  # ako voopshto nema noviот vnos za dx ili tx vo porakata na lekarot
+                    return (  # vrakjam pouchna poraka so primer kako da go napravi azhuriranjeto pravilno
+                        f'Терминот ID {t["termin_ID"]} веќе има статус „завршен“.\n\n'  # objasnuvanje deka terminot veke e zatvoren
+                        "За ажурирање наведете дијагноза/терапија, на пр.:\n"  # nasoka shto treba da napishe lekarot za update
+                        f'„Додади дијагноза: … и терапија: … на ID {t["termin_ID"]}“.'  # konkreten primer so id na terminot
+                    )  # kraj na pouchnata poraka koga nema dx/tx vnesi
+                if not _azuriraj_dx_tx(t["termin_ID"], dijagnoza, terapija):  # ako apdejt funkcijata vrati false znaci nema sto da se izmeni
+                    return f'Нема промени за термин ID {t["termin_ID"]}.'  # vrakjam jasno izvestuvanje deka nemalo nikakva razlika
+                msg = (  # gradam poraka za potvrda na uspeshniot apdejt na medicinskite podatoci
+                    f'Прегледот ID {t["termin_ID"]} е веќе завршен — ажурирани се медицинските податоци.'  # glavna potvrdna linija
+                    + (f"\nДијагноза: {dijagnoza}" if dijagnoza and not _prazna_dx_tx(dijagnoza) else "")  # dodavam linija so dijagnoza ako e azhurirana
+                    + (f"\nТерапија: {terapija}" if terapija and not _prazna_dx_tx(terapija) else "")  # dodavam linija so terapija ako e azhurirana
+                )  # kraj na gradenjeto na finalnata poraka za korisnikot
+                if nepostoekji:  # ako voedno vo prasanjeto imalo i drugi broevi koi ne pripagaat na ovoj lekar
+                    msg += f"\n\nНе најдов: ID {', '.join(str(x) for x in nepostoekji)}"  # ja prikachuvam listata na nevalidni broevi
+                return msg  # ja vrakjam celosno sklopena poraka za update na veke zavrshen pregled
             _zavrshi(t["termin_ID"], dijagnoza, terapija)  # ja izvrsushuvam realnata izmena vo bazata za toj pregled so dijagnozata
             msg = _format_uspeh(t, dijagnoza, terapija)  # go generiram ubaviot poedinecen izveshtaj za uspeshen zavrshetok na akcijata
             if nepostoekji:  # ako pokraj uspeshniot termin lekarot vo porakata pishal i neki drugi nepostoecki broevi

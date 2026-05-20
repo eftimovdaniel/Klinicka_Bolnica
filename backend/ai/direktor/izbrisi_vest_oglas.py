@@ -93,6 +93,12 @@ def odgovori_za_brisenje(
         # др Владко Захариев vo sportivno ova ne treba da e ovozmozeno)
         return err      # ako ne e najaven gorespoenetiot lekar se vraka error, porka za nastanata greska 
 
+    # PRVENSTVO ZA NASLOV: ako vo prasanjeto se prepoznae realen naslov od baza, brisi po naslov.
+    # Ova spreciuva koristenje na star last_vest_id koga korisnikot navede nova vest.
+    vest_po_naslov = pronajdi_vest_po_naslov(prasanje)   # try direkno prebaruvanje po naslov vo bazata
+    if vest_po_naslov:  # ako e najdena vest so toj naslov
+        return _izbrisi_vest(int(vest_po_naslov["id"])) # ja brise sodrzinata na sajtot direktno
+
     if prasanje_e_izbrisi_po_kontekst(prasanje, kontekst) and kontekst: # proverka dali korisnikot saka da ja izbrise vesta spored konekstot na prethodnite poraki
         vid = kontekst.get("last_vest_id")  # se zema posledniot id na objavenata vest
         if vid: # ako toa id postoi vo memorijata na porakite 
