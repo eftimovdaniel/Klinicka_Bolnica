@@ -20,16 +20,7 @@ def izvlechi_ocena_podatoci(prasanje: str) -> dict:  # funkcija za izvlekuvanje 
     den_vo_nedela = [
         "понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"
     ][date.today().weekday()]  # den vo nedelata
-    full_prompt = f"""
-Денес: {denes} ({den_vo_nedela})
-
-Лекари:
-{lista_text}
-
-Корисник: „{prasanje}"
-
-Извлечи ocena, komentar, doctor_id и datum.
-""".strip()  # kreiraj prompt za ai
+    full_prompt = f""" Денес: {denes} ({den_vo_nedela}) Лекари: {lista_text} Корисник: „{prasanje}" Извлечи ocena, komentar, doctor_id и datum. """.strip()  # kreiraj prompt za ai
     podatoci = izvlechi_json_so_ai(
         full_prompt, load_prompt("oceni_extract"), log_tag="oceni_pregled"
     )  # povikaj ai
