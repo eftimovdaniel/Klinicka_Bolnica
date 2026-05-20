@@ -1,7 +1,7 @@
-"""Заеднички контекст за преглед/промена на дежурства во AI разговор.""" # dokumentacija za modulot — memorija vo chat za dezurstva
+"""Заеднички контекст за преглед/промена на дежурства во AI разговор."""
 
-from datetime import date, datetime # vcituvame klasa date za datum i datetime od mysql
-from ai._kernel.utils import format_vreme # vcituvame funkcija koja vreme od baza go pravi vo HH:MM tekst
+from datetime import date, datetime
+from ai._kernel.utils import format_vreme
 
 
 def izgradi_kontekst(found: dict, dez: dict | None) -> dict: # funkcija koja go gradи kontekstot posle pregled na dezurstvo
