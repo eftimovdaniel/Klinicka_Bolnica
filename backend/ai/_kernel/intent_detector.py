@@ -1018,9 +1018,8 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
     if _tekst_e_oglas_za_objava(p):
         return "kreiraj_oglas"
 
-    if _ima_zbor(p, KLUCNI_OBJAVI_VEST):
-        return "objavi_vest"
-
+    # ВАЖНО: izbrisi проверка ПРЕД objavi_vest зашто „последната вест"
+    # содржи substring „следната вест" (KLUCNI_OBJAVI_VEST го фаќа погрешно).
     try:
         from ai.opsto.vest_naslov import prasanje_e_izbrisi_vest_oglas
 
@@ -1046,6 +1045,9 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
 
     if _ima_zbor(p, KLUCNI_IZBRISI_VEST_OGLAS):
         return "izbrisi_vest_oglas"
+
+    if _ima_zbor(p, KLUCNI_OBJAVI_VEST):
+        return "objavi_vest"
 
     # ВАЖНО: „затвори оглас" мора пред „kreiraj_oglas"
     if _ima_zbor(p, KLUCNI_ZATVORI_OGLAS):
@@ -1436,7 +1438,10 @@ def detektiraj_intent_keyword(prasanje: str) -> str | None:
 
 
 def detektiraj_intent(prasanje: str) -> str:
-    """AI-only: Groq класифицира интент (без keyword fallback)."""
+    """Правила прво, Groq само за нејасни прашања."""
+    kw = detektiraj_intent_keyword(prasanje)
+    if kw:
+        return kw
     from ai._kernel.groq_helpers import detektiraj_intent_ai_only
 
     return detektiraj_intent_ai_only(prasanje)

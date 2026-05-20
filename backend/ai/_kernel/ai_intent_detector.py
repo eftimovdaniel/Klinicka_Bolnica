@@ -1,5 +1,5 @@
 """
-AI-driven intent detector со Groq (Llama 3.3 70B).
+AI-driven intent detector со Groq API.
 
 Зашто:
 - Keyword detector-от пропушта природни варијации:

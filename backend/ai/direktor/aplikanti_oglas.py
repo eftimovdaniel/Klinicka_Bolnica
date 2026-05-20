@@ -2,7 +2,7 @@ from ai._kernel.prompt_loader import load_prompt  # vcituvanje AI prompt od agen
 from ai._kernel.ai_json import parse_ai_json  # AI odgovor -> JSON dict
 from ai._kernel.auth import require_direktor  # samo direktor ima pristap
 from ai._kernel.db_helpers import as_dict, db_cursor, prijaveni_select_sql  # pomos za MySQL kursor
-from ai._kernel.groq_client import ask_ai  # povik kon Groq (Llama)
+from ai._kernel.groq_client import ask_ai  # povik kon Groq API
 from ai._kernel.utils import format_datum_vreme
 
 

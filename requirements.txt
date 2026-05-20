@@ -118,7 +118,6 @@ nltk==3.9.2
 numpy==1.26.4
 nvdlib==0.8.3
 nvidia-riva-client==2.16.0
-ollama==0.6.1
 openai==1.109.1
 opencv-python==4.8.1.78
 optree==0.18.0
