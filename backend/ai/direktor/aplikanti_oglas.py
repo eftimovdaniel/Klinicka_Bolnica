@@ -7,18 +7,16 @@ from ai._kernel.utils import format_datum_vreme
 
 
 def _izvlechi(prasanje: str) -> dict:  # izvleci pozicija ili id_oglas od prasanjeto
-    odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=load_prompt("direktor_aplikanti_oglas"))  # AI analiza
-    print(f"[aplikanti] AI: {odgovor!r}")  # log za debug
+    odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=load_prompt("direktor_aplikanti_oglas"))  # AI analiza, se praka baranje do ai so soodvetniot promtp
     return parse_ai_json(odgovor, log_tag="aplikanti_oglas")  # dict ili _error
 
 
 def odgovori_za_aplikanti(prasanje: str, lekar: dict | None) -> str:  # glaven handler (intent aplikanti_oglas)
     if err := require_direktor(lekar):  # proveri uloga direktor
         return err  # odbien pristap
-
     podatoci = _izvlechi(prasanje)  # {pozicija, id_oglas} od AI
     if podatoci.get("_error"):  # Groq limit ili los JSON
-        return podatoci["_error"]  # prikazi greska
+        return podatoci["_error"]  # prikazi ja sisitemskata greska
 
     pozicija = (podatoci.get("pozicija") or "").strip() or None  # filter po pozicija (opcionalno)
     id_oglas = podatoci.get("id_oglas")  # filter po broj na oglas (opcionalno)

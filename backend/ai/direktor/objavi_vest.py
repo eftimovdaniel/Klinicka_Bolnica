@@ -19,7 +19,6 @@ def _video_id(text: str) -> str | None:
 def _zimi_transcript(video_id: str) -> str | None:
     try:
         from youtube_transcript_api import YouTubeTranscriptApi # lokalno se povikuva biblioteka za da se dobie tekst 
-
         api = YouTubeTranscriptApi()   #instalacija od api klienti za rabota so titles
         try:
             tr = api.fetch(video_id, languages=["mk", "en", "en-US", "sr", "bg"])   # se postavuva prioreite na koj jazici da bidat

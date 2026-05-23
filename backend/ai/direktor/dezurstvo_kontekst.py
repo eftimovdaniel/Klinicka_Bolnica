@@ -4,13 +4,12 @@ from datetime import date, datetime
 from ai._kernel.utils import format_vreme
 
 
-def izgradi_kontekst(found: dict, dez: dict | None) -> dict: # funkcija koja go gradи kontekstot posle pregled na dezurstvo
+def izgradi_kontekst(found: dict, dez: dict | None) -> dict: # funkcija koja go gradiss kontekstot posle pregled na dezurstvo
     """Го пакува лекарот и дежурството за контекст во разговор.""" # dokumentacija — found e lekar, dez e red od Dezurstva ili None
     datum = dez.get("datum") if dez else None # go zemame datumot od dez ako lekarot veke ima dezurstvo vo baza
     if isinstance(datum, datetime): # proveruvame dali od bazata doagja datetime (so vreme)
         datum = datum.date() # go zemame samo delot datum — vremeto ne ni treba za kontekst
     datum_s = datum.isoformat() if isinstance(datum, date) else None # go pretvorame vo tekst YYYY-MM-DD za ai i za zacuvuvanje
-
     dez_id = dez.get("dezurstvo_ID") if dez else None # go zemame id na dezurstvoto za UPDATE vo baza podocna
     vreme_od = format_vreme(dez.get("vreme_od")) if dez and dez.get("vreme_od") is not None else None # pocetok na dezurstvoto formatiran
     vreme_do = format_vreme(dez.get("vreme_do")) if dez and dez.get("vreme_do") is not None else None # kraj na dezurstvoto formatiran
