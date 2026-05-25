@@ -25,7 +25,6 @@ PROMPT = """ Ти си систем што извлекува параметри
 from ai.lekar.lekar_intent import prasanje_e_moj_raspored_lekar
 from ai._kernel.transliteracija import transliterijaj
 
-
 def _lokalno_izvlechi(prasanje: str) -> dict | None:
     """Брза локална детекција без Groq за чести форми."""
     p = transliterijaj(prasanje or "").lower().strip()
