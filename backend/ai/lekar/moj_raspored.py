@@ -9,8 +9,7 @@ from ai.pacient.moi_pregledi import (
     datum_za_pregledi_od_prasanje,
     prasanje_e_lista_site_pregledi,
 )
-PROMPT = """
-Ти си систем што извлекува параметри за распоред на лекар. Корисникот е лекар и сака да види свои закажани прегледи. Врати САМО JSON:
+PROMPT = """ Ти си систем што извлекува параметри за распоред на лекар. Корисникот е лекар и сака да види свои закажани прегледи. Врати САМО JSON:
 {"period": "denes" | "utre" | "nedela" | "mesec" | "site" | null,
  "datum": "YYYY-MM-DD" | null,
  "broj": число | null}
@@ -22,8 +21,7 @@ PROMPT = """
 - „сите" / „воопшто" → "period"="site"
 - ако корисникот спомне конкретен датум (пр. „15.05" или „понеделник") → "datum"=YYYY-MM-DD
 - ако корисникот спомне број (пр. „следните 5", „топ 3") → "broj"=число
-- ако нема ништо јасно → сите вредности null БЕЗ markdown, БЕЗ објаснувања. Само JSON.
-""".strip()
+- ако нема ништо јасно → сите вредности null БЕЗ markdown, БЕЗ објаснувања. Само JSON.""".strip()
 from ai.lekar.lekar_intent import prasanje_e_moj_raspored_lekar
 from ai._kernel.transliteracija import transliterijaj
 
