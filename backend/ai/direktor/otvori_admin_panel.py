@@ -92,5 +92,5 @@ def odgovori_za_otvori_admin(
         ),  
         "navigacija": navigacija, # navigaciski parametri so filtri za ui
         "akcija": "otvori_admin_panel", # sistemska naredba za frontend za otvaranje na panelot
-        "kontekst": kontekst,   # se dava kontekst za da se zacuvuva sostojbata na razgovor
+        "kontekst": kontekst,  # se dava kontekst za da se zacuvuva sostojbata na razgovor
     }
