@@ -252,6 +252,7 @@ def prasanje_e_drugi_lekari_specijalnost(prasanje: str) -> bool:  # Proverka za 
 
 def prasanje_e_specijalnost_izbran_lekar(prasanje: str, kontekst: dict | None = None) -> bool:  # Proverka za specijalnost na konkreten lekar
     if prasanje_e_drugi_lekari_specijalnost(prasanje): return False  # Ako bara drugi lekari, ne e za izbran lekar
+    if prasanje_e_baranje_slobodni(prasanje): return False  # Ako bara slobodni termini, ne e info za eden lekar
     
     p = transliterijaj(prasanje).lower()  # Normalizacija
     ima_lekari_pl = any(x in p for x in ("лекари", "lekari", "доктори", "doktori"))  # Proverka za plural
