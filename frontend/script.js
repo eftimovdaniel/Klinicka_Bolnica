@@ -5125,8 +5125,16 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
  * `style.css` (блок што почнува со „ИЗГЛЕД: КБ Штип AI асистент — ПОЧЕТОК").
  *
  * Бекенд: backend/routers/ai_chat.py (POST /ai-chat/ask).
+ *
+ * ─── ОПШТ FLOW ───
+ *   1) Корисникот пишува порака во widget-от и стиска „Испрати"
+ *   2) `pitajAI()` ја праќа пораката + контекстот на backend
+ *   3) Backend препознава intent, повикува Python handler, враќа JSON одговор
+ *   4) Frontend го прикажува одговорот, го зачувува новиот контекст
+ *   5) Опционално: извршува акција (отвори login) или навигација (отвори таб)
  */
 (function () {
+  // Основна адреса на AI endpoint-от (на пр. http://localhost:8000/ai-chat)
   const AI_CHAT_BASE = API_BASE + "/ai-chat";
 
   // Конверзациски контекст – се чува меѓу прашања за повеќестепен дијалог
@@ -5134,24 +5142,28 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
   // го прати бројот → AI ја испрати апликацијата).
   // Се чисти при нов чат, при logout/session-end и автоматски кога backend-от
   // врати null. За најавени корисници се зачувува и во база (session_id).
-  let kbsAIKontekst = null;
-  let kbsAISessionId = null;
-  const KBS_GUEST_CHAT_KEY = "kbs_guest_chat_pending";
-  var kbsGuestChatResumeImpl = null;
+  let kbsAIKontekst = null;                  // објект {doctor_id, datum, ...} или null
+  let kbsAISessionId = null;                 // ID на разговор (за најавени корисници — историја)
+  const KBS_GUEST_CHAT_KEY = "kbs_guest_chat_pending";  // localStorage клуч за гостински чат пред најава
+  var kbsGuestChatResumeImpl = null;         // референца до функција за продолжување на гостински разговор
 
+  // Подготвува податоци за најавениот корисник (пациент или лекар) — се праќаат во body на секое прашање.
+  // Backend ги користи за да знае дали корисникот е најавен и кој е (за закажување, мој распоред, итн.).
   function kbsAIAuthPayload() {
-    var pacientData = null;
-    var lekarData = null;
+    var pacientData = null;                  // ако нема логин → останува null
+    var lekarData = null;                    // ако нема лекар логин → останува null
+    // Ако постои глобален `currentPacient` (поставен при најава) — состави го пакетот за пациент
     if (typeof currentPacient !== "undefined" && currentPacient && currentPacient.email) {
       pacientData = {
         pacient_ID: currentPacient.pacient_ID || null,
-        ime: currentPacient.ime || currentPacient.name_patient || "",
+        ime: currentPacient.ime || currentPacient.name_patient || "",      // поддршка за стара/нова шема
         prezime: currentPacient.prezime || currentPacient.surname_patient || "",
-        email: currentPacient.email || "",
+        email: currentPacient.email || "",                                  // задолжително за закажување
         telefon: currentPacient.telefon || currentPacient.phone_number || "",
         embg: currentPacient.embg || "",
       };
     }
+    // Истото и за лекар — ако е најавен лекар, се полни `lekarData`
     if (typeof currentLekar !== "undefined" && currentLekar && currentLekar.doctor_ID) {
       lekarData = {
         doctor_ID: currentLekar.doctor_ID,
@@ -5161,7 +5173,7 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
         specialty: currentLekar.specialty || "",
       };
     }
-    return { pacientData: pacientData, lekarData: lekarData };
+    return { pacientData: pacientData, lekarData: lekarData };  // едниот / двата / ниту еден може да бидат null
   }
 
   function kbsAIHistoryEnabled() {
@@ -5196,30 +5208,49 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
     });
   }
 
-  // Функција за праќање на прашање кон backend и враќање одговор.
+  // ─────────────────────────────────────────────────────────────────────────
+  // ГЛАВНА ФУНКЦИЈА — ова е МОСТОТ меѓу frontend и AI backend.
+  // Прима текст од корисникот, праќа POST на /ai-chat/ask, враќа одговор.
   // Ако корисникот е логиран (пациент или лекар), ги праќа и неговите податоци.
+  // ─────────────────────────────────────────────────────────────────────────
   async function pitajAI(prasanje) {
     try {
-      var auth = kbsAIAuthPayload();
+      var auth = kbsAIAuthPayload();         // зема податоци за најавен корисник (или null)
+
+      // Пакет што се праќа на backend како JSON:
+      //   prasanje  → текстот што корисникот го напишал
+      //   pacient   → податоци за најавен пациент (или null)
+      //   lekar     → податоци за најавен лекар (или null)
+      //   kontekst  → состојба од претходна порака (за повеќестепен разговор)
       var body = {
         prasanje: prasanje,
         pacient: auth.pacientData,
         lekar: auth.lekarData,
         kontekst: kbsAIKontekst,
       };
+      // Ако веќе постои отворен разговор (за најавени) — продолжи во истиот session
       if (kbsAISessionId) body.session_id = kbsAISessionId;
 
+      // САМОТО ИСПРАЌАЊЕ — POST на backend endpoint-от
       const response = await fetch(AI_CHAT_BASE + "/ask", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
 
+      // Ако серверот вратил HTTP грешка (500, 404...) — покажи кратка порака
       if (!response.ok) {
         return { odgovor: "Серверот врати грешка (" + response.status + ")." };
       }
 
+      // Парсирај JSON одговор: { odgovor, kontekst, navigacija, akcija, session_id }
       const data = await response.json();
+
+      // Зачувај го новиот контекст (за следно прашање).
+      // Backend може да врати:
+      //   - објект → продолжуваме разговор (на пр. чекаме „да/не" за апликација)
+      //   - null + clear_kontekst:true → разговорот е затворен, ресетирај
+      //   - ништо → задржи го стариот
       if (data && Object.prototype.hasOwnProperty.call(data, "kontekst")) {
         if (data.kontekst !== null && typeof data.kontekst === "object") {
           kbsAIKontekst = data.kontekst;
@@ -5227,17 +5258,20 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
           kbsAIKontekst = null;
         }
       }
+      // Backend може да отвори нов session (за најавен корисник) — зачувај го ID-то
       if (data && data.session_id) {
         kbsAISessionId = data.session_id;
       }
 
+      // Враќаме „чист" објект — само важните полиња за горниот код
       return {
-        odgovor: data.odgovor || "Не добив одговор.",
-        navigacija: data.navigacija || null,
-        akcija: data.akcija || null,
+        odgovor: data.odgovor || "Не добив одговор.",   // текст за прикажување во чатот
+        navigacija: data.navigacija || null,            // {target, label} → отвори страница/таб
+        akcija: data.akcija || null,                    // "otvori_pacient_login" и сл.
         session_id: data.session_id || null,
       };
     } catch (err) {
+      // Network failure (backend не работи, нема интернет, итн.)
       return { odgovor: "Не можам да се поврзам со серверот. Провери дали backend-от работи." };
     }
   }
@@ -5328,18 +5362,24 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
   window.kbsSaveGuestChatForLogin = kbsSaveGuestChatForLogin;
 
   // Извршува UI-акција побарана од backend-от (пр. отворање login форма).
+  // Backend може да врати поле `akcija` во одговорот — на пр. „otvori_pacient_login".
+  // Ова е начин AI агентот да „кликне нешто" на интерфејсот наместо корисникот.
   function kbsIzvrsiAkcija(akcija) {
-    if (!akcija) return;
+    if (!akcija) return;                       // нема акција → не прави ништо
     console.log("[kbs-ai] изврши акција:", akcija);
 
+    // СЦЕНАРИО: корисник пробал да закаже без најава
+    // Backend во `zakazi_termin.py` врати akcija="otvori_pacient_login"
     if (akcija === "otvori_pacient_login") {
-      kbsSaveGuestChatForLogin();
-      setTimeout(function () {
+      kbsSaveGuestChatForLogin();              // зачувај го гостинскиот чат за после најава
+      setTimeout(function () {                 // мал delay за да корисникот да го прочита одговорот
         try {
+          // Прва опција: јавно изложена функција за отворање модал
           if (typeof window.openPacientLoginModal === "function") {
             window.openPacientLoginModal();
             return;
           }
+          // Втора опција: алтернативно име на функција
           if (typeof window.showPacientLogin === "function") {
             window.showPacientLogin();
             return;
@@ -5365,18 +5405,22 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
         }
       }, 500);
     } else if (akcija === "otvori_pacient_register") {
+      // СЦЕНАРИО: AI препорачува регистрација на пациент
       setTimeout(function () {
         if (typeof window.showPacientRegister === "function") {
           window.showPacientRegister();
         }
       }, 500);
     } else if (akcija === "osvezi_admin_dezurstva") {
+      // СЦЕНАРИО: директор додал/променил дежурство — освежи ја листата во админ панел
       if (typeof window.loadAdminDezurstva === "function") {
         window.loadAdminDezurstva();
       }
     } else if (akcija === "otvori_lekar_panel") {
       /* навигацијата го отвора лекарскиот dashboard таб */
+      // (праксиски: акцијата се обработува преку `navigacija` поле, тука нема логика)
     } else if (akcija === "otvori_lekar_login") {
+      // СЦЕНАРИО: пробал нешто што бара лекарска најава
       setTimeout(function () {
         if (typeof window.openLekarLoginModal === "function") {
           window.openLekarLoginModal();
@@ -6039,18 +6083,22 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       }
     });
 
+    // ─────────────────────────────────────────────────────────────────────
+    // ГЛАВЕН СЛУЧУВАЧ: што се прави кога корисникот ќе притисне „Испрати" / Enter
+    // ─────────────────────────────────────────────────────────────────────
     form.addEventListener("submit", function (e) {
-      e.preventDefault();
-      const text = input.value.trim();
-      if (!text) return;
+      e.preventDefault();                       // не дозволи default browser submit (refresh страница)
+      const text = input.value.trim();          // зема го текстот од input полето
+      if (!text) return;                        // ако е празно, ништо не прави
 
-      if (introEl) introEl.hidden = true;
+      if (introEl) introEl.hidden = true;       // сокри ја „pocetnata" порака во чатот
 
-      kbsAppendUserMsg(text);
-      kbsCloseHistoryPanel();
+      kbsAppendUserMsg(text);                   // прикажи ја пораката на КОРИСНИКОТ во chat bubble
+      kbsCloseHistoryPanel();                   // ако е отворена историјата, затвори ја
 
-      input.value = "";
+      input.value = "";                         // исчисти го input полето
 
+      // Креирај „агентот пишува..." (3 точки анимација) додека чекаме одговор
       const typingEl = document.createElement("div");
       typingEl.className = "kbs-ai-typing";
       typingEl.setAttribute("role", "status");
@@ -6060,23 +6108,33 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
         typingEl.appendChild(document.createElement("span"));
       }
       messagesEl.appendChild(typingEl);
-      kbsScrollChatToBottom(true, true);
+      kbsScrollChatToBottom(true, true);        // скрол до дното за да се види typing-от
 
+      // ОВДЕ Е КЛУЧНОТО — повикај го backend-от со прашањето
       pitajAI(text).then(function (rezultat) {
-        typingEl.remove();
+        typingEl.remove();                      // отстрани ја „пишува..." анимацијата
+
+        // Извади ги трите важни полиња од одговорот
         var odgovor = (rezultat && typeof rezultat === "object") ? rezultat.odgovor : rezultat;
         var nav = (rezultat && typeof rezultat === "object") ? rezultat.navigacija : null;
         var akc = (rezultat && typeof rezultat === "object") ? rezultat.akcija : null;
 
+        // ПРИКАЖИ го одговорот на АГЕНТОТ во chat bubble
         kbsAppendAgentMsg(odgovor || "");
 
+        // Backend може да побара отворање на таб / страница (на пр. „Кариера")
         if (nav) kbsIzvrsiNavigacija(nav);
+
+        // Специјален случај: треба најава како пациент → зачувај чат пред да отвориш модал
         if (akc === "otvori_pacient_login") {
           kbsSaveGuestChatForLogin();
           kbsIzvrsiAkcija(akc);
         } else if (akc) {
+          // Други акции: регистрација, освежување админ панел, отворање лекарски логин...
           kbsIzvrsiAkcija(akc);
         } else if (
+          // Heuristika: ако одговорот спомнува дежурство и сме во админ панел,
+          // освежи ја листата на дежурства (без експлицитна акција од backend)
           odgovor &&
           /е додадено|е променето/i.test(odgovor) &&
           typeof window.loadAdminDezurstva === "function"
@@ -6084,6 +6142,7 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
           window.loadAdminDezurstva();
         }
 
+        // Освежи го панелот со историја на чатови (за најавени корисници)
         if (typeof window.kbsChatRefreshHistory === "function") {
           window.kbsChatRefreshHistory();
         }
@@ -6091,5 +6150,5 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
     });
   }
 
-  initKbsAgent();
+  initKbsAgent();                               // стартувај го целиот widget кога ќе се вчита DOM
 })();
