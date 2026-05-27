@@ -55,25 +55,15 @@ def _izvlechi_ai(prasanje: str, denes: date) -> dict:
     full = (
         f"Денес: {denes.isoformat()} ({denes_den})\n\n"
         f'Прашање: „{prasanje}"\nВрати JSON.'
-    )
-    # se kreira finalen prompt za ai — denes + prasanje od direktorot
-    odgovor = ask_ai(full, system_prompt=PROMPT)
-    # se povikuva ai — system_prompt e pravilata, full e konkretnoto prasanje
-    print(f"[promeni_dezurstvo] AI: {odgovor!r}")
-    # debug pecatenje vo terminal — !r e raw string
+    ) # se kreira finalen prompt za ai — denes + prasanje od direktorot
+    odgovor = ask_ai(full, system_prompt=PROMPT) # se povikuva ai — system_prompt e pravilata, full e konkretnoto prasanje
     return parse_ai_json(odgovor, log_tag="promeni_dezurstvo")
     # odgovorot se pretvara vo dict; nevaliden json -> greska
 
 
-def _datum_od_tekst(prasanje: str, denes: date) -> date | None:
-    # rezervna funkcija dokolku ai ne uspeal da izvlece datum
-    p = transliterijaj(prasanje).lower()
-    # tekstot se normalizira — lower() za polesno sporeduvanje
-    m = re.search(
-        r"(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})",
-        prasanje,
-    )
-    # regex za datum: 21.05.2026, 21-05-2026, 21/05/2026
+def _datum_od_tekst(prasanje: str, denes: date) -> date | None: # rezervna funkcija dokolku ai ne uspeal da izvlece datum
+    p = transliterijaj(prasanje).lower() # tekstot se normalizira — lower() za polesno sporeduvanje
+    m = re.search(r"(\d{1,2})[.\-/](\d{1,2})[.\-/](\d{4})", prasanje,) # regex za datum: 21.05.2026, 21-05-2026, 21/05/2026
     if m:
         try:
             return date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
@@ -99,28 +89,17 @@ def _datum_od_tekst(prasanje: str, denes: date) -> date | None:
     # ako ne se najde datum — None
 
 
-def _vreme_od_tekst(prasanje: str) -> tuple[str | None, str | None]:
-    # funkcija za izvlekuvanje pocetno i krajno vreme od tekst
-    m = re.search(
-        r"(?:од\s+)?(\d{1,2})[:.](\d{2})\s*(?:до|-|–)\s*(\d{1,2})[:.](\d{2})",
-        prasanje,
-        re.IGNORECASE,
-    )
-    # regex: 20:00 до 04:00 — ?: grupa koja ne se zacuvuva
+def _vreme_od_tekst(prasanje: str) -> tuple[str | None, str | None]: # funkcija za izvlekuvanje pocetno i krajno vreme od tekst
+    m = re.search( r"(?:од\s+)?(\d{1,2})[:.](\d{2})\s*(?:до|-|–)\s*(\d{1,2})[:.](\d{2})", prasanje, re.IGNORECASE, ) # regex: 20:00 до 04:00 — ?: grupa koja ne se zacuvuva
     if m:
-        return f"{int(m.group(1)):02d}:{m.group(2)}", f"{int(m.group(3)):02d}:{m.group(4)}"
-        # :02d dodava nula napred (4 -> 04)
+        return f"{int(m.group(1)):02d}:{m.group(2)}", f"{int(m.group(3)):02d}:{m.group(4)}" # :02d dodava nula napred (4 -> 04)
     m2 = re.search( r"периодот\s+од\s+(\d{1,2})[:.](\d{2})\s+до\s+(\d{1,2})[:.](\d{2})",
-        transliterijaj(prasanje).lower(),
-    )
-    # alternativen obrazec: „периодот од 20:00 до 04:00"
+        transliterijaj(prasanje).lower(), ) # alternativen obrazec: „периодот од 20:00 до 04:00"
     if m2:
         return f"{int(m2.group(1)):02d}:{m2.group(2)}", f"{int(m2.group(3)):02d}:{m2.group(4)}"
     return None, None
 
 def _vreme_samo_do(prasanje: str) -> str | None: # funkcija za vadenje samo na krajno vreme od tekst
-    """«да е до 03:00», «до 03».""" # dokumentacija za tipot na vlez sto go ocekuvame
-    # samo krajno vreme — na pr. „промени да е до 03:00"
     p = transliterijaj(prasanje).lower() # gi pretvorame site karakteri vo mali bukvi za polesna proverka
     m = re.search( # barame po soodveten obrazec vo tekstot
         r"(?:да\s+е\s+)?(?:до|do)\s+(\d{1,2})[:.]?(\d{2})?\b", # regex koj prepoznavase "do" sledeno od brojki
@@ -156,29 +135,16 @@ def _baranje_e_premesti_datum(prasanje: str) -> bool:
     p = transliterijaj(prasanje).lower()
     return any(
         w in p
-        for w in ("премести", "префрли", "пренеси", "одложи", "premesti", "prefrli")
-    )
+        for w in ("премести", "префрли", "пренеси", "одложи", "premesti", "prefrli") )
 
-
-def _baranje_e_promena(prasanje: str, ai_akcija: str | None) -> bool:
-    # dali korisnikot saka promena na postoecko dezurstvo
+def _baranje_e_promena(prasanje: str, ai_akcija: str | None) -> bool: # dali korisnikot saka promena na postoecko dezurstvo
     if (ai_akcija or "").lower() == "promeni":
-        return True
-        # ako ai vekje zaklucil deka e promena
+        return True # ako ai vekje zaklucil deka e promena
     p = transliterijaj(prasanje).lower()
     return any(
         w in p
         for w in (
-            "премести",
-            "префрли",
-            "промени",
-            "промениш",
-            "пренеси",
-            "одложи",
-            "смени",
-            "може да го промениш",
-            "da go promenish",
-        )
+            "премести", "префрли", "промени", "промениш", "пренеси", "одложи", "смени", "може да го промениш", "da go promenish", )
     )
 def _baranje_e_dodadi(prasanje: str, ai_akcija: str | None) -> bool: # funkcija za prepoznavanje namera za kreiranje novo dezurstvo
     # dali korisnikot saka novo dezurstvo (INSERT)
@@ -189,22 +155,12 @@ def _baranje_e_dodadi(prasanje: str, ai_akcija: str | None) -> bool: # funkcija 
     return any( # vrakjame true dokolku najdeme klucen zbor za dodavanje
         w in p # proverka dali zborot 'w' postoi vo tekstot 'p'
         for w in ( # lista na izrazi koi sugeriraat kreiranje na novo dezurstvo
-            "додади",
-            "dodadi",
-            "додадете",
-            "внеси",
-            "закажи дежурство",
-            "ново дежурство",
-            "нека биде дежур",
-            "да биде дежур",
-        )
+            "додади", "dodadi",  "додадете", "внеси", "закажи дежурство", "ново дежурство", "нека биде дежур", "да биде дежур", )
     )
 
 def _najdi_lekar(ime_prezime: str) -> dict | None: # funkcija za pronagjanje lekar vo bazata spored ime
-    # funkcija za pronagjanje lekar vo baza
     if not ime_prezime: # ako tekstot za ime e prazen
         return None # nema sto da prebaruva, vrakjame nisto
-        
     from ai._kernel.lekar_lookup import ( # uvoz na potrebni funkcii samo koga se potrebni (lazy import)
         izvlechi_delovi_ime,
         najdi_lekar_od_delovi,
@@ -212,8 +168,7 @@ def _najdi_lekar(ime_prezime: str) -> dict | None: # funkcija za pronagjanje lek
     )
 
     delovi = izvlechi_delovi_ime(ime_prezime) or [ # gi delime delovite od imeto ili koristime split
-        d for d in ime_prezime.strip().split() if d
-    ] # „Marija Hubreva" -> ["Marija", "Hubreva"]
+        d for d in ime_prezime.strip().split() if d ] # „Marija Hubreva" -> ["Marija", "Hubreva"]
     if len(delovi) >= 2: # ako imame ime i prezime
         return najdi_lekar_od_delovi(delovi) # koristime precizno prebaruvanje so poveke delovi
     return najdi_lekar_od_prasanje(ime_prezime) # fallback: prebaruvanje so edinstven zbor (na pr. prezime)
@@ -339,12 +294,7 @@ def _valid_time(s: str) -> bool: # funkcija za validacija dali stringot e tocen 
         return False # vrakjame deka vremeto ne e validno
 
 def _dodadi_dezurstvo( # funkcija za vnesuvanje novo dezurstvo vo baza
-    found: dict, # recnik so podatoci za lekarot
-    datum: date, # datum na dezurstvoto
-    vreme_od: str, # pocetno vreme
-    vreme_do: str, # krajno vreme
-    oddel_hint: str | None, # opcionalen hint za oddelot
-) -> str: # vrakja poraka za potvrda
+    found: dict, datum: date, vreme_od: str,  vreme_do: str,  oddel_hint: str | None, ) -> str: 
     # INSERT novo dezurstvo — vraka poraka za chat
     oddel = _najdi_oddel_po_ime(oddel_hint or "", found.get("specialty") or "") # mapirame oddel spored hint ili specijalnost
     if _ima_preklop(found["doctor_ID"], datum, vreme_od, vreme_do): # proveruvame dali lekarot vekje ima drugo dezurstvo vo toj termin
@@ -352,7 +302,6 @@ def _dodadi_dezurstvo( # funkcija za vnesuvanje novo dezurstvo vo baza
             f"Д-р {found['name']} {found['surname']} веќе има дежурство на "
             f"{format_datum(datum)} во тој временски период."
         )
-
     conn = get_connection() # otvarame konekcija so bazata
     cur = conn.cursor() # kreirame kursor za izvrsuvanje
     cur.execute( # izvrsuvame vnesuvanje na podatocite vo tabelata Dezurstva
@@ -363,7 +312,6 @@ def _dodadi_dezurstvo( # funkcija za vnesuvanje novo dezurstvo vo baza
         (found["doctor_ID"], datum, oddel, vreme_od, vreme_do), # vnesuvame NULL za napomena bidejki ne e potrebna
     )
     conn.commit() # zacuvuvame promeni vo bazata (vazen cekor)
-    # commit e vazen — bez nego nema trajno zacuvuvanje
     cur.close() # zatvorame kursor
     conn.close() # zatvorame konekcija
 
@@ -392,16 +340,11 @@ def _odgovor(tekst: str, found: dict | None, dez: dict | None) -> dict: # funkci
         out["akcija"] = "osvezi_admin_dezurstva" # dodavame signal za osvezuvanje na tabelata
     return out # go vrakjame finalniot recnik
 
-
-def odgovori_za_dezurstvo( # glavna funkcija za obrabotka na baranjata za dezurstva
-    prasanje: str,
-    lekar: dict | None,
-    kontekst: dict | None = None,
-) -> dict:
+# glavna funkcija za obrabotka na baranjata za dezurstva
+def odgovori_za_dezurstvo( prasanje: str, lekar: dict | None, kontekst: dict | None = None, ) -> dict:
     # glavna funkcija koja ja povikuva routerot
     # tuka pocnuva celata logika za dezurstva
     if err := require_direktor(lekar): # proveruvame dali korisnikot ima pristap kako direktor
-        # walrus operator := — zacuvuva i proveruva istovremeno
         return {"odgovor": err} # ako nema dozvola, vrakjame greska
         # ako nema dozvola — vrakame greska
 
