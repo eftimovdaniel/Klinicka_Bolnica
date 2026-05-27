@@ -488,7 +488,6 @@ def odgovori_za_dezurstvo( prasanje: str, lekar: dict | None, kontekst: dict | N
             ),
             "kontekst": izgradi_kontekst(found, None),
         }
-
     if ista: # ako direktorot rekol "ista data"
         nov_datum = _as_date(dez["datum"])
         # ostaj na istiot datum od postoeckoto dezurstvo

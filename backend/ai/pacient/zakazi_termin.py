@@ -1,31 +1,14 @@
-"""
-Закажување термин преку AI агент (Groq). # Izvrshuvanje na naredba
-
-Едноставен flow: # Izvrshuvanje na naredba
-  1) AI извлекува doctor_id + datum + vreme од прашањето # Izvrshuvanje na naredba
-  2) Ако нешто недостасува → прашува корисникот # Izvrshuvanje na naredba
-  3) Валидација (минато, викенд, работно време, дали е слободен) # Izvrshuvanje na naredba
-  4) Прашува за напомена (Дали сакаш да оставиш порака за лекарот?) # Izvrshuvanje na naredba
-  5) INSERT во база # Izvrshuvanje na naredba
-  6) Email потврда (со напомена ако е дадена) + текст потврда # Izvrshuvanje na naredba
-
-Главна функција: odgovori_za_zakazuvanje(prasanje, pacient, kontekst) # Izvrshuvanje na naredba
-"""
-from datetime import datetime, date, time # Uvoz na datetime klasi za rabota so datumi i vreme # Uvoz na datetime, date i time klasi za manipulacija so datumi
-from database import get_connection # Uvoz na funkcija za konekcija so MySQL bazata # Uvoz na funkcija za konekcija so bazata
-from ai._kernel.prompts import ZAKAZI_EXTRACT_PROMPT # Uvoz na prompt sablon za AI ekstrakcija # Uvoz na prompt sablon za ekstrakcija
-from ai._kernel.groq_helpers import izvlechi_json_so_ai # Uvoz na Groq AI pomoshna funkcija # Uvoz na Groq AI pomosni funkcii
-from ai._kernel.utils import format_datum, format_vreme # Uvoz na pomoshni funkcii za formatiranje # Uvoz na formatiracki funkcii za datum/vreme
-
+from datetime import datetime, date, time 
+from database import get_connection 
+from ai._kernel.prompts import ZAKAZI_EXTRACT_PROMPT 
+from ai._kernel.groq_helpers import izvlechi_json_so_ai 
+from ai._kernel.utils import format_datum, format_vreme 
 
 RABOTNO_VREME_OD = time(8, 0)    # Konstanta — pocetok na rabotnoto vreme (08:00) # Dodeluvanje na vrednost
 RABOTNO_VREME_DO = time(15, 30)  # Konstanta — kraj na rabotnoto vreme (15:30) # Dodeluvanje na vrednost
-
 # Lista na denovi vo nedelata na makedonski (za prikaz vo potvrda) # Izvrshuvanje na naredba
 DENOVI_VO_NEDELA = ["Понеделник", "Вторник", "Среда", "Четврток", "Петок", "Сабота", "Недела"] # Lista na denovi vo nedelata na makedonski jazik
 
-
-# ───────────────── AI povik ───────────────── # Izvrshuvanje na naredba
 def zimi_site_lekari_od_baza() -> list:  # SQL upit — vrakja site lekari za AI promptot # Definicija na funkcija
     """Vrakja lista na site lekari ({'doctor_ID', 'name', 'surname', 'specialty'})."""
     konekcija = None # Dodeluvanje na vrednost
@@ -37,17 +20,14 @@ def zimi_site_lekari_od_baza() -> list:  # SQL upit — vrakja site lekari za AI
         cursor.close() # Izvrshuvanje na naredba
         return rezultat # Vrakjanje na rezultat
     except Exception as e: # Fakjanje na bilo kakva greska i pechatenje na log poraka
-        print(f"[zakazi_termin] zimi_site_lekari_od_baza: {e}") # Pechatenje na greska vo log za debagiranje
         return [] # Vrakjanje na rezultat
     finally: # Blok sto se izvrshuva sekogas (zatvaranje na resursi)
         if konekcija: # Uslovna proverka
             konekcija.close() # Izvrshuvanje na naredba
 
-
-def izvlechi_podatoci_so_ai(prasanje: str) -> dict:  # Eden Groq povik koj vrakja doctor_id / datum / vreme # Definicija na funkcija
+def izvlechi_podatoci_so_ai(prasanje: str) -> dict:  # Eden Groq povik koj vrakja doctor_id / datum / vreme Definicija na funkcija
     """AI extract: doctor_id, datum (YYYY-MM-DD), vreme (HH:MM)."""
     site_lekari = zimi_site_lekari_od_baza()  # Lista na site lekari za AI da znae koe ID kome pripaga # Zemanje na lista na site lekari od kesirana funkcija
-
     # Tekst-lista na lekari za AI promptot # Izvrshuvanje na naredba
     lista_tekst = "" # Dodeluvanje na vrednost
     for lekar in site_lekari: # Iteracija niz site lekari za formatiranje na lista
@@ -66,20 +46,16 @@ def izvlechi_podatoci_so_ai(prasanje: str) -> dict:  # Eden Groq povik koj vrakj
         f"Корисник пишува: „{prasanje}\"\n\n" # Izvrshuvanje na naredba
         "Извлечи doctor_id, datum, vreme и врати JSON." # Izvrshuvanje na naredba
     ) # Izvrshuvanje na naredba
-
     return izvlechi_json_so_ai(full_prompt, ZAKAZI_EXTRACT_PROMPT, log_tag="zakazi_termin") # Vrakjanje na rezultat
 
-
-# ───────────────── Pomoshni funkcii ───────────────── # Izvrshuvanje na naredba
+# Izvrshuvanje na naredba
 def najdi_ime_na_lekar(doctor_id: int) -> str:  # Vrakja „Д-р Ime Prezime“ ili prazno # Definicija na funkcija
     for lekar in zimi_site_lekari_od_baza(): # Iteracija niz site lekari za formatiranje na lista
         if lekar.get("doctor_ID") == doctor_id: # Uslovna proverka
             return f"Д-р {lekar['name']} {lekar['surname']}" # Vrakjanje na rezultat
     return "" # Vrakjanje na rezultat
 
-
 def zacuvaj_pending_vo_kontekst(kontekst, doctor_id, datum_str, vreme_str) -> dict:  # Zachuvaj nekompletni podatoci za sledna poraka # Definicija na funkcija
-    """Po neuspeshen pokushai ili neprijaven pacient — zachuvaj sto AI uspeal da izvleche."""
     nov_kontekst = dict(kontekst) if isinstance(kontekst, dict) else {} # Dodeluvanje na vrednost
     pending = {} # Inicijalizacija na prazen dictionary za pending podatoci
     if doctor_id: # Uslovna proverka
@@ -90,8 +66,7 @@ def zacuvaj_pending_vo_kontekst(kontekst, doctor_id, datum_str, vreme_str) -> di
         pending["vreme"] = str(vreme_str)[:5] # Dodeluvanje na vrednost
     nov_kontekst["zakazi_pending"] = pending # Zemanje na podatoci za cekanje na napomena od kontekstot
     return nov_kontekst # Vrakjanje na rezultat
-
-
+ 
 def dopolni_od_kontekst(doctor_id, datum_str, vreme_str, kontekst):  # Dokolku AI ne izvlekol nesto — zemi od zapamten pending # Definicija na funkcija
     """Vrakja (doctor_id, datum_str, vreme_str) — popolneti od pending ako AI propushtil."""
     if not isinstance(kontekst, dict): # Proverka dali objektot e od tocen tip (dict, str)
@@ -107,10 +82,8 @@ def dopolni_od_kontekst(doctor_id, datum_str, vreme_str, kontekst):  # Dokolku A
         vreme_str = pending["vreme"] # Dodeluvanje na vrednost
     return doctor_id, datum_str, vreme_str # Vrakjanje na izvleceni podatoci vo standardiziran format
 
-
-# ───────────────── Validacija ───────────────── # Izvrshuvanje na naredba
+ # Izvrshuvanje na naredba
 def proveri_datum(datum_str: str):  # Vrakja (datum_objekt, poraka_greska) — eden od dvete e None # Definicija na funkcija
-    """Validacija na datum string: format, ne e minato, ne e vikend."""
     try: # Pocetok na blok za obrabotka na potencijalni greski
         datum_objekt = datetime.strptime(datum_str, "%Y-%m-%d").date() # Parsiranje na string vo datetime objekt za validacija
     except (ValueError, TypeError): # Fakjanje na greska pri nevaliden datum/vreme format
@@ -120,7 +93,6 @@ def proveri_datum(datum_str: str):  # Vrakja (datum_objekt, poraka_greska) — e
     if datum_objekt.weekday() >= 5:  # 5 = sabota, 6 = nedela # Validacija: zakazuvanje e zabraneto za vikend (sabota=5, nedela=6)
         return None, "Не се закажуваат прегледи во сабота и недела. Избери друг ден." # Vrakjanje None pri nevalidna vrednost
     return datum_objekt, None # Vrakjanje None pri nevalidna vrednost
-
 
 def proveri_vreme(vreme_str: str):  # Vrakja (vreme_objekt, poraka_greska) # Definicija na funkcija
     """Validacija na vreme string: format + rabotno vreme."""
@@ -135,7 +107,6 @@ def proveri_vreme(vreme_str: str):  # Vrakja (vreme_objekt, poraka_greska) # Def
         ) # Izvrshuvanje na naredba
         return None, poraka # Vrakjanje None pri nevalidna vrednost
     return vreme_objekt, None # Vrakjanje None pri nevalidna vrednost
-
 
 def terminot_e_sloboden(doctor_id: int, datum_str: str, vreme_str: str) -> bool:  # SQL proverka dali drug pacient veke zakazal vo toj termin # Definicija na funkcija
     """True ako terminot ne e veke zafateн (sprechuva preklopuvanje)."""
@@ -160,10 +131,7 @@ def terminot_e_sloboden(doctor_id: int, datum_str: str, vreme_str: str) -> bool:
         if konekcija: # Uslovna proverka
             konekcija.close() # Izvrshuvanje na naredba
 
-
-# ───────────────── Napomena flow (2-step state machine) ───────────────── # Izvrshuvanje na naredba
 def proveri_dali_cekame_napomena(kontekst):  # Vrakja recnik so {doctor_id, datum, vreme} ili None # Definicija na funkcija
-    """Dali sme vo faza na cekanje napomena od pacientot (drug cekor)."""
     if not isinstance(kontekst, dict): # Proverka dali objektot e od tocen tip (dict, str)
         return None # Vrakjanje None pri nevalidna vrednost
     cekanje = kontekst.get("zakazi_ceka_napomena") # Zemanje na podatoci za cekanje na napomena od kontekstot
@@ -173,18 +141,14 @@ def proveri_dali_cekame_napomena(kontekst):  # Vrakja recnik so {doctor_id, datu
         return cekanje # Vrakjanje na rezultat
     return None # Vrakjanje None pri nevalidna vrednost
 
-
 def korisnikot_odbiva_napomena(prasanje: str) -> bool:  # Dali pacientot odbiva da ostavi napomena # Definicija na funkcija
-    """Detekcija na negativni odgovori („ne“, „nema“, „bez napomena“…)."""
     p = (prasanje or "").strip().lower() # Dodeluvanje na vrednost
     return p in { # Vrakjanje na rezultat
         "не", "не.", "no", "nema", "нема", "немам", "немам напомена", # Izvrshuvanje na naredba
         "без напомена", "нема напомена", "не сакам", "не сакам напомена", # Izvrshuvanje na naredba
     } # Izvrshuvanje na naredba
 
-
 def postavi_cekanje_na_napomena(kontekst, doctor_id, datum_str, vreme_str) -> dict:  # Postavuva flag deka sledna poraka = napomena # Definicija na funkcija
-    """Vrakja nov kontekst so zakazi_ceka_napomena = {doctor_id, datum, vreme}."""
     nov_kontekst = dict(kontekst) if isinstance(kontekst, dict) else {} # Dodeluvanje na vrednost
     nov_kontekst["zakazi_ceka_napomena"] = { # Zemanje na podatoci za cekanje na napomena od kontekstot
         "doctor_id": int(doctor_id), # Izvrshuvanje na naredba
@@ -193,8 +157,6 @@ def postavi_cekanje_na_napomena(kontekst, doctor_id, datum_str, vreme_str) -> di
     } # Izvrshuvanje na naredba
     return nov_kontekst # Vrakjanje na rezultat
 
-
-# ───────────────── INSERT + email + potvrda ───────────────── # Izvrshuvanje na naredba
 def insert_termin_vo_baza(doctor_id, ime_pacient, email_pacient, telefon_pacient, datum_str, vreme_str, napomena):  # Zachuvuvanje na nov termin vo Termin_pregled # Definicija na funkcija
     """Vrakja (uspeh, info_za_lekar_ili_greska)."""
     konekcija = None # Dodeluvanje na vrednost
@@ -303,18 +265,10 @@ def finaliziraj_zakazuvanje(doctor_id, datum_str, vreme_str, pacient, napomena):
         }, # Izvrshuvanje na naredba
     } # Izvrshuvanje na naredba
 
-
-# ───────────────── Napomena handler (drug cekor) ───────────────── # Izvrshuvanje na naredba
 def obrabotka_na_napomena(prasanje: str, pacient: dict, cekanje: dict) -> dict:  # Obrabotka na napomenata posle prashanjeto „Dali sakas napomena?“ # Definicija na funkcija
-    """
-    Sekoja poraka po prashanjeto za napomena vlguva tuka: # Izvrshuvanje na naredba
-      - „не“ / „нема“ → INSERT bez napomena # Izvrshuvanje na naredba
-      - bilo koj drug tekst → INSERT so toj tekst kako napomena # Izvrshuvanje na naredba
-    """
     doctor_id = int(cekanje["doctor_id"]) # Dodeluvanje na vrednost
     datum_str = str(cekanje["datum"]) # Dodeluvanje na vrednost
     vreme_str = str(cekanje["vreme"]) # Dodeluvanje na vrednost
-
     if korisnikot_odbiva_napomena(prasanje): # Uslovna proverka
         return finaliziraj_zakazuvanje(doctor_id, datum_str, vreme_str, pacient, napomena=None) # Vrakjanje na izvleceni podatoci vo standardiziran format
 
@@ -331,16 +285,6 @@ def obrabotka_na_napomena(prasanje: str, pacient: dict, cekanje: dict) -> dict: 
 
 # ───────────────── GLAVNA FUNKCIJA ───────────────── # Izvrshuvanje na naredba
 def odgovori_za_zakazuvanje(prasanje: str, pacient: dict | None, kontekst: dict | None = None):  # Vlezna tocka — povikana od router # GLAVNA FUNKCIJA: vlezna tocka za celiot zakazuvacki proces
-    """
-    Edinstven flow: # Izvrshuvanje na naredba
-      1) ako sme vo napomena-faza → obrabotka_na_napomena # Izvrshuvanje na naredba
-      2) AI ekstrakcija (doctor_id / datum / vreme) # Izvrshuvanje na naredba
-      3) pacient najaven? # Izvrshuvanje na naredba
-      4) imame li lekar/datum/vreme? # Izvrshuvanje na naredba
-      5) validacija (datum, vreme, slobodno) # Izvrshuvanje na naredba
-      6) prashaj za napomena → postavi flag i cekaj sledna poraka # Izvrshuvanje na naredba
-    """
-
     # 1) Ako vo prethodnata poraka prashavme za napomena — ovaa poraka e nejziniot odgovor # Izvrshuvanje na naredba
     cekanje_napomena = proveri_dali_cekame_napomena(kontekst) # Dodeluvanje na vrednost
     if cekanje_napomena and pacient and pacient.get("email"): # Uslovna proverka

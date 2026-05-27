@@ -1,10 +1,3 @@
-"""Запиши терапија/дијагноза за пациент од лекар.
-Примери:
-- „Запиши терапија за пациент Марко Иванов: 2x дневно парацетамол"
-- „Додај терапија на термин 42: Аспирин 100mg"
-- „Дијагноза за пациент Ана Стојановска: Хипертензија. Терапија: Лосартан 50mg"
-- „Запиши: дијагноза грип, терапија витамин Ц"
-"""
 from database import get_connection  
 from ai._kernel.ai_json import parse_ai_json  
 from ai._kernel.groq_client import ask_ai  
@@ -123,11 +116,7 @@ def _update_terapija( termin_id: int, dijagnoza: str | None, terapija: str | Non
 # glavna handler funkcija koja se povikuva od strana na router-ot
 def odgovori_za_terapija(prasanje: str, lekar: dict | None) -> str:
     if not lekar or not lekar.get("doctor_ID"):  # proverka dali korisnikot e najaven kako lekar
-        return (
-            "За да запишеш терапија преку AI асистентот, прво најави "
-            "се како лекар."
-        )  # poraka dokolku se posaka ovaa akcija bez avtentikacija
-
+        return ( "За да запишеш терапија преку AI асистентот, прво најави се како лекар.")  # poraka dokolku se posaka ovaa akcija bez avtentikacija
     podatoci = _izvlechi(prasanje)  # povik na ai funkcijata za izvlekuvanje na podatocite
     if podatoci.get("_error"):  # ako ai funkcijata javi greska pri rabotata
         return podatoci["_error"]  # vrati ja greskata direktno nazad
@@ -139,16 +128,12 @@ def odgovori_za_terapija(prasanje: str, lekar: dict | None) -> str:
         termin_id = None  # ponistuvanje na vrednosta ako konverzijata e neuspesna
     dijagnoza = (podatoci.get("dijagnoza") or "").strip() or None  # formatiranje i cistenje na tekstot za dijagnoza
     terapija = (podatoci.get("terapija") or "").strip() or None  # formatiranje i cistenje na tekstot za terapija
-
     if not dijagnoza and not terapija:  # ako modelot ne prepoznal nitu dijagnoza nitu terapija vo baranjeto
         return (
             'Не препознав терапија или дијагноза за запис. Пробај пр.: '
             '„Запиши терапија за Марко Иванов: 2x дневно парацетамол" или '
-            '„Дијагноза за термин 42: грип, терапија Витамин Ц".'
-        )  # vrakjanje instrukcija za upatstvo kon lekarot
-
+            '„Дијагноза за термин 42: грип, терапија Витамин Ц".' )  # vrakjanje instrukcija za upatstvo kon lekarot
     doctor_id = lekar["doctor_ID"]  # prevzemanje na doctor_id od sesijata
-
     # Dokolku e dadeno id na terminot
     if termin_id:
         termin = _najdi_termin_po_id(doctor_id, termin_id)  # prebaruvanje na terminot spored negovoto id
@@ -157,12 +142,10 @@ def odgovori_za_terapija(prasanje: str, lekar: dict | None) -> str:
                 f"Не најдов твој термин со ID {termin_id}. "
                 "Провери го бројот или пробај по име на пациент."
             )  # izvestuvanje ako vnesenoto id ne postoi ili ne pripaga na toj lekar
-
         avtomatski = (termin.get("status_pregled") == "закажан")  # proverka dali terminot treba avtomatski da se zatvori
         ok = _update_terapija(termin_id, dijagnoza, terapija, avtomatski)  # izmena na podatocite vo bazata
         if not ok:
             return "Се случи грешка при зачувувањето. Те молам обиди се повторно."  # greska pri update
-
         return _ispisi_po_uspesno(termin, dijagnoza, terapija, avtomatski)  # generiranje na uspesen tekstualen izvestaj
 
     # Dokolku e dadeno imeto na pacientot
@@ -187,7 +170,6 @@ def odgovori_za_terapija(prasanje: str, lekar: dict | None) -> str:
         return _ispisi_po_uspesno(t, dijagnoza, terapija, avtomatski)  # prikaz na uspesen izvestaj
 
     # ima povekje termini -> se ponuduva izbor 
-    # preferiraj: zakazan bez terapija > zavrshen bez terapija > najnov
     def prioritet(t):
         ima_ter = bool((t.get("terapija") or "").strip())  # dali veke postoi zapisana terapija
         ima_dij = bool((t.get("dijagnoza") or "").strip())  # dali veke postoi zapisana dijagnoza
@@ -200,7 +182,6 @@ def odgovori_za_terapija(prasanje: str, lekar: dict | None) -> str:
         if st == "закажан":
             return 2
         return 3
-
     termini_sortirani = sorted(termini, key=prioritet)  # sortiranje na listata termini spored definiranata funkcija za prioritet
     najpriroditen = termini_sortirani[0]  # zemanje na najsoodvetniot termin
 

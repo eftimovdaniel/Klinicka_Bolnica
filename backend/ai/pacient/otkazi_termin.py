@@ -16,13 +16,9 @@ from database import get_connection  # Uvoz na funkcija za konekcija so MySQL ba
 from ai._kernel.prompt_loader import load_prompt  # Uvoz na pomoshna funkcija za citanje na prompt sablon
 from ai._kernel.groq_helpers import izvlechi_json_so_ai  # Uvoz na Groq AI pomoshna funkcija
 from ai._kernel.utils import format_datum, format_vreme  # Uvoz na pomoshni funkcii za formatiranje
-
-
 # Lista na denovi vo nedelata na makedonski (za prikaz vo potvrda)
 DENOVI_VO_NEDELA = ["Понеделник", "Вторник", "Среда", "Четврток", "Петок", "Сабота", "Недела"]
 
-
-# ───────────────── AI povik ─────────────────
 def zimi_site_lekari_od_baza() -> list:  # SQL upit — vrakja site lekari za AI promptot
     """Vrakja lista na site lekari ({'doctor_ID', 'name', 'surname', 'specialty'})."""
     konekcija = None  # Inicijalizacija — vazno za finally blokot
@@ -44,7 +40,6 @@ def zimi_site_lekari_od_baza() -> list:  # SQL upit — vrakja site lekari za AI
 def izvlechi_podatoci_so_ai(prasanje: str) -> dict:  # Eden Groq povik koj vrakja doctor_id / datum / vreme / prezime_filter
     """AI extract: doctor_id, datum (YYYY-MM-DD), vreme (HH:MM), prezime_filter."""
     site_lekari = zimi_site_lekari_od_baza()  # Lista na site lekari za AI da znae koe ID kome pripaga
-
     # Tekst-lista na lekari za AI promptot
     lista_tekst = ""  # Pochetna prazna niza koja ke ja popolnuvame
     for lekar in site_lekari:  # Iteracija niz site lekari
@@ -55,7 +50,6 @@ def izvlechi_podatoci_so_ai(prasanje: str) -> dict:  # Eden Groq povik koj vrakj
     deneshen_datum = date.today()  # Zemanje na deneshen datum
     denovi_mali = ["понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"]  # Denovi na kirilica
     deneshen_den = denovi_mali[deneshen_datum.weekday()]  # Deneshen den (weekday vrakja 0-6)
-
     # Polniot prompt sto se prakja kako „user“ poraka (system prompt e od otkazi_extract)
     full_prompt = (  # Sostavuvanje na promptot od delovi
         f"Денешен датум: {deneshen_datum.isoformat()} ({deneshen_den})\n"
@@ -63,11 +57,8 @@ def izvlechi_podatoci_so_ai(prasanje: str) -> dict:  # Eden Groq povik koj vrakj
         f"Корисник пишува: „{prasanje}\"\n\n"
         "Извлечи doctor_id, datum, vreme, prezime_filter и врати JSON."
     )
-
     return izvlechi_json_so_ai(full_prompt, load_prompt("otkazi_extract"), log_tag="otkazi_termin")  # Povik do Groq AI
 
-
-# ───────────────── Pomoshni funkcii ─────────────────
 def validiraj_doctor_id(vrednost) -> int | None:  # Pretvori vrednost vo int ili vrati None
     """Validacija na doctor_id od AI — vrakja int ili None."""
     if vrednost is None:  # Ako AI ne vratil id
@@ -77,12 +68,10 @@ def validiraj_doctor_id(vrednost) -> int | None:  # Pretvori vrednost vo int ili
     except (TypeError, ValueError):  # Ako konverzijata ne uspee
         return None  # Vrati None
 
-
 def dopolni_od_kontekst(doctor_id, datum_str, prasanje, kontekst):  # Dokolku AI ne izvlekol — zemi od pretohden razgovor
     """Vrakja (doctor_id, datum_str) — popolneti od kontekst ako AI propushtil."""
     if not isinstance(kontekst, dict):  # Proverka dali kontekstot e validen recnik
         return doctor_id, datum_str  # Ako ne e — vrati nepromeneti vrednosti
-
     # Probaj prvo od „slobodni“, potoa od „pending“ kontekst (od prethodno zakazuvanje)
     pretohden = kontekst.get("zakazi_od_slobodni") or kontekst.get("zakazi_pending") or {}  # Pretohden razgovor
     if not isinstance(pretohden, dict):  # Proverka dali e validen recnik
@@ -104,15 +93,11 @@ def dopolni_od_kontekst(doctor_id, datum_str, prasanje, kontekst):  # Dokolku AI
 
     return doctor_id, datum_str  # Vrakjame dvojka so popolneti vrednosti
 
-
-# ───────────────── SQL operacii ─────────────────
 def najdi_termini_za_otkazuvanje(email_pacient, doctor_id, datum_str, vreme_str, prezime_filter) -> list:  # SELECT na aktivni termini
-    """Vrakja lista na zakazani termini sto se poklopuvaat so filtrite."""
     konekcija = None  # Inicijalizacija — vazno za finally blokot
     try:  # Pocetok na blok za obrabotka na potencijalni greski
         konekcija = get_connection()  # Otvoranje na konekcija so bazata
         cursor = konekcija.cursor(dictionary=True)  # Dictionary kursor za citki redovi
-
         # Osnoven SQL upit — site zakazani termini na ovoj pacient
         query = (
             "SELECT termin_ID, datum_pregled, vreme_pregled, "
@@ -122,33 +107,26 @@ def najdi_termini_za_otkazuvanje(email_pacient, doctor_id, datum_str, vreme_str,
             "  AND status_pregled = 'закажан'"  # Samo zakazani (ne zavrseni / otkazani)
         )
         parametri = [email_pacient]  # Prv parametar — email na pacientot
-
         # Ako nema konkreten datum vo prashanjeto — pokazi samo idni termini
         if not datum_str:  # Bez datum
             query += " AND datum_pregled >= CURDATE()"  # Samo denes i nataka
-
         # Ako ima konkreten lekar — filtriraj po doctor_ID
         if doctor_id:  # Imame doctor_id od AI ili kontekst
             query += " AND doctor_ID = %s"  # Dodavanje na uslov
             parametri.append(doctor_id)  # Dodavanje na parametar
-
         # Ako ima konkreten datum — filtriraj po datum
         if datum_str:  # Imame datum
             query += " AND datum_pregled = %s"  # Dodavanje na uslov
             parametri.append(datum_str)  # Dodavanje na parametar
-
         # Ako nema doctor_id no ima del od prezime — pretraga po ime_lekar
         if prezime_filter and not doctor_id:  # Imame prezime, no nemame ID
             query += " AND LOWER(COALESCE(ime_lekar, '')) LIKE %s"  # LIKE pretraga
             parametri.append(f"%{prezime_filter.strip().lower()}%")  # Wildcard pretraga
-
         # Ako ima konkretno vreme — filtriraj po vreme
         if vreme_str:  # Imame vreme
             query += " AND TIME(vreme_pregled) = %s"  # SQL TIME() konverzija
             parametri.append(vreme_str)  # Dodavanje na parametar
-
         query += " ORDER BY datum_pregled, vreme_pregled"  # Sortirano po datum i vreme
-
         cursor.execute(query, parametri)  # Izvrshuvanje na upitot
         rezultati = list(cursor.fetchall() or [])  # Zemanje na site redovi
         cursor.close()  # Zatvaranje na kursorot
@@ -227,25 +205,13 @@ def isprati_email_potvrda_za_otkaz(pacient: dict, termin: dict) -> None:  # SMTP
         print(f"[otkazi_termin] email: {e}")  # Log za debagiranje
 
 
-# ───────────────── GLAVNA FUNKCIJA ─────────────────
 def odgovori_za_otkazuvanje(prasanje: str, pacient: dict | None, kontekst: dict | None = None) -> str:  # Vlezna tocka — povikana od router
-    """
-    Edinstven flow:
-      1) pacient najaven?
-      2) AI ekstrakcija (doctor_id / datum / vreme / prezime_filter)
-      3) dopolni od kontekst (pretohden razgovor)
-      4) SELECT vo baza
-      5) 0 / >1 / tocno 1 termin
-      6) UPDATE + email potvrda
-    """
-
     # 1) Pacientot mora da bide najaven (email e zadolzitelen za pretraga)
     if not pacient or not pacient.get("email"):  # Proverka dali ima pacient + email
         return (  # Vrakjame poraka za najava
             "За да откажеш термин, прво најави се како пациент. "
             "Кликни „Најави се!\" горе десно."
         )
-
     # 2) AI ekstrakcija na podatoci od prashanjeto
     podatoci_od_ai = izvlechi_podatoci_so_ai(prasanje)  # Eden Groq povik
     if podatoci_od_ai.get("_error"):  # Ako Groq vratil greska (npr. rate-limit)

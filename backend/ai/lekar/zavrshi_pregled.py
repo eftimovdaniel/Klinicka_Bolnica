@@ -38,8 +38,7 @@ _RE_TX_SO = re.compile(  # regex za prepoznavanje na terapija vmetnata so vrznic
 
 
 PROMPT = """
-Ти си систем што извлекува податоци за завршување медицински прегледи.
-Корисникот е лекар и сака да означи еден или повеќе прегледи како „завршени". Врати САМО JSON:
+Ти си систем што извлекува податоци за завршување медицински прегледи. Корисникот е лекар и сака да означи еден или повеќе прегледи како „завршени". Врати САМО JSON:
 {"termin_ids": [42, 43] | null, "ime_pacient": "Име Презиме" | null,
  "datum": "YYYY-MM-DD" | null, "site": true | false,
  "dijagnoza": "текст" | null, "terapija": "текст" | null}
@@ -104,7 +103,6 @@ def _sql_filter_ime_pacient(ime_pacient: str) -> tuple[str, list]:  # funkcija z
             return "", []  # prekinuvam i vrakjam prazni vrednosti
         clause = " AND (" + " OR ".join(["LOWER(ime_pacient) LIKE %s"] * len(vars_)) + ")"  # sozdavam sql or uslov za sekoja varijanta
         return clause, [f"%{v}%" for v in vars_]  # gi pakuvam vrednostite so procenti za sql lajk prebaruvajneto
-
     first, last = delovi[0], delovi[-1]  # gi zemam prviot i posledniot zbor od stringot kako ime i prezime
     v_first = _like_variants_ime(first)  # generiram jazicni varijanti za prvoto ime
     v_last = _like_variants_ime(last)  # generiram jazicni varijanti za prezimeto
@@ -162,7 +160,6 @@ def _izvlechi(prasanje: str) -> dict:  # funkcija za povik na ai modelot i izvle
 
     if msg := groq_zadolzhitelen():  # ako se javi poraka za greshka vo vrskata so servisot
         return {"_error": msg}  # ja vrakjam taa poraka kako greshka vo rechnikot
-
     full = f'{today_prompt_line()}\n\nПрашање: "{prasanje}"\nВрати JSON.'  # go spremam finalniot prompt za modelot so se tekovniot den
     podatoci = izvlechi_json_so_ai(full, PROMPT, log_tag="zavrshi_pregled")  # povik do pomosnata funkcija i zemanje strukturiran json response
     if podatoci.get("_error"):  # ako ima greshka uste pri samiot povik na ai modelot
@@ -171,25 +168,16 @@ def _izvlechi(prasanje: str) -> dict:  # funkcija za povik na ai modelot i izvle
     if tid is not None and not podatoci.get("termin_ids"):  # ako jas najdov id a modelot go propushtil vo jsonot
         podatoci["termin_ids"] = [tid]  # racno go vmetnuvam id brojot vo strukturata so podatoci
     from ai.pacient.moi_pregledi import datum_za_pregledi_od_prasanje  # uvoz na logikata za vadenje datum od tekst
-
     d = datum_za_pregledi_od_prasanje(prasanje)  # ja povikuvam funkcijata da prepoznae tekstualni datumi ako denes ili utre
     if d and not podatoci.get("datum"):  # ako e pronajden datum a modelot nema nisto staveno vo jsonot
         podatoci["datum"] = d.isoformat()  # go zacuvasam vo standardiziran izo format na string
     return podatoci  # go vrakjam celosno spremniot i korigiran rechnik so podatoci
 
-
-def _najdi_termin(  # funkcija za prebaruvanje na termini vo mysql bazata po poveke kriteriumi
-    doctor_id: int,  # id na lekarot koj ja vrshi operacijata
-    termin_id: int | None,  # opciono id na specificen termin
-    ime_pacient: str | None,  # opciono ime na pacientot za pretraga
-    datum_str: str | None,  # opcionen datum na pregleduvanje
-    *,  # granica za poedinecni imenuvani argumenti vo python
-    samo_zakazani: bool = True,  # flag dali da prebaruvame samo seuste nezavrsheni pregledi
-) -> list[dict]:  # vrakja lista od rechnici so pronajdenite termini
+ # funkcija za prebaruvanje na termini vo mysql bazata po poveke kriteriumi
+def _najdi_termin(  doctor_id: int,  termin_id: int | None,  ime_pacient: str | None,   datum_str: str | None,  *,   samo_zakazani: bool = True,) -> list[dict]:  # vrakja lista od rechnici so pronajdenite termini
     """Termini na lekarot — po ID, ime (lat/kir) ili datum."""
     conn = get_connection()  # vospostavuvam aktivna konekcija so mysql bazata na podatoci
     cur = conn.cursor(dictionary=True)  # kreiram kursor koj vrakja redovi ako python rechnici
-
     if termin_id:  # ako eksplicitno e podadeno id na terminot preku argument
         cur.execute(  # go izvrshuvam upitot za selektiranje po id i id na doktorot
             "SELECT termin_ID, ime_pacient, datum_pregled, vreme_pregled, status_pregled"  # gi baram samo neophodnite polinja
@@ -200,20 +188,16 @@ def _najdi_termin(  # funkcija za prebaruvanje na termini vo mysql bazata po pov
         cur.close()  # vednas go zatvoram kursorot za da oslobodam memorija
         conn.close()  # ja zatvoram vrskata so mysql bazata
         return rows  # gi vrakjam pronajdenite podatoci od bazata na podatoci
-
     sql = (  # pocnuvam da go gradam dinamickiot sql upit za ostanatite slucaevi
         "SELECT termin_ID, ime_pacient, datum_pregled, vreme_pregled, status_pregled"  # selekcija na osnovnite polinja
         " FROM Termin_pregled WHERE doctor_ID = %s"  # poceten uslov deka terminot mora da e kaj ovoj lekar
     )  # kraj na pocetniot string na upitot
     params: list = [doctor_id]  # ja inicijaliziram listata na parametri so id na lekarot
-
     if samo_zakazani:  # ako e aktiviran uslovot za baranje samo na zakazani termini
         sql += f" AND {_status_zakazan_sql()}"  # ja lepam prethodno definiranata status klauzula vo stringot
-
     if datum_str:  # ako vo filtrite e prosleden konkreten datum ako uslov
         sql += " AND datum_pregled = %s"  # go dodavam sql uslovot za sovpagjanje na datumot
         params.append(datum_str)  # ja stavam vrednosta na datumot vo listata so parametri
-
     if ime_pacient:  # ako e vneseno ime na pacient za prebaruvanje vo bazata
         clause, clause_params = _sql_filter_ime_pacient(ime_pacient)  # gi zemam dinamickite sql delovi od filterot za ime
         if clause:  # ako filterot generiral validna sql klauzula
@@ -222,7 +206,6 @@ def _najdi_termin(  # funkcija za prebaruvanje na termini vo mysql bazata po pov
         if "@" in ime_pacient:  # ako imeto sodrzi majmunche shto ukazuva na prebaruvanje po email adresa
             sql += " AND LOWER(TRIM(email_pacient)) = LOWER(TRIM(%s))"  # dodavam bezbeden uslov za filtriranje po email
             params.append(ime_pacient.strip())  # go chistam emailot od prazni mesta i go stavam vo parametrite
-
     sql += " ORDER BY datum_pregled, vreme_pregled"  # gi sortiram rezultatite po hronoloshki redosled na pregledite
     cur.execute(sql, params)  # go izvrshuvam finalno sklopeniot i bezbeden dinamicki sql upit
     rows = cur.fetchall()  # gi povlekuvam site pronajdeni redovi od bazata vo promenlivata rows
@@ -230,16 +213,11 @@ def _najdi_termin(  # funkcija za prebaruvanje na termini vo mysql bazata po pov
     conn.close()  # ja zatvoram konekcijata do bazata na podatoci
     return rows  # ja vrakjam listata so pronajdeni termini nazad
 
-
 def _poraka_ne_najden_termin(doctor_id: int, ime: str | None) -> str:  # pomoshna funkcija za generiranje ubava poraka pri neuspeh
-    """Pomoshna poraka — slicni iminja ili pogreshen status."""
     base = "Не најдов соодветен закажан преглед кај тебе."  # definiram osnoven tekst za porakata za greshka
     if not ime:  # ako ne bilo preneseno ime na pacient ako kriterium
         return (  # vrakjam nasoka kako korisnikot da postapi vo ovoj slucaj
-            base  # osnovnata poraka
-            + '\n\nПровери "Мој распоред" или наведи "Заврши термин ID …".'  # sovet za vnesuvanje na konkreten id broj
-        )  # kraj na stringot za vrakjanje koga nema ime
-
+            base + '\n\nПровери "Мој распоред" или наведи "Заврши термин ID …".') ## osnovnata poraka i sovet za vnesuvanje na konkreten id broj
     site = _najdi_termin(doctor_id, None, ime, None, samo_zakazani=False)  # pravam ushte edna prebaruvanje bez filter za status
     if not site:  # ako voopshto ne postoi termin so toa ime kaj ovoj lekar vo celata baza
         return (  # vrakjam detalno izvestuvanie za nepostoenje na takov pacient vo negoviot karton
@@ -247,7 +225,6 @@ def _poraka_ne_najden_termin(doctor_id: int, ime: str | None) -> str:  # pomoshn
             + f'\n\nНемам термин за "{ime}" на твојот распоред.\n'  # specificiram za koe ime stanuva zbor
             'Провери правопис (латиница/кирилица) или ID од "Мој распоред".'  # sovet za proverka na bukvite od tastaturata
         )  # kraj na stringot koga nema nikakov termin so toa ime
-
     zakazani = [  # filtriram lokalno koi od pronajdenite termini se vo status zakazan
         r  # go zacuvuvam redcheto
         for r in site  # vrtam niz site rezultati vrateni od bazata
@@ -255,23 +232,15 @@ def _poraka_ne_najden_termin(doctor_id: int, ime: str | None) -> str:  # pomoshn
     ]  # kraj na listickata kompresija
     if zakazani:  # ako imalo zakazani termini no ne se sovpadnal datumot
         return base  # ja vrakjam samo osnovnata poraka za nesovpagjanje
-
-    linii = [  # pocnuvam da gradam detalna lista na linii za korisnikot koga terminite se so drug status
-        base,  # ja stavam pocetnata linija vo listata
-        "",  # prazen red za poubav estetski izgled na porakata
-        f'Имам преглед за "{ime}", но не е со статус „закажан":',  # objasnuvanje deka terminot e najden no ima razlicen status
-    ]  # kraj na pocetnata inicijalizacija na liniite
+    # pocnuvam da gradam detalna lista na linii za korisnikot koga terminite se so drug status
+    linii = [ base,"",f'Имам преглед за "{ime}", но не е со статус „закажан":', ] # objasnuvanje deka terminot e najden no ima razlicen status
     for r in site[:5]:  # prikazuvam najmnogu do pet termini za da ne go preplavam ekranom so tekst
         st = (r.get("status_pregled") or "—").strip()  # go zemam statusot i mu pravam chistenje na stringot od prazni mesta
         linii.append(  # dodavam nov red so detali za sekoj pronajden termin poedinecno
             f"• ID {r['termin_ID']}: {r['ime_pacient']} — "  # prikazuvam id broj i ime na pacient
-            f"{format_datum_i_vreme(r['datum_pregled'], r['vreme_pregled'])} (статус: {st})"  # prikazuvam koga bil pregledot i koj e statusot
-        )  # kraj na linijata za tekovniot pregled od ciklusot
-    linii.append(  # dodavam zavrshen sovet na krajot od porakata za korisnikot
-        "\nАко сакате да го ажурирате, наведете ID или контактирајте админ."  # nasoka za reshavanje na problemot so status
-    )  # kraj na poslednata linija
+            f"{format_datum_i_vreme(r['datum_pregled'], r['vreme_pregled'])} (статус: {st})") # prikazuvam koga bil pregledot i koj e statusot
+    linii.append(   "\nАко сакате да го ажурирате, наведете ID или контактирајте админ." ) # nasoka za reshavanje na problemot so status
     return "\n".join(linii)  # gi spojuvam site linii vo eden ubav tekst razdelen so novi redovi
-
 
 def _prazna_dx_tx(v: str | None) -> bool:  # funkcija koja proveruva dali vrednostite za dijagnoza ili terapija se prazni
     if v is None:  # ako vrednosta e nane odnosno voopshto ne e ispratena od modelot
@@ -279,9 +248,7 @@ def _prazna_dx_tx(v: str | None) -> bool:  # funkcija koja proveruva dali vredno
     t = str(v).strip()  # ja pretvoram vrednosta vo klasicen string i gi brisham okolnite prazni mesta
     return not t or t in ("/", "—", "-", "…", ".", "n/a", "N/A", "нема", "none")  # vrakjam tru ako stringot e kratok ili sodrzi znaci za prazno pole
 
-
 def _zavrshi(termin_id: int, dijagnoza: str | None, terapija: str | None) -> None:  # moja funkcija shto go pravi realniот apdejt vo bazata
-    """Markira pregled kako zavrshen. Opciono zapishuva dx/tx."""
     conn = get_connection()  # otvoram nova chista konekcija do mysql bazata na podatoci
     cur = conn.cursor()  # kreiram klasicen kursor za izvleshuvanje na izmenite
     sets = ["status_pregled = 'завршен'"]  # ja definiram pocetnata izmena kade statusot se postavuva vo zavrshen
@@ -303,7 +270,6 @@ def _zavrshi(termin_id: int, dijagnoza: str | None, terapija: str | None) -> Non
 
 
 def _azuriraj_dx_tx(termin_id: int, dijagnoza: str | None, terapija: str | None) -> bool:  # funkcija za partialen apdejt na medicinski beleshki bez izmena na statusot
-    """UPDATE dx/tx БЕЗ менување на статусот (за пр. ажурирање на веќе завршен преглед)."""
     sets: list[str] = []  # lokalna lista vo koja ke gi sobiram delovite od set delot na sql upitot
     params: list = []  # parallel lista vo koja ke gi chuvam vrednostite za sekoja sql klauzula
     if dijagnoza and not _prazna_dx_tx(dijagnoza):  # ako ima validna dijagnoza koja ne e prazen simbol kako kosi crti
@@ -326,9 +292,7 @@ def _azuriraj_dx_tx(termin_id: int, dijagnoza: str | None, terapija: str | None)
     conn.close()  # ja zatvoram vrskata so mysql serverot za da oslobodam konekciski resurs
     return True  # vrakjam true kako potvrda deka apdejtot e uspeshno izvrshen vo bazata
 
-
 def _najdi_site_zakazani(doctor_id: int, datum_str: str | None) -> list[dict]:  # funkcija za povlekuvanje na apsolutno site zakazani termini odednas
-    """Site zakazani pregledi na lekarot (opciono filtrirani po datum)."""
     conn = get_connection()  # otvoram aktivna vrska do mysql databazata
     cur = conn.cursor(dictionary=True)  # koristam recnicki kursor za polesna obrabotka na polinjata vo kod
     sql = (  # go pishuvam osnovniot sql select tekst za povlekuvanje na terminite
@@ -346,12 +310,9 @@ def _najdi_site_zakazani(doctor_id: int, datum_str: str | None) -> list[dict]:  
     conn.close()  # ja zatvoram vrskata so mysql serverot
     return rows  # ja vrakjam listata so site pronajdeni zakazani termini kaj doktorot
 
-
 def _zavrshi_mnogu(rows: list[dict], dijagnoza: str | None, terapija: str | None) -> str:  # funkcija za masovno zatvoranje na poveke termini vo serija
-    """Zavrshi poveke pregledi i vrati rezime."""
     if not rows:  # ako listata so termini e prazna odnosno nema nisto za obrabotka
         return "Нема закажани прегледи за завршување."  # vednas vrakjam izvestuvanje do lekarot vo asistentot
-
     uspesni = 0  # brojac za uspesno zatvoreni termini vo bazata
     preskoknati = 0  # brojac za termini koi bile preskoknati poradi nesoodveten status
     for r in rows:  # zapocnuvam ciklus niz sekoj poedinecen termin od listata
@@ -360,38 +321,27 @@ def _zavrshi_mnogu(rows: list[dict], dijagnoza: str | None, terapija: str | None
             continue  # vednas preodjam na obrabotka na sledniot termin od ciklusot
         _zavrshi(r["termin_ID"], dijagnoza, terapija)  # ja povikuvam glavnata funkcija za izmena za tekovniot id broj
         uspesni += 1  # go zgolemuvam brojacot na uspesni zatvoranja za eden po transakcijata
-
     linii = [f"Завршени {uspesni} прегледи."]  # ja kreiram pocetnata linija na izveshtajot so brojot na uspesni izmeni
     if preskoknati:  # ako vo tekot na ciklusot imalo preskoknati termini koi veke bile zatvoreni
         linii.append(f'Прескокнати {preskoknati} (веќе немаа статус „закажан").')  # dodavam informativna linija za preskoknatite vo izveshtajot
-
     linii.append("")  # stavam eden prazen element vo listata za vizuelno odvojuvanje na sekciite vo izlezot
     linii.append("Детали:")  # dodavam naslov za delot kade shto ke bidat izlistani pregledite so detali
     for r in rows:  # ushte eden ciklus niz listata na termini za podgotovka na detalniot prikaz
         if r["status_pregled"] != "закажан":  # ako terminot ne bil del od grupata na uspesno izmeneti
             continue  # go preskoknuvam i ne go prikazuvam vo finalniot izveshtaj za korisnikot
-        linii.append(  # dodavam detalen red vo tekstualniot izveshtaj za sekoj zatvoren pregled
-            f"• ID {r['termin_ID']}: {r['ime_pacient']} ({format_datum_i_vreme(r['datum_pregled'], r['vreme_pregled'])})"  # prikazuvam id ime i tochen chas
-        )  # kraj na dodavanjeto na redot od ciklusot vo izveshtajot
+        linii.append(  f"• ID {r['termin_ID']}: {r['ime_pacient']} ({format_datum_i_vreme(r['datum_pregled'], r['vreme_pregled'])})")  # prikazuvam id ime i tochen chas
     return "\n".join(linii)  # gi spojuvam site podgotveni linii vo eden finalen izveshtaj so novi redovi
 
-
-def odgovori_za_zavrshi(  # mojata glavna hendler funkcija koja ja povikuva ruterot na asistentot
-    prasanje: str, lekar: dict | None, kontekst: dict | None = None  # prima prasanje podatoci za lekarot i kontekst od razgovorot
-) -> str:  # sekogash vrakja string poraka koja se prikazuva na interfejsot kaj lekarot
-    """Glavna tocka - povikana od router-ot."""
+# mojata glavna hendler funkcija koja ja povikuva ruterot na asistentot
+def odgovori_za_zavrshi(prasanje: str, lekar: dict | None, kontekst: dict | None = None ) -> str: # prima prasanje podatoci za lekarot i kontekst od razgovorot, sekogash vrakja string poraka koja se prikazuva na interfejsot kaj lekarot
     if err := require_lekar(lekar):  # pravam prvichna proverka dali korisnikot voopshto ima uloga na lekar vo sistemot
         return err  # ja vrakjam sistemskata poraka za greshka ako korisnikot ne e avtoriziran lekar
-
     doctor_id = lekar["doctor_ID"]  # go zemam i zacuvuvam id brojot na lekarot od negovata aktivna sesija
-
     termin_ids: list[int] = []  # definiram pocetna prazna lista vo koja ke gi chuvam id broevite na terminite
     tid = _termin_id_od_prasanje(prasanje)  # se obiduvam brzo da izvlecham id broj od prasanjeto preku mojot regularen izraz
     if tid is not None:  # ako mojot regularen izraz uspesno pronashel tochen id broj vo prasanjeto
         termin_ids = [tid]  # go stavam toj pronajden broj kako edinstven element vo listata za obrabotka
 
-    # BUG FIX: brz tek bez AI ako veke imame ID + dx/tx (ili gi nema)
-    # mozhe da se izvlechat regex-no. Sprechuva 429 da go blokira korisnikot.
     dx_match = _RE_DX.search(prasanje)
     dx_so_match = _RE_DX_SO.search(prasanje)
     tx_match = _RE_TX.search(prasanje)

@@ -1,1384 +1,687 @@
-"""
-Korisnikot moze da aplicira za nekoja rabota pozicija so pomos na ai agento, se najavuva kako pacient, se bara broj na medicinska 
-licena i so zapisuvanje na istata podatocite se obrabotuvaat i negovoto ime se smestuva vo the database kako kandidat koj ima podneseno baranje za rabota
-"""
-import re           # sabloni kako ai da mi gi dava odgovorite
-from datetime import datetime       # rabota o datum i vreme, koristam gi koga apliciram za rabota i koga gi prikazuvam aplikaciite na korisnikot
-from database import get_connection # konekcija so the database
-from ai._kernel.ai_json import parse_ai_json    # funkcija koja go cita i parsira ai odgovorot vo Python recnik
-from ai._kernel.db_helpers import ( # pomosna funkcija za interakcija so bazata, kako da gi zemam aplikaciite, da gi brisam, da gi prikazuvam i sl.
-    as_dict,        # go pretvarame sql redot vo Python recnik 
-    fetch_one,      # vlecam samo eden rezlutat od izvedenata akcija 
-    normalize_int,  # normalizacija na integer vrednosti, za da se osiguram deka ID-to e validno
-    prijaveni_order_desc,   # se sortiraat aplikaciite za rabota po datumi 
-    prijaveni_pk_column,    # go zema imeto na primarniot kluc od tabelata so prijavite
-    prijaveni_row_id,       # id od aplikacijata, od redot vo bazata
-    prijaveni_select_sql,   # Select za da moze da se vidat lekarite koj aplicirale za rabota
+import re                                        
+from datetime import datetime                      
+from database import get_connection                
+from ai._kernel.ai_json import parse_ai_json       
+from ai._kernel.db_helpers import (                # pomoshni alatki za rabota so tabelata prijaveni_lekari
+    as_dict,                                       # pretvora red od baza vo obichen Python dict
+    fetch_one,                                     # zemi samo eden red (ili None ako nema)
+    normalize_int,                                 # sigurno „17" → 17 (ili None ako ne moze)
+    prijaveni_order_desc,                          # vraka SQL string „ORDER BY datum DESC" — najnovi prvo
+    prijaveni_pk_column,                           # vraka ime na primary key kolonata (razlichno po tabela)
+    prijaveni_row_id,                              # vadi ID od eden red (bez vaznost kako se vika kolonata)
+    prijaveni_select_sql,                          # standarden SELECT od prijaveni_lekari (bez WHERE)
 )
-from ai._kernel.groq_client import ask_ai   # so ovaa funkcija isprakam poraki do LLM modelot sto go koristam (Groq) za da dobijam nekoj odgovor
-from ai._kernel.transliteracija import transliterijaj   # latinica -> kirilica, agento sekogas dava odgovor na kirilica
-from ai._kernel.utils import format_datum_vreme # formatiranje na datum i vreme za prikaz na korisnikot
-from vrabotuvanje_helpers import fetch_aktivni_oglasi_rows, format_rok_datum   # aktivni oglasi i rok za prijavuvanje
-# ai agento moze da gi prenasoce korisnikot na delot kade imame aktivni oglasi za rabota,
-# tuka gi prenosocuva na index.html delot kade imame kariera 
+from ai._kernel.groq_client import ask_ai          # funkcija — praka prompt do Groq AI i vraka tekst
+from ai._kernel.transliteracija import transliterijaj  # pretvora latinica → kirilica (za polesno prebaruvanje)
+from ai._kernel.utils import format_datum_vreme    # formatira datetime objekt vo ubav tekst za prikaz
+from vrabotuvanje_helpers import (                 # modul za alatki okolu „Vrabotuvanje / Kariera"
+    fetch_aktivni_oglasi_rows,                     # SELECT od tabelata Vrabotuvanje (samo aktivni oglasi)
+    format_rok_datum,                              # formatira DATE → string „21.07.2024"
+)
+# Koga ke odgovorime, frontend-ot ke go nosi korisnikot do sekcijata „Kariera" na sajtot
 NAV_KARIERA = {"target": "index.html#kariera", "label": "Кариера"}
-# promtovi so koj ai agento (LLM) modelot go na nekoj nacin treniram da moze od kontekst na porakite da gi izvlece poziciite
-PROMPT_POZICIJA = """
-Ти си систем што извлекува позиција за работа од прашање.
-Корисникот сака да аплицира за работа во болница. Извлечи го името на позицијата за која аплицира.
-Врати САМО JSON:
-{"pozicija": "<име на позицијата>" | null}
+
+# AI prompt — upatstvo kako LLM-ot da izvlece pozicija od prashanjeto kako JSON.
+# LLM-ot sekogash mora da vraka isklucivo JSON {"pozicija": ...} — nikakov drug tekst.
+PROMPT_POZICIJA = """ Ти си систем што извлекува позиција за работа од прашање. Корисникот сака да аплицира за работа во болница. Извлечи го името на позицијата.
+Врати САМО JSON: {"pozicija": "<име на позицијата>" | null}
 Правила:
-- Корисникот пишува на македонски (можно е и латиница).
-- Прифатени примери: „кардиолог", „хирург", „анестезиолог", „медицинска сестра",
-  „гинеколог", „педијатар", „радиолог", „интернист", „уролог" итн.
-- Ако корисникот пишува на латиница, врати на кирилица: „kardiolog" → „Кардиолог".
-- Ако позицијата НЕ е јасна → null.
-- „сакам да аплицирам за работа", „да работам кај вас", „вработување" БЕЗ
-  конкретна специјалност/оддел → null (не „работа" како позиција).
-- Ако корисникот залепи цел **оглас за работа** (на пр. „Се вработува медицинска сестра…"),
-  извлечи ја позицијата од текстот (на пр. „Медицинска сестра").
+- Корисникот пишува на македонски (можно и латиница).
+- Прифатени примери: „кардиолог", „хирург", „медицинска сестра", „гинеколог" итн.
+- Ако пишува на латиница, врати на кирилица: „kardiolog" → „Кардиолог".
+- Ако позицијата НЕ е јасна (само „сакам да аплицирам") → null.
+- Ако корисникот залепи цел оглас за работа → извлечи ја позицијата од текстот.
 БЕЗ markdown, БЕЗ објаснувања.
-""".strip() # gi trgame site nepotrebni prazni mesta od vnesenata poraka, za da e se osigurame deka agento ne gleda nekoja zborovi plus
-# promtovi za medicinska licena, treba da poznaa dali e vnesena brojak ili ne, 
-# bidejki licencata mora da e broj, a ne tekst, i da znae da prepoznae zborovi kako „немам", „преска", „пропушти" за да znae deka korisnikot ne saka da vnesi licenca и da se preskoci toj del od procesot
-PROMPT_LICENCA = """
-Ти си систем што извлекува број на медицинска лиценца од одговор.
-Корисникот ти прати порака која може да содржи број на лиценца.
-Врати САМО JSON:
-{"licenca": "<број (само цифри)>" | null, "preskoki": true/false}
+""".strip()  # .strip() gi trga praznite mesta na pochetok/kraj (LLM-ovite se chuvstvitelni)
+
+# AI prompt za izvlekuvanje na broj na medicinska licenca od odgovor.
+# `preskoki: true` znaci „korisnikot ne saka da dade" (napishal „nemam", „preska", itn.)
+PROMPT_LICENCA = """ Ти си систем што извлекува број на медицинска лиценца од одговор.
+Врати САМО JSON: {"licenca": "<број (само цифри)>" | null, "preskoki": true/false}
 Правила:
-- Извлечи го бројот (само цифрите). Пр. „Бројот ми е 12345" → "12345".
-- Ако корисникот напише „немам", „преска", „пропушти", „не сакам" → preskoki: true, licenca: null.
-- Ако не е јасно → licenca: null, preskoki: false.
-БЕЗ markdown. """.strip() # trgame praznite mesta kaj agento
-# funkcija koja proveriva dali korsnikot ima staveno teskt od nadvoresen oglas za rabota, bidejki ako ima, treba da se obideme da izvlece pozicija direktno od toj tekst, namesto da se obiduvame da ja izvlece od prasanje
-def _tekst_e_zalepen_oglas(prasanje: str) -> bool:
-    """Цел текст на оглас (копиран од сајт/FB), не само „сакам да аплицирам“."""
-    p = transliterijaj(prasanje).lower()  # ako e na latinica baranjeto go pretvara na kirilica i site mali bukvi
-    ima_oglas = any(    # proverka dali vo vnesenta sodrzina imam bareme eden klucen zbor koj ke detektira dali korisnikot saka da aplicira za rabota ili imam nekoe drugo baranje
-        x in p  # od vnesenito tekt (p) se prebaruva dali e venseno nekoj od zboroviet podolu i ako e smestuvame go vo x za obrabotka
-        for x in (
-            "оглас за работа",
-            "oglas za rabota",
-            "се вработува",
-            "se vrabotuva",
-            "можност за аплицирање",
-            "moznost za apliciranje",
-            "рок за пријавување",
-        )
+- Извлечи го бројот. Пр. „Бројот ми е 12345" → "12345".
+- Ако корисникот напише „немам", „преска", „пропушти", „не сакам" → preskoki: true.
+- Ако не е јасно → licenca: null, preskoki: false. БЕЗ markdown.""".strip()
+
+# Funkcija sho praka potvrda na email po uspeshen INSERT vo bazata
+def _isprati_email_za_aplikacija( to_email: str, ime: str, prezime: str, pozicija: str, licenca: str | None,) -> None:                                        
+    """Praka potvrda na email po uspeshen INSERT."""
+    # Prva proverka — ako email-ot ne e validen, ne pravime nishto
+    if not to_email or "@" not in to_email:
+        return # izlez bez greshka (ne e kritichno)
+    # Lazy import — go import-irame helper-ot ovde, ne na vrvot na fajlot.
+    # Zoshto? — za da izbegneme „circular import" (termini.py isto se vika od drugo mesto).
+    from routers.termini import _isprati_email_poraka
+    # Uslovno pokazuvame licenca — ako nema, pishuvame „(не е внесена)"
+    licenca_red = f"\nЛиценца: {licenca}" if licenca else "\nЛиценца: (не е внесена)"
+    subject = "Потврда за апликација – Клиничка Болница Штип" # Naslov na mailot
+    # Telo na mailot — se koristat f-stringovi za da se vmetnat vrednostite
+    body = (
+        f"Почитуван/а {ime} {prezime},\n\n"
+        f"Вашата апликација за работа е успешно поднесена.\n\n"
+        f"Позиција: {pozicija}{licenca_red}\n\n"
+        f"Тимот за човечки ресурси ќе ве контактира за следните чекори.\n\n"
+        f"Клиничка Болница Штип\n"
     )
-    # proverka dali vo vnesot e vnesen nekoj od klucnite zborovi za pozicija ili oddel 
-    ima_pozicija = any(
-        x in p   # proverka na zborovite vo tekstot
-        for x in (
-            "медицинск",
-            "сестр",
-            "лекар",
-            "доктор",
-            "гинекол",
-            "гиникол",
-            "акауш",
-            "кардиол",
-            "хирург",
-            "одделот",
+    # Vikame postoechki SMTP helper — toj se grizhi za greshki i logiranje
+    _isprati_email_poraka(to_email, subject, body, "Потврда за апликација испратена на")
+
+# Intent detekcija — proveruva dali korisnikot prashuva „dali imam aplicirano?"
+# (Ovaa funkcija e javna — se koristi i od intent_detector.py nadvor!)
+def prasanje_e_proverka_aplikacija_rabota(prasanje: str) -> bool:
+    """Dali korisnikot prashuva „dali imam aplicirano?" (status, ne nov flow)?"""
+    p = transliterijaj(prasanje).lower()    # Prvo normaliziraj go tekstot — kirilica + mali bukvi, za polesno prebaruvanje
+    if prasanje_e_izbrisi_aplikacija_rabota(prasanje):  # Ako korisnikot saka da brishe → taa funkcija ima prioritet, ovaa NE e proverka
+        return False   # izlez — ne sme vo „proverka" scenario
+
+    # Ako korisnikot EKSPLICITNO saka da aplicira → ne e proverka, tuku nov flow
+    # (bez ovaa provera, „dali mozam da aplicir..." bi se smetalo kako status-prashanje)
+    # Pokrivame poveke varijanti: sakam/može/kako + (aplicir|aplicira|apliciram)
+    if any(w in p for w in (
+        "сакам да аплицир", "sakam da aplicir",
+        "како да аплицир", "kako da aplicir",
+        "може да аплицир", "moze da aplicir",         # „mozhe da apliciram/aplicira" (1-vo + 3-to lice)
+        "може ли да аплицир", "moze li da aplicir",
+        "може да се аплицир", "moze da se aplicir",
+        "како се аплицир", "kako se aplicir",
+        "како можам да аплицир", "kako mozam da aplicir",
+        "дали можам да аплицир", "dali mozam da aplicir",
+    )):
+        return False                                # ova e nov flow, ne proverka
+
+    # Klasichni frazi za proverka status (ako se pojavi bilo koja → vednash true)
+    if any(x in p for x in ( "дали имам аплициран", "dali imam apliciran", "дали имам апликаци", "dali imam aplikaci", "дали имам поднесено", "dali imam podneseno", "имам ли апликаци", "imam li aplikaci", "моја апликаци", "moja aplikaci", "статус на апликаци", "status na aplikaci", )):
+        return True                                 # sigurno e „proverka status"
+    # Poopshta forma: „dali" + „aplicir/aplikaci" vo ista rechenica
+    # No NE e proverka ako e spomnata konkretna pozicija/oddel (toa e nova aplikacija)
+    if ("дали" in p or "dali" in p) and any(
+        w in p for w in ("аплицир", "aplicir", "апликаци", "aplikaci")):
+        # Ako vo prashanjeto ima zbor za pozicija/specijalnost → ova e baranje za nova aplikacija
+        spec_hints = (
+            "кардиол", "хирург", "урол", "анестез", "гинекол", "педијат",
+            "невро", "ортопед", "радиол", "интерн", "сестр", "медицинск",
+            "дермато", "офталмо", "лабор", "оториноларинг", "kardiol",
+            "hirurg", "urol", "ginekol", "pedijat", "nevrol", "ortoped",
+            "radiol", "sestr", "medicinsk",
         )
-    )
-    return ima_oglas and ima_pozicija   # na kraj se vraka true ako korsnikot ima vneseno deka e kandidat za rabota i ima nekoja aktivna pozicija za koja istiot saka da aplicira, vo sprotivno e false
-# ako e vensen pogolem tekst se obiduvame da ja izvleceme rabotnata pozcija pobrzo
-# voa go koristam koga groq tokenite ke mi se istroseni, i ja vlecam od kontekst na imputot
-def _izvlechi_pozicija_od_oglas_pravila(prasanje: str) -> str | None:
-    """Брзо извлекување од типичен текст на оглас (без Groq)."""
-    # prasanjeto se pretvara vo mali kirilicno bukvi ode vo proces na obrabotka
-    p = transliterijaj(prasanje).lower()
-    if "медицинск" in p and "сестр" in p:   # ako nekade ima vnesenо медицинска, se prepoznava i vraka dokolku ima oglas za medicinska sestra
-        return "Медицинска сестра"          #   vraka dokolku imame aktivni oglasi
-    if "гинекол" in p or "гиникол" in p:    # proverka za ginekolog vo tekstot
-        if "сестр" in p:                    # ako ima i sestra se raboti za medicinska sestra
-            return "Медицинска сестра"      # vrakame medicinska sestra
-        return "Гинеколог"                  # inaku se raboti za ginekolog
-    if "акауш" in p:                        # proverka za akuser
-        return "Акушер"                      # vrakame akuser
-    if "кардиол" in p:                      # proverka za kardiolog
-        return "Кардиолог"                   # vrakame kardiolog
-    if "хирург" in p:                         # proverka za hirurg
-        return "Хирург"                     # vrakame hirurg
-    if "урол" in p:                          # proverka zaa urolog
-        return "Уролог"                     # vrakame urolog
-    if "анестез" in p:                      # proverka za anesteziolog
-        return "Анестезиолог"               # vrakame anesteziologg
-    
-    m = re.search(r"\(([^)]+)\)", prasanje)     # voa go koristi koa go testira i ako ne najde pozicija vo teksto pregleduva dali imam nekade () i ni gi cita
-    if m:
-        inner = m.group(1).strip()  # dokolku ima () go cita i trga prazni mesta
-        if len(inner) > 3 and len(inner) < 80:  # dali iimame dovolno bukvi za da moze da bide pozicija 0<pozicija<80
-            return inner[0].upper() + inner[1:] if inner else None  # ako ime go vrakame stringo so golema bukva na pocetok
-    return None # dokolku nema vneseno vo tekstot nekoja pozicija ili nema aktiven oglas none
+        if any(h in p for h in spec_hints):
+            return False                            # spomnata pozicija → nov flow
+        return True
+    return False                                    # nitu eden uslov ne odgovara → ne e proverka
 
-# pozicija od zalepen oglas (pravila) ili preku groq
-def _baraj_pozicija_za_aplikacija(prasanje: str) -> str | None:
-    """Позиција од оглас (правила) или преку AI."""
-    if _tekst_e_zalepen_oglas(prasanje):    # ako e prepoznaen kako kopiran oglas od nadvor
-        poz = _izvlechi_pozicija_od_oglas_pravila(prasanje) # probaj da izvleces pozicija po brzi pravila
-        if poz:                             # ako e najdeno nesto
-            return poz                      # vrati ja izvlecenata pozicija
-    return _izvlechi_pozicija(prasanje)     # inaku pusti ja na povomosen ai agent da ja izvlece
+def prasanje_e_izbrisi_aplikacija_rabota(prasanje: str) -> bool:
+    p = transliterijaj(prasanje).lower()     # Normaliziraj go tekstot za prebaruvanje
+    # Prv uslov: mora da ima zbor za „aplikacija/prijava"
+    # (za da ne zafatime brishenje na neshto drugo kako „izbrishi termin")
+    if not any(w in p for w in (
+        "апликаци", "aplikaci", "аплиц", "aplic", "пријав", "prijav")):
+        return False                                # nema vrska so aplikacii
+    # Vtor uslov: mora da ima komanda za brishenje/otkazhuvanje.
+    # \w* znachi „bilo koi bukvi/cifri posle" — pa „izbrishi", „izbrisham" se sovpagaat.
+    return bool(re.search(
+        r"(избриш\w*|izbris\w*|откаж\w*|otkaz\w*|тргни|"
+        r"отстрани|повлеч\w*|delete|cancel)", p))
 
-
-# odgovor koj bara najava kako pacient pred da se isprati aplikacija
-def _odgovor_bara_pacient_login(kontekst_za_po_login: dict | None, prikaz_pozicija: str) -> dict:
-    out: dict = {                           # se podgotvuva odgovorot koj bara najava kako pacient
-        "odgovor": (
-            f"Го препознав огласот за работа: {prikaz_pozicija}.\n\n"
-            "За да ја испратам апликацијата преку AI, прво треба да се "
-            "најавиш како пациент (не како лекар). "
-            "Ти ја отворам формата за најава — по најавата напиши «да» "
-            "или «сакам да аплицирам» за да продолжиме."
-        ),
-        "akcija": "otvori_pacient_login",   # akcija koja kazuva na frontendo da ja otvori formata za pacient
-        "navigacija": NAV_KARIERA,          # navigacija kon kariera
-    }
-    if kontekst_za_po_login:                # ako imame zacuvan kontekst za po najavata
-        out["kontekst"] = kontekst_za_po_login # dodadi go vo izlezot
-    else:
-        out["kontekst"] = None              # inaku stavi null
-    return out                              # vrati go recnikot so podatoci za frontendo
-
-
-# normalizacija na email za sporedba (gmail tocki i +alias)
-def _email_kluc_za_sporedba(email: str) -> tuple[str, str] | None:
-    """(local, domain) — Gmail: без точки и +alias."""
-    e = (email or "").strip().lower()       # cistenje na prazni mesta i pretvaranje vo mali bukvi
-    if "@" not in e:                        # ako nema majmunska bukva toa ne e validen email
-        return None                         # vrati null
-    local, domain = e.split("@", 1)         # podeli go emailot na lokalen del i domen
-    domain = domain.replace("googlemail.com", "gmail.com") # normalizacija na googlemail vo gmail
-    if domain == "gmail.com":               # ako domenot e gmail
-        local = local.split("+")[0].replace(".", "") # trgni go delot posle plus i trgni gi tockite
-    return local, domain                    # vrati go normaliziraniot par za sporedba
-
-
-def _email_se_sovpaaga(a: str, b: str) -> bool:
-    ka, kb = _email_kluc_za_sporedba(a), _email_kluc_za_sporedba(b) # gi zemame klucevite za sporedba na dvata email-i
-    if ka and kb:                           # ako dvata se validno parsirani
-        return ka == kb                     # sporedi gi lokalniot del i domenot directly
-    return (a or "").strip().lower() == (b or "").strip().lower() # inaku napravi obicna sporedba so goli stringovi
-
-
-# email od patient tabela po pacient_ID
-def _email_iz_baza_po_pacient_id(pacient_id: int) -> str | None:
-    conn = None                             # inicijalizacija na konekcijata
-    try:
-        conn = get_connection()             # zemi konekcija do bazata na podatoci
-        cur = conn.cursor(dictionary=True)  # otvori kuror koj vraka rezultati kako recnik
-        cur.execute(                        # izvrsi selekt query za email po pacient id
-            "SELECT email FROM patient WHERE patient_ID = %s LIMIT 1",
-            (pacient_id,),
-        )
-        row = fetch_one(cur)                # zemi go edinstveniot red od rezultatot
-        cur.close()                         # zatvori go kursorot
-        if row:                             # ako postoi takov pacient
-            return (row.get("email") or "").strip() or None # vrati go negoviot email iscisten od prazni mesta
-    except Exception as e:                  # fati bilo kakva greska pri rabota so bazata
-        print(f"[apliciraj] email od patient_ID: {e!r}") # ispecati ja greskata vo konzola za debagiranje
-    finally:
-        if conn:                            # ako konekcijata e ostanata otvorena
-            conn.close()                    # zatvori ja konekcijata so bazata
-    return None                             # vo slucaj na greska vrati null
-
-
-def _emails_za_prebaruvanje(
-    pacient: dict | None, kontekst: dict | None
-) -> list[str]:
-    """Сите можни email-и (најава, контекст, patient табела)."""
-    seen: set[str] = set()                  # set za sledenje na unikatni email adresi
-    out: list[str] = []                     # lista kade ke gi smestime unikatnite email-i
-
-    def add(e: str | None) -> None:
-        e = (e or "").strip()               # iscisti gi praznite mesta od stringot
-        if not e or e.lower() in seen:      # ako e prazen ili veke postoi vo setot
-            return                          # preskokni go i ne go dodavaj pak
-        seen.add(e.lower())                 # dodadi go vo setot so mali bukvi
-        out.append(e)                       # dodadi go vo finalnata lista za vrakanje
-
-    add(_email_za_brisenje_aplikacija(pacient, kontekst)) # probaj da go dodades emailot od kontekstot ili sesijata
-    if pacient:                             # ako korisnikot e najaven kako pacient
-        pid = normalize_int(pacient.get("pacient_ID")) # normaliziraj go negovoto pacient id vo int
-        if pid:                             # ako id-to e validno
-            add(_email_iz_baza_po_pacient_id(pid)) # izvleci go emailot directly od bazata i dodadi go
-    return out                              # vrati ja listata na email adresi za skeniranje
-
-
-# trgni duplikati od lista aplikacii i sortiraj po datum
-def _dedupe_aplikacii(rows: list[dict]) -> list[dict]:
-    seen: set[int] = set()                  # set za sledenje na unikatni id-a na redovite
-    out: list[dict] = []                    # lista na unikatni aplikacii
-    for r in rows:                          # pomini niz sekoj red od bazata
-        try:
-            rid = prijaveni_row_id(r)        # izvleci go primarniot kluc na aplikacijata
-        except ValueError:                  # ako pretvoranjeto propadne radi los format
-            continue                        # preskokni go toj red
-        if rid in seen:                     # ako ova id veke sme go obrabotile porano
-            continue                        # preskokni go za da nema duplikati
-        seen.add(rid)                       # registriraj go id-to vo setot na videni
-        if r.get("id") is None:             # ako klucot id ne e postaven vo samiot recnik
-            r = {**r, "id": rid}            # dodadi go id-to vnatre vo strukturata
-        out.append(r)                       # dodadi ja aplikacijata vo finalnata lista
-    out.sort(                               # sortiraj gi site unikatni aplikacii
-        key=lambda x: (x.get("datum_prijava") or "", x.get("id") or 0), # po datum na prijava i po id kako vtor kriterium
-        reverse=True,                       # od najnovite kon najstarite
-    )
-    return out                              # vrati ja filtriranata i sortirana lista
-
-
-# lista aplikacii po primaren kluc (id)
-def _lista_aplikacii_po_id(app_id: int) -> list[dict]:
-    conn = None                             # podgotovka na konekcijata
-    try:
-        conn = get_connection()             # otvori nova vrska so bazata
-        cur = conn.cursor(dictionary=True)  # kreiraj kursor so recnik opcija
-        pk = prijaveni_pk_column()          # zemi ja kolona na primarniot kluc
-        cur.execute(                        # izvrsi selekt query preku id
-            prijaveni_select_sql() + f" WHERE {pk} = %s LIMIT 1",
-            (app_id,),
-        )
-        row = fetch_one(cur)                # procitaj go edinstveniot red od bazata
-        cur.close()                         # zatvori go kursorot vednas
-        return [as_dict(row)] if row else [] # ako ima red vrati go kako recnik staven vo lista, inaku prazna lista
-    except Exception as e:                  # fati eventualna greska pri izvrsuvanje na sql-ot
-        print(f"[apliciraj] lista po id: {e!r}") # deponiraj greska vo logovi
-        return []                           # vrati prazna lista pri defekt
-    finally:
-        if conn:                            # proverka na status na konekcija
-            conn.close()                    # bezbedno zatvoranje na resursot
-
-
-# striktno prebaruvanje po email string vo baza
-def _lista_aplikacii_po_email_striktno(email: str) -> list[dict]:
-    conn = None                             # pocetna vrednost za konekcija
-    try:
-        conn = get_connection()             # povrzi se so bazata
-        cur = conn.cursor(dictionary=True)  # zemi kursor so konfiguracija za dict
-        cur.execute(                        # izvrsi prebaruvanje so striktno spreduvanje na email vo baza
-            prijaveni_select_sql()
-            + " WHERE LOWER(TRIM(email)) = LOWER(TRIM(%s))"
-            + prijaveni_order_desc(),
-            (email.strip(),),
-        )
-        rows = [as_dict(r) for r in cur.fetchall()] # konvertiraj gi site najdeni redovi vo python recnici
-        cur.close()                         # oslobodi go kursorot
-        return rows                         # vrati gi najdenite rezultati
-    except Exception as e:                  # menadzment so greski
-        print(f"[apliciraj] lista po email: {e!r}") # pecatenje greska vo serverska konzola
-        return []                           # vrati prazno bidejki prebaruvanjeto puknalo
-    finally:
-        if conn:                            # osiguraj se deka baza nema da ostane blokirana
-            conn.close()                    # zatvori ja aktivnata sesija kon baza
-
-
-# gmail alias i tocki — sporedba vo python
-def _lista_aplikacii_po_email_fuzzy(email: str) -> list[dict]:
-    """Gmail alias/точки — споредба на local+domain во Python."""
-    kluc = _email_kluc_za_sporedba(email)   # zemi go unificiraniot kluc od vneseniot email
-    if not kluc:                            # ako ne mozelo da se generira kluc
-        return []                           # vrati prazna lista, nema sto da barame
-    _local, domain = kluc                   # raspakuj gi lokalniot del i domenot
-    conn = None                             # postavi ja bazata na default
-    try:
-        conn = get_connection()             # otvori konekcija za sql
-        cur = conn.cursor(dictionary=True)  # zemi kursor so dict format
-        cur.execute(                        # selektiraj gi site redovi sto go sodrzat istiot domen za polesno filtriranje
-            prijaveni_select_sql()
-            + " WHERE LOWER(email) LIKE %s"
-            + prijaveni_order_desc(),
-            (f"%@{domain}",),
-        )
-        rows = [                            # napravi dopolnitelno strukturno filtriranje vo python
-            as_dict(r)                      # pretvori go sekoj red vo recnik
-            for r in cur.fetchall()         # pomini niz site rezultati od bazata
-            if _email_se_sovpaaga(r.get("email") or "", email) # proveri dali navistina se sovpagaat preku gmail pravilata
-        ]
-        cur.close()                         # zatvori go kursorot na bazata
-        return rows                         # vrati gi filtriranite aplikacii
-    except Exception as e:                  # handling na ekscesni situacii
-        print(f"[apliciraj] lista fuzzy email: {e!r}") # zapisi greska vo konzola
-        return []                           # vrati prazno bidejki operacijata e neuspesna
-    finally:
-        if conn:                            # ako konekcijata ne e zatvorena
-            conn.close()                    # zatvori ja konekcijata do bazata
-
-
-# prebaruvanje po ime i prezime na kandidatot
-def _lista_aplikacii_po_ime_prezime(ime: str, prezime: str) -> list[dict]:
-    conn = None                             # inicializiranje na objektot konekcija
-    try:
-        conn = get_connection()             # povrzi se so bazata
-        cur = conn.cursor(dictionary=True)  # kursor konfiguriran da vraka dict
-        cur.execute(                        # query za prebaruvanje na aplikacii spored ime i prezime
-            prijaveni_select_sql()
-            + """
-            WHERE LOWER(TRIM(ime_lekar)) = LOWER(TRIM(%s))
-              AND LOWER(TRIM(prezime_lekar)) = LOWER(TRIM(%s))
-            """
-            + prijaveni_order_desc(),
-            (ime.strip(), prezime.strip()),   # parametri za cistenje na vnesovite
-        )
-        rows = [as_dict(r) for r in cur.fetchall()] # konvertiranje na sekoj red vo standarden python dict
-        cur.close()                         # zatvoranje na kursorot
-        return rows                         # vrakame se sto e pronajdeno vo tabelata
-    except Exception as e:                  # logiranje pri greska vo baza
-        print(f"[apliciraj] lista po ime: {e!r}") # pecatenje detalna greska
-        return []                           # neuspesno izvrsuvanje, vrati prazno
-    finally:
-        if conn:                            # proverka pred zatvoranje
-            conn.close()                    # zatvori go kanalot kon bazata
-
-
-def _filtriraj_aplikacii_po_emails(
-    rows: list[dict], emails: list[str]
-) -> list[dict]:
-    """Само пријави чија е-пошта се совпаѓа со најавената (вкл. Gmail нормализација)."""
-    if not emails:                          # ako nema prateno nitu eden email za sporedba
-        return rows                         # vrati ja celata lista bez filtriranje
-    out: list[dict] = []                    # nova lista za filtrirani aplikacii
-    for r in rows:                          # pomini niz sekoja aplikacija od listata
-        app_em = (r.get("email") or "").strip() # zemi go emailot zacuvan vo aplikacijata
-        if app_em and any(_email_se_sovpaaga(app_em, e) for e in emails): # ako emailot se sovpaga so bilo koj od baranite
-            out.append(r)                   # dodadi ja aplikacijata vo filtriranata lista
-    return out                              # vrati gi isfiltriranite redovi
-
-
-# gi sobira site aplikacii na pacientot (po id, email, ime)
-def _zemi_site_aplikacii_pacient(
-    pacient: dict | None, kontekst: dict | None ) -> tuple[list[dict], str]:
-    rows: list[dict] = []                   # inicijaliziranje na listata na redovi
-    nacin = ""                              # string koj ke kaze kako se pronajdeni podatocite
-    emails = _emails_za_prebaruvanje(pacient, kontekst) # zemi gi site dostapni email adresi od sesijata
-    ima_email = bool(emails)                # flag dali voopsto imame email za prebaruvanje
-
-    app_id = normalize_int((kontekst or {}).get("last_aplikacija_id")) # proveri dali ima id od posledna aplikacija vo kontekst
-    if app_id:                              # ako postoi takvo id
-        found = _lista_aplikacii_po_id(app_id) # probaj da ja najdes aplikacijata direktno po id
-        if found and ima_email:             # ako e najdena i imame email za proverka
-            found = _filtriraj_aplikacii_po_emails(found, emails) # potvrdi deka emailot na taa aplikacija se sovpaga so korisnikot
-        if found:                           # ako i posle ova e validna
-            rows.extend(found)              # dodadi ja vo rezultatite
-            nacin = "id"                    # zapisi deka e najdena po id metod
-
-    for email in emails:                    # vrti niz site email adresi na korisnikot
-        strict = _lista_aplikacii_po_email_striktno(email) # baraj tochno sovpaganja po string
-        if strict:                          # ako najdes nesto
-            rows.extend(strict)             # dodadi gi vo glavnata lista
-            if not nacin:                   # ako nacinot ne e veke postaven od prethodno
-                nacin = "email"             # oznaci deka nacinot e preku strikten email
-        fuzzy = _lista_aplikacii_po_email_fuzzy(email) # baraj i polesno spovpaganja (tocki, plus)
-        if fuzzy:                           # ako ima takvi rezultati
-            rows.extend(fuzzy)              # dodadi gi i niv vo kupot
-            if not nacin:                   # ako se uste nema nacin
-                nacin = "gmail"             # oznaci deka e pronajdeno preku gmail logika
-
-    rows = _dedupe_aplikacii(rows)          # iscisti gi duplikatite bidejki metodite mozat da zacukaat isti redovi
-    if rows:                                # ako listata ne e prazna
-        return rows, nacin                  # vrati gi aplikaciite i metodot na naoganje
-
-    # Po ime samo ako nema email (retko — gostin bez smetka)
-    if not ima_email and pacient:           # ako nemame email no imame objekt za pacient
-        ime = (pacient.get("ime") or "").strip() # zemi go imeto na pacientot
-        prezime = (pacient.get("prezime") or "").strip() # zemi go prezimeto na pacientot
-        if ime and prezime:                 # ako i dvete se prisutni
-            by_name = _lista_aplikacii_po_ime_prezime(ime, prezime) # baraj aplikacija spored imeto na doktorot
-            if by_name:                     # ako ima rezultat
-                return by_name, "ime_prezime" # vrati gi aplikaciite i oznaci deka se po ime i prezime
-
-    return [], ""                           # ako nisto ne bide najdeno vrati prazna lista i prazen nacin
-
-
-# odgovor za prasanje „dali imam aplicirano"
-def _odgovor_proverka_aplikacija(
-    pacient: dict | None, kontekst: dict | None
-) -> dict:
-    email_prikaz = _email_za_brisenje_aplikacija(pacient, kontekst) # zemi email za vizuelen prikaz vo porakata
-    if not email_prikaz and not (pacient and pacient.get("pacient_ID")): # anonimen korisnik — bara login
-        return {                            # vrati odgovor so otvori_pacient_login
-            "odgovor": (
-                "За да проверам дали имате поднесена апликација за работа, "
-                "најавете се како пациент со истата сметка со која сте аплицирале.\n\n"
-                "Потоа повторете: „Дали имам аплицирано за работа\"."
-            ),
-            "akcija": "otvori_pacient_login", # frontend ja otvara formata
-            "navigacija": NAV_KARIERA,      # del kariera
-            "kontekst": None,               # reset kontekst
-        }
-
-    apps, nacin = _zemi_site_aplikacii_pacient(pacient, kontekst) # site aplikacii za ovoj korisnik
-    if not apps:                            # nema pronajdeno
-        ref = email_prikaz or "вашата сметка" # referenca vo porakata
-        return {                            # informativen odgovor
-            "odgovor": (
-                "Не — немам пронајдена апликација за работа во системот "
-                f"({ref}).\n\n"
-                'Ако сте аплицирале преку формата во "Кариера", проверете дали '
-                "сте внеле истата е-пошта како при најавата.\n\n"
-                "Ако сакате повторно да аплицирате, наведете ја позицијата, на пример:\n"
-                '"Сакам да аплицирам за Уролог".'
-            ),
-            "kontekst": None,
-            "navigacija": NAV_KARIERA,
-        }
-
-    if len(apps) == 1:                      # edna aplikacija
-        naslov = "Да — имате поднесена апликација за работа:\n"
-    else:                                   # poveke aplikacii
-        naslov = f"Да — имате {len(apps)} поднесени апликации за работа (на {email_prikaz or 'вашата сметка'}):\n"
-    linii = [naslov]                        # pocni so naslov
-    if nacin == "ime_prezime":               # pronajdeno po ime, ne po email
-        linii.append(
-            "(Пронајдено по име и презиме — најавете се со е-поштата од пријавата за поточен преглед.)\n"
-        )
-    for a in apps:                          # lista na sekoja aplikacija
-        poz = (a.get("pozicija") or "—").strip() or "—"
-        app_id = a.get("id")
-        linii.append(
-            f"• {poz} — пријавено на {format_datum_vreme(a.get('datum_prijava'))}"
-            + (f" (ID: {app_id})" if app_id is not None else "")
-        )
-    linii.extend(                           # zavrsni linii
-        [
-            "",
-            "Тимот за човечки ресурси ќе ве контактира за следните чекори.",
-            "",
-            'За откажување: „Избриши ја апликацијата".',
-        ]
-    )
-    store_email = email_prikaz or (apps[0].get("email") or "").strip() # za kontekst po proverka
-    return {                                # struktuiran odgovor
-        "odgovor": "\n".join(linii),
-        "kontekst": {
-            "applicant_email": store_email,
-            "last_aplikacija_id": apps[0].get("id"),
-            "last_aplikacija_pozicija": (apps[0].get("pozicija") or "").strip(),
-        },
-        "navigacija": NAV_KARIERA,
-    }
-
-
-# „apliciram za rabota" bez konkretna pozicija
+# Intent detekcija — pomoshna za „sakam rabota" bez konkretna pozicija
 def _prasanje_e_opsto_za_rabota(prasanje: str) -> bool:
-    """„Аплицирам за работа" без конкретна позиција/специјалност."""
-    if prasanje_e_proverka_aplikacija_rabota(prasanje): # ako prasanjeto bara status ili proverka
-        return False                        # toa ne e opsto prasanje za nova prijava
-    if prasanje_e_izbrisi_aplikacija_rabota(prasanje): # ako e prasanje za brisenje
-        return False                        # isto taka ne e opsto apliciranje
-    p = transliterijaj(prasanje).lower()    # pretvori go tekstot vo kirilica so mali bukvi
-    if not any(                             # proveri dali sodrzi zbor povrzan so vrabotuvanje
-        w in p
-        for w in (
-            "аплиц", "aplic", "пријав", "prijav", "вработ", "vrabot", "работа", "rabota", "работам","rabotam",
-        )
-    ):
-        return False                        # ako nema takvi zborovi
-    spec_hints = ( "кардиол","хирург", "урол","анестез","гинекол", "педијат", "неврол","ортопед","радиол","интерн","офталм","инфект","психијат","оторин","пулмол","гастро","онкол",
-        "сестр","неврохирург","пластич","патолош","медицинск",
-    )
-    return not any(h in p for h in spec_hints) # nema konkretna specijalnost vo tekstot
+    if prasanje_e_proverka_aplikacija_rabota(prasanje): # Ako veke e prepoznato kako proverka/brishenje → ne e „opshto"
+        return False
+    if prasanje_e_izbrisi_aplikacija_rabota(prasanje):
+        return False
+    p = transliterijaj(prasanje).lower()     # Normaliziraj go tekstot za prebaruvanje
 
-# gi zema aktivnite oglasi od baza za prikaz na korisnikot
+    # Mora da sodrzi barem eden zbor povrzan so vrabotuvanje
+    ima_keyword = any(w in p for w in ( "аплиц", "aplic", "пријав", "prijav", "вработ", "vrabot", "работа", "rabota"))
+    if not ima_keyword:                             # nema nitu eden raboten termin
+        return False
+    # Ako spomnal konkretna specijalnost → NE e opshto (drugiot flow ke go obraboti)
+    spec_hints = ("кардиол", "хирург", "урол", "анестез", "гинекол", "педијат", "неврол", "ортопед", "радиол", "интерн", "сестр", "медицинск")
+    return not any(h in p for h in spec_hints)     # true samo ako NEMA specijalnost
+
+# Funkcija sho gi vraka aktivnite oglasi (za prikaz na korisnikot vo chat)
 def _aktivni_oglasi() -> list[dict]:
-    conn = None                             # postavi bazna varijabla za vrskata
+    conn = None                                     # podgotovka za try/finally
     try:
-        conn = get_connection()             # zemi konekcija do bazata
-        cur = conn.cursor(dictionary=True)  # kursor so recnici
-        rows = fetch_aktivni_oglasi_rows(cur) # aktivni oglasi od tabelata
-        cur.close()                         # zatvori kursor
-        out: list[dict] = []                # lista za frontendo
-        for raw in rows:                    # pomini niz sekoj red
-            r = as_dict(raw)                # pretvori vo recnik
-            out.append(
-                {
-                    "id_oglas": r.get("id_oglas"), # id na oglasot
-                    "pozicija": (r.get("pozicija") or "").strip(), # ocistena pozicija
-                    "oddel": (r.get("oddel") or "").strip(), # oddel
-                    "rok": format_rok_datum(r.get("datum_na_prijavuvanje")), # rok za prijava
-                }
-            )
-        return out                          # vrati ja listata
-    except Exception as e:                  # greska pri citanje
+        conn = get_connection()                    # otvori MySQL vrska
+        cur = conn.cursor(dictionary=True)         # cursor sho vraka dict (ne tuple)
+        rows = fetch_aktivni_oglasi_rows(cur)      # SELECT od tabelata Vrabotuvanje (aktivni)
+        cur.close()                                # zatvori go cursor-ot vednash
+
+        # List comprehension — za sekoj red napravi mal dict so samo potrebnite polinja
+        return [{
+            "id_oglas": r.get("id_oglas"),                          # ID na oglasot
+            "pozicija": (r.get("pozicija") or "").strip(),          # pozicija, bez prazni mesta
+            "oddel": (r.get("oddel") or "").strip(),                # oddel, bez prazni mesta
+            "rok": format_rok_datum(r.get("datum_na_prijavuvanje")),  # DATE → tekst „dd.mm.yyyy"
+        } for r in (as_dict(raw) for raw in rows)]                  # sekoj red → dict
+    except Exception as e:                          # ako neshto pukne → logiraj i vrati prazna lista
         print(f"[apliciraj] lista oglasi: {e}")
-        return []                           # prazna lista
+        return []
     finally:
-        if conn and conn.is_connected():    # zatvori konekcija
+        if conn:                                    # sekogash zatvori ja konekcijata
             conn.close()
 
+# Funkcija sho bara aktiven oglas po pozicija (+ opcionalno po oddel od prashanjeto)
+def _najdi_aktiven_oglas(baran: str, prasanje: str = "") -> dict | None:
+    """
+    Najdi aktiven oglas po pozicija.
+    Ako ima poveke kandidati (pr. „Medicinska sestra" za 2 razlichni oddeli),
+    izberi go onoj chii oddel e spomnat vo prashanjeto.
+    """
+    site = _aktivni_oglasi()                       # zemi gi site aktivni oglasi
+    if not site:                                    # nema aktivni — vrati None
+        return None
+    b = baran.lower().strip()                       # normaliziraj go baranot (mali bukvi, bez prazno)
+    p_norm = transliterijaj(prasanje).lower() if prasanje else ""  # za sporedba so oddel
 
-# formatira pozicija i oddel za poraka do korisnikot
+    # Chekor 1: izvadi gi kandidati sho odgovaraat na pozicijata
+    # (tochno sovpaganje ILI substring vo dvete naskoki)
+    kandidati: list[dict] = []
+    for o in site:
+        pos = (o.get("pozicija") or "").strip().lower()
+        if pos == b or (b and (b in pos or pos in b)):
+            kandidati.append(o)
+
+    # Nema nitu eden kandidat → vrati None
+    if not kandidati:
+        return None
+    # Samo eden kandidat → direktno vrati go
+    if len(kandidati) == 1:
+        return kandidati[0]
+
+    # Pove'kje kandidati → probaj da go izberesh prefered po oddel spomnat vo prashanjeto
+    if p_norm:
+        najdobar = None
+        najdobar_skor = 0
+        for o in kandidati:
+            odd = transliterijaj(o.get("oddel") or "").lower().strip()
+            if not odd:
+                continue
+            # Skor 1: cel oddel kako substring vo prashanjeto („urologija" vo „...na urologija")
+            if odd in p_norm and len(odd) > najdobar_skor:
+                najdobar_skor = len(odd)
+                najdobar = o
+                continue
+            # Skor 2: prv zbor od oddel (npr. „Урологија" od „Урологија и нефрологија")
+            prv_zbor = odd.split()[0] if odd.split() else ""
+            if len(prv_zbor) >= 4 and prv_zbor in p_norm and len(prv_zbor) > najdobar_skor:
+                najdobar_skor = len(prv_zbor)
+                najdobar = o
+        if najdobar:
+            return najdobar
+
+    # Nema match po oddel — vrati prv kandidat (default)
+    return kandidati[0]
+
+# Pomoshna funkcija — formatira pozicija + oddel za prikaz vo chat
 def _format_pozicija_oglas(oglas: dict) -> str:
-    poz = (oglas.get("pozicija") or "").strip() or "—" # pozicija ili crta
-    odd = (oglas.get("oddel") or "").strip() # oddel
-    if odd and odd.lower() not in poz.lower(): # oddelot ne e veke vo pozicijata
-        return f'„{poz}" ({odd})'           # pozicija (oddel)
-    return f'„{poz}"'                       # samo pozicija
+    poz = (oglas.get("pozicija") or "").strip() or "—"   # pozicija (ili crtichka ako nema)
+    odd = (oglas.get("oddel") or "").strip()             # oddel
+    if odd and odd.lower() not in poz.lower():  # Ako imame oddel i ne e veke vo imeto na pozicijata → dodaj vo zagrada
+        return f'„{poz}" ({odd})'                  # pr. „Кардиолог" (Кардиологија)
+    return f'„{poz}"'                              # inaku samo pozicijata
 
-
-# dali korisnikot prasa za status na postoecka aplikacija
-def prasanje_e_proverka_aplikacija_rabota(prasanje: str) -> bool:
-    """„Дали имам аплицирано", „имам ли апликација" — статус, не нов flow."""
-    p = transliterijaj(prasanje).lower()    # unificiraj go pismoto
-    if prasanje_e_izbrisi_aplikacija_rabota(prasanje): # brisenje ima prednost
-        return False                        # ne e proverka na status
-    if any(                                 # eksplicitno saka da aplicira sega
-        w in p
-        for w in (
-            "сакам да аплицирам",
-            "sakam da apliciram",
-            "аплицирај ме",
-            "apliciraj me",
-            "како да аплицирам",
-            "kako da apliciram",
-            "може да аплицирам",
-            "moze da apliciram",
-            "може да аплицира",
-            "moze da aplicira",
-            "можам да аплицирам",
-            "mozam da apliciram",
-            "можеш да ме аплицир",
-            "mozes da me aplicir",
-            "може ли да аплицир",
-            "moze li da aplicir",
-        )
-    ):
-        return False                        # nov protok, ne proverka
-
-    # BUG FIX: "дали имам" / "dali imam" goli (bez kontekst) gi fakaa
-    # i prashanja kako „Дали имам прегледи за денес", „Дали имам термини".
-    # Sega se baraat zaedno so аплицир/апликаци kluchen zbor.
-    if any(                                 # klasicni frazi za status (so kontekst)
-        x in p
-        for x in (
-            "дали имам аплициран",
-            "dali imam apliciran",
-            "дали имам апликаци",
-            "dali imam aplikaci",
-            "дали имам поднесено",
-            "dali imam podneseno",
-            "дали сум аплицирал",
-            "dali sum apliciral",
-            "имам ли апликаци",
-            "imam li aplikaci",
-            "имам ли аплициран",
-            "моја апликаци",
-            "moja aplikaci",
-            "статус на апликаци",
-            "status na aplikaci",
-            "поднесов ли",
-            "podnesov li",
-            "провери ја апликаци",
-            "proveri ja aplikaci",
-            "дали постои апликаци",
-            "која апликација имам",
-            "koja aplikacija imam",
-        )
-    ):
-        return True                         # prepoznato kako proverka
-
-    # Kombinacija dali + work-app keyword. „пријав" namerno NE e tuka -
-    # mozhe da znachi i prijava za pregled (pacient check-in). Za jobs
-    # baraj aplicir/aplikaci kako sigurno-pozitivni kluchni zborovi.
-    if ("дали" in p or "dali" in p) and any( # kombinacija dali + aplikacija
-        w in p for w in ("аплицир", "aplicir", "апликаци", "aplikaci")
-    ):
-        return True
-    return False                            # ne e proverka
-
-
-# dali korisnikot saka da ja izbrise/otkaze aplikacijata
-def prasanje_e_izbrisi_aplikacija_rabota(prasanje: str) -> bool:
-    """„Избриши/избришам ја апликацијата", „откажи пријава" — не нов apply flow."""
-    p = transliterijaj(prasanje).lower()    # normaliziraj tekst
-    if not any(                             # mora da ima vrska so aplikacija
-        w in p
-        for w in (
-            "апликаци",
-            "aplikaci",
-            "аплиц",
-            "aplic",
-            "пријав",
-            "prijav",
-        )
-    ):
-        return False                        # ne e brisenje
-    if re.search(                           # komanda za brisenje/otkazuvanje
-        r"(избриш\w*|izbris\w*|откаж\w*|otkaz\w*|тргни|отстрани|повлеч\w*|delete|cancel)",
-        p,
-    ):
-        return True
-    if ("сакам" in p or "sakam" in p) and re.search( # sakam da izbrisam
-        r"(избриш|izbris|откаж|otkaz|тргни|отстрани)", p
-    ):
-        return True
-    return False
-
-
-# go prekinuva aktivniot flow na apliciranje
-def _otkazi_aplikacija_flow(kontekst: dict | None) -> dict:
-    return {                                # prekinuvanje na flow
-        "odgovor": (
-            "Го прекинав процесот на аплицирање.\n\n"
-            "Ако сакате повторно да аплицирате, наведете ја позицијата "
-            '(на пр. „Сакам да аплицирам за медицинска сестра").'
-        ),
-        "kontekst": None,                   # iscisti kontekst
-        "navigacija": NAV_KARIERA,
-    }
-
-# hint za pozicija od tekst pri brisenje
-def _pozicija_hint_od_brisenje(prasanje: str) -> str | None:
-    """„… за медицинска сестра" / „апликацијата за …" → hint за пребарување."""
-    p = transliterijaj(prasanje).lower()  # normaliziraj — latinica → kirilica, mali bukvi
-    m = re.search(  # prv obid — frazata „апликација за X" do krajot na recenicata
-        r"апликаци\w*\s+за\s+(.+?)\s*$",
-        p,
-        flags=re.UNICODE | re.IGNORECASE,
-    )
-    if not m:  # ako prviot regex ne najde, probaj samo „за X" do krajot
-        m = re.search(
-            r"\bза\s+(.+?)\s*$",
-            p,
-            flags=re.UNICODE | re.IGNORECASE,
-        )
-    if m:  # ako e najdeno nesto sto lici na pozicija
-        hint = m.group(1).strip()  # zemi go izvleceniot del + iscisti prazni mesta
-        for stop in (  # otsechi po klucni zborovi koi ne se del od pozicijata
-            "апликаци",
-            "aplikaci",
-            "мојата",
-            "мојот",
-            "моето",
-        ):
-            if stop in hint:  # ako ima takov zbor
-                hint = hint.split(stop)[0].strip()  # zemi samo delot pred nego
-        if len(hint) >= 4:  # mora da ima barem 4 karakteri za da e validna pozicija
-            return hint
-    if "медицинск" in p and "сестр" in p:  # specijalen sluchaj: medicinska sestra (chesto pisuvanа)
-        return "медицинск"
-    return None  # ne mozhe da se izvleche pozicija — vrati prazno
-
-
-# id na red vo prijaveni_lekari
-def _app_row_id(row: dict) -> int:
-    return prijaveni_row_id(row)
-
-
-# email od najava ili kontekst za brisenje
-def _email_za_brisenje_aplikacija(
-    pacient: dict | None, kontekst: dict | None
-) -> str | None:
-    """Email од најава или од контекст по успешна апликација."""
-    if pacient and (pacient.get("email") or "").strip():  # najavena sesija ima prednost
-        return str(pacient["email"]).strip()
-    if isinstance(kontekst, dict):  # ako nema najava — probaj od zacuvan kontekst
-        for key in ("applicant_email", "email", "pacient_email"):  # tri mozhni klucevi vo kontekst
-            e = (kontekst.get(key) or "").strip()  # zemi vrednost + iscisti prazni mesta
-            if e:  # ako ima nesto
-                return e  # vrati ja prvata neprazna
-    return None  # nema nadenat email
-
-
-# izvleci broj na aplikacija od tekstot
-def _izvlechi_app_id_od_prasanje(prasanje: str) -> int | None:
-    p = transliterijaj(prasanje).lower()  # normaliziraj tekst za regex match
-    m = re.search(r"апликаци[јj][аи]?\s*(?:id)?\s*#?:?\s*(\d+)", p)  # „апликација 17", „апликација id 17"
-    if m:
-        return int(m.group(1))  # vrati go brojot kako int
-    m = re.search(r"\bid\s*(\d+)\b", p)  # „id 17" kako fallback
-    if m:
-        return int(m.group(1))
-    return None  # ne e najden eksplictien id
-
-
-# dali najaveniot lekar e direktor/admin
-def _direktor_e_admin(lekar: dict | None) -> bool:
-    if not lekar or not lekar.get("doctor_ID"):  # nema lekar / nema ID → ne e admin
-        return False
-    try:
-        from routers.admin import check_admin_access  # lazy import — izbegnuvanje cikulus
-
-        return bool(check_admin_access(int(lekar["doctor_ID"])))  # proverka preku admin modul
-    except Exception:  # ako modul fali ili greska — tretiraj kako ne-admin
-        return False
-
-
-# najdi eden red od prijaveni_lekari za brisenje
-def _najdi_aplikacija_za_brisenje(
-    cur: object,
-    *,
-    email: str | None = None,
-    app_id: int | None = None,
-    id_oglas: int | None = None,
-    pozicija_hint: str | None = None,
-    posledna_bilo_koja: bool = False,
-) -> dict | None:
-    """Еден ред од prijaveni_lekari за бришење."""
-    pk = prijaveni_pk_column()  # ime na primarniot kluc (npr. „id_prijava")
-    sel = prijaveni_select_sql()  # standarden SELECT bez WHERE — go dopolnuvame so uslovi
-    ord1 = prijaveni_order_desc() + " LIMIT 1"  # sortiranje + ogranichuvanje na 1 red
-
-    if app_id is not None:  # 1) prebaruvanje po konkreten ID — najsiguren nachin
-        cur.execute(sel + f" WHERE {pk} = %s LIMIT 1", (app_id,))
-        return fetch_one(cur)
-
-    if posledna_bilo_koja:  # 2) admin moze da ja izbrise „poslednata bilo koja"
-        cur.execute(sel + ord1)
-        return fetch_one(cur)
-
-    if not email:  # bez email i bez ID — ne mozhe da se najde nesto sigurno
+# AI funkcija sho izvlekuva pozicija od prashanjeto na korisnikot (preku Groq)
+def _izvlechi_pozicija(prasanje: str) -> str | None:
+    odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=PROMPT_POZICIJA) # Prakame prompt na LLM-ot + negovoto sistemsko upatstvo (PROMPT_POZICIJA)
+    data = parse_ai_json(odgovor, log_tag="apliciraj_pozicija")  # Parsiraj go JSON-ot — funkcijata vraka dict so „_error": True ako pukne
+    if data.get("_error"):                          # LLM-ot ne vratil validen JSON
         return None
+    val = data.get("pozicija")   # Izvleci go poleto „pozicija" i trgni prazni mesta (ako postoi)
+    return str(val).strip() if val else None       # ako e prazno/None → vrati None
 
-    email_n = email.strip().lower()  # normaliziraj email (mali bukvi, bez prazno)
-    base = sel + " WHERE LOWER(TRIM(email)) = %s"  # osnoven SELECT + email filter
-    params: list = [email_n]  # parametri za sql placeholder-ite
+# AI funkcija sho izvlekuva broj na medicinska licenca (i preskok flag)
+def _izvlechi_licenca(prasanje: str) -> tuple[str | None, bool]:
+    from ai._kernel.groq_client import groq_e_isklucen # Lazy import za da izbegneme cirkularen import
+    if groq_e_isklucen():   # Ako Groq ne e dostapen (nema tokeni, mrezhen problem) → ne mozheme izvlece
+        return None, False                          # nishto ne mozheme da zaklucime
+    
+    # Prati go korisnichkiot odgovor + sistemski prompt za licenca
+    odgovor = ask_ai(f"Одговор: „{prasanje}\"", system_prompt=PROMPT_LICENCA)
+    data = parse_ai_json(odgovor, log_tag="apliciraj_licenca") # Parsiraj go JSON-ot
+    if data.get("_error"):                          # nevazechki JSON
+        return None, False
+    # Izvleci gi dvete polinja od dict-ot
+    licenca = data.get("licenca")                  # mozhe da e string so broj ili None
+    preskoki = bool(data.get("preskoki"))          # true ako korisnikot rekol „nemam"
+    if licenca:          # Zemi samo cifri od licencata (LLM-ot ponekogash vraka „12345-A" ili so punktuacija)
+        licenca = re.sub(r"\D", "", str(licenca)) or None   # \D = bilo shto NE e cifra
+    return licenca, preskoki                       # vrakame par (tuple)
 
-    if id_oglas is not None:  # 3) email + konkreten oglas — najprecizen filter
-        cur.execute(
-            base + " AND id_oglas = %s" + ord1,
-            tuple(params + [id_oglas]),
-        )
-        row = fetch_one(cur)
-        if row:
-            return row  # pronajdeno — vrati ja
-
-    if pozicija_hint:  # 4) email + del od ime na pozicija (LIKE)
-        hint = pozicija_hint.strip().lower()
-        cur.execute(
-            base + " AND LOWER(TRIM(pozicija)) LIKE %s" + ord1,
-            tuple(params + [f"%{hint}%"]),
-        )
-        row = fetch_one(cur)
-        if row:
-            return row  # pronajdeno — vrati ja
-
-    cur.execute(base + ord1, tuple(params))  # 5) samo po email — posledna prijava
-    row = fetch_one(cur)
-    if row:
-        return row
-
-    kluc = _email_kluc_za_sporedba(email)  # 6) fuzzy match (Gmail tochki + alias)
-    if kluc:
-        _local, domain = kluc  # raspakuj go (local, domain)
-        cur.execute(  # zemi 30 najnovi prijavi so istiot domen
-            sel + " WHERE LOWER(email) LIKE %s" + prijaveni_order_desc() + " LIMIT 30",
-            (f"%@{domain}",),
-        )
-        for raw in cur.fetchall():  # iteriraj kandidatite i filtriraj vo Python
-            cand = as_dict(raw)  # pretvori go redot vo dict
-            if not _email_se_sovpaaga(cand.get("email") or "", email):  # email so Gmail pravila
-                continue
-            if id_oglas is not None and cand.get("id_oglas") != id_oglas:  # ako baravme oglas, mora da se sovpadne
-                continue
-            if pozicija_hint:  # ako baravme pozicija, mora da sodrzhi hint
-                hint = pozicija_hint.strip().lower()
-                if hint not in (cand.get("pozicija") or "").lower():
-                    continue
-            return cand  # prv kandidat sto gi pominal site filtri
-    return None  # ne e najdena aplikacija
-
-
-# izberi edna aplikacija od lista spored tragite
-def _izberi_aplikacija_za_brisenje(
-    apps: list[dict],
-    *,
-    id_oglas: int | None = None,
-    pozicija_hint: str | None = None,
-    app_id: int | None = None,
-) -> dict | None:
-    if not apps:  # prazna lista — nema sto da izberes
-        return None
-    if app_id is not None:  # prv prioritet: tochno poklopuvanje po ID
-        for a in apps:
-            if int(a.get("id") or 0) == int(app_id):
-                return a  # najdena — vrati ja
-    if id_oglas is not None:  # vtor prioritet: poklopuvanje po id na oglasot
-        for a in apps:
-            if a.get("id_oglas") == id_oglas:
-                return a
-    if pozicija_hint:  # tret prioritet: del od imeto na pozicijata
-        hint = pozicija_hint.strip().lower()
-        for a in apps:
-            if hint in (a.get("pozicija") or "").lower():  # substring match
-                return a
-    return apps[0]  # fallback: prvata (najnovata, bidejki listata e sortirana DESC)
-
-
-# brisi aplikacija od prijaveni_lekari vo baza
-def _izbrisi_aplikacija_od_baza(
-    *,
-    email: str | None = None,
-    id_oglas: int | None = None,
-    pozicija_hint: str | None = None,
-    app_id: int | None = None,
-    posledna_bilo_koja: bool = False,
-    pacient: dict | None = None,
-    kontekst: dict | None = None,
-) -> tuple[bool, str]:
-    """Брише апликација од prijaveni_lekari (ист пат како INSERT)."""
-    conn = None  # inicijalizacija — vazno za finally blokot
-    try:
-        conn = get_connection()  # otvori MySQL konekcija
-        cur = conn.cursor(dictionary=True)  # kursor sto vrakja recnici
-        row = _najdi_aplikacija_za_brisenje(  # 1) probaj direktno preku SQL
-            cur,
-            email=email,
-            app_id=app_id,
-            id_oglas=id_oglas,
-            pozicija_hint=pozicija_hint,
-            posledna_bilo_koja=posledna_bilo_koja,
-        )
-        if not row and not posledna_bilo_koja and app_id is None:  # 2) fallback — preku site najdeni aplikacii
-            apps, _ = _zemi_site_aplikacii_pacient(pacient, kontekst)  # zemi gi site aplikacii na pacientot
-            picked = _izberi_aplikacija_za_brisenje(  # izberi spored prioriteti
-                apps,
-                id_oglas=id_oglas,
-                pozicija_hint=pozicija_hint,
-                app_id=normalize_int((kontekst or {}).get("last_aplikacija_id")),
-            )
-            if picked:
-                row = picked  # iskoristi go izbraniot kandidat
-        if not row:  # nisto ne pronajdeno — vrati greska
-            cur.close()
-            if email:  # ima email — porakata e konkretizirana
-                return False, (
-                    "Немам пронајдена поднесена апликација за работа на вашето име "
-                    f"({email}).\n\n"
-                    "Најавете се како пациент со истата сметка со која ја "
-                    "поднесовте апликацијата, па повторете „Избриши ја апликацијата\"."
-                )
-            return False, "Немам пронајдена апликација за бришење."  # bez email — opshta poraka
-
-        app_id_del = _app_row_id(as_dict(row))  # ID-to na aplikacijata za brisenje
-        poz = (row.get("pozicija") or "").strip()  # ime na pozicijata (za potvrda)
-        pk = prijaveni_pk_column()  # ime na primarniot kluc
-        cur.execute(f"DELETE FROM prijaveni_lekari WHERE {pk} = %s", (app_id_del,))  # DELETE
-        conn.commit()  # potvrduvanje na transakcijata
-        cur.close()
-        return True, (  # uspeshno brisenje — vrati poraka so detali
-            "Апликацијата е избришана.\n\n"
-            f"Позиција: {poz or '—'}\n"
-            f"ID: {app_id_del}\n\n"
-            'Можете повторно да аплицирате преку "Кариера" ако сакате.'
-        )
-    except Exception as e:  # bilo kakva greska pri brisenje
-        print(f"[apliciraj] DELETE aplikacija: {e!r}")  # log za debagiranje
-        return False, (  # vrati friendly poraka kon korisnikot
-            "Се случи грешка при бришењето на апликацијата. Обидете се повторно."
-        )
-    finally:
-        if conn:
-            conn.close()  # sekogas zatvori ja konekcijata
-
-
-# odgovor za baranje za brisenje na aplikacija
-def _odgovor_izbrisi_aplikacija(
-    pacient: dict | None,
-    kontekst: dict | None,
-    prasanje: str = "",
-    lekar: dict | None = None,
-) -> dict:
-    app_id = _izvlechi_app_id_od_prasanje(prasanje)
-    email = _email_za_brisenje_aplikacija(pacient, kontekst)
-    id_oglas = normalize_int((kontekst or {}).get("id_oglas"))
-    poz_hint = _pozicija_hint_od_brisenje(prasanje)
-
-    if app_id and _direktor_e_admin(lekar):
-        ok, poraka = _izbrisi_aplikacija_od_baza(app_id=app_id)
-    elif email or pacient:
-        ok, poraka = _izbrisi_aplikacija_od_baza(
-            email=email,
-            id_oglas=id_oglas,
-            pozicija_hint=poz_hint,
-            app_id=normalize_int((kontekst or {}).get("last_aplikacija_id")),
-            pacient=pacient,
-            kontekst=kontekst,
-        )
-    elif _direktor_e_admin(lekar):
-        ok, poraka = _izbrisi_aplikacija_od_baza(posledna_bilo_koja=True)
-    else:
-        return {
-            "odgovor": (
-                "За бришење на апликација треба да сте најавени како пациент "
-                "(истата сметка со која ја поднесовте апликацијата).\n\n"
-                "Гостинскиот режим и најавата како лекар не можат да ја избришат "
-                "вашата пријава — само вие или директорот (преку админ) може.\n\n"
-                "Најавете се како пациент и пишете: „Избриши ја апликацијата\"."
-            ),
-            "kontekst": None,
-            "navigacija": NAV_KARIERA,
-        }
-
-    return {
-        "odgovor": poraka,
-        "kontekst": None,
-        "navigacija": NAV_KARIERA,
-    }
-
-
-# prepoznaj da/ne od kratok odgovor na korisnikot
+# Pomoshna funkcija — parsira „da"/„ne" od kratok odgovor
 def _parse_da_ne(prasanje: str) -> str | None:
-    """Враќа 'da', 'ne' или None."""
-    p = transliterijaj(prasanje).lower().strip()
-    p = re.sub(r"[^\w\sа-яѓќѕџ]+", " ", p, flags=re.IGNORECASE)
-    p = re.sub(r"\s+", " ", p).strip()
-
-    ne_frazi = (
-        "не сакам",
-        "ne sakam",
-        "не би",
-        "не сак",
-        "откажи",
-        "odkazi",
-        "нема интерес",
-        "не ме интересира",
-    )
+    p = transliterijaj(prasanje).lower().strip() # Prvo normaliziraj go tekstot (mali bukvi, kirilica, bez prazni mesta)
+    p = re.sub(r"[^\w\sа-яѓќѕџ]+", " ", p, flags=re.IGNORECASE) # Trgni gi interpunkciite (zapirki, tochki, itn.) — da ostane samo tekst
+    p = re.sub(r"\s+", " ", p).strip()  # Site povtoreni prazni mesta → eden edinstven (za urednost)
+    ne_frazi = ("не сакам", "ne sakam", "не би", "не сак", "откажи", "odkazi", "не ме интересира") # „Ne" varijanti — ako se sovpaga bilo koe → korisnikot rekol NE
     if p in ("не", "ne", "no") or any(x in p for x in ne_frazi):
         return "ne"
-    if p in (
-        "да",
-        "da",
-        "yes",
-        "ja",
-        "јас",
-        "сакам",
-        "аплицирај",
-        "аплицирам",
-        "во ред",
-        "ok",
-        "okej",
-        "okay",
-        "се разбира",
-    ) or re.search(r"\bда\b", p):
-        if "не" not in p and "ne " not in p:
-            return "da"
+    
+    if p in ("да", "da", "yes", "ja", "сакам", "аплицирај", "аплицирам", "во ред", "ok", "okej", "okay", "се разбира"):  # „Da" varijanti — eднoznachni odgovori
+        return "da"
 
-    return None
+    # Poopsht sluchaj: „da" kako posebеn zbor vo rechenica (no bez „ne" voopshto)
+    if re.search(r"\bда\b", p) and "не" not in p:
+        return "da"
+    return None  # ne sme sigurni → nishto
 
-
-# chekor potvrda — prasanje da/ne pred licenca
-def _pocni_potvrda_flow(oglas: dict) -> dict:
-    """Праша дали сака да аплицира — пред лиценца."""
-    pozicija_naslov = oglas["pozicija"]
-    id_o = oglas["id_oglas"]
-    prikaz = _format_pozicija_oglas(oglas)
-    rok = oglas.get("rok")
-    rok_linija = f"\nРок за пријава: {rok}." if rok else ""
-
+# Funkcija sho vraka odgovor koj bara od korisnikot da se najavi kako pacient
+def _odgovor_bara_pacient_login(kontekst: dict | None, prikaz: str) -> dict:
+    # `kontekst` se pamti na frontend-ot — po uspeshen login se vraka so „ceka=login"
     return {
         "odgovor": (
-            f"Во моментов има отворена позиција за {prikaz}.{rok_linija}\n\n"
-            "Дали сакате да аплицирате?\n"
-            'Одговорете со „да" или „не".'
-        ),
+            f"Го препознав огласот за работа: {prikaz}.\n\n"
+            "За да ја испратам апликацијата преку AI, прво треба да се "
+            "најавиш како пациент (не како лекар). Ти ја отворам формата за најава — "
+            'по најавата напиши „да" или „сакам да аплицирам".'),
+        "akcija": "otvori_pacient_login",          # znak za frontend-ot: otvori ja formata
+        "navigacija": NAV_KARIERA,                  # navigacija kon sekcijata „Kariera"
+        "kontekst": kontekst,                       # zachuvan oglas za posle login (ili None)
+    }
+
+
+# Funkcija sho odgovara koga nema imenuvana pozicija — prikazuva lista oglasi
+def _odgovor_izberi_pozicija(_pacient: dict) -> dict:
+    oglasi = _aktivni_oglasi() # zemi gi site aktivni oglasi
+    # Ako bazata nema aktivni oglasi → informiraj go korisnikot
+    if not oglasi:
+        return {
+            "odgovor": ("Моментално нема отворени работни позиции за пријавување.\n\n"
+                        'Страницата ќе се отвори на делот "Кариера" — '
+                        "проверете повторно подоцна."),
+            "kontekst": None, "navigacija": NAV_KARIERA}
+
+    if len(oglasi) == 1:        # Ako ima SAMO eden oglas → direktno vlezi vo flow za potvrda (nema smisla da prashuvame)
+        return _pocni_potvrda_flow(oglasi[0])
+    linii = ["Моментално има следниве отворени позиции:", ""]    # Ima poveke oglasi → prikazi gi kako lista so buleti
+    for o in oglasi:                                # za sekoj oglas dodaj edna linija so bulet
+        linii.append(f"• {o['pozicija']} — оддел: {o.get('oddel') or '—'}. "
+                     f"Рок: {o.get('rok') or '—'}.")
+    linii.extend(["", "Напишете која позиција ве интересира, на пример:",'„Сакам да аплицирам за Уролог" или „Аплицирај ме за кардиолог".',]) # Finalni instrukcii za korisnikot
+    # \n go spojuva listata vo eden tekst (so novi redovi megju niv)
+    return {"odgovor": "\n".join(linii), "kontekst": None, "navigacija": NAV_KARIERA}
+
+# Funkcija sho zapochnuva flow za potvrda (chekor 1)
+def _pocni_potvrda_flow(oglas: dict) -> dict:
+    prikaz = _format_pozicija_oglas(oglas)         # „Кардиолог (Кардиологија)"
+    # Uslovno pokazi rok — samo ako oglasot ima datum na prijavuvanje
+    rok_linija = f"\nРок за пријава: {oglas['rok']}." if oglas.get("rok") else ""
+    return {
+        "odgovor": (f"Во моментов има отворена позиција за {prikaz}.{rok_linija}\n\n" "Дали сакате да аплицирате?\n" 'Одговорете со „да" или „не".'),
+        # Kontekstot se pamti na frontend-ot — slednata poraka ke go vrati nazad tuka
+        # za da znaeme deka sme vo „chekor za potvrda" za toj konkreten oglas.
         "kontekst": {
-            "intent": "apliciraj_za_rabota",
-            "ceka": "potvrda",
-            "pozicija": pozicija_naslov,
-            "id_oglas": id_o,
-            "oddel": oglas.get("oddel") or "",
-            "rok": rok or "",
+            "intent": "apliciraj_za_rabota",       # za koj handler e namenetо
+            "ceka": "potvrda",                      # tekoven chekor vo flow-ot
+            "pozicija": oglas["pozicija"],         # pozicija (za nova poraka da znaeme za koja sme)
+            "id_oglas": oglas["id_oglas"],         # foreign key — za INSERT vo baza
+            "oddel": oglas.get("oddel") or "",     # oddel (za prikaz vo potvrdata)
+            "rok": oglas.get("rok") or "",         # rok (za prikaz)
         },
         "navigacija": NAV_KARIERA,
     }
 
-
-# pretvori go zacuvaniot kontekst vo oglas recnik
-def _oglas_od_kontekst(kontekst: dict) -> dict:
-    return {
-        "id_oglas": kontekst.get("id_oglas"),
-        "pozicija": kontekst.get("pozicija") or "",
-        "oddel": kontekst.get("oddel") or "",
-        "rok": kontekst.get("rok") or "",
-    }
-
-
-# chekor licenca — bara broj ili preskok
+# Funkcija sho zapochnuva flow za licenca (chekor 2)
 def _pocni_licenca_flow(oglas: dict, pacient: dict) -> dict:
-    pozicija_naslov = oglas["pozicija"]
-    id_o = oglas["id_oglas"]
     return {
         "odgovor": (
-            f"Одлично! Продолжуваме со апликацијата за {_format_pozicija_oglas(oglas)}.\n\n"
-            f"Ќе ги користам вашите податоци: "
-            f'{pacient.get("ime", "")} {pacient.get("prezime", "")}, '
-            f'{pacient.get("email", "")}.\n\n'
-            "Те молам испратете го бројот на вашата медицинска лиценца "
-            '(само цифри), или напишете „немам" ако не сакате да го '
-            "споделите сега."
-        ),
+            f"Одлично! Продолжуваме со апликацијата за {_format_pozicija_oglas(oglas)}.\n\n" # Pokazi mu gi na korisnikot podatocite sho ke gi koristime od profilot
+            f'Ќе ги користам твоите податоци: {pacient.get("ime","")} '
+            f'{pacient.get("prezime","")}, {pacient.get("email","")}.\n\n' "Те молам испрати го бројот на твојата медицинска лиценца " '(само цифри), или напиши „немам" за да продолжиме без лиценца.'),
         "kontekst": {
             "intent": "apliciraj_za_rabota",
-            "ceka": "licenca",
-            "pozicija": pozicija_naslov,
-            "id_oglas": id_o,
+            "ceka": "licenca",                      # slednata poraka ke vlezi vo licenca-blokot
+            "pozicija": oglas["pozicija"],         # za da ja pamtime vo narednite chekori
+            "id_oglas": oglas["id_oglas"],
+            # applicant_email e email-ot za koj sme vo flow — se chuva za brishenje posle uspeh
             "applicant_email": (pacient.get("email") or "").strip(),
         },
         "navigacija": NAV_KARIERA,
     }
 
-
-# korisnikot rekol ne na potvrda
+# Funkcija sho vraka odgovor koga korisnikot rekol „ne" na potvrda
 def _odgovor_odbien_aplikacija() -> dict:
     return {
-        "odgovor": (
-            "Ви благодариме.\n\n"
-            'Следете ги огласите во делот "Кариера" на сајтот.\n\n'
-            "Доколку подоцна сте заинтересирани, тука сме да го обработиме "
-            "вашето барање за работа — слободно пишете повторно кога ќе сакате."
-        ),
-        "kontekst": None,
+        "odgovor": ("Ви благодариме.\n\n"
+                    'Следете ги огласите во делот „Кариера" на сајтот. '
+                    "Слободно пишете повторно ако се предомислите."),
+        "kontekst": None,                          # resetiraj go kontekstot (nema aktiven flow)
         "navigacija": NAV_KARIERA,
     }
 
-
-# nema jasna pozicija — prikazi lista oglasi
-def _odgovor_izberi_pozicija(pacient: dict) -> dict:
-    """Нема именувана позиција — кратка листа + навигација кон Кариера."""
-    oglasi = _aktivni_oglasi()
-    if not oglasi:
-        return {
-            "odgovor": (
-                "Моментално нема отворени работни позиции за пријавување.\n\n"
-                'Страницата ќе се отвори на делот "Кариера" — проверете повторно подоцна '
-                "или контактирајте ја централата."
-            ),
-            "kontekst": None,
-            "navigacija": NAV_KARIERA,
-        }
-
-    if len(oglasi) == 1:
-        return _pocni_potvrda_flow(oglasi[0])
-
-    linii = [
-        "Сакате да аплицирате за работа. Моментално има следниве отворени позиции:",
-        "",
-    ]
-    for o in oglasi:
-        linii.append(
-            f"• {o['pozicija']} — оддел: {o.get('oddel') or '—'}. "
-            f"Рок за пријава: {o.get('rok') or '—'}."
-        )
-    linii.extend(
-        [
-            "",
-            "Напишете која позиција ве интересира, на пример:",
-            '„Сакам да аплицирам за Уролог" или „Аплицирај ме за кардиолог".',
-            "Ќе ве водам чекор по чекор (лиценца и потврда).",
-            "",
-            'Исто така можете да се пријавите преку формата во делот "Кариера" на страницата.',
-        ]
-    )
+# Pomoshna funkcija — od zachuvan kontekst rekonstruira „oglas" dict
+def _oglas_od_kontekst(kontekst: dict) -> dict:
+    # Korisно vo sluchaj koga frontend-ot ni go vraka kontekstot posle login — go rekonstruirame oglasot
     return {
-        "odgovor": "\n".join(linii),
-        "kontekst": None,
+        "id_oglas": kontekst.get("id_oglas"),       # ID na oglasot za SQL
+        "pozicija": kontekst.get("pozicija") or "", # pozicija (za prikaz)
+        "oddel": kontekst.get("oddel") or "",       # oddel (za prikaz)
+        "rok": kontekst.get("rok") or "",           # rok (za prikaz)
+    }
+
+# DB funkcija — SELECT na site aplikacii za daden email (strogo sovpaganje)
+def _zemi_aplikacii_po_email(email: str) -> list[dict]:
+    """SELECT od prijaveni_lekari po email — strogo sovpaganje."""
+    if not email:                                   # bez email ne mozeme da barame
+        return []
+    conn = None                                     # za try/finally — da mozeme sekogash da zatvorime
+    try:
+        conn = get_connection()                    # otvori MySQL vrska
+        cur = conn.cursor(dictionary=True)         # cursor sho vraka dict namesto tuple
+        # SQL: SELECT od prijaveni_lekari WHERE email = ? ORDER BY datum DESC
+        # LOWER+TRIM na dvete strani — za da ne pukne ako korisnikot pishal so glavni bukvi/prazni mesta
+        cur.execute(
+            prijaveni_select_sql()                  # standarden SELECT
+            + " WHERE LOWER(TRIM(email)) = LOWER(TRIM(%s))"
+            + prijaveni_order_desc(),               # ORDER BY datum DESC
+            (email.strip(),))                       # parametri (tuple so eden element)
+        # Site redovi kako dict-ovi
+        rows = [as_dict(r) for r in cur.fetchall()]
+        cur.close()                                 # zatvori go cursor-ot
+        # Osiguraj deka sekoj red ima „id" kluch (nekoi tabeli imaat drugo ime na PK)
+        for r in rows:
+            if r.get("id") is None:                # ako kluchot „id" fali
+                try:
+                    r["id"] = prijaveni_row_id(r)  # izvadi ID bez vaznost kako se vika kolonata
+                except ValueError:
+                    pass                            # ako ne uspee → ostavi go bez id
+        return rows
+    except Exception as e:                          # fati bilo kakva DB greshka
+        print(f"[apliciraj] zemi po email: {e!r}")  # log za debagiranje
+        return []                                   # na greshka → prazna lista (nikogash ne pukaj)
+    finally:
+        if conn:                                    # ako imashe otvorena vrska
+            conn.close()                            # sekogash zatvori ja
+
+# Funkcija sho odgovara na „dali imam aplicirano?"
+def _odgovor_proverka_aplikacija(pacient: dict | None, kontekst: dict | None) -> dict:
+    # Email e prv od sesijata (ako e najaven), pa od kontekst (ako veke aplicira)
+    email = (pacient or {}).get("email") or (kontekst or {}).get("applicant_email")
+    email = (email or "").strip() # normaliziraj (bez prazni mesta)
+    # Bez email — ne mozeme da barame, barame login
+    if not email:
+        return {
+            "odgovor": ("За да проверам дали имате поднесена апликација, најавете "
+                        "се како пациент со истата сметка со која сте аплицирале.\n\n"
+                        "Потоа повторете: „Дали имам аплицирано за работа\"."),
+            "akcija": "otvori_pacient_login",      # frontend ja otvori formata
+            "navigacija": NAV_KARIERA, "kontekst": None,
+        }
+    apps = _zemi_aplikacii_po_email(email)  # Baraj aplikacii po email
+    # Nema pronajdeni aplikacii — uchtivo kazhi „ne"
+    if not apps:
+        return {
+            "odgovor": (f"Не — немам пронајдена апликација за работа во системот "
+                        f"({email}).\n\n"
+                        'Ако сте аплицирале преку формата во „Кариера", проверете дали '
+                        "сте внеле истата е-пошта како при најавата."),
+            "kontekst": None, "navigacija": NAV_KARIERA,
+        }
+    # Ima pronajdeni — naslov se menuva dali se edna ili poveke
+    if len(apps) == 1:
+        naslov = "Да — имате поднесена апликација за работа:\n"
+    else:
+        naslov = f"Да — имате {len(apps)} поднесени апликации за работа ({email}):\n"
+    linii = [naslov]    # Sega pravime lista na buleti — eden za sekoja aplikacija
+    for a in apps:                                  # pomine niz site aplikacii
+        poz = (a.get("pozicija") or "—").strip() or "—"   # pozicija (ili crtichka)
+        app_id = a.get("id")                       # ID na red (za prikaz)
+        linii.append(f"• {poz} — пријавено на "
+                     f"{format_datum_vreme(a.get('datum_prijava'))}"
+                     # Prikazhi go ID-to samo ako postoi (za da korisnikot znae shto da brishe)
+                     + (f" (ID: {app_id})" if app_id is not None else ""))
+
+    # Finalni instrukcii na korisnikot
+    linii.extend(["", "Тимот за човечки ресурси ќе ве контактира за следните чекори.", "", 'За откажување: „Избриши ја апликацијата".'])
+    # Zachuvaj go email-ot + ID-to na najnovata aplikacija vo kontekst
+    # (za poleсno brishenje ako korisnikot vednash kazhe „izbrishi")
+    return {
+        "odgovor": "\n".join(linii),               # site linii vo eden tekst
+        "kontekst": {
+            "applicant_email": email,
+            "last_aplikacija_id": apps[0].get("id"),     # najnova prva (DESC)
+            "last_aplikacija_pozicija": (apps[0].get("pozicija") or "").strip(),
+        },
         "navigacija": NAV_KARIERA,
     }
 
+# Pomoshna funkcija — izvlekuva broj na aplikacija od tekstot („аплик. 17" → 17)
+def _izvlechi_app_id_od_prasanje(prasanje: str) -> int | None:
+    p = transliterijaj(prasanje).lower()           # normaliziraj za regex
+    # Prv shablon: „aplikacija 17", „aplikacijata ID 17" (faka ID posle „aplikacija")
+    # Vtor shablon: „id 17" — fallback za bilo koj kontekst.
+    for pat in (r"апликаци[јj][аи]?\s*(?:id)?\s*#?:?\s*(\d+)", r"\bid\s*(\d+)\b"):
+        m = re.search(pat, p)
+        if m:                                       # ako shablonot najde neshto
+            return int(m.group(1))                 # m.group(1) = prvata grupa (brojot)
+    return None                                    # ne nashovme broj
 
-# izvleci pozicija preku groq i parse_ai_json
-def _izvlechi_pozicija(prasanje: str) -> str | None:
-    odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=PROMPT_POZICIJA)
-    print(f"[apliciraj] pozicija AI: {odgovor!r}")
-    data = parse_ai_json(odgovor, log_tag="apliciraj_pozicija")
-    if data.get("_error"):
-        return None
-    val = data.get("pozicija")
-    return str(val).strip() if val else None
-
-
-# izvleci broj na licenca ili preskok preku groq
-def _izvlechi_licenca(prasanje: str) -> tuple[str | None, bool]:
-    """Враќа (licenca, preskoki) — само преку Groq."""
-    from ai._kernel.groq_client import groq_e_isklucen, GROQ_OFFLINE_MSG
-
-    if groq_e_isklucen():
-        print(f"[apliciraj] licenca blocked: {GROQ_OFFLINE_MSG}")
-        return None, False
-
-    odgovor = ask_ai(f"Одговор: „{prasanje}\"", system_prompt=PROMPT_LICENCA)
-    print(f"[apliciraj] licenca AI: {odgovor!r}")
-    data = parse_ai_json(odgovor, log_tag="apliciraj_licenca")
-    if data.get("_error"):
-        return None, False
-    licenca = data.get("licenca")
-    preskoki = bool(data.get("preskoki"))
-    if licenca:
-        licenca = re.sub(r"\D", "", str(licenca))
-        if not licenca:
-            licenca = None
-    return licenca, preskoki
-
-
-# najdi aktivен oglas vo baza spored baranata pozicija
-def _najdi_aktiven_oglas(pozicija_baranо: str) -> dict | None:
-    """
-    Пробува да најде активен оглас чија позиција содржи / е содржана во баранatа.
-    """
-    conn = None
+# Pomoshna funkcija — proveruva dali tekovniot lekar e direktor (admin)
+def _direktor_e_admin(lekar: dict | None) -> bool:
+    if not lekar or not lekar.get("doctor_ID"):    # bez lekar/bez ID → ne e admin
+        return False
     try:
-        conn = get_connection()
-        cur = conn.cursor(dictionary=True)
-        site = fetch_aktivni_oglasi_rows(cur)
+        # Lazy import — da ne zavisi fajlot od routers/admin.py pri load time
+        from routers.admin import check_admin_access
+        return bool(check_admin_access(int(lekar["doctor_ID"])))
+    except Exception:                              # ako pukne neshto → trgnuvame od false (pobezbedno)
+        return False
+
+
+# DB funkcija — DELETE od `prijaveni_lekari` (po email ili ID)
+def _izbrisi_aplikacija(email: str | None, app_id: int | None) -> tuple[bool, str]:
+    # Bez nitu eden kriterium → nema shto da brisheme
+    if not email and not app_id:
+        return False, "Немам пронајдена апликација за бришење."
+    conn = None                                     # za try/finally
+    try:
+        conn = get_connection()                    # otvori MySQL vrska
+        cur = conn.cursor(dictionary=True)         # cursor sho vraka dict
+        pk = prijaveni_pk_column()                 # ime na primary key (pr. „id_prijava")
+        # 1) Najdi go redot — dve scenarija:
+        if app_id is not None:                     # 1a) tochno po ID (za direktor)
+            cur.execute(prijaveni_select_sql() + f" WHERE {pk} = %s LIMIT 1",
+                        (app_id,))
+        else:                                       # 1b) najnova za toj email (za pacient)
+            cur.execute(prijaveni_select_sql()
+                        + " WHERE LOWER(TRIM(email)) = LOWER(TRIM(%s))"
+                        + prijaveni_order_desc() + " LIMIT 1",
+                        (email.strip(),))
+        row = fetch_one(cur)                       # zemi go prvot red (ili None)
+        # 2) Ako ne sme nashle — uchtivo vrati greshka
+        if not row:
+            cur.close()
+            ref = f" ({email})" if email else ""    # pokazi email vo porakata ako imame
+            return False, f"Немам пронајдена апликација за бришење{ref}."
+        # 3) Imame red → DELETE
+        app_id_del = prijaveni_row_id(as_dict(row))   # izvadi ID bez vaznost za ime na kolonata
+        poz = (row.get("pozicija") or "").strip() or "—"  # pozicija za porakata (ili crtichka)
+        cur.execute(f"DELETE FROM prijaveni_lekari WHERE {pk} = %s", (app_id_del,))
+        conn.commit()                              # potvrdi ja transakcijata (bez ova ne se zapisuva!)
         cur.close()
-    except Exception as e:
-        print(f"[apliciraj] DB greska: {e}")
-        return None
+        # Vrakaj uspeshna poraka so detali (korisnikot treba da vidi shto e izbrisano)
+        return True, ("Апликацијата е избришана.\n\n"
+                      f"Позиција: {poz}\nID: {app_id_del}\n\n"
+                      'Можете повторно да аплицирате преку „Кариера".')
+    except Exception as e:                          # ako SQL pukne
+        print(f"[apliciraj] DELETE: {e!r}")        # log za debagiranje
+        return False, ("Се случи грешка при бришењето на апликацијата. " "Обидете се повторно.")
     finally:
-        if conn:
+        if conn:                                    # sekogash zatvori ja vrskata
             conn.close()
 
-    if not site:
-        return None
+# Funkcija sho odgovara na barannje za brishenje na aplikacija
+def _odgovor_izbrisi_aplikacija(pacient: dict | None, kontekst: dict | None, prasanje: str = "", lekar: dict | None = None) -> dict:
+    app_id = _izvlechi_app_id_od_prasanje(prasanje)     # Probaj da izvlechesh ID od prashanjeto („izbrishi aplikacija 17")
+    email = (pacient or {}).get("email") or (kontekst or {}).get("applicant_email") # Email e prv od sesijata (pacient), pa od kontekst (ako veke aplicira vo istiot razgovor)
+    email = (email or "").strip() or None          # normaliziraj (ili None ako e prazno)
 
-    b = pozicija_baranо.lower().strip()
+    # Scenario 1: Direktor + konkreten app_id → brishi go tochno toa
+    if app_id and _direktor_e_admin(lekar):
+        ok, poraka = _izbrisi_aplikacija(None, app_id)
+    # Scenario 2: Najaven pacient → gi brishe svoite po email (poslednata)
+    elif email:
+        ok, poraka = _izbrisi_aplikacija(email, None)
+    # Scenario 3: Nema nishto korisно → bara login
+    else:
+        return {
+            "odgovor": ("За бришење на апликација треба да сте најавени како пациент "
+                        "со истата сметка со која сте аплицирале.\n\n"
+                        "Најавете се и пишете: „Избриши ја апликацијата\"."),
+            "kontekst": None, "navigacija": NAV_KARIERA}
 
-    # 1) Точна еднаквост (case-insensitive)
-    for o in site:
-        if (o.get("pozicija") or "").strip().lower() == b:
-            return o
-    # 2) Substring
-    for o in site:
-        p = (o.get("pozicija") or "").strip().lower()
-        if b and (b in p or p in b):
-            return o
-    return None
+    # Vrakame poraka od _izbrisi_aplikacija + resetiran kontekst
+    return {"odgovor": poraka, "kontekst": None, "navigacija": NAV_KARIERA}
 
 
-# insert na nova prijava vo prijaveni_lekari
-def _zapisi_aplikacija(
-    id_oglas: int | None,
-    pozicija: str,
-    ime: str,
-    prezime: str,
-    email: str,
-    telefon: str | None,
-    licenca: str | None,
-) -> tuple[bool, str]:
-    conn = None
+# DB funkcija — INSERT vo `prijaveni_lekari` (zapishi nova aplikacija)
+def _zapisi_aplikacija( id_oglas: int | None, pozicija: str, ime: str, prezime: str, email: str, telefon: str | None, licenca: str | None,) -> tuple[bool, int | None]:                     
+    """INSERT vo `prijaveni_lekari` + vrati go generiranio ID (za kontekst)."""
+    conn = None                                     # za try/finally
     try:
-        conn = get_connection()
-        cur = conn.cursor(dictionary=True)
-        denes = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        tel_int = None
-        if telefon:
-            t = re.sub(r"\D", "", str(telefon))
-            tel_int = int(t) if t else None
-        lic_int = None
-        if licenca:
-            l = re.sub(r"\D", "", str(licenca))
-            lic_int = int(l) if l else None
-        email_norm = (email or "").strip().lower()
-        cur.execute("""
+        conn = get_connection()                    # otvori MySQL vrska
+        cur = conn.cursor(dictionary=True)         # cursor sho vraka dict
+        denes = datetime.now().strftime("%Y-%m-%d %H:%M:%S") # Time-stamp na prijavata (datum + vreme)
+        # Telefon/licenca vo bazata se INT (ne varchar) — zatoa samo cifrite → int.
+        # Ako nema nishto korisно → None (NULL vo bazata).
+        # re.sub(r"\D", "", X) → trgni se shto ne e cifra.
+        tel_int = int(re.sub(r"\D", "", str(telefon))) if telefon and re.sub(
+            r"\D", "", str(telefon)) else None
+        lic_int = int(re.sub(r"\D", "", str(licenca))) if licenca and re.sub(
+            r"\D", "", str(licenca)) else None
+        #izvrasuvanje na sql komandata 
+        cur.execute("""             
             INSERT INTO prijaveni_lekari
               (id_oglas, pozicija, ime_lekar, prezime_lekar,
                broj_med_licenca, email, telefon, datum_prijava)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        """, (id_oglas, pozicija, ime, prezime, lic_int, email_norm, tel_int, denes))
-        conn.commit()
-        cur.close()
-        return True, ""
-    except Exception as e:
-        print(f"[apliciraj] INSERT greska: {e}")
-        return False, str(e)
+        """, (id_oglas, pozicija, ime, prezime, lic_int, (email or "").strip().lower(), tel_int, denes))
+        new_id = cur.lastrowid                     # ID na novioт red (AUTO_INCREMENT)
+        conn.commit()                              # potvrdi ja transakcijata (bez ova ne se zapisuva!)
+        cur.close()                                # zatvori go cursor-ot
+        return True, new_id                        # uspeh + ID na novata aplikacija
+    except Exception as e:                          # ako SQL pukne
+        print(f"[apliciraj] INSERT: {e}")          # log za debagiranje
+        return False, None
     finally:
-        if conn:
+        if conn:                                    # sekogash zatvori ja vrskata
             conn.close()
 
 
-# glaven handler — intent apliciraj_za_rabota (login → pozicija → potvrda → licenca → INSERT)
-def odgovori_za_aplikacija(
-    prasanje: str,
-    pacient: dict | None,
-    kontekst: dict | None,
-    lekar: dict | None = None,
-) -> dict:
-    """
-    Враќа: { "odgovor": str, "kontekst": dict|None }
-
-    Логика:
-    - Ако нема пациент логиран → бара логин.
-    - Ако нема активен kontekst → почни нов flow: извлечи позиција, потврди, прашај за лиценца.
-    - Ако има активен kontekst со ceka='licenca' → прими лиценца и испрати апликација.
-    - Ако има активен kontekst со ceka='potvrduvanje' → потврди и испрати.
-    """
-
-    ceka = (kontekst or {}).get("ceka")     # koj chekor go cekame (login, potvrda, licenca)
-
+# Glaven handler — ova e tochkata sho se vika od handlers.py (intent: apliciraj_za_rabota)
+def odgovori_za_aplikacija( prasanje: str, pacient: dict | None, kontekst: dict | None, lekar: dict | None = None,) -> dict:
+    ceka = (kontekst or {}).get("ceka")  # `ceka` ni kazuva vo koj chekor sme (od prethodna poraka). None = nov razgovor.
+    # Brishenje + proverka imaat prioritet
+    # (mozhe da se pojavat i vo sredina na flow — korisnikot mozhe da se predomisli)
     if prasanje_e_izbrisi_aplikacija_rabota(prasanje):
-        if _email_za_brisenje_aplikacija(pacient, kontekst) or _direktor_e_admin(lekar):
-            return _odgovor_izbrisi_aplikacija(pacient, kontekst, prasanje, lekar)
-        return _otkazi_aplikacija_flow(kontekst)
-
+        return _odgovor_izbrisi_aplikacija(pacient, kontekst, prasanje, lekar)
     if prasanje_e_proverka_aplikacija_rabota(prasanje):
         return _odgovor_proverka_aplikacija(pacient, kontekst)
-
-    # По најава: продолжи од зачуваниот оглас
+    
+    # Po najava: prodolzhi od zachuvaniот oglas
+    # Ova go faka sluchajot: korisnikot rekol „sakam kardiolog", se najavil, i sega
+    # mu ja prikazuvame vednash potvrdata bez da go prashuvame povtorno za pozicijata.
     if ceka == "login" and pacient and pacient.get("email"):
         oglas = _oglas_od_kontekst(kontekst or {})
         if oglas.get("id_oglas") and oglas.get("pozicija"):
-            return _pocni_potvrda_flow(
-                {
-                    "id_oglas": oglas["id_oglas"],
-                    "pozicija": oglas["pozicija"],
-                    "oddel": oglas.get("oddel") or "",
-                    "rok": oglas.get("rok") or "",
-                }
-            )
-
-    if not pacient or not pacient.get("email"):
-        if not ceka and (_tekst_e_zalepen_oglas(prasanje) or "аплиц" in transliterijaj(prasanje).lower()):
-            baran = _baraj_pozicija_za_aplikacija(prasanje)
-            if baran:
-                oglas = _najdi_aktiven_oglas(baran)
+            return _pocni_potvrda_flow(oglas)
+    
+    if not pacient or not pacient.get("email"): # Ne sme logirani → bara login (so zachuvan kontekst za posle)
+        # Ako nema aktiven flow + vo tekstot spomeknal „aplicira..." →
+        # probaj da izvlechesh pozicija i da zachuvash kontekst pred da go pratish na login
+        if not ceka and "аплиц" in transliterijaj(prasanje).lower():
+            baran = _izvlechi_pozicija(prasanje)   # AI: izvleci pozicija
+            if baran:                              # AI nashol pozicija
+                # KLUCNO: prakame i prasanjeto za da se zeme predvid oddelot
+                oglas = _najdi_aktiven_oglas(baran, prasanje)
                 if oglas:
-                    prikaz = _format_pozicija_oglas(oglas)
-                    return _odgovor_bara_pacient_login(
-                        {
-                            "intent": "apliciraj_za_rabota",
-                            "ceka": "login",
-                            "pozicija": oglas["pozicija"],
-                            "id_oglas": oglas["id_oglas"],
-                            "oddel": oglas.get("oddel") or "",
-                            "rok": oglas.get("rok") or "",
-                        },
-                        prikaz,
-                    )
+                    # Ima aktiven oglas — zachuvaj go vo kontekst, baraj login
+                    return _odgovor_bara_pacient_login({
+                        "intent": "apliciraj_za_rabota", "ceka": "login",
+                        "pozicija": oglas["pozicija"], "id_oglas": oglas["id_oglas"],
+                        "oddel": oglas.get("oddel") or "", "rok": oglas.get("rok") or "",
+                    }, _format_pozicija_oglas(oglas))
+                # Nema aktiven oglas za toa ime → informiraj, no sepak prati na login
                 return _odgovor_bara_pacient_login(
                     None,
-                    f'„{baran}" (во моментов нема точен активен оглас во системот — провери Кариера)',
-                )
-        return _odgovor_bara_pacient_login(
-            None,
-            "аплицирање за работа",
-        )
+                    f'„{baran}" (во моментов нема активен оглас — провери Кариера)')
+        # Opsht sluchaj: samo barame login (bez zachuvan oglas)
+        return _odgovor_bara_pacient_login(None, "аплицирање за работа")
 
-    pozicija = (kontekst or {}).get("pozicija")
-    id_oglas = (kontekst or {}).get("id_oglas")
+    # Od ovde natamu garantirano imame najaven pacient so email
+    pozicija = (kontekst or {}).get("pozicija")    # zachuvana pozicija (ili None)
+    id_oglas = (kontekst or {}).get("id_oglas")    # ID na oglasot za INSERT
 
-    # === Чекор 1: нов flow — извлечи позиција ===
-    if not ceka:
+    # Chekor 1: nov flow → izvleci pozicija
+    if not ceka:                                    # bez aktiven flow → pocni nov
+        # Korisnikot pishal „sakam rabota" bez specijalnost → prikazi lista
         if _prasanje_e_opsto_za_rabota(prasanje):
             return _odgovor_izberi_pozicija(pacient)
 
-        if prasanje_e_izbrisi_aplikacija_rabota(prasanje):
-            if _email_za_brisenje_aplikacija(pacient, kontekst) or _direktor_e_admin(lekar):
-                return _odgovor_izbrisi_aplikacija(pacient, kontekst, prasanje, lekar)
-            return _otkazi_aplikacija_flow(kontekst)
-
-        baran = _baraj_pozicija_za_aplikacija(prasanje)
-        if not baran:
+        # Probaj da izvlechesh konkretna pozicija preku AI
+        baran = _izvlechi_pozicija(prasanje)
+        if not baran:                              # AI ne nashol → prikazhi lista
             return _odgovor_izberi_pozicija(pacient)
 
-        oglas = _najdi_aktiven_oglas(baran)
+        # Imame barana pozicija → dali postoi aktiven oglas?
+        # KLUCNO: prakame i prasanjeto za da se izbere TOCNIOT oglas po oddel
+        # (npr. „Медицинска сестра на Урологија" → Urologija, ne Akusherstvo)
+        oglas = _najdi_aktiven_oglas(baran, prasanje)
         if not oglas:
-            return {
-                "odgovor": (
-                    f'Во моментот нема активен оглас за „{baran}". '
-                    "Подолу се сите отворени позиции — изберете друга или проверете "
-                    'на делот „Кариера".'
-                ),
-                "kontekst": None,
-                "navigacija": NAV_KARIERA,
-            }
-
-        return _pocni_potvrda_flow(oglas)
-
-    # === Чекор 2: потврда (да / не) ===
+            # Nema aktiven oglas za taa pozicija → informiraj
+            return {"odgovor": (f'Во моментот нема активен оглас за „{baran}". ' "Подолу се сите отворени позиции — изберете друга или " 'проверете на делот „Кариера".'), "kontekst": None, "navigacija": NAV_KARIERA}
+        return _pocni_potvrda_flow(oglas)          # se e dobro → vlezi vo potvrda
+    # Chekor 2: potvrda (da / ne)
     if ceka == "potvrda":
-        odluka = _parse_da_ne(prasanje)
+        odluka = _parse_da_ne(prasanje)            # 'da', 'ne' ili None
         if odluka is None:
+            # Korisnikot nitu rekol da, nitu ne → povtorno prashaj (zachuvaj kontekst!)
             prikaz = _format_pozicija_oglas(_oglas_od_kontekst(kontekst or {}))
-            return {
-                "odgovor": (
-                    f"Не разбрав. За позицијата {prikaz} — "
-                    'одговорете со „да" ако сакате да аплицирате, или „не" ако не.'
-                ),
-                "kontekst": kontekst,
-            }
+            return {"odgovor": (f"Не разбрав. За позицијата {prikaz} — "
+                                'одговорете со „да" или „не".'),
+                    "kontekst": kontekst}           # kluchno: zachuvaj go kontekstot
         if odluka == "ne":
-            return _odgovor_odbien_aplikacija()
+            return _odgovor_odbien_aplikacija()    # blagodarnost + resetiranje
+        # Korisnikot rekol „da" → prodolzhi kon licenca
         return _pocni_licenca_flow(_oglas_od_kontekst(kontekst or {}), pacient)
-
-    # === Чекор 3: лиценца ===
+    # Chekor 3: licenca → INSERT + email
     if ceka == "licenca":
-        if prasanje_e_izbrisi_aplikacija_rabota(prasanje):
-            return _odgovor_izbrisi_aplikacija(pacient, kontekst, prasanje, lekar)
-
-        licenca, preskoki = _izvlechi_licenca(prasanje)
+        licenca, preskoki = _izvlechi_licenca(prasanje)   # AI parsiranje
+        # Nitu broj nitu „nemam" → pobarah povtorno (no zachuvaj kontekst)
         if licenca is None and not preskoki:
-            return {
-                "odgovor": (
-                    'Не препознав важечки број на лиценца. Те молам '
-                    'прати само цифри (пр. „12345") или напиши „немам" '
-                    'за да продолжиме без лиценца.'
-                ),
-                "kontekst": kontekst,
-            }
-
-        ok, err = _zapisi_aplikacija(
-            id_oglas=id_oglas,
-            pozicija=pozicija or "",
-            ime=pacient.get("ime", "") or "",
-            prezime=pacient.get("prezime", "") or "",
-            email=pacient.get("email", "") or "",
-            telefon=pacient.get("telefon"),
-            licenca=licenca,
-        )
-        if not ok:
-            return {
-                "odgovor": (
-                    'Се случи грешка при зачувувањето на апликацијата. '
-                    'Те молам обиди се повторно или контактирај ја рецепцијата.'
-                ),
-                "kontekst": None,
-            }
-
-        lic_info = f"Лиценца: {licenca}" if licenca else "Лиценца: (без)"
+            return {"odgovor": ('Не препознав важечки број на лиценца. Те молам '
+                                'прати само цифри (пр. „12345") или напиши „немам".'),
+                    "kontekst": kontekst}
+        # Zemi gi podatocite od profilot na pacientot (ne prashuvame povtorno)
+        ime = pacient.get("ime", "") or ""
+        prezime = pacient.get("prezime", "") or ""
         app_email = (pacient.get("email") or "").strip()
-        last_id = None
-        try:
-            conn = get_connection()
-            cur = conn.cursor()
-            pk = prijaveni_pk_column()
-            cur.execute(
-                f"""
-                SELECT {pk} AS id FROM prijaveni_lekari
-                WHERE LOWER(TRIM(email)) = LOWER(TRIM(%s))
-                {prijaveni_order_desc()} LIMIT 1
-                """,
-                (app_email,),
-            )
-            r = cur.fetchone()
-            cur.close()
-            conn.close()
-            if r:
-                last_id = int(r[0] if not isinstance(r, dict) else r.get("id") or r[0])
-        except Exception as e:
-            print(f"[apliciraj] last id po insert: {e!r}")
-
+        # Izvrshi INSERT vo baza
+        ok, new_id = _zapisi_aplikacija(
+            id_oglas=id_oglas, pozicija=pozicija or "",
+            ime=ime, prezime=prezime, email=app_email,
+            telefon=pacient.get("telefon"), licenca=licenca)
+        # Ako INSERT ne uspeal → uchtivа greshka
+        if not ok:
+            return {"odgovor": ('Се случи грешка при зачувувањето на апликацијата. ' 'Обиди се повторно или контактирај ja рецепцијата.'), "kontekst": None} # Se uspeshno → isprati email potvrda (bez blokiranje na odgovorot)
+        _isprati_email_za_aplikacija(app_email, ime, prezime, pozicija or "—", licenca)
+        lic_info = f"Лиценца: {licenca}" if licenca else "Лиценца: (без)" # Finalna poraka do korisnikot + zachuvaj kontekst za mozhno brishenje
         return {
-            "odgovor": (
-                'Готово! Апликацијата е успешно испратена.\n\n'
-                f'Позиција: {pozicija}\n'
-                f'Кандидат: {pacient.get("ime","")} {pacient.get("prezime","")}\n'
-                f'Email: {app_email}\n'
-                f'{lic_info}\n\n'
-                'Тимот за човечки ресурси ќе те контактира за следните чекори. Среќно!\n\n'
-                'За откажување: „Избриши ја апликацијата" (најавени како пациент).'
-            ),
+            "odgovor": ('Готово! Апликацијата е успешно испратена.\n\n'
+                        f'Позиција: {pozicija}\n'
+                        f'Кандидат: {ime} {prezime}\n'
+                        f'Email: {app_email}\n{lic_info}\n\n'
+                        'Потврда е испратена на твојата e-пошта.\n'
+                        'Тимот за човечки ресурси ќе те контактира. Среќно!\n\n'
+                        'За откажување: „Избриши ја апликацијата".'),
             "kontekst": {
                 "applicant_email": app_email,
-                "last_aplikacija_id": last_id,
+                "last_aplikacija_id": new_id,      # za brzo brishenje
                 "last_aplikacija_pozicija": pozicija,
             },
         }
 
-    return {                                # neпознат ceka — reset na flow
-        "odgovor": 'Те молам обиди се повторно: „Сакам да аплицирам за [позиција]".',
-        "kontekst": None,                   # iscisti go kontekstot
-    }
+    # Nepoznat ceka → resetiraj flow (safety net)
+    # Dokolku kontekstot e rasipan ili dojde neochekuvana sostojba, barame korisnikot da pochne od pochetok
+    return {"odgovor": 'Те молам обиди се повторно: „Сакам да аплицирам за [позиција]".',
+            "kontekst": None}

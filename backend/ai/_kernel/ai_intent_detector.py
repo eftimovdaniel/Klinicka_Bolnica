@@ -1,30 +1,7 @@
-"""
-AI-driven intent detector со Groq API.
-
-Зашто:
-- Keyword detector-от пропушта природни варијации:
-    "Dali možeš da mi zakažeš pregled?" - има „закажеш" не „закажи"
-    "Бих сакал да одам кај лекар" - нема јасен keyword
-    "Што имам утре?" - не е во ниту еден keyword list
-- AI го разбира значењето, не само зборовите.
-
-Стратегија:
-- Главна функција: detektiraj_intent_so_ai(prasanje)
-- Прима природен текст, враќа intent string
-- Ако AI не одговори јасно → "general" (па одговара со општ AI)
-
-Се користи КАКО fallback или замена за keyword detektorot во intent_detector.py.
-"""
-
 import re
 from ai._kernel.groq_client import ask_ai
 from ai._kernel.prompt_loader import load_prompt
-
-
 # Промпт: backend/data/prompts/intent_classifier.txt
-
-
-
 # Mnozhestvo validni intenti - sluzhi za validacija deka AI vratil poznata vrednost
 # (kako safelist - ako AI izmisli neshto, ne se prifaka)
 VALIDNI_INTENTI = {

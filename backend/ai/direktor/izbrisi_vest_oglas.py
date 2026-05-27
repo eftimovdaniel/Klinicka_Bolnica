@@ -21,12 +21,10 @@ from ai.opsto.vest_naslov import (
 )
 # funkcija koja go prasuva ai modelot sto tocno sakame da izbriseme 
 def _izvlechi(prasanje: str) -> dict[str, Any]:
-    """AI враќа dict со tip/id/kriterium."""
     odgovor = ask_ai(   # povikuvanje na ai modelot
         f"Прашање: „{prasanje}\"",  # se postavuva prasanjeto sto e vneseno od korisnikot 
         system_prompt=load_prompt("direktor_izbrisi_vest_oglas"), # go vcituvame promto so pravila za toa kako teba da se odnsuva koga se brisi nekoja vest i slicno
         )
-    print(f"[izbrisi] AI: {odgovor!r}") 
     return parse_ai_json(odgovor, log_tag="izbrisi_vest_oglas")
 
 # pomosna funkcija koja ja birse novosta po id ili onaa koja e objavena najnova ili posledna
@@ -49,6 +47,7 @@ def _izbrisi_vest(target_id: int | None) -> str:
         cur.execute("DELETE FROM Novosti WHERE id = %s", (vest_id,))    # se koristi za da ja izbriseme vesta od bazata so id 
         conn.commit()   # site promeni se zacuvuvaat vo bazata na podatoci
     return f"Вест е избришана.\n\nID: {vest_id}\nНаслов: {naslov}"  # vraka poraka deka vesta e izbrisana so toj i toj id i naslovot na vesta
+
 # funkcija koja go brise oglasot za rabota 
 def _izbrisi_oglas(target_id: int | None) -> str:
     with db_cursor() as (conn, cur):    # kreiranje na konekcija so bazata i moznost za izvvrasuvanje na aktivnosti na istata
@@ -80,9 +79,8 @@ def _izbrisi_oglas(target_id: int | None) -> str:
         f"Оддел: {oddel}"
     )
 # glavna tocka za brisenje na vest ili na oglasi
-def odgovori_za_brisenje(
-    prasanje: str, lekar: dict | None, kontekst: dict | None = None # prime prasanje vo vid na string, lekar i memorija od porakite smesteni vo kontekstoto
-) -> str:   # se vraka finalniot tekst na ekranot so koj e potvrdeno deka e napravena promena ili pa ne e
+def odgovori_za_brisenje( prasanje: str, lekar: dict | None, kontekst: dict | None = None ) -> str: # prime prasanje vo vid na string, lekar i memorija od porakite smesteni vo kontekstoto
+  # se vraka finalniot tekst na ekranot so koj e potvrdeno deka e napravena promena ili pa ne e
     if err := require_direktor(lekar):  # proverka dali korisnikot koj se obiduva izbrise vest ili oglas e direktor (se dava da se pravat ovie promeni dokolku e najaven 
         # др Владко Захариев vo sportivno ova ne treba da e ovozmozeno)
         return err      # ako ne e najaven gorespoenetiot lekar se vraka error, porka za nastanata greska 

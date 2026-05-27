@@ -38,10 +38,7 @@ def izvlechi_ocena_podatoci(prasanje: str) -> dict:  # funkcija za izvlekuvanje 
         "datum": podatoci.get("datum"),
     }  # vrati recnik so podatoci
 
-
-def najdi_zaversen_termin(
-    pacient_email: str, doctor_id: int | None, datum: str | None
-) -> list[dict]:  # najdi zavrsen termin
+def najdi_zaversen_termin( pacient_email: str, doctor_id: int | None, datum: str | None) -> list[dict]:  # najdi zavrsen termin
     conn = None  # pocetna konekcija
     try:
         conn = get_connection()  # otvori baza
@@ -74,7 +71,6 @@ def najdi_zaversen_termin(
         if conn:
             conn.close()  # zatvori konekcija
 
-
 def vmetni_ili_azhuriraj_ocena(termin_id: int, ocena: int, komentar: str | None) -> bool:  # zacuvaj ocena
     conn = None
     try:
@@ -101,7 +97,6 @@ def vmetni_ili_azhuriraj_ocena(termin_id: int, ocena: int, komentar: str | None)
         if conn:
             conn.close()  # zatvori konekcija
 
-
 def odgovori_za_ocenuvanje(prasanje: str, pacient: dict | None) -> str:  # glavna funkcija za odgovor
     if not pacient or not pacient.get("email"):  # proveri najava
         return (
@@ -112,22 +107,17 @@ def odgovori_za_ocenuvanje(prasanje: str, pacient: dict | None) -> str:  # glavn
     izvleceno = izvlechi_ocena_podatoci(prasanje)  # izvlechi podatoci so ai
     if izvleceno.get("_error"):
         return str(izvleceno["_error"])  # vrati greska
-
     ocena = izvleceno.get("ocena")
     komentar = izvleceno.get("komentar")
     doctor_id = izvleceno.get("doctor_id")
     datum_str = izvleceno.get("datum")
-
     if ocena is None or ocena < 1 or ocena > 5:  # validacija ocena
         return (
             'Не разбрав која оцена сакаш да дадеш. Кажи број од 1 до 5.\n'
             'Пример: „Оцена 5 за д-р Петров — беше одличен"'
         )
-
     termini = najdi_zaversen_termin(pacient["email"], doctor_id, datum_str)  # najdi termini
-    DENOVI = [
-        "Понеделник", "Вторник", "Среда", "Четврток", "Петок", "Сабота", "Недела"
-    ]  # iminja na denovi za prikaz
+    DENOVI = [ "Понеделник", "Вторник", "Среда", "Четврток", "Петок", "Сабота", "Недела"]  # iminja na denovi za prikaz
 
     if not termini:  # nema najden termin
         return (

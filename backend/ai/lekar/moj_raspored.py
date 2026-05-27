@@ -20,16 +20,12 @@ PROMPT = """ Ти си систем што извлекува параметри
 - ако нема ништо јасно → сите вредности null БЕЗ markdown, БЕЗ објаснувања. Само JSON.""".strip()
 from ai.lekar.lekar_intent import prasanje_e_moj_raspored_lekar
 
-
 # funkcija koja go povikuva llm modelot za strukturiranje na baranjeto
 def _izvlechi(prasanje: str) -> dict:
     if err := groq_zadolzhitelen():  # ako Groq nedostapen — vrati greska kon korisnikot
         return {"_error": err}
-
     denes = date.today().strftime("%Y-%m-%d")   # se zema denesnata data kako string
-    denes_den = ["понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"][
-        date.today().weekday()
-    ]   # se pravi presmetka na dekovniot den
+    denes_den = ["понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"][ date.today().weekday() ]   # se pravi presmetka na dekovniot den
     full = f'Денес: {denes} ({denes_den})\n\nПрашање: „{prasanje}"\nВрати JSON.'
     return izvlechi_json_so_ai(full, PROMPT, log_tag="moj_raspored")  # povik do groq api i parsiranje na baranjeto
 
@@ -51,9 +47,7 @@ def _period_to_dates(period: str | None) -> tuple[date | None, date | None, str]
         return None, None, "сите"   # gi vraka site bez vremenski opseg
     return denes, None, "од денес"
 #glavna funkcija
-def odgovori_za_raspored(
-    prasanje: str, lekar: dict | None, kontekst: dict | None = None
-) -> str | dict:
+def odgovori_za_raspored( prasanje: str, lekar: dict | None, kontekst: dict | None = None ) -> str | dict:
     if err := require_lekar(lekar): # proverka koj e najven dali e lekar samo toj moze da gleda
         return {
             "odgovor": (
@@ -67,7 +61,6 @@ def odgovori_za_raspored(
     podatoci = _izvlechi(prasanje)  # povik na ai funkcijata za izvlekuvanje na json parametri
     if podatoci.get("_error"):  # ako ai dade greska    
         return str(podatoci["_error"])  # greskata se pretvara vo string i se vrka kon korisnikot
-
     konkreten_datum = podatoci.get("datum") # se proveruva dali modelot uspeal da pronajde konkreten datum
     broj = podatoci.get("broj") # se proveruva dali lekarot pobaral limit na rezultato
     try:
@@ -101,17 +94,14 @@ def odgovori_za_raspored(
         if do:
             sql += " AND datum_pregled <= %s"
             params.append(do)
-
     sql += " ORDER BY datum_pregled, vreme_pregled"
     if broj:
         sql += " LIMIT %s"
         params.append(broj)
-
     cur.execute(sql, params)
     rows = cur.fetchall()
     cur.close()
     conn.close()
-
     if not rows:
         termini_mode = "date" if konkreten_datum else "all"
         return dopuni_so_lekar_panel(
@@ -120,15 +110,13 @@ def odgovori_za_raspored(
             termini_mode=termini_mode,
             datum=konkreten_datum,
         )
-
     zakazani_ids = [
         int(r["termin_ID"])
         for r in rows
         if (r.get("status_pregled") or "закажан").strip() == "закажан"
     ]
 
-    linii = [f"Прегледи {label} ({len(rows)} вкупно):", ""]
-
+    linii = [f"Прегледи {label} ({len(rows)} вкупно):", ""]  
     # Групирај по датум за полесно читање
     po_datum: dict = {}
     for r in rows:

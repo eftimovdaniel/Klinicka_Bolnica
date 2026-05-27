@@ -5,11 +5,9 @@ from ai._kernel.db_helpers import as_dict, db_cursor, prijaveni_select_sql  # po
 from ai._kernel.groq_client import ask_ai  # povik kon Groq API
 from ai._kernel.utils import format_datum_vreme
 
-
 def _izvlechi(prasanje: str) -> dict:  # izvleci pozicija ili id_oglas od prasanjeto
     odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=load_prompt("direktor_aplikanti_oglas"))  # AI analiza, se praka baranje do ai so soodvetniot promtp
     return parse_ai_json(odgovor, log_tag="aplikanti_oglas")  # dict ili _error
-
 
 def odgovori_za_aplikanti(prasanje: str, lekar: dict | None) -> str:  # glaven handler (intent aplikanti_oglas)
     if err := require_direktor(lekar):  # proveri uloga direktor
