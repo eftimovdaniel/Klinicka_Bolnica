@@ -4,14 +4,6 @@
 - „Додај терапија на термин 42: Аспирин 100mg"
 - „Дијагноза за пациент Ана Стојановска: Хипертензија. Терапија: Лосартан 50mg"
 - „Запиши: дијагноза грип, терапија витамин Ц"
-Логика:
-1. AI извлекува: ime_pacient, termin_id, dijagnoza, terapija
-2. Идентификува термин:
-- ако има termin_id → користи него
-- инаку → бара завршен или закажан термин за тој пациент кај овој лекар
-- ако има повеќе → бара ID или последниот
-3. UPDATE на Termin_pregled.dijagnoza/terapija
-4. Ако терминот е „закажан" → автоматски го преместува на „завршен"
 """
 from database import get_connection  
 from ai._kernel.ai_json import parse_ai_json  
@@ -19,8 +11,7 @@ from ai._kernel.groq_client import ask_ai
 from ai._kernel.utils import format_datum, format_vreme  
 
 # sistemski prompt koj go nasocuva ai modelot kako strogo da gi izvleche baranite podatoci vo json format
-PROMPT = """ Ти си систем што од прашање извлекува податоци за запис на терапија/дијагноза.
-Корисникот (лекар) пишува на македонски. Извлечи:
+PROMPT = """ Ти си систем што од прашање извлекува податоци за запис на терапија/дијагноза. Корисникот (лекар) пишува на македонски. Извлечи:
 - "ime_pacient": име+презиме на пациент или null
 - "termin_id": ID на термин (само цифри) или null
 - "dijagnoza": текст за дијагнозата или null
@@ -38,13 +29,11 @@ PROMPT = """ Ти си систем што од прашање извлекув�
 - „Дијагноза за термин 42: грип. Терапија: Витамин Ц"
   → {"ime_pacient":null,"termin_id":42,"dijagnoza":"грип","terapija":"Витамин Ц"}
 - „За Ана Стојановска препиши Лосартан 50mg"
-  → {"ime_pacient":"Ана Стојановска","termin_id":null,"dijagnoza":null,"terapija":"Лосартан 50mg"}
-БЕЗ markdown, БЕЗ објаснувања.""".strip()
+  → {"ime_pacient":"Ана Стојановска","termin_id":null,"dijagnoza":null,"terapija":"Лосартан 50mg"} БЕЗ markdown, БЕЗ објаснувања.""".strip()
 
 # vnatresna funkcija koja go povikuva groq ai za izvlekuvanje na strukturiranite podatoci od baranjeto
 def _izvlechi(prasanje: str) -> dict:
     odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=PROMPT)  # povik do llm preku soodvetna funkcijata
-    print(f"[zapishi_terapija] AI: {odgovor!r}")  
     return parse_ai_json(odgovor, log_tag="zapishi_terapija")  # bezbedno parsiranje na odgovorot vo rechnik
 
 # pomosna funkcija za naoganje na tocen termin vo bazata spored poduredeno id i id na lekarot
@@ -101,12 +90,7 @@ def _najdi_termini_po_ime(doctor_id: int, ime_pacient: str) -> list[dict]:
             conn.close()  # zatvoranje na mysql konekcijata
 
 # pomosna funkcija koja go izvrsuva samiot update upit vo bazata za vnesuvanje na dijagnozata i terapijata
-def _update_terapija(
-    termin_id: int,
-    dijagnoza: str | None,
-    terapija: str | None,
-    avtomatski_zavrshi: bool,
-) -> bool:
+def _update_terapija( termin_id: int, dijagnoza: str | None, terapija: str | None, avtomatski_zavrshi: bool,) -> bool:
     conn = None
     try:
         conn = get_connection()  # otvoranje vrska do mysql bazata na podatoci
@@ -136,7 +120,6 @@ def _update_terapija(
         if conn:
             conn.close()  # zatvoranje na aktivnata konekcija
 
-
 # glavna handler funkcija koja se povikuva od strana na router-ot
 def odgovori_za_terapija(prasanje: str, lekar: dict | None) -> str:
     if not lekar or not lekar.get("doctor_ID"):  # proverka dali korisnikot e najaven kako lekar
@@ -148,7 +131,6 @@ def odgovori_za_terapija(prasanje: str, lekar: dict | None) -> str:
     podatoci = _izvlechi(prasanje)  # povik na ai funkcijata za izvlekuvanje na podatocite
     if podatoci.get("_error"):  # ako ai funkcijata javi greska pri rabotata
         return podatoci["_error"]  # vrati ja greskata direktno nazad
-
     ime_pacient = (podatoci.get("ime_pacient") or "").strip() or None  # cistenje na prazni mesta i postavuvanje none ako e prazno imeto na paciento
     termin_id = podatoci.get("termin_id")  # prevzemanje na izvlechenoto id na terminot
     try:

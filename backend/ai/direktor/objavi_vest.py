@@ -6,6 +6,8 @@ from ai._kernel.ai_json import parse_ai_json
 from ai._kernel.groq_client import GROQ_OFFLINE_MSG, ask_ai, groq_e_isklucen
 from ai._kernel.groq_helpers import groq_zadolzhitelen
 from ai._kernel.prompt_loader import load_prompt
+
+
 # funkcija za izvlekuvanje na karakterite na videoto sto e staveno od direktorot
 def _video_id(text: str) -> str | None:
     m = re.search(r"youtu\.be/([a-zA-Z0-9_-]{11})", text)   # baranje na nekoj skreaten link

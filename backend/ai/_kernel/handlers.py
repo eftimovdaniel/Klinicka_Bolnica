@@ -34,7 +34,6 @@ def _build_handlers() -> dict[str, HandlerSpec]:
         info_lekar,
         istorija_pacient,
         izbrisi_vest_oglas,
-        izvestaj_den_nedela,
         karton_pacient,
         kreiraj_oglas,
         lekari_oddel,
@@ -52,9 +51,7 @@ def _build_handlers() -> dict[str, HandlerSpec]:
         preporaka_lekar,
         pregled_dezurstvo,
         promeni_dezurstvo,
-        otvori_admin_panel,
         slobodni_termini,
-        statistika_oddeli,
         trgni_ocena,
         uslugi,
         zatvori_oglas,
@@ -89,10 +86,6 @@ def _build_handlers() -> dict[str, HandlerSpec]:
         "promeni_dezurstvo": HandlerSpec(
             promeni_dezurstvo.odgovori_za_dezurstvo, kind="dict"
         ),
-        "otvori_admin_panel": HandlerSpec(
-            otvori_admin_panel.odgovori_za_otvori_admin, kind="dict_full"
-        ),
-        "statistika_oddeli": HandlerSpec(statistika_oddeli.odgovori_za_statistika),
         "zavrshi_pregled": HandlerSpec(zavrshi_pregled.odgovori_za_zavrshi),
         "istorija_pacient": HandlerSpec(istorija_pacient.odgovori_za_istorija),
         "karton_pacient": HandlerSpec(karton_pacient.odgovori_za_karton),
@@ -113,7 +106,6 @@ def _build_handlers() -> dict[str, HandlerSpec]:
         "preference_lekar": HandlerSpec(
             preference_lekar.odgovori_za_preference, kind="dict"
         ),
-        "izvestaj_den_nedela": HandlerSpec(izvestaj_den_nedela.odgovori_za_izvestaj),
     }
 
 
@@ -166,7 +158,7 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
         raw = spec.fn()
     elif intent in ("slobodni_termini", "lekari_oddel"):
         raw = spec.fn(q, ctx.kontekst)
-    elif intent in ("otvori_admin_panel", "otvori_lekar_panel"):
+    elif intent == "otvori_lekar_panel":
         raw = spec.fn(q, ctx.lekar, ctx.kontekst)
     elif intent == "zakazi_termin":
         raw = spec.fn(q, ctx.pacient, ctx.kontekst)
@@ -195,13 +187,11 @@ def dispatch(intent: str, ctx: AiContext) -> dict[str, Any]:
         "objavi_vest",
         "kreiraj_oglas",
         "zatvori_oglas",
-        "statistika_oddeli",
         "istorija_pacient",
         "karton_pacient",
         "moja_statistika",
         "aplikanti_oglas",
         "zapishi_terapija",
-        "izvestaj_den_nedela",
     ):
         raw = spec.fn(q, ctx.lekar)
     else:

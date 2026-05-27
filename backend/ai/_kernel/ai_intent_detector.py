@@ -47,7 +47,6 @@ VALIDNI_INTENTI = {
     "zatvori_oglas",
     "pregled_dezurstvo",
     "promeni_dezurstvo",
-    "statistika_oddeli",
     "zavrshi_pregled",
     "istorija_pacient",
     "karton_pacient",
@@ -64,8 +63,6 @@ VALIDNI_INTENTI = {
     "faq_pregled",
     "rezultati_testovi",
     "preference_lekar",
-    "izvestaj_den_nedela",
-    "otvori_admin_panel",
     "general",
 }
 def detektiraj_intent_so_ai(prasanje: str) -> str:

@@ -13,11 +13,11 @@ def _izvlechi(prasanje: str) -> dict:
     odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=PROMPT) # se praka prasanje do groq so soodvetno formiran promt
     print(f"[karton] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="karton_pacient") #odgovorot se parsira vo python recnik
+
 # glavna funkcija koja se povikuva za obrabotka od ai asistesten
 def odgovori_za_karton(prasanje: str, lekar: dict | None) -> str:
     if err := require_lekar(lekar): # proverka dali e najaven lekar kako korisnik ili pacient
         return err  # ako ne e najaven lekar se dava error poraka ova smee samo da go obrabotuva lekarot
-
     podatoci = _izvlechi(prasanje)  # se povikuva llm modelot sto go koristam za izvlekuvanje na imeto na paxientp
     if podatoci.get("_error"):  # ako nastane greska pri povikot ili pri parsiranjeto na json
         return podatoci["_error"]   # se vraka greska nazad do korisnikot vo ovoj slucaj do lekarot

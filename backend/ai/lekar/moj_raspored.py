@@ -5,10 +5,6 @@ from ai._kernel.groq_helpers import groq_zadolzhitelen, izvlechi_json_so_ai
 from ai._kernel.napomena import napomena_za_prikaz_lekar
 from ai._kernel.utils import format_datum_so_den, format_vreme
 from ai.lekar.lekar_panel_nav import dopuni_so_lekar_panel
-from ai.pacient.moi_pregledi import (
-    datum_za_pregledi_od_prasanje,
-    prasanje_e_lista_site_pregledi,
-)
 PROMPT = """ Ти си систем што извлекува параметри за распоред на лекар. Корисникот е лекар и сака да види свои закажани прегледи. Врати САМО JSON:
 {"period": "denes" | "utre" | "nedela" | "mesec" | "site" | null,
  "datum": "YYYY-MM-DD" | null,
@@ -23,69 +19,19 @@ PROMPT = """ Ти си систем што извлекува параметри
 - ако корисникот спомне број (пр. „следните 5", „топ 3") → "broj"=число
 - ако нема ништо јасно → сите вредности null БЕЗ markdown, БЕЗ објаснувања. Само JSON.""".strip()
 from ai.lekar.lekar_intent import prasanje_e_moj_raspored_lekar
-from ai._kernel.transliteracija import transliterijaj
-
-def _lokalno_izvlechi(prasanje: str) -> dict | None:
-    """Брза локална детекција без Groq за чести форми."""
-    p = transliterijaj(prasanje or "").lower().strip()
-    if not p:
-        return None
-    if prasanje_e_lista_site_pregledi(prasanje):
-        return {"period": "site", "datum": None, "broj": None}
-    if any(x in p for x in ("денес", "denes", "за денеска", "za deneska")):
-        return {"period": "denes", "datum": None, "broj": None}
-    if any(x in p for x in ("утре", "utre", "za utre", "за утре")):
-        return {"period": "utre", "datum": None, "broj": None}
-    if any(
-        x in p
-        for x in (
-            "оваа недела", "ovaa nedela",
-            "следната недела", "slednata nedela",
-            "наредната недела", "narednata nedela",
-            "наредните 7 дена", "narednite 7 dena",
-            "7 дена", "7 dena",
-        )
-    ):
-        return {"period": "nedela", "datum": None, "broj": None}
-    if any(
-        x in p
-        for x in (
-            "овој месец", "ovoj mesec",
-            "наредните 30 дена", "narednite 30 dena",
-            "30 дена", "30 dena",
-        )
-    ):
-        return {"period": "mesec", "datum": None, "broj": None}
-    # „Мој распоред“ / „распоред“ без друг детал → од денес натаму
-    if re.fullmatch(r"(?:мој\s+)?распоред\.?", p) or re.fullmatch(r"(?:moj\s+)?raspored\.?", p):
-        return {"period": None, "datum": None, "broj": None}
-    return None
 
 
-import re  # за локалниот parser
-
-# funkcija koja go povikuva llm modelot za strukturiranje na branjeto
+# funkcija koja go povikuva llm modelot za strukturiranje na baranjeto
 def _izvlechi(prasanje: str) -> dict:
-    lok = _lokalno_izvlechi(prasanje)
-    if lok is not None:
-        return lok
-    if datum_za_pregledi_od_prasanje(prasanje):
-        # Конкретен ден ќе се извлече локално подоцна — нема потреба од Groq
-        return {"period": None, "datum": None, "broj": None}
-    if groq_zadolzhitelen():
-        # Groq недостапен → разумен default наместо грешка
-        return {"period": None, "datum": None, "broj": None}
+    if err := groq_zadolzhitelen():  # ako Groq nedostapen — vrati greska kon korisnikot
+        return {"_error": err}
 
     denes = date.today().strftime("%Y-%m-%d")   # se zema denesnata data kako string
     denes_den = ["понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"][
         date.today().weekday()
-    ]   # se pravi presmetka na dekovnite denovi
+    ]   # se pravi presmetka na dekovniot den
     full = f'Денес: {denes} ({denes_den})\n\nПрашање: „{prasanje}"\nВрати JSON.'
-    podatoci = izvlechi_json_so_ai(full, PROMPT, log_tag="moj_raspored")    # povik do groq api i parsiranje na baranjeto
-    if podatoci.get("_error"):
-        # Тивок fallback за rate-limit / 429 — не блокирај го корисникот
-        return {"period": None, "datum": None, "broj": None}
-    return podatoci
+    return izvlechi_json_so_ai(full, PROMPT, log_tag="moj_raspored")  # povik do groq api i parsiranje na baranjeto
 
 # funkcija koja detektira period od do 
 def _period_to_dates(period: str | None) -> tuple[date | None, date | None, str]:
@@ -123,10 +69,6 @@ def odgovori_za_raspored(
         return str(podatoci["_error"])  # greskata se pretvara vo string i se vrka kon korisnikot
 
     konkreten_datum = podatoci.get("datum") # se proveruva dali modelot uspeal da pronajde konkreten datum
-    if not konkreten_datum: # ako ne e pronajden se pravi lokalno
-        d = datum_za_pregledi_od_prasanje(prasanje) 
-        if d:
-            konkreten_datum = d.strftime("%Y-%m-%d")    # formatiranje na vremeto vo iso format
     broj = podatoci.get("broj") # se proveruva dali lekarot pobaral limit na rezultato
     try:
         broj = int(broj) if broj else None

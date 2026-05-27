@@ -228,28 +228,6 @@ def _resolve_intent(
             )
         ) or re.search(r"\b\d{1,2}\s*[:.]\s*\d{2}\b", q):
             return "promeni_dezurstvo"
-        if any(
-            w in q
-            for w in (
-                "админ",
-                "административ",
-                "admin",
-                "панел",
-            )
-        ) and any(
-            w in q
-            for w in (
-                "прикажи",
-                "prikazi",
-                "отвори",
-                "otvori",
-                "однеси",
-                "види",
-                "го ",
-                " го",
-            )
-        ):
-            return "otvori_admin_panel"
     try:
         intent = detektiraj_intent(pitanje_norm)
     except Exception as e:

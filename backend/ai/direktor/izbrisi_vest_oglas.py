@@ -1,14 +1,10 @@
-"""
-Бришење вест или оглас — само за директорот (правила + AI, локално за „истата").
-
+"""Бришење вест или оглас — само за директорот (правила + AI, локално за „истата").
 Примери:
 - „Избриши го најновиот оглас"           → DELETE од Vrabotuvanje (последниот)
 - „Избриши ја најновата вест"            → DELETE од Novosti (последната)
 - „Избриши ја веста со наслов …"         → DELETE по наслов од Novosti
 - „Избриши оглас ID 5"                   → DELETE Vrabotuvanje WHERE id=5
-- „Избриши вест 3"                       → DELETE Novosti WHERE id=3
-"""
-
+- „Избриши вест 3"                       → DELETE Novosti WHERE id=3 """
 import re
 from typing import Any
 from ai._kernel.ai_json import parse_ai_json
@@ -32,9 +28,9 @@ def _izvlechi(prasanje: str) -> dict[str, Any]:
         )
     print(f"[izbrisi] AI: {odgovor!r}") 
     return parse_ai_json(odgovor, log_tag="izbrisi_vest_oglas")
+
 # pomosna funkcija koja ja birse novosta po id ili onaa koja e objavena najnova ili posledna
 def _izbrisi_vest(target_id: int | None) -> str:
-    """Брише вест по ID или најновата."""
     with db_cursor() as (conn, cur):    # se vospostavuva konekcija so bazata i se vlecat informacii od bazata po ostvaruvanje na konekcijata
         if target_id:   # dokolku korisnikot vnel id za biresenje na novosta se bara po id 
             cur.execute("SELECT id, naslov FROM Novosti WHERE id = %s", (target_id,))   # se selektira novosta koja e odgovara na vneseniot id od starna na direktorot
@@ -55,7 +51,6 @@ def _izbrisi_vest(target_id: int | None) -> str:
     return f"Вест е избришана.\n\nID: {vest_id}\nНаслов: {naslov}"  # vraka poraka deka vesta e izbrisana so toj i toj id i naslovot na vesta
 # funkcija koja go brise oglasot za rabota 
 def _izbrisi_oglas(target_id: int | None) -> str:
-    """Брише оглас по ID или најновиот."""
     with db_cursor() as (conn, cur):    # kreiranje na konekcija so bazata i moznost za izvvrasuvanje na aktivnosti na istata
         if target_id:   # ako korisnikto navede tocen id na oglasot se bara po vneseniot id
             cur.execute(        # se selektira oglasot od bazata so toj id
@@ -88,7 +83,6 @@ def _izbrisi_oglas(target_id: int | None) -> str:
 def odgovori_za_brisenje(
     prasanje: str, lekar: dict | None, kontekst: dict | None = None # prime prasanje vo vid na string, lekar i memorija od porakite smesteni vo kontekstoto
 ) -> str:   # se vraka finalniot tekst na ekranot so koj e potvrdeno deka e napravena promena ili pa ne e
-    """Главна точка - повикана од router-от."""
     if err := require_direktor(lekar):  # proverka dali korisnikot koj se obiduva izbrise vest ili oglas e direktor (se dava da se pravat ovie promeni dokolku e najaven 
         # др Владко Захариев vo sportivno ova ne treba da e ovozmozeno)
         return err      # ako ne e najaven gorespoenetiot lekar se vraka error, porka za nastanata greska 

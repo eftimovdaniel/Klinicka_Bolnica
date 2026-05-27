@@ -5374,8 +5374,6 @@ window.closeLekarRegisterModal = closeLekarRegisterModal;
       if (typeof window.loadAdminDezurstva === "function") {
         window.loadAdminDezurstva();
       }
-    } else if (akcija === "otvori_admin_panel") {
-      /* навигацијата го отвора панелот со филтер; не повикувај повторно */
     } else if (akcija === "otvori_lekar_panel") {
       /* навигацијата го отвора лекарскиот dashboard таб */
     } else if (akcija === "otvori_lekar_login") {

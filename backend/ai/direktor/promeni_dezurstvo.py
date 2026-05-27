@@ -45,13 +45,11 @@ _MESECI = {
     "juli": 7, "avgust": 8, "septemvri": 9, "oktomvri": 10, "noemvri": 11, "dekemvri": 12,
 }
 
-
 def _izvlechi_ai(prasanje: str, denes: date) -> dict:
     # funkcija koja go prakja prasanjeto do ai modelot
     # i ocekuva strukturiran json odgovor
     denes_den = [
-        "понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"
-    ][denes.weekday()]
+        "понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела" ][denes.weekday()]
     # denes.weekday() vraka broj 0-6 (0=ponedelnik, 6=nedela)
     # so toa go zemame imeto na denot od listata
     full = (

@@ -1,442 +1,177 @@
+"""
+Закажување термин преку AI агент (Groq).
+
+Сè оди преку AI: лекар, датум, време и специјалност се извлекуваат од
+едно Groq повикување. Локалниот код само ги собира пораките, ја пополнува
+празнината од контекстот и прави валидација пред INSERT во базата.
+
+Главна функција: odgovori_za_zakazuvanje(prasanje, pacient, kontekst).
+"""
 import re
 from datetime import datetime, date, time
 from database import get_connection
 from ai._kernel.odgovor_formatter import formatiraj_odgovor_so_ai
 from ai._kernel.prompts import ZAKAZI_EXTRACT_PROMPT
-from ai.pacient.slobodni_termini import (
-    baranje_e_zakazuvanje,
-    datum_od_prasanje_lokalno,
-    lekar_od_zakazi_kontekst,
-    prasanje_bar_datum_od_kontekst,
-    vreme_od_prasanje_lokalno,
-    zimi_site_lekari,
-)
+from ai._kernel.groq_helpers import izvlechi_json_so_ai
 from ai._kernel.db_helpers import db_cursor
 from ai._kernel.utils import format_datum, format_vreme
+from ai.pacient.slobodni_termini import baranje_e_zakazuvanje, zimi_site_lekari
 
 
-# Работно време - не дозволуваме закажување надвор
-RABOTNO_OD = time(8, 0)     # pocetok na rabotno vreme 
-RABOTNO_DO = time(15, 30)   # kraj na rabotno vreme 
+RABOTNO_OD = time(8, 0)   # pocetok na rabotno vreme
+RABOTNO_DO = time(15, 30) # kraj na rabotno vreme
+
+DENOVI = ["Понеделник", "Вторник", "Среда", "Четврток", "Петок", "Сабота", "Недела"]
 
 
-def _normalize_doctor_id(v) -> int | None:
-    # pretvora vrednost vo int (doctor_id), ili vraka None ako ne moze
-    if v is None:
-        return None
-    try:
-        # probaj direkten cast vo int (string ili broj)
-        return int(v)
-    except (TypeError, ValueError):
-        # nevalidna vrednost -> vrati None za da se prepoznae kako "nema lekar"
-        return None
-
-
-def _spoi_zakazi_so_slobodni_kontekst(prasanje: str, izvleceno: dict,kontekst: dict | None,
-) -> None:
-    """Дополнува doctor_id/datum/vreme од конверзација по слободни термини (in-place)."""
-    # ako nema kontekst od prethodna poraka, nema sto da se spoi
-    if not kontekst:
-        return
-    # zemi gi sочуваните podatoci od slobodni_termini ili od zakazi_pending
-    zos = kontekst.get("zakazi_od_slobodni")
-    if not isinstance(zos, dict):
-        zos = kontekst.get("zakazi_pending")
-    # ako i dvete ne se dict, nema sto da napravime
-    if not isinstance(zos, dict):
-        return
-    # prasanjeto vo mala cirilica/latinica za ednostavna proverka
-    p = (prasanje or "").lower()
-    # dali korisnikot upauva na prethodno spomenat lekar (npr. „izbraniot", „od listata")
-    izbran = any(
-        x in p
-        for x in (
-            "избраниот",
-            "избраниов",
-            "истиот",
-            "истиов",
-            "погоре",
-            "од листата",
-            "од горе",
-        )
+# ───────────────── ai povik ─────────────────
+def _povikaj_ai(prasanje: str) -> dict:
+    """Eden povik do Groq — vrazka doctor_id / datum / vreme / specialty."""
+    lekari = zimi_site_lekari()
+    lista = "\n".join(
+        f"ID {l['doctor_ID']}: Д-р {l['name']} {l['surname']} - "
+        f"{l.get('specialty') or 'Општа пракса'}"
+        for l in lekari
     )
-    # dali da go iskoristime datumot od kontekstot
-    koristi_kontekst_datum = izbran or prasanje_bar_datum_od_kontekst(prasanje)
-    # dali porakata e prodolzenie na zakazi-flow (npr. „zakazi vo 10:00")
-    prodolzuva = baranje_e_zakazuvanje(prasanje)
-    # lokalno probaj da izvleces nov datum od porakata
-    nov_datum = datum_od_prasanje_lokalno(prasanje)
-
-    from ai._kernel.lekar_lookup import izvlechi_delovi_ime, najdi_lekar_od_prasanje
-
-    # ako vo porakata ima ime/prezime od lekar, probaj da go najdes
-    lekar_od_ime = None
-    if izvlechi_delovi_ime(prasanje):
-        lekar_od_ime = najdi_lekar_od_prasanje(prasanje, koristi_ai=True)
-    # ako se najde nov lekar po prezime (i ne se referira na „izbraniot") -> prepokrii
-    if lekar_od_ime and not izbran:
-        izvleceno["doctor_id"] = int(lekar_od_ime["doctor_ID"])
-
-    # zemi go zacuvaniot doctor_id od slobodni_termini
-    nid = _normalize_doctor_id(zos.get("doctor_id"))
-    if nid is not None:
-        # ako AI ne izvlekol lekar, koristi go od kontekst
-        if not _normalize_doctor_id(izvleceno.get("doctor_id")):
-            izvleceno["doctor_id"] = nid
-        # ili ako korisnikot izrecno upauva ili samo prodolzuva flow bez novo ime
-        elif izbran or (prodolzuva and not lekar_od_ime):
-            izvleceno["doctor_id"] = nid
-    # spoj datum od kontekst ako e potrebno
-    if zos.get("datum"):
-        d = str(zos["datum"]).strip()[:10]
-        if d:
-            # ako vo porakata ima nov datum -> toj ima prednost
-            if nov_datum is not None:
-                izvleceno["datum"] = nov_datum.isoformat()
-            # inaku iskoristi go datumot od kontekst
-            elif koristi_kontekst_datum or prodolzuva or not izvleceno.get("datum"):
-                izvleceno["datum"] = d
-    # spoj vreme samo ako AI ne izvlekol vreme
-    if zos.get("vreme") and not izvleceno.get("vreme"):
-        v = str(zos["vreme"]).strip()[:5]
-        if v:
-            izvleceno["vreme"] = v
-    # fallback: poslednite prikazani slobodni datum/vreme od slobodni_termini
-    if isinstance(kontekst, dict):
-        if not izvleceno.get("datum") and kontekst.get("last_slobodni_datum"):
-            izvleceno["datum"] = str(kontekst["last_slobodni_datum"]).strip()[:10]
-        if not izvleceno.get("vreme") and kontekst.get("last_slobodni_vreme"):
-            izvleceno["vreme"] = str(kontekst["last_slobodni_vreme"]).strip()[:5]
-
-    # lokalen fallback: ako AI ne uspeal da izvlece vreme/datum od kratka poraka („vo 12:00"),
-    # probaj go so regex od slobodni_termini (raboti i so kirilica i so latinica)
-    if not izvleceno.get("vreme"):
-        v_lok = vreme_od_prasanje_lokalno(prasanje)
-        if v_lok:
-            izvleceno["vreme"] = v_lok
-    # ako sè ushte nema datum, a lokalno se najde -> stavi go
-    if not izvleceno.get("datum") and nov_datum is not None:
-        izvleceno["datum"] = nov_datum.isoformat()
+    denes = date.today()
+    den_vo_nedela = ["понеделник", "вторник", "среда", "четврток",
+                     "петок", "сабота", "недела"][denes.weekday()]
+    prompt = (
+        f"Денешен датум: {denes.isoformat()} ({den_vo_nedela})\n"
+        f"Листа на лекари:\n{lista}\n\n"
+        f"Корисник пишува: „{prasanje}\"\n\n"
+        "Извлечи doctor_id, datum, vreme, specialty и врати JSON."
+    )
+    podatoci = izvlechi_json_so_ai(prompt, ZAKAZI_EXTRACT_PROMPT, log_tag="zakazi_termin")
+    if podatoci.get("_error"):
+        # Groq nedostapen — vrati prazna struktura so error flag
+        return {"doctor_id": None, "datum": None, "vreme": None, "specialty": None,
+                "_error": podatoci["_error"]}
+    return {
+        "doctor_id": _kako_int(podatoci.get("doctor_id")),
+        "datum": _kako_datum(podatoci.get("datum")),
+        "vreme": _kako_vreme(podatoci.get("vreme")),
+        "specialty": (podatoci.get("specialty") or None),
+    }
 
 
-def _oddel_od_prasanje(prasanje: str) -> str | None:
-    """Специјалност/оддел од текст (правила + алијаси, без задолжително Groq)."""
-    from ai._kernel.oddel_resolver import resolve_oddel
+# ───────────────── helpers ─────────────────
+def _kako_int(v) -> int | None:
+    try:
+        return int(v) if v is not None else None
+    except (TypeError, ValueError):
+        return None
 
-    # resolve_oddel vraka struktura so ok/oddel (centraliziran resolver)
-    r = resolve_oddel(prasanje or "")
-    if r.ok and r.oddel:
-        return r.oddel
-    # ako ne se prepoznae oddel -> None
-    return None
+
+def _kako_datum(v) -> str | None:
+    if not v:
+        return None
+    s = str(v).strip()[:10]  # YYYY-MM-DD
+    try:
+        datetime.strptime(s, "%Y-%m-%d")
+        return s
+    except ValueError:
+        return None
+
+
+def _kako_vreme(v) -> str | None:
+    if not v:
+        return None
+    s = str(v).strip()[:5]   # HH:MM
+    try:
+        datetime.strptime(s, "%H:%M")
+        return s
+    except ValueError:
+        return None
+
+
+def _ime_lekar(doctor_id: int | None) -> str:
+    """Cita ime + prezime od listata na lekari (kesirana funkcija)."""
+    if not doctor_id:
+        return ""
+    for l in zimi_site_lekari():
+        if l.get("doctor_ID") == doctor_id:
+            return f"Д-р {l.get('name', '')} {l.get('surname', '')}".strip()
+    return ""
 
 
 def _lekari_po_oddel(oddel: str) -> list[dict]:
-    # vrati lista lekari za dadena specijalnost (case-insensitive sporedba)
+    """Lekari za dadena specijalnost (case-insensitive)."""
     try:
         with db_cursor() as (_, cur):
             cur.execute(
-                """
-                SELECT doctor_ID, name, surname, specialty, email
-                FROM Doctors
-                WHERE LOWER(TRIM(specialty)) = LOWER(TRIM(%s))
-                ORDER BY surname, name
-                """,
+                "SELECT doctor_ID, name, surname, specialty, email "
+                "FROM Doctors WHERE LOWER(TRIM(specialty)) = LOWER(TRIM(%s)) "
+                "ORDER BY surname, name",
                 (oddel,),
             )
             return list(cur.fetchall())
     except Exception as e:
-        # log greska no ne ja prekinuvaj konverzacijata
         print(f"[zakazi_termin] lekari_po_oddel: {e}")
         return []
 
 
-def _ima_dovolno_za_zakaz_flow(izvleceno: dict) -> bool:
-    """Дали после локално+AI извлекување има смисла да продолжи закажување."""
-    # dovolno e da postoi barem edno polinje za da prodolzime so flow
-    return bool(
-        _normalize_doctor_id(izvleceno.get("doctor_id"))
-        or izvleceno.get("datum")
-        or izvleceno.get("vreme")
-        or izvleceno.get("specialty")
+# ───────────────── kontekst ─────────────────
+def _spoji_so_kontekst(izvleceno: dict, kontekst: dict | None) -> None:
+    """Popolnuva prazni polinja (doctor_id/datum/vreme/specialty) od zapamten pending — in-place."""
+    if not isinstance(kontekst, dict):
+        return
+    pending = (
+        kontekst.get("zakazi_pending")
+        or kontekst.get("zakazi_od_slobodni")
+        or {}
     )
+    if not isinstance(pending, dict):
+        return
+    if not izvleceno.get("doctor_id"):
+        izvleceno["doctor_id"] = _kako_int(pending.get("doctor_id"))
+    if not izvleceno.get("datum"):
+        izvleceno["datum"] = _kako_datum(pending.get("datum"))
+    if not izvleceno.get("vreme"):
+        izvleceno["vreme"] = _kako_vreme(pending.get("vreme"))
+    if not izvleceno.get("specialty"):
+        izvleceno["specialty"] = pending.get("specialty")
+    if not izvleceno.get("datum") and kontekst.get("last_slobodni_datum"):
+        izvleceno["datum"] = _kako_datum(kontekst.get("last_slobodni_datum"))
+    if not izvleceno.get("vreme") and kontekst.get("last_slobodni_vreme"):
+        izvleceno["vreme"] = _kako_vreme(kontekst.get("last_slobodni_vreme"))
 
 
-def _linii_lekari_specijalnost(oddel: str, lekari: list[dict]) -> list[str]:
-    # gradimo lista redovi za prikaz na site lekari po specijalnost
-    linii = [
-        f"За преглед кај {oddel} во Клиничка Болница Штип, изберете лекар:",
-        "",
-    ]
-    # dodadi po eden red za sekoj lekar
-    for l in lekari:
-        linii.append(f"- Д-р {l['name']} {l['surname']}")
-    return linii
-
-
-def _poraka_izberi_lekar_specijalnost(
-    oddel: str,
-    lekari: list[dict],
-    datum_str: str | None,
-    kontekst: dict | None,
-) -> dict:
-    from ai.opsto.lekari_oddel import navigacija_lekari
-
-    # imenja na denovi za poubav prikaz na datum
-    DENOVI = ["Понеделник", "Вторник", "Среда", "Четврток", "Петок", "Сабота", "Недела"]
-    # osnovni redovi so lista lekari
-    linii = _linii_lekari_specijalnost(oddel, lekari)
-    # ako e poznat datum, dodadi go na krajot za pojasna poraka
-    if datum_str:
-        try:
-            dt = datetime.strptime(str(datum_str)[:10], "%Y-%m-%d").date()
-            linii.append(
-                f"\nЗа датумот: {DENOVI[dt.weekday()]}, {format_datum(dt)}."
-            )
-        except ValueError:
-            # ako datum_str nema validen format, samo prikazi go kako e
-            linii.append(f"\nЗа датумот: {datum_str}.")
-    # dodadi uputstva kako da prodolzi korisnikot
-    linii.extend(
-        [
-            "",
-            "Наведете презиме (на пр. „кај Петров“) или прашајте:",
-            "„Кога е слободен д-р [презиме]?“ — ќе ви прикажам слободни часови.",
-            "",
-            "Можете и на страницата „Лекари“ да ги видите филтрирани по специјалност "
-            "(го отворам делот подолу).",
-        ]
-    )
-    # gradime nov kontekst (kopija + zakazi_pending)
+def _zacuvaj_pending(kontekst: dict | None, izvleceno: dict) -> dict:
+    """Vrati nov kontekst so zacuvani pending podatoci (za sledna poraka)."""
     ctx = dict(kontekst) if isinstance(kontekst, dict) else {}
-    pending = dict(ctx.get("zakazi_pending") or {})
-    pending["specialty"] = oddel
-    # zapomni go datumot ako e dostapen
-    if datum_str:
-        pending["datum"] = str(datum_str).strip()[:10]
-    # ako doctor_id e nevalden, izvadi go za da ne ostane stara vrednost
-    if _normalize_doctor_id(pending.get("doctor_id")) is None:
-        pending.pop("doctor_id", None)
-    ctx["zakazi_pending"] = pending
-    # paralelno zapomni vo "zakazi_od_slobodni" (sinhronizirano so slobodni_termini flow)
-    ctx["zakazi_od_slobodni"] = {
-        "doctor_id": pending.get("doctor_id"),
-        "datum": pending.get("datum"),
-    }
-    # vrati dict so poraka, kontekst i navigacija (frontend filterira po specijalnost)
-    return {
-        "odgovor": "\n".join(linii),
-        "kontekst": ctx,
-        "navigacija": navigacija_lekari(oddel, lekari),
-    }
-
-
-def _vrati_zakazi_poraka(
-    odgovor: str,
-    kontekst: dict | None,
-    izvleceno: dict,
-    prasanje: str | None = None,
-) -> dict:
-    """Порака + зачуван контекст (лекар/датум/време) за следна порака."""
-    # standarden helper: vrati poraka + kontekst so zacuvani pending podatoci
-    return {
-        "odgovor": odgovor,
-        "kontekst": _snimi_zakazi_pending(kontekst, izvleceno, prasanje),
-    }
-
-
-def _snimi_zakazi_pending(
-    kontekst: dict | None,
-    izvleceno: dict,
-    prasanje: str | None = None,
-) -> dict | None:
-    """Зачувај лекар/датум/време/специјалност за продолжување по најава."""
-    # zapocni so prazni objekti
     pending: dict = {}
-    zos = {}
-    if isinstance(kontekst, dict):
-        # ako veke postoi pending vo kontekst, kopiraj go
-        pending = dict(kontekst.get("zakazi_pending") or {})
-        zos = kontekst.get("zakazi_od_slobodni") or {}
-        if not isinstance(zos, dict):
-            zos = {}
-
-    # spoji doctor_id od izvleceno ili od stariot kontekst
-    did = _normalize_doctor_id(izvleceno.get("doctor_id")) or _normalize_doctor_id(
-        zos.get("doctor_id")
-    )
-    if did is not None:
-        pending["doctor_id"] = did
-    # spoji datum (prvo izvleceno, potoa kontekst)
-    datum = izvleceno.get("datum") or zos.get("datum")
-    if datum:
-        pending["datum"] = str(datum).strip()[:10]
-    # spoji vreme
-    vreme = izvleceno.get("vreme") or zos.get("vreme")
-    if vreme:
-        pending["vreme"] = str(vreme).strip()[:5]
-    # ako prashanjeto sodrzi oddel a sè ushte ne e zacuvan -> zachuvaj go
-    if prasanje and not pending.get("specialty"):
-        oddel = _oddel_od_prasanje(prasanje)
-        if oddel:
-            pending["specialty"] = oddel
-
-    # ako nema sto da se zachuva, vrati go starot kontekst
-    if not pending:
-        return kontekst
-
-    # napravi nov dict za kontekst i upiši go pending
-    ctx = dict(kontekst) if isinstance(kontekst, dict) else {}
+    for k in ("doctor_id", "datum", "vreme", "specialty"):
+        v = izvleceno.get(k)
+        if v:
+            pending[k] = v
     ctx["zakazi_pending"] = pending
-    # sinhroniziraj go i so "zakazi_od_slobodni" (za soobrazenost so slobodni flow)
-    ctx["zakazi_od_slobodni"] = {
-        "doctor_id": pending.get("doctor_id"),
-        "datum": pending.get("datum"),
-        "vreme": pending.get("vreme"),
-    }
-    # zapomni go i kako "posleden lekar" za drugi handler-i
-    if pending.get("doctor_id") is not None:
+    if pending.get("doctor_id"):
         ctx["last_doctor_id"] = int(pending["doctor_id"])
     return ctx
 
 
-def izvlechi_podatoci_so_ai(prasanje: str) -> dict:
-    """
-    Прашува AI (Groq) да ги извлече: лекар, датум, време од прашањето.
-
-    Враќа dict со 3 полиња:
-    {"doctor_id": int|None, "datum": str|None, "vreme": str|None}
-    """
-    # zemi gi site lekari za da gi pratime na AI kako lista (mapa imenja -> ID)
-    site_lekari = zimi_site_lekari()
-
-    # lista na lekari koj ke ja koristi AI
-    lista_text = ""
-    for lekar in site_lekari:
-        # specijalnost - ako nema, koristi "Општа пракса" kako fallback
-        spec = lekar.get("specialty") or "Општа пракса" or "Општа медицина"
-        lista_text += f"ID {lekar['doctor_ID']}: Д-р {lekar['name']} {lekar['surname']} - {spec}\n"
-
-    # tekoven datum i den vo nedelata za AI da gi razbere „utre/sreda/..."
-    denes = date.today().strftime("%Y-%m-%d")
-    den_vo_nedela = ["понеделник", "вторник", "среда", "четврток", "петок", "сабота", "недела"][date.today().weekday()]
-
-    # gradime promptot za AI so site informacii
-    full_prompt = f""" Денешен датум: {denes} ({den_vo_nedela})
-Листа на лекари:
-{lista_text}
-
-Корисник пишува: „{prasanje}"
-
-Извлечи doctor_id, datum, vreme и врати JSON.
-""".strip()
-
-    from ai._kernel.groq_helpers import izvlechi_json_so_ai
-
-    # povik kon Groq: vrazka JSON so doctor_id/datum/vreme ili _error
-    podatoci = izvlechi_json_so_ai(
-        full_prompt, ZAKAZI_EXTRACT_PROMPT, log_tag="zakazi_termin"
-    )
-
-    # ako Groq vrati greska, vrati strukura so _error za handler da odlucii
-    if podatoci.get("_error"):
-        return {
-            "doctor_id": None,
-            "datum": None,
-            "vreme": None,
-            "_error": podatoci["_error"],
-        }
-    # normalen slucaj: izvadi gi trite polinja
-    result = {
-        "doctor_id": podatoci.get("doctor_id"),
-        "datum": podatoci.get("datum"),
-        "vreme": podatoci.get("vreme"),
-    }
-    # log za debug (vidliv vo konzola)
-    print(f"[zakazi_termin] Parsed: {result}")
-    return result
-
-
-def proveri_dali_e_slobodno(doctor_id: int, datum_str: str, vreme_str: str) -> bool:
-    """Проверка дали терминот е слободен (не е веќе закажан)."""
-    conn = None
-    try:
-        # otvori MySQL konekcija (so dictionary=True za pristap so kluc)
-        conn = get_connection()
-        cur = conn.cursor(dictionary=True)
-        # barame terminni so isti doctor_ID/datum/vreme i status „zakazan"
-        cur.execute("""
-            SELECT termin_ID FROM Termin_pregled
-            WHERE doctor_ID = %s
-              AND DATE(datum_pregled) = %s
-              AND TIME(vreme_pregled) = %s
-              AND status_pregled = 'закажан'
-        """, (doctor_id, datum_str, vreme_str))
-        # ako nema rezultat -> terminot e slobodden
-        return cur.fetchone() is None
-    except Exception as e:
-        # ako baza padne, podobro vrati False (ne dozvoluvaj duplo zakazuvanje)
-        print(f"[zakazi_termin] proveri_dali_e_slobodno: {e}")
-        return False
-    finally:
-        # vrati ja konekcijata vo pool
-        if conn:
-            conn.close()
-
-
-def _kontekst_ceka_napomena(kontekst: dict | None) -> dict | None:
-    # vrati go „ceka_napomena" objektot samo ako gi ima svite tri polinja
+# ───────────────── napomena flow ─────────────────
+def _ceka_napomena(kontekst: dict | None) -> dict | None:
     z = (kontekst or {}).get("zakazi_ceka_napomena")
     if isinstance(z, dict) and z.get("doctor_id") and z.get("datum") and z.get("vreme"):
         return z
     return None
 
 
-def _prasanje_odbiva_napomena(prasanje: str) -> bool:
-    # normaliziraj go prashanjeto (samo eden razmak, sve so mali bukvi)
+def _e_odbiva_napomena(prasanje: str) -> bool:
     p = re.sub(r"\s+", " ", (prasanje or "").strip().lower())
-    if not p:
-        return False
-    # tocno sovpaganje so kratki potvrdi za "nema napomena"
-    if p in (
-        "не",
-        "неа",
-        "нема",
-        "немам",
-        "no",
-        "nema",
-        "нема напомена",
-        "без напомена",
-        "не сакам",
-        "не сакам напомена",
-    ):
-        return True
-    # podetalna proverka za frazi (delumni sovpaganja)
-    return any(
-        x in p
-        for x in (
-            "нема напомена",
-            "без напомена",
-            "не сакам напомена",
-            "не сакам да оставам",
-            "нема да оставам",
-        )
-    )
+    return p in {"не", "не.", "no", "nema", "нема", "немам", "без напомена",
+                 "нема напомена", "не сакам", "не сакам напомена"}
 
 
-def _prasanje_samo_potvrda_da(prasanje: str) -> bool:
-    # normaliziraj i sporedi so kratko „da" / „ok"
+def _e_samo_da(prasanje: str) -> bool:
     p = re.sub(r"\s+", " ", (prasanje or "").strip().lower())
-    return p in ("да", "da", "се", "сеа", "во ред", "ok", "okay")
+    return p in {"да", "da", "ок", "ok", "okay", "во ред"}
 
 
-def _postavi_ceka_napomena(
-    kontekst: dict | None,
-    doctor_id: int,
-    datum_str: str,
-    vreme_str: str,
-) -> dict:
-    # kopiraj kontekst i postavi flag deka cekame napomena (sledna poraka = napomena)
+def _postavi_ceka_napomena(kontekst: dict | None, doctor_id: int,
+                           datum_str: str, vreme_str: str) -> dict:
     ctx = dict(kontekst) if kontekst else {}
     ctx["zakazi_ceka_napomena"] = {
         "doctor_id": int(doctor_id),
@@ -446,220 +181,71 @@ def _postavi_ceka_napomena(
     return ctx
 
 
-def _poraka_prasanje_napomena(ime_lekar: str, datum_lepo: str, vreme_str: str) -> str:
-    # tekst koj se prikazuva pred finalniot INSERT - prashuva za napomena
-    return (
-        f"Сè е подготвено за закажување кај {ime_lekar} на {datum_lepo} во {vreme_str}.\n\n"
-        "Дали сакате да оставите напомена за лекарот?\n"
-        "Напишете ја (на пр. алергија, претходна терапија) или кажете „не\" / „нема напомена\"."
-    )
+# ───────────────── baza ─────────────────
+def _e_slobodno(doctor_id: int, datum_str: str, vreme_str: str) -> bool:
+    """True ako terminot ne e zafateн od drug pacient."""
+    try:
+        with db_cursor(dictionary=True) as (_, cur):
+            cur.execute(
+                "SELECT termin_ID FROM Termin_pregled "
+                "WHERE doctor_ID = %s AND DATE(datum_pregled) = %s "
+                "  AND TIME(vreme_pregled) = %s AND status_pregled = 'закажан'",
+                (doctor_id, datum_str, vreme_str),
+            )
+            return cur.fetchone() is None
+    except Exception as e:
+        print(f"[zakazi_termin] proverka: {e}")
+        return False
 
 
-def vmetni_termin_vo_baza(
-    doctor_id: int,
-    ime_pacient: str,
-    email_pacient: str,
-    telefon_pacient: str,
-    datum_str: str,
-    vreme_str: str,
-    napomena: str | None = None,
-) -> tuple[bool, str, dict | None]:
-    """
-    INSERT во Termin_pregled.
-
-    Враќа: (uspeshno, poraka_za_greska, podatoci_za_lekarot)
-    """
+def _insert_termin(doctor_id: int, ime_pacient: str, email_pacient: str,
+                   telefon_pacient: str, datum_str: str, vreme_str: str,
+                   napomena: str | None) -> tuple[bool, str, dict | None]:
+    """INSERT vo Termin_pregled. Vrazka (uspeh, greska, info_za_lekar)."""
     conn = None
     try:
-        # otvori konekcija i dohvaki cursor so dict pristap
         conn = get_connection()
         cur = conn.cursor(dictionary=True)
-
-        # zemi gi imenjata i specijalnost na lekarot za da gi zapisheme vo terminoot
-        cur.execute("SELECT name, surname, specialty FROM Doctors WHERE doctor_ID = %s", (doctor_id,))
+        cur.execute(
+            "SELECT name, surname, specialty FROM Doctors WHERE doctor_ID = %s",
+            (doctor_id,),
+        )
         doctor = cur.fetchone()
-        # ako lekarot ne postoi (greska vo doctor_id) -> vrati neuspeh
         if not doctor:
             return False, "Лекарот не постои.", None
 
-        # spremeni pole `ime_lekar` (kombinacija ime + prezime)
-        ime_lekar = f"{doctor['name']} {doctor['surname']}"
-        # ako nema napomena, vo baza zapisi NULL (ne prazna niza)
-        napomena_db = (napomena or "").strip() or None
-
-        # samiot INSERT - statusot e „zakazan" (cirilica zaradi baza)
-        cur.execute("""
-            INSERT INTO Termin_pregled
-            (doctor_ID, ime_pacient, specijalnost_termin, ime_lekar,
-             datum_pregled, vreme_pregled, status_pregled, email_pacient,
-             telefon_pacient, napomena)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            doctor_id,
-            ime_pacient,
-            doctor.get('specialty') or '',
-            ime_lekar,
-            datum_str,
-            vreme_str,
-            'закажан',
-            email_pacient,
-            telefon_pacient,
-            napomena_db,
-        ))
-        # commit za da se zachuvа i zatvori cursor
+        cur.execute(
+            "INSERT INTO Termin_pregled "
+            "(doctor_ID, ime_pacient, specijalnost_termin, ime_lekar, "
+            " datum_pregled, vreme_pregled, status_pregled, email_pacient, "
+            " telefon_pacient, napomena) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (
+                doctor_id, ime_pacient,
+                doctor.get("specialty") or "",
+                f"{doctor['name']} {doctor['surname']}",
+                datum_str, vreme_str, "закажан",
+                email_pacient, telefon_pacient,
+                (napomena or "").strip() or None,
+            ),
+        )
         conn.commit()
         cur.close()
-
-        # vrati uspeh + osnovni informacii za potvrda i email
         return True, "", {
             "doctor_id": doctor_id,
-            "ime_lekar": ime_lekar,
-            "specialty": doctor.get('specialty') or 'Општа пракса',
+            "ime_lekar": f"{doctor['name']} {doctor['surname']}",
+            "specialty": doctor.get("specialty") or "Општа пракса",
         }
-
     except Exception as e:
-        # tehnicka greska (npr. baza nedostapna) - vrati poraka so detal
-        return False, f"Грешка при запис: {str(e)}", None
+        return False, f"Грешка при запис: {e}", None
     finally:
-        # sekogash zatvori go conn (i pri greska i pri uspeh)
         if conn:
             conn.close()
 
 
-def _finaliziraj_zakazuvanje(
-    doctor_id: int,
-    datum_str: str,
-    vreme_str: str,
-    pacient: dict,
-    kontekst: dict | None,
-    napomena: str | None,
-) -> str | dict:
-    """Валидација (повторна), INSERT, email и потврда."""
-    # normaliziraj tipovi
-    did = int(doctor_id)
-    ds = str(datum_str)
-    vs = str(vreme_str)
-
-    # zashtita: ako vo megjuvreme terminot e zafateн -> izvesti i prekini
-    if not proveri_dali_e_slobodno(did, ds, vs):
-        ctx = dict(kontekst) if kontekst else {}
-        # iscisti go flagot „ceka_napomena" za da ne ostane vo loop
-        ctx.pop("zakazi_ceka_napomena", None)
-        return {
-            "odgovor": (
-                "Тој термин е веќе зафатен. Прашај за слободни термини и обиди се повторно."
-            ),
-            "kontekst": ctx,
-        }
-
-    # spremeni ime + prezime na pacient od frontend objektot
-    ime_pacient = (
-        (pacient.get("ime") or pacient.get("name_patient") or "")
-        + " "
-        + (pacient.get("prezime") or pacient.get("surname_patient") or "")
-    ).strip()
-    # fallback: ako nema ime/prezime, koristi e-posta
-    if not ime_pacient:
-        ime_pacient = pacient.get("email", "")
-
-    # zemi email i telefon (podrzhana e i en/mk konvencija na pole)
-    email_pacient = pacient.get("email", "")
-    telefon_pacient = pacient.get("telefon") or pacient.get("phone_number") or ""
-
-    # samiot INSERT vo baza preku helper-ot
-    uspesno, greska, info = vmetni_termin_vo_baza(
-        doctor_id=did,
-        ime_pacient=ime_pacient,
-        email_pacient=email_pacient,
-        telefon_pacient=telefon_pacient,
-        datum_str=ds,
-        vreme_str=vs,
-        napomena=napomena,
-    )
-
-    # ako baza vrati greska, izvesti go korisnikot bez da menime kontekst
-    if not uspesno:
-        return {
-            "odgovor": f"Не успеа закажувањето: {greska}",
-            "kontekst": kontekst,
-        }
-
-    # probaj da prati email potvrda (ako SMTP ne e postaven, greshkata se logira no flow prodolzuva)
-    try:
-        from routers.termini import _poslati_potvrda_na_email
-
-        _poslati_potvrda_na_email(
-            to_email=email_pacient,
-            ime_pacient=ime_pacient,
-            ime_lekar=info["ime_lekar"],
-            datum=ds,
-            vreme=vs,
-        )
-    except Exception as e:
-        # email greska ne e fatalna - terminoot e veke vo baza
-        print(f"[zakazi_termin] email greska: {e}")
-
-    # vrati finalna potvrda i nov kontekst (zapomni go „posledniot lekar")
-    return {
-        "odgovor": formatiraj_potvrda(
-            ime_pacient=ime_pacient,
-            ime_lekar=info["ime_lekar"],
-            specialty=info["specialty"],
-            datum_str=ds,
-            vreme_str=vs,
-        ),
-        "kontekst": {
-            "zakazi_od_slobodni": {
-                "doctor_id": did,
-                "datum": ds,
-            },
-            "last_doctor_id": did,
-        },
-    }
-
-
-def _odgovori_napomena_faza(
-    prasanje: str,
-    pacient: dict,
-    ceka: dict,
-    kontekst: dict | None,
-) -> str | dict:
-    # izvadi gi zapomnetite podatoci od kontekst (lekar/datum/vreme)
-    did = int(ceka["doctor_id"])
-    ds = str(ceka["datum"])
-    vs = str(ceka["vreme"])
-
-    # ako korisnikot odbiva napomena -> finaliziraj bez napomena
-    if _prasanje_odbiva_napomena(prasanje):
-        return _finaliziraj_zakazuvanje(did, ds, vs, pacient, kontekst, napomena=None)
-
-    # ako e samo „da" -> prashaj go vo sledna poraka da ja napisi
-    if _prasanje_samo_potvrda_da(prasanje):
-        return {
-            "odgovor": (
-                "Во ред. Напишете ја напомената за лекарот "
-                "(на пр. алергија, хронична болест) во следната порака."
-            ),
-            "kontekst": _postavi_ceka_napomena(kontekst, did, ds, vs),
-        }
-
-    # site ostanati pratenija - razgledaj go kako napomena, no zashtiti od slucajn prazni
-    tekst = (prasanje or "").strip()
-    if len(tekst) < 2:
-        return {
-            "odgovor": (
-                "Напишете ја напомената или кажете „не\" ако не сакате да оставите напомена."
-            ),
-            "kontekst": _postavi_ceka_napomena(kontekst, did, ds, vs),
-        }
-
-    # validna napomena -> finaliziraj zakazuvanjeto so nea
-    return _finaliziraj_zakazuvanje(did, ds, vs, pacient, kontekst, napomena=tekst)
-
-
-def formatiraj_potvrda(ime_pacient: str, ime_lekar: str, specialty: str, datum_str: str, vreme_str: str) -> str:
-    """Текст потврда за корисникот — Groq од факти, шаблон при грешка."""
-    DENOVI = ["Понеделник", "Вторник", "Среда", "Четврток", "Петок", "Сабота", "Недела"]
+def _formatiraj_potvrda(ime_pacient: str, ime_lekar: str, specialty: str,
+                        datum_str: str, vreme_str: str) -> str:
+    """Tekst potvrda preku AI od fakti + sablon ako Groq padne."""
     dt = datetime.strptime(datum_str, "%Y-%m-%d").date()
     den_ime = DENOVI[dt.weekday()]
     datum_lep = format_datum(dt)
@@ -672,323 +258,272 @@ def formatiraj_potvrda(ime_pacient: str, ime_lekar: str, specialty: str, datum_s
         f"Датум: {den_ime}, {datum_lep}\n"
         f"Време: {vreme_str}\n\n"
         "Потврда е испратена на твојата е-пошта ако е поставен SMTP на серверот. "
-        "Ако сакаш промена (откажување или преместување), напиши со свои зборови — "
-        "агентот ги препознава формулациите „откажи термин“, „префрли на друг ден“ и слично."
+        "Ако сакаш промена напиши „откажи термин“ или „префрли на друг ден“."
     )
-    podatoci = {
-        "status": "zakazano",
-        "pacient": ime_pacient,
-        "lekar": f"Д-р {ime_lekar}",
-        "specialnost": specialty,
-        "datum": datum_lep,
-        "den": den_ime,
-        "vreme": vreme_str,
-        "email_potvrda": True,
-        "sledna_akcija": (
-            "За откажување или преместување напишете „откажи термин“ или „префрли на друг ден“."
-        ),
+    fakti = {
+        "status": "zakazano", "pacient": ime_pacient, "lekar": f"Д-р {ime_lekar}",
+        "specialnost": specialty, "datum": datum_lep, "den": den_ime,
+        "vreme": vreme_str, "email_potvrda": True,
     }
-    return formatiraj_odgovor_so_ai("zakazi_potvrda", podatoci, sablon)
+    return formatiraj_odgovor_so_ai("zakazi_potvrda", fakti, sablon)
 
 
+def _finaliziraj(doctor_id: int, datum_str: str, vreme_str: str,
+                 pacient: dict, kontekst: dict | None,
+                 napomena: str | None) -> dict:
+    """Posledna proverka + INSERT + email + potvrda."""
+    if not _e_slobodno(doctor_id, datum_str, vreme_str):
+        ctx = dict(kontekst) if kontekst else {}
+        ctx.pop("zakazi_ceka_napomena", None)
+        return {
+            "odgovor": "Тој термин е веќе зафатен. Прашај за слободни термини и обиди се повторно.",
+            "kontekst": ctx,
+        }
+
+    ime_pacient = (
+        (pacient.get("ime") or pacient.get("name_patient") or "") + " "
+        + (pacient.get("prezime") or pacient.get("surname_patient") or "")
+    ).strip() or pacient.get("email", "")
+    email_pacient = pacient.get("email", "")
+    telefon = pacient.get("telefon") or pacient.get("phone_number") or ""
+
+    uspeh, greska, info = _insert_termin(
+        doctor_id, ime_pacient, email_pacient, telefon,
+        datum_str, vreme_str, napomena,
+    )
+    if not uspeh:
+        return {"odgovor": f"Не успеа закажувањето: {greska}", "kontekst": kontekst}
+
+    try:
+        from routers.termini import _poslati_potvrda_na_email
+        _poslati_potvrda_na_email(
+            to_email=email_pacient, ime_pacient=ime_pacient,
+            ime_lekar=info["ime_lekar"], datum=datum_str, vreme=vreme_str,
+        )
+    except Exception as e:
+        print(f"[zakazi_termin] email: {e}")
+
+    return {
+        "odgovor": _formatiraj_potvrda(
+            ime_pacient, info["ime_lekar"], info["specialty"],
+            datum_str, vreme_str,
+        ),
+        "kontekst": {
+            "zakazi_od_slobodni": {"doctor_id": doctor_id, "datum": datum_str},
+            "last_doctor_id": doctor_id,
+        },
+    }
+
+
+# ───────────────── napomena handler ─────────────────
+def _napomena_faza(prasanje: str, pacient: dict, ceka: dict,
+                   kontekst: dict | None) -> dict:
+    did = int(ceka["doctor_id"])
+    ds = str(ceka["datum"])
+    vs = str(ceka["vreme"])
+
+    if _e_odbiva_napomena(prasanje):
+        return _finaliziraj(did, ds, vs, pacient, kontekst, napomena=None)
+    if _e_samo_da(prasanje):
+        return {
+            "odgovor": "Во ред. Напишете ја напомената за лекарот (на пр. алергии) во следната порака.",
+            "kontekst": _postavi_ceka_napomena(kontekst, did, ds, vs),
+        }
+    tekst = (prasanje or "").strip()
+    if len(tekst) < 2:
+        return {
+            "odgovor": "Напишете ја напомената или кажете „не\" ако не сакате.",
+            "kontekst": _postavi_ceka_napomena(kontekst, did, ds, vs),
+        }
+    return _finaliziraj(did, ds, vs, pacient, kontekst, napomena=tekst)
+
+
+# ───────────────── flow control ─────────────────
 def _vo_zakazi_flow(prasanje: str, kontekst: dict | None) -> bool:
-    """Дали пораката навистина продолжува закажување (не случаен медицински текст)."""
+    """Dali porakata navistina prodolzuva zakaz-flow (so klucni zborovi ili kontekst)."""
     if baranje_e_zakazuvanje(prasanje):
         return True
-    if _kontekst_ceka_napomena(kontekst):
+    if _ceka_napomena(kontekst):
         return True
     if not isinstance(kontekst, dict):
         return False
-    if kontekst.get("zakazi_ceka_napomena"):
-        return True
     if kontekst.get("zakazi_pending") or kontekst.get("zakazi_od_slobodni"):
         q = (prasanje or "").lower()
         if re.search(r"\b\d{1,2}\s*[:.]\s*\d{2}\b", q):
             return True
-        if any(
-            x in q
-            for x in (
-                "закаж",
-                "zakaz",
-                "термин",
-                "termin",
-                "напомена",
-                "немам",
-                "нема",
-                "не ",
-                "кај ",
-                "kaj ",
-                "утре",
-                "време",
-                "датум",
-            )
-        ):
+        if any(x in q for x in (
+            "закаж", "zakaz", "термин", "termin", "напомена",
+            "нема", "не ", "кај ", "kaj ", "утре", "време", "датум",
+        )):
             return True
     return False
 
 
-def odgovori_za_zakazuvanje(
-    prasanje: str,
-    pacient: dict | None,
-    kontekst: dict | None = None,
-) -> str | dict:
-    """
-    Главна точка - повикана од router-от.
+# ───────────────── poraki „sto nedostasuva" ─────────────────
+def _poraka_nedostasuvaat(izvleceno: dict, kontekst: dict | None,
+                          ime_lekar: str) -> dict:
+    """Edna funkcija za site varijanti na „nedostasuva lekar/datum/vreme"."""
+    did = izvleceno.get("doctor_id")
+    ds = izvleceno.get("datum")
+    vs = izvleceno.get("vreme")
 
-    Параметри:
-        prasanje - целото прашање
-        pacient   - dict со пациент податоци од frontend, или None ако не е логиран
-        kontekst  - опционално од претходен одговор (на пр. zakazi_od_slobodni по листа слободни)
+    if not did and not ds and not vs:
+        return _vrati_so_kontekst(
+            "Го разбирам барањето како закажување, но недостасуваат податоци.\n\n"
+            "Потребни се: лекар (име/презиме), датум и време.\n"
+            "Пример: „Закажи кај д-р Петров среда во 10:00“.",
+            kontekst, izvleceno,
+        )
 
-    Враќа: текст (str) или dict со „odgovor“, опционално „akcija“, опционално „kontekst“ (None = избриши го на фронтот).
+    if did and not ds and not vs:
+        return _vrati_so_kontekst(
+            f"Кога би сакал/а да закажеш термин кај {ime_lekar or 'избраниот лекар'}?\n\n"
+            "Кажи ми датум и време. Пример: „утре во 10:00“ или „среда во 14:30“.",
+            kontekst, izvleceno,
+        )
+
+    if did and ds and not vs:
+        try:
+            dt = datetime.strptime(ds, "%Y-%m-%d").date()
+            datum_lepo = format_datum(dt)
+        except ValueError:
+            datum_lepo = ds
+        return _vrati_so_kontekst(
+            f"Во кое време сакаш термин кај {ime_lekar or 'лекарот'} на {datum_lepo}?\n\n"
+            f"Работно време: {format_vreme(RABOTNO_OD)} – {format_vreme(RABOTNO_DO)}.",
+            kontekst, izvleceno,
+        )
+
+    if did and not ds and vs:
+        return _vrati_so_kontekst(
+            f"Кој датум сакаш термин кај {ime_lekar or 'лекарот'} во {vs}?\n\n"
+            "Пример: „утре“, „среда“, „15.05“.",
+            kontekst, izvleceno,
+        )
+
+    # nema lekar — prashaj za prezime ili spec
+    return _vrati_so_kontekst(
+        "Кај кој лекар сакаш да закажеш? Кажи го презимето или специјалноста.\n\n"
+        "Пример: „кај д-р Петров“, „преглед кај кардиолог“.",
+        kontekst, izvleceno,
+    )
+
+
+def _vrati_so_kontekst(odgovor: str, kontekst: dict | None,
+                       izvleceno: dict) -> dict:
+    return {"odgovor": odgovor, "kontekst": _zacuvaj_pending(kontekst, izvleceno)}
+
+
+def _poraka_izberi_lekar_oddel(oddel: str, lekari: list[dict],
+                               datum_str: str | None,
+                               kontekst: dict | None) -> dict:
+    """Korisnikot kaza specijalnost — pokazi gi lekarite + filter na frontend."""
+    from ai.opsto.lekari_oddel import navigacija_lekari
+
+    linii = [f"За преглед кај {oddel} во Клиничка Болница Штип, изберете лекар:", ""]
+    linii += [f"- Д-р {l['name']} {l['surname']}" for l in lekari]
+    if datum_str:
+        try:
+            dt = datetime.strptime(datum_str[:10], "%Y-%m-%d").date()
+            linii.append(f"\nЗа датумот: {DENOVI[dt.weekday()]}, {format_datum(dt)}.")
+        except ValueError:
+            pass
+    linii += [
+        "",
+        "Наведете презиме (на пр. „кај Петров“) или прашајте:",
+        "„Кога е слободен д-р [презиме]?“",
+    ]
+
+    ctx = dict(kontekst) if isinstance(kontekst, dict) else {}
+    pending = {"specialty": oddel}
+    if datum_str:
+        pending["datum"] = datum_str[:10]
+    ctx["zakazi_pending"] = pending
+    return {
+        "odgovor": "\n".join(linii),
+        "kontekst": ctx,
+        "navigacija": navigacija_lekari(oddel, lekari),
+    }
+
+
+# ───────────────── glavna ─────────────────
+def odgovori_za_zakazuvanje(prasanje: str, pacient: dict | None,
+                            kontekst: dict | None = None) -> str | dict:
     """
+    Vlezna tocka — povikana od router.
+
+    Flow:
+      1. proverka dali e voopsto zakaz-baranje
+      2. AI izvlekuva doctor_id/datum/vreme/specialty
+      3. spoj so zapamten kontekst (po slobodni_termini ili prethodno pending)
+      4. ako cekame napomena → napomena_faza
+      5. ako pacient ne e najaven → otvori login + zachuvaj pending
+      6. valdacija + INSERT
+    """
+    # ne e zakaz-baranje — vrati uputstvo bez da pravime nista
     if not _vo_zakazi_flow(prasanje, kontekst):
         return {
             "odgovor": (
                 "Не го препознав ова како барање за закажување термин.\n\n"
-                "За закажување напишете, на пр.: „Закажи кај д-р Петров утре во 10:00“.\n"
-                "За општо прашање опишете го со други зборови."
+                "Пример: „Закажи кај д-р Петров утре во 10:00“."
             ),
             "kontekst": kontekst if isinstance(kontekst, dict) else None,
         }
 
-    izvleceno = izvlechi_podatoci_so_ai(prasanje)
-    _spoi_zakazi_so_slobodni_kontekst(prasanje, izvleceno, kontekst)
+    # AI izvlekuvanje (eden Groq povik)
+    izvleceno = _povikaj_ai(prasanje)
+    _spoji_so_kontekst(izvleceno, kontekst)
 
-    ceka_napomena = _kontekst_ceka_napomena(kontekst)
-    if ceka_napomena and pacient and pacient.get("email"):
-        return _odgovori_napomena_faza(prasanje, pacient, ceka_napomena, kontekst)
+    # cekame napomena (vtor cekor) — pacient mora da e najaven
+    ceka = _ceka_napomena(kontekst)
+    if ceka and pacient and pacient.get("email"):
+        return _napomena_faza(prasanje, pacient, ceka, kontekst)
 
-    # Проверка дали пациентот е логиран — фронтот ја отвора формата за најава како пациент
+    # pacient ne e najaven — otvori login modal i zacuvaj pending
     if not pacient or not pacient.get("email"):
-        from ai.opsto.lekari_oddel import navigacija_lekari
+        return _odgovor_neprijaven(izvleceno, kontekst)
 
-        oddel = None
-        if isinstance(kontekst, dict):
-            lekar_ctx = lekar_od_zakazi_kontekst(kontekst)
-            if lekar_ctx:
-                oddel = (lekar_ctx.get("specialty") or "").strip() or None
-        if not oddel:
-            oddel = _oddel_od_prasanje(prasanje)
-        spec_hint = ""
-        nav = None
-        if oddel:
-            lekari = _lekari_po_oddel(oddel)
-            datum_hint = (
-                f", датум {izvleceno['datum'][:10]}"
-                if izvleceno.get("datum")
-                else ""
-            )
-            if lekari:
-                spec_hint = (
-                    "\n\n"
-                    + "\n".join(_linii_lekari_specijalnost(oddel, lekari))
-                    + f"\n\nЗачувано: специјалност „{oddel}“{datum_hint}. "
-                    "По најава наведете презиме (на пр. „кај Петров“)."
-                )
-                nav = navigacija_lekari(oddel, lekari)
-            else:
-                spec_hint = (
-                    f"\n\nЗачувано: специјалност „{oddel}“{datum_hint}. "
-                    "По најава изберете лекар (презиме)."
-                )
-        odgovor: dict = {
-            "odgovor": (
-                "За да закажам термин во твое име, треба да се најавиш како пациент "
-                "(системот ги користи твоето име, е-пошта и телефон од профилот).\n\n"
-                "Ти ја отворам формата за најава — по најавата повтори ја истата наредба; "
-                "можеш и поинаку, на пример „закажи во 10:00“ или „за претходно спомнатиот датум“."
-                f"{spec_hint}"
-            ),
-            "akcija": "otvori_pacient_login",
-            "kontekst": _snimi_zakazi_pending(kontekst, izvleceno, prasanje),
+    # Groq padna i nema sto da koristime — vrati greska
+    if izvleceno.get("_error") and not any(
+        izvleceno.get(k) for k in ("doctor_id", "datum", "vreme", "specialty")
+    ):
+        return str(izvleceno["_error"])
+
+    did = izvleceno.get("doctor_id")
+    ds = izvleceno.get("datum")
+    vs = izvleceno.get("vreme")
+    oddel = izvleceno.get("specialty")
+    ime_lekar = _ime_lekar(did)
+
+    # nema lekar ama ima specijalnost → pokazi lekari od taa specijalnost
+    if not did and oddel:
+        lekari = _lekari_po_oddel(oddel)
+        if lekari:
+            return _poraka_izberi_lekar_oddel(oddel, lekari, ds, kontekst)
+        return {
+            "odgovor": f"Моментално нема регистрирани лекари на „{oddel}“.",
+            "kontekst": kontekst,
         }
-        if nav:
-            odgovor["navigacija"] = nav
-        return odgovor
 
-    # Groq грешка само ако локално не се извлече ништо корисно
-    if izvleceno.get("_error") and not _ima_dovolno_za_zakaz_flow(izvleceno):
-        err = izvleceno["_error"]
-        return err if isinstance(err, str) else str(err)
+    # ako falet bilo koe od 3-te polinja → prashaj
+    if not (did and ds and vs):
+        return _poraka_nedostasuvaat(izvleceno, kontekst, ime_lekar)
 
-    doctor_id = _normalize_doctor_id(izvleceno.get("doctor_id"))
-    datum_str = izvleceno.get("datum")
-    vreme_str = izvleceno.get("vreme")
-    if datum_str is not None:
-        datum_str = str(datum_str).strip()[:10] if str(datum_str).strip() else None
-    if vreme_str is not None:
-        vreme_str = str(vreme_str).strip()[:5] if str(vreme_str).strip() else None
-
-    # Што недостасува? Поспецифична порака според комбинацијата:
-    ima_lekar = bool(doctor_id)
-    ima_datum = bool(datum_str)
-    ima_vreme = bool(vreme_str)
-
-    # Земи име на лекар за персонализирана порака
-    ime_lekar_za_poraka = ""
-    if ima_lekar:
-        try:
-            for lekar in zimi_site_lekari():
-                if lekar.get("doctor_ID") == doctor_id:
-                    ime_lekar_za_poraka = f"Д-р {lekar.get('name', '')} {lekar.get('surname', '')}".strip()
-                    break
-        except Exception:
-            pass
-
-    # Сите три недостасуваат → провери специјалност (кардиолог, дерматолог, …)
-    if not ima_lekar and not ima_datum and not ima_vreme:
-        oddel = _oddel_od_prasanje(prasanje)
-        if oddel:
-            lekari = _lekari_po_oddel(oddel)
-            if lekari:
-                return _poraka_izberi_lekar_specijalnost(
-                    oddel, lekari, None, kontekst
-                )
-        return _vrati_zakazi_poraka(
-            "Го разбирам барањето како закажување на преглед, но недостасуваат клучни податоци.\n\n"
-            "Потребни се: лекар (име или презиме), датум и време. "
-            "Можеш да ги кажеш во една реченица или во повеќе пораки — агентот ги собира.\n\n"
-            'Пример: „Сакам преглед кај д-р Петров среда во 10:00"\n'
-            'или: „Закажи кај Серафимов утре во 12:30".',
-            kontekst,
-            izvleceno,
-            prasanje,
-        )
-
-    # Имаме само лекар - прашај за датум и време
-    if ima_lekar and not ima_datum and not ima_vreme:
-        lekar_text = ime_lekar_za_poraka or "избраниот лекар"
-        return _vrati_zakazi_poraka(
-            f'Кога би сакал/а да закажеш термин кај {lekar_text}?\n\n'
-            f'Кажи ми датум и време. Пример:\n'
-            f'„утре во 10:00" или „среда во 14:30"',
-            kontekst,
-            izvleceno,
-            prasanje,
-        )
-
-    # Имаме лекар + датум, нема време
-    if ima_lekar and ima_datum and not ima_vreme:
-        lekar_text = ime_lekar_za_poraka or "лекарот"
-        try:
-            dt = datetime.strptime(str(datum_str)[:10], "%Y-%m-%d").date()
-            datum_lepo = format_datum(dt)
-        except ValueError:
-            datum_lepo = datum_str
-        pret = (
-            " (претходно спомнатиот ден)"
-            if prasanje_bar_datum_od_kontekst(prasanje)
-            else ""
-        )
-        return _vrati_zakazi_poraka(
-            f"Во кое време сакаш термин кај {lekar_text} на {datum_lepo}{pret}?\n\n"
-            f"Работно време: {format_vreme(RABOTNO_OD)} – "
-            f"{format_vreme(RABOTNO_DO)}\n"
-            'Пример: „во 10:00“ или „закажи во 10:30“.',
-            kontekst,
-            izvleceno,
-            prasanje,
-        )
-
-    # Имаме лекар + време, нема датум
-    if ima_lekar and not ima_datum and ima_vreme:
-        lekar_text = ime_lekar_za_poraka or "лекарот"
-        return _vrati_zakazi_poraka(
-            f'Кој датум сакаш термин кај {lekar_text} во {vreme_str}?\n\n'
-            f'Пример: „утре", „среда", „15.05" или „2026-05-15"',
-            kontekst,
-            izvleceno,
-            prasanje,
-        )
-
-    # Нема лекар — специјалност или име
-    if not ima_lekar:
-        oddel = _oddel_od_prasanje(prasanje)
-        if not oddel and isinstance(kontekst, dict):
-            oddel = (kontekst.get("zakazi_pending") or {}).get("specialty")
-        if oddel:
-            lekari = _lekari_po_oddel(oddel)
-            if lekari:
-                return _poraka_izberi_lekar_specijalnost(
-                    oddel, lekari, datum_str, kontekst
-                )
-            return {
-                "odgovor": (
-                    f'Моментално нема регистрирани лекари на „{oddel}".\n\n'
-                    'Прашајте „Кои лекари работат во болницата?" или изберете друга специјалност.'
-                ),
-                "kontekst": kontekst,
-            }
-
-        zos = (kontekst or {}).get("zakazi_od_slobodni") if isinstance(kontekst, dict) else {}
-        if isinstance(zos, dict) and _normalize_doctor_id(zos.get("doctor_id")):
-            return (
-                "Не го препознавам лекарот од пораката. Кажи го презимето или избери од листата "
-                "со слободни термини погоре, на пример „кај Захариев во 10:30“."
-            )
-
-        if isinstance(kontekst, dict) and (kontekst.get("zakazi_pending") or zos):
-            extra = ""
-            if datum_str:
-                try:
-                    dt = datetime.strptime(str(datum_str)[:10], "%Y-%m-%d").date()
-                    extra = f" Датумот {format_datum(dt)} е зачуван."
-                except ValueError:
-                    extra = f" Датумот {datum_str} е зачуван."
-            return {
-                "odgovor": (
-                    "За да продолжиме со закажувањето, наведете лекар (презиме), "
-                    f"на пр. „кај Петров“ или „слободни термини кај [презиме]“.{extra}"
-                ),
-                "kontekst": kontekst,
-            }
-
-        return (
-            "Кај кој лекар сакаш да закажеш термин? Кажи го презимето или специјалноста.\n\n"
-            'Пример: „кај д-р Петров", „преглед кај интернист", „следниот вторник кај кардиолог“.\n\n'
-            'Ако не знаеш кој лекар, прашај: „Кои лекари имате на интерна?" или '
-            '„препорачај лекар за болки во градите".'
-        )
-
-    # Сите 3 полиња се присутни - продолжи со валидација и INSERT
-    if doctor_id is None or not datum_str or not vreme_str:
-        return "Недостасуваат податоци за закажување (лекар, датум, време)."
-    did = int(doctor_id)
-    ds = str(datum_str)
-    vs = str(vreme_str)
-
-    # Валидација на датум
+    # site 3 polinja gi imame — validacija + napomena prashanje
     try:
         datum_obj = datetime.strptime(ds, "%Y-%m-%d").date()
     except ValueError:
         return "Неважечки формат на датум."
 
     if datum_obj < date.today():
-        return {
-            "odgovor": "Не може да закажеш термин во минатото. Избери иден датум.",
-            "kontekst": kontekst,
-        }
+        return {"odgovor": "Не може да закажеш термин во минатото.", "kontekst": kontekst}
 
     if datum_obj.weekday() >= 5:
-        nov_kontekst = dict(kontekst) if kontekst else {}
-        pending: dict = {}
-        if did is not None:
-            pending["doctor_id"] = did
-        if vs:
-            pending["vreme"] = vs
-        if pending:
-            nov_kontekst["zakazi_pending"] = pending
         return {
-            "odgovor": (
-                "Не се закажуваат прегледи во сабота и недела. Избери друг ден.\n\n"
-                'Можеш да прашаш: „Кога е следен работен ден?" — ќе ти кажам датум '
-                "и слободни термини кај истиот лекар, доколку веќе го имаше избран."
-            ),
-            "kontekst": nov_kontekst,
+            "odgovor": "Не се закажуваат прегледи во сабота и недела. Избери друг ден.",
+            "kontekst": _zacuvaj_pending(kontekst, izvleceno),
         }
 
-    # Валидација на време
     try:
         vreme_obj = datetime.strptime(vs, "%H:%M").time()
     except ValueError:
@@ -996,30 +531,55 @@ def odgovori_za_zakazuvanje(
 
     if vreme_obj < RABOTNO_OD or vreme_obj > RABOTNO_DO:
         return {
-            "odgovor": (
-                f"Работно време е од {format_vreme(RABOTNO_OD)} до {format_vreme(RABOTNO_DO)}."
-            ),
+            "odgovor": f"Работно време е од {format_vreme(RABOTNO_OD)} до {format_vreme(RABOTNO_DO)}.",
             "kontekst": kontekst,
         }
 
-    # Проверка дали е слободен
-    if not proveri_dali_e_slobodno(did, ds, vs):
+    if not _e_slobodno(did, ds, vs):
         return {
-            "odgovor": (
-                'Тој термин е веќе зафатен. Те молам прашај за слободни термини '
-                'со „Кога е слободен д-р [презиме]?" и обиди се повторно.'
-            ),
+            "odgovor": "Тој термин е веќе зафатен. Прашај за слободни термини и обиди се повторно.",
             "kontekst": kontekst,
         }
 
-    lekar_text = ime_lekar_za_poraka or "избраниот лекар"
+    # site uslovi se ispolneti → prashaj za napomena pred INSERT
     try:
-        dt = datetime.strptime(ds, "%Y-%m-%d").date()
-        datum_lepo = format_datum(dt)
-    except ValueError:
+        datum_lepo = format_datum(datum_obj)
+    except Exception:
         datum_lepo = ds
-
     return {
-        "odgovor": _poraka_prasanje_napomena(lekar_text, datum_lepo, vs),
+        "odgovor": (
+            f"Сè е подготвено за закажување кај {ime_lekar or 'лекарот'} "
+            f"на {datum_lepo} во {vs}.\n\n"
+            "Дали сакате да оставите напомена за лекарот?\n"
+            "Напишете ја или кажете „не“."
+        ),
         "kontekst": _postavi_ceka_napomena(kontekst, did, ds, vs),
     }
+
+
+def _odgovor_neprijaven(izvleceno: dict, kontekst: dict | None) -> dict:
+    """Pacient ne e najaven — otvori login modal i zacuvaj pending podatoci."""
+    oddel = izvleceno.get("specialty")
+    nav = None
+    spec_hint = ""
+    if oddel:
+        from ai.opsto.lekari_oddel import navigacija_lekari
+        lekari = _lekari_po_oddel(oddel)
+        if lekari:
+            linii = [f"За преглед кај {oddel}, изберете лекар:", ""]
+            linii += [f"- Д-р {l['name']} {l['surname']}" for l in lekari]
+            spec_hint = "\n\n" + "\n".join(linii) + f"\n\nЗачувано: специјалност „{oddel}“."
+            nav = navigacija_lekari(oddel, lekari)
+
+    out: dict = {
+        "odgovor": (
+            "За да закажам термин во твое име, треба да се најавиш како пациент.\n\n"
+            "Ти ја отворам формата за најава — по најавата повтори ја истата наредба."
+            f"{spec_hint}"
+        ),
+        "akcija": "otvori_pacient_login",
+        "kontekst": _zacuvaj_pending(kontekst, izvleceno),
+    }
+    if nav:
+        out["navigacija"] = nav
+    return out

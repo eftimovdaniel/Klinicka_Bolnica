@@ -11,13 +11,14 @@ PROMPT = """ Ти си систем што извлекува име на пац
 Правила:
 - ако има јасно име+презиме → "ime_pacient"="Име Презиме"
 - ако има само едно име → "ime_pacient"="Име"
-- ако нема воопшто име → null
-БЕЗ markdown, БЕЗ објаснувања. Само JSON.""".strip()
+- ако нема воопшто име → null БЕЗ markdown, БЕЗ објаснувања. Само JSON.""".strip()
+
 # funkcija koja gi praka prasanjeto na lekarot do ai agento
 def _izvlechi(prasanje: str) -> dict:
     odgovor = ask_ai(f"Прашање: „{prasanje}\"", system_prompt=PROMPT)   # se povikuva llm so prasanje i idefiniraniot sistemski prompt
     print(f"[istorija] AI: {odgovor!r}")
     return parse_ai_json(odgovor, log_tag="istorija_pacient")   # se dava odgovor od ai agento vo forma na pyrhon recnik
+
 # funkcija koja vraka odgovor na lekarot
 def odgovori_za_istorija(prasanje: str, lekar: dict | None) -> str:
     if err := require_lekar(lekar): # se pravi proveka dali e najaven lekar toj ima pristap
@@ -42,6 +43,7 @@ def odgovori_za_istorija(prasanje: str, lekar: dict | None) -> str:
         " WHERE doctor_ID = %s"
     )
     params: list = [doctor_id]
+
 # dokolku ai agento razbere dva zbota 
     if len(delovi) >= 2:
         sql += " AND LOWER(ime_pacient) LIKE %s AND LOWER(ime_pacient) LIKE %s" # se dava prebaruvanje kade i prviot i vtorniot del mora da bidat isti bez razlika dali e mala ili golema bukva 
@@ -49,7 +51,6 @@ def odgovori_za_istorija(prasanje: str, lekar: dict | None) -> str:
     else: # filtriranje vo bazata samo na eden zbor, koj se pretvra vo mala bukva
         sql += " AND LOWER(ime_pacient) LIKE %s"
         params.append(f"%{delovi[0].lower()}%") # se dodava vo parametrite za sql izvrasuvanje
-
     sql += " ORDER BY datum_pregled DESC, vreme_pregled DESC"   # se podreduvaat pregledite taka da najnovite se na vrvot
     cur.execute(sql, params)    # se izvrasuva sql naredbata 
     rows = cur.fetchall()   # a gi zema site redovi koj se dobieni od izvrsenata aktivnost vo bazata
