@@ -56,10 +56,12 @@ def _isprati_email_poraka(to_email: str, subject: str, body: str, log_uspesno: s
 
 
 def _poslati_potvrda_na_email(
-    to_email: str, ime_pacient: str, ime_lekar: str, datum: str, vreme: str
+    to_email: str, ime_pacient: str, ime_lekar: str, datum: str, vreme: str,
+    napomena: str | None = None,  # Opcionalna napomena za lekarot — vleguva vo mailot ako ja ima
 ):
     """Испрати потврда на е-пошта до пациентот по закажан термин."""
     subject = "Потврда за закажан термин – Клиничка Болница Штип"
+    # Bazichniot del od mailot (sekogash isti polinja)
     body = f"""Почитуван/а {ime_pacient},
 
 Вашиот термин е успешно закажан.
@@ -67,9 +69,11 @@ def _poslati_potvrda_na_email(
 Лекар: {ime_lekar}
 Датум: {datum}
 Време: {vreme}
-
-Клиничка Болница Штип
 """
+    # Ako pacientot ostavil napomena, dodadi ja na kraj
+    if napomena and napomena.strip():
+        body += f"\nНапомена за лекарот: {napomena.strip()}\n"
+    body += "\nКлиничка Болница Штип\n"
     _isprati_email_poraka(to_email, subject, body, "Потврда за закажување испратена на")
 
 
