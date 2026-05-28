@@ -1,25 +1,13 @@
-"""
-slobodni_termini.py — AI handler za „slobodni termini kaj lekar".
+import re                                              
+from datetime import date, time, datetime, timedelta 
+from typing import Any                                 
+from database import get_connection                    
+from ai._kernel.db_helpers import db_cursor, fetch_all, normalize_int  
+from ai._kernel.groq_client import ask_ai              
+from ai._kernel.prompts import LEKAR_EXTRACT_PROMPT    
+from ai._kernel.transliteracija import transliterijaj  
+from ai._kernel.utils import format_datum, format_vreme  
 
-Korisnikot prashuva „koga e sloboden d-r X?" / „koj e sloboden utre vo 10:00?"
-→ generirame slotovi (08:00-15:30, 30 min, samo pon-pet), otfrlame zakazani
-vo bazata (Termin_pregled), formatirame odgovor na makedonski.
-
-Se koristi od: handlers.py, routers/ai_chat.py, intent_detector.py,
-opsto/info_lekar.py, opsto/lekari_oddel.py, opsto/preference_lekar.py,
-pacient/moi_pregledi.py, oceni_pregled.py, trgni_ocena.py.
-"""
-import re                                              # alatka za regex — barame sablon vo tekst
-from datetime import date, time, datetime, timedelta   # za rabota so datumi, vremiwa i intervali
-from typing import Any                                 # tip „bilo kakov" — koristen vo dict-ovi
-from database import get_connection                    # otvora konekcija so MySQL bazata
-from ai._kernel.db_helpers import db_cursor, fetch_all, normalize_int  # pomoshni alatki za DB
-from ai._kernel.groq_client import ask_ai              # praka prompt do Groq AI, vraka tekst
-from ai._kernel.prompts import LEKAR_EXTRACT_PROMPT    # sistemski prompt za izvlekuvanje na lekar
-from ai._kernel.transliteracija import transliterijaj  # latinica → kirilica za poleсno prebaruvanje
-from ai._kernel.utils import format_datum, format_vreme  # formatiranje datum/vreme za prikaz
-
-# ─── Konstanti: raboten vreme + denovi ───
 RABOTNO_VREME_OD = time(8, 0)          # klinikata otvora vo 08:00
 RABOTNO_VREME_DO = time(16, 0)         # klinikata zatvora vo 16:00
 TRAENJE_TERMIN_MINUTI = 30             # sekoj termin trae 30 min
@@ -27,8 +15,7 @@ DENOVI_NAPRED = 7                      # kolku denovi gledame napred (koga nema 
 MAX_TERMINI = 8                        # makc. termini vo eden odgovor (za da ne se preplavi chatot)
 
 # Mapa: ime na den → brojka (kako Python weekday: pon=0 ... ned=6)
-_DEN_WD = {"понеделник": 0, "вторник": 1, "среда": 2, "четврток": 3,
-           "петок": 4, "сабота": 5, "недела": 6}
+_DEN_WD = {"понеделник": 0, "вторник": 1, "среда": 2, "четврток": 3,"петок": 4, "сабота": 5, "недела": 6}
 # String „понеделник|вторник|…" — gotov za vmetnuvanje vo regex (sortirani po dolzhina za sigurno match-iranje)
 _DEN_ALT = "|".join(sorted(_DEN_WD.keys(), key=len, reverse=True))
 # Lista imenovi za prikaz (po redosled na weekday: pon=0 → "понеделник")

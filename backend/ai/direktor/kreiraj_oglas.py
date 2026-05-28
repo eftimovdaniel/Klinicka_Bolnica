@@ -109,7 +109,7 @@ def odgovori_za_kreiranje_oglas(prasanje: str, lekar: dict | None) -> str:
 
     if rok is None: # ako ne e naveden rok koga e kraj za apliciranje se zema da e 30 dena pocnuvajki od denot na objava
         rok = denes + timedelta(days=30)
-    if rok < denes: # ako e vnesen minat datum sisitemot advotatski posatvuva 30 den od momento na objava
+    if rok < denes: # ako e vnsesen minat datum sisitemot advotatski posatvuva 30 den od momento na objava
         rok = denes + timedelta(days=30)
 
     conn = get_connection() # ostvaruvanje na konekcija so bazata na podatoci i kveri za nejzina manipulacija
