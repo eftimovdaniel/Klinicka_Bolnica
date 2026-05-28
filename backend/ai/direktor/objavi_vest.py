@@ -1,3 +1,4 @@
+# mu se dozvoluvan na direktoror da objavuva vest na sajtot na bolnicata so koristenje na ai agento
 import re
 import requests
 from database import get_connection
