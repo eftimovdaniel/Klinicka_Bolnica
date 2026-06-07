@@ -30,7 +30,7 @@
   * [Ai_chat_message](#tab-ai-message)
 * [9. Конвенции и важни забелешки](#9-konvencii)
 
-> 📎 Поврзани страници: [Архитектура](../overview_na_sisitemot/architecture.md) ·
+> Поврзани страници: [Архитектура](../overview_na_sisitemot/architecture.md) ·
 > [Преглед на backend](pregled.md) · [API → Термини](api/termini.md)
 
 ---
@@ -49,7 +49,7 @@
 Базата се состои од **14 табели**, групирани во неколку логички целини:
 корисници, термини, апарати, содржини и AI историја.
 
-> 💡 **Зошто InnoDB?** Овозможува **foreign keys** (врски меѓу табели со
+> **Зошто InnoDB?** Овозможува **foreign keys** (врски меѓу табели со
 > автоматска контрола) и **трансакции** (или сѐ се зачувува, или ништо — нема
 > полу-зачувани податоци).
 
@@ -124,7 +124,7 @@ erDiagram
     }
 ```
 
-> ℹ️ **Легенда:** `PK` = примарен клуч · `FK` = странски клуч (врска) ·
+> **Легенда:** `PK` = примарен клуч · `FK` = странски клуч (врска) ·
 > `UK` = уникатен клуч · `||--o{` = еден-кон-повеќе · `||--o|` = еден-кон-еден.
 
 ---
@@ -159,7 +159,7 @@ erDiagram
 
 | Колона | Тип | Ограничувања | Опис |
 |--------|-----|--------------|------|
-| `doctor_ID` | INT | 🔑 PK, AUTO_INCREMENT | Единствен идентификатор |
+| `doctor_ID` | INT | PK, AUTO_INCREMENT | Единствен идентификатор |
 | `name` | VARCHAR(120) | NOT NULL | Име |
 | `surname` | VARCHAR(120) | NOT NULL | Презиме |
 | `specialty` | VARCHAR(120) | NULL | Специјалност (оддел) |
@@ -167,7 +167,7 @@ erDiagram
 | `password` | VARCHAR(255) | NOT NULL | Хеширана лозинка (bcrypt) |
 | `must_change_password` | TINYINT(1) | DEFAULT 0 | 1 = мора да ја смени привремената лозинка |
 
-> 🔒 `password` секогаш содржи **bcrypt хеш**, никогаш чист текст. Привремената
+> `password` секогаш содржи **bcrypt хеш**, никогаш чист текст. Привремената
 > лозинка за примерните лекари е `Test123..` и мора да се смени при прва најава.
 
 ### patient <a id="tab-patient"></a>
@@ -176,7 +176,7 @@ erDiagram
 
 | Колона | Тип | Ограничувања | Опис |
 |--------|-----|--------------|------|
-| `patient_ID` | INT | 🔑 PK, AUTO_INCREMENT | Единствен идентификатор |
+| `patient_ID` | INT | PK, AUTO_INCREMENT | Единствен идентификатор |
 | `name_patient` | VARCHAR(120) | NOT NULL | Име |
 | `surname_patient` | VARCHAR(120) | NOT NULL | Презиме |
 | `embg` | VARCHAR(13) | UNIQUE, NULL | 13-цифрен матичен број (ЕМБГ) |
@@ -184,7 +184,7 @@ erDiagram
 | `phone_number` | VARCHAR(32) | NULL | Телефон |
 | `password` | VARCHAR(255) | NOT NULL | Хеширана лозинка (bcrypt) |
 
-> ⚠️ И `email` и `embg` се **уникатни** — не може двајца пациенти со иста е-пошта
+> И `email` и `embg` се **уникатни** — не може двајца пациенти со иста е-пошта
 > или ист ЕМБГ.
 
 ### password_reset_tokens <a id="tab-prt"></a>
@@ -194,7 +194,7 @@ erDiagram
 
 | Колона | Тип | Ограничувања | Опис |
 |--------|-----|--------------|------|
-| `id` | INT | 🔑 PK, AUTO_INCREMENT | Идентификатор |
+| `id` | INT | PK, AUTO_INCREMENT | Идентификатор |
 | `email` | VARCHAR(255) | NOT NULL | Е-пошта на корисникот |
 | `token` | VARCHAR(255) | NOT NULL, INDEX | Кодот за ресетирање |
 | `user_type` | VARCHAR(20) | NOT NULL | `pacient` или `lekar` |
@@ -211,8 +211,8 @@ erDiagram
 
 | Колона | Тип | Ограничувања | Опис |
 |--------|-----|--------------|------|
-| `termin_ID` | INT | 🔑 PK, AUTO_INCREMENT | Идентификатор на термин |
-| `doctor_ID` | INT | 🔗 FK → Doctors, NOT NULL | Лекар |
+| `termin_ID` | INT | PK, AUTO_INCREMENT | Идентификатор на термин |
+| `doctor_ID` | INT | FK → Doctors, NOT NULL | Лекар |
 | `ime_pacient` | VARCHAR(255) | NOT NULL | Име и презиме на пациент |
 | `specijalnost_termin` | VARCHAR(120) | NULL | Специјалност на прегледот |
 | `ime_lekar` | VARCHAR(255) | NULL | Име на лекар (снимка за приказ) |
@@ -248,13 +248,13 @@ erDiagram
 
 | Колона | Тип | Ограничувања | Опис |
 |--------|-----|--------------|------|
-| `feedback_ID` | INT | 🔑 PK, AUTO_INCREMENT | Идентификатор |
-| `termin_ID` | INT | 🔗 FK → Termin_pregled, UNIQUE | Кој термин се оценува |
+| `feedback_ID` | INT | PK, AUTO_INCREMENT | Идентификатор |
+| `termin_ID` | INT | FK → Termin_pregled, UNIQUE | Кој термин се оценува |
 | `ocena` | TINYINT | NOT NULL, CHECK 1–5 | Оцена од 1 до 5 |
 | `komentar` | TEXT | NULL | Опционален коментар |
 | `datum_na_ocena` | DATETIME | DEFAULT CURRENT_TIMESTAMP | Кога е дадена |
 
-> ✅ **CHECK ограничување:** `ocena` мора да биде помеѓу 1 и 5 — базата сама
+> **CHECK ограничување:** `ocena` мора да биде помеѓу 1 и 5 — базата сама
 > одбива невалидна вредност.
 
 ---
@@ -267,7 +267,7 @@ erDiagram
 
 | Колона | Тип | Ограничувања | Опис |
 |--------|-----|--------------|------|
-| `aparat_id` | INT | 🔑 PK, AUTO_INCREMENT | Идентификатор |
+| `aparat_id` | INT | PK, AUTO_INCREMENT | Идентификатор |
 | `ime` | VARCHAR(255) | NOT NULL | Име (на пр. „Рентген") |
 | `opis` | TEXT | NULL | Опис |
 | `kod` | VARCHAR(64) | NOT NULL, UNIQUE | Код (на пр. `rentgen`, `kt`, `mri`, `usg`) |
@@ -279,8 +279,8 @@ erDiagram
 
 | Колона | Тип | Ограничувања | Опис |
 |--------|-----|--------------|------|
-| `aparat_termin_id` | INT | 🔑 PK, AUTO_INCREMENT | Идентификатор |
-| `doctor_ID` | INT | 🔗 FK → Doctors, NOT NULL | Лекар што закажува |
+| `aparat_termin_id` | INT | PK, AUTO_INCREMENT | Идентификатор |
+| `doctor_ID` | INT | FK → Doctors, NOT NULL | Лекар што закажува |
 | `lekar_ime` | VARCHAR(255) | NOT NULL | Име на лекар (приказ) |
 | `pacient_ime` | VARCHAR(255) | NOT NULL | Име на пациент |
 | `aparat` | VARCHAR(64) | NOT NULL | Код на апаратот |
@@ -289,7 +289,7 @@ erDiagram
 | `opis` | TEXT | NOT NULL | Зошто е потребен апаратот |
 | `status` | VARCHAR(40) | DEFAULT 'закажан' | Статус на терминот |
 
-> 🔗 Полето `aparat` го чува **кодот** на апаратот (текст), не нумеричка врска
+> Полето `aparat` го чува **кодот** на апаратот (текст), не нумеричка врска
 > кон `Aparati`. Кодовите се усогласени со колоната `kod` од `Aparati`.
 
 ---
@@ -302,7 +302,7 @@ erDiagram
 
 | Колона | Тип | Ограничувања | Опис |
 |--------|-----|--------------|------|
-| `id` | INT | 🔑 PK, AUTO_INCREMENT | Идентификатор |
+| `id` | INT | PK, AUTO_INCREMENT | Идентификатор |
 | `naslov` | VARCHAR(500) | NOT NULL | Наслов |
 | `sodrzina` | MEDIUMTEXT | NOT NULL | Содржина |
 | `slika_path` | VARCHAR(1024) | NULL | Патека до главна слика |
@@ -310,11 +310,11 @@ erDiagram
 | `slika_height` | VARCHAR(32) | NULL | Висина на сликата |
 | `video_url` | VARCHAR(1024) | NULL | Линк до видео |
 | `slike_extra` | TEXT | NULL | Дополнителни слики |
-| `author_doctor_id` | INT | 🔗 FK → Doctors, NULL | Автор (лекар/директор) |
+| `author_doctor_id` | INT | FK → Doctors, NULL | Автор (лекар/директор) |
 | `created_at` | DATETIME | DEFAULT CURRENT_TIMESTAMP | Создадено |
 | `updated_at` | DATETIME | ON UPDATE CURRENT_TIMESTAMP | Изменето |
 
-> 🔗 `author_doctor_id` → `Doctors` со `ON DELETE SET NULL` (ако се избрише
+> `author_doctor_id` → `Doctors` со `ON DELETE SET NULL` (ако се избрише
 > авторот, новоста останува, само авторот станува празен).
 
 ### Vrabotuvanje <a id="tab-vrabotuvanje"></a>
@@ -323,7 +323,7 @@ erDiagram
 
 | Колона | Тип | Ограничувања | Опис |
 |--------|-----|--------------|------|
-| `id_oglas` | INT | 🔑 PK, AUTO_INCREMENT | Идентификатор |
+| `id_oglas` | INT | PK, AUTO_INCREMENT | Идентификатор |
 | `pozicija` | VARCHAR(255) | NOT NULL | Позиција |
 | `oddel` | VARCHAR(255) | NOT NULL | Оддел |
 | `datum_na_objava` | DATE | NOT NULL | Датум на објава |
@@ -336,8 +336,8 @@ erDiagram
 
 | Колона | Тип | Ограничувања | Опис |
 |--------|-----|--------------|------|
-| `id` | INT | 🔑 PK, AUTO_INCREMENT | Идентификатор |
-| `id_oglas` | INT | 🔗 FK → Vrabotuvanje, NULL | На кој оглас |
+| `id` | INT | PK, AUTO_INCREMENT | Идентификатор |
+| `id_oglas` | INT | FK → Vrabotuvanje, NULL | На кој оглас |
 | `pozicija` | VARCHAR(255) | NOT NULL | Позиција |
 | `ime_lekar` | VARCHAR(120) | NOT NULL | Име |
 | `prezime_lekar` | VARCHAR(120) | NOT NULL | Презиме |
@@ -346,7 +346,7 @@ erDiagram
 | `telefon` | BIGINT | NULL | Телефон |
 | `datum_prijava` | DATETIME | NOT NULL | Кога е поднесена |
 
-> 🔗 `id_oglas` → `Vrabotuvanje` со `ON DELETE SET NULL` (ако се избрише огласот,
+> `id_oglas` → `Vrabotuvanje` со `ON DELETE SET NULL` (ако се избрише огласот,
 > апликациите остануваат, но без врска кон огласот).
 
 ### Dezurstva <a id="tab-dezurstva"></a>
@@ -355,8 +355,8 @@ erDiagram
 
 | Колона | Тип | Ограничувања | Опис |
 |--------|-----|--------------|------|
-| `dezurstvo_ID` | INT | 🔑 PK, AUTO_INCREMENT | Идентификатор |
-| `doctor_ID` | INT | 🔗 FK → Doctors, NOT NULL | Лекар |
+| `dezurstvo_ID` | INT | PK, AUTO_INCREMENT | Идентификатор |
+| `doctor_ID` | INT | FK → Doctors, NOT NULL | Лекар |
 | `datum` | DATE | NOT NULL | Датум |
 | `oddel` | VARCHAR(255) | NOT NULL | Оддел |
 | `vreme_od` | TIME | NOT NULL | Почеток |
@@ -369,7 +369,7 @@ erDiagram
 
 | Колона | Тип | Ограничувања | Опис |
 |--------|-----|--------------|------|
-| `id` | INT | 🔑 PK, AUTO_INCREMENT | Идентификатор |
+| `id` | INT | PK, AUTO_INCREMENT | Идентификатор |
 | `ime_na_oddel` | VARCHAR(255) | NOT NULL, UNIQUE | Име на оддел |
 
 ---
@@ -382,15 +382,15 @@ erDiagram
 
 | Колона | Тип | Ограничувања | Опис |
 |--------|-----|--------------|------|
-| `session_id` | INT | 🔑 PK, AUTO_INCREMENT | Идентификатор на сесија |
-| `pacient_id` | INT | 🔗 FK → patient, NULL | Ако разговорот е на пациент |
-| `doctor_id` | INT | 🔗 FK → Doctors, NULL | Ако разговорот е на лекар |
+| `session_id` | INT | PK, AUTO_INCREMENT | Идентификатор на сесија |
+| `pacient_id` | INT | FK → patient, NULL | Ако разговорот е на пациент |
+| `doctor_id` | INT | FK → Doctors, NULL | Ако разговорот е на лекар |
 | `naslov` | VARCHAR(255) | NULL | Наслов на разговорот |
 | `kontekst_json` | MEDIUMTEXT | NULL | Зачуван контекст (JSON) |
 | `created_at` | DATETIME | DEFAULT CURRENT_TIMESTAMP | Создадено |
 | `updated_at` | DATETIME | ON UPDATE CURRENT_TIMESTAMP | Последна измена |
 
-> ℹ️ Сесијата припаѓа или на пациент или на лекар — затоа двете FK колони се
+> Сесијата припаѓа или на пациент или на лекар — затоа двете FK колони се
 > опционални (`NULL`).
 
 ### Ai_chat_message <a id="tab-ai-message"></a>
@@ -399,8 +399,8 @@ erDiagram
 
 | Колона | Тип | Ограничувања | Опис |
 |--------|-----|--------------|------|
-| `message_id` | INT | 🔑 PK, AUTO_INCREMENT | Идентификатор |
-| `session_id` | INT | 🔗 FK → Ai_chat_session, NOT NULL | На која сесија |
+| `message_id` | INT | PK, AUTO_INCREMENT | Идентификатор |
+| `session_id` | INT | FK → Ai_chat_session, NOT NULL | На која сесија |
 | `uloga` | ENUM('user','assistant') | NOT NULL | Кој ја испратил пораката |
 | `sodrzina` | TEXT | NOT NULL | Текст на пораката |
 | `navigacija_json` | TEXT | NULL | Навигациски податоци (JSON) |
@@ -413,7 +413,7 @@ erDiagram
 
 ### Конвенции за именување
 
-> ⚠️ Имињата на табели и колони **не се целосно конзистентни** (мешани се
+> Имињата на табели и колони **не се целосно конзистентни** (мешани се
 > англиски и македонски, еднина/множина). Ова е свесно документирано за да не
 > се прават грешки при пишување SQL:
 
@@ -425,7 +425,7 @@ erDiagram
 
 ### Како се поврзани пациент и термин
 
-> 🔎 **Важно:** Табелата `Termin_pregled` **нема** foreign key кон `patient`.
+> **Важно:** Табелата `Termin_pregled` **нема** foreign key кон `patient`.
 > Врската се прави преку **`email_pacient`** (текст), а не преку `patient_ID`.
 > Затоа кодот често бара термини по е-пошта на пациентот, не по ID.
 
@@ -449,8 +449,8 @@ erDiagram
 - **1 оглас** за работа
 - **4 апарати** (Рентген, КТ, МРТ, Ултразвук)
 
-> 💡 Најава на лекар: корисничкото име е транслитерирано `име.презиме`
+> Најава на лекар: корисничкото име е транслитерирано `име.презиме`
 > (на пр. `vladko.zahariev`).
 
-📎 Следно: [Преглед на backend](pregled.md) · [API → Термини](api/termini.md) ·
+Следно: [Преглед на backend](pregled.md) · [API → Термини](api/termini.md) ·
 [API → Пациенти](api/pacienti.md)
