@@ -312,7 +312,7 @@ flowchart LR
 
 На `index.html` има вграден **плутачки AI асистент** (`#kbs-ai-widget`) — копче во долниот агол што отвора панел за разговор.
 
-![AI икона на асистентот](../../frontend/assets/kbs-ai-icon-web.png)
+![AI икона на асистентот](assets/kbs-ai-icon-small.png)
 
 - HTML структурата е во `index.html` (панел `#kbs-ai-panel`, пораки `#kbs-ai-messages`, input `#kbs-ai-input`)
 - Логиката (испраќање прашања, приказ на одговори, контекст) е во **`script.js`**
