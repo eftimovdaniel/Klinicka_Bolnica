@@ -14,6 +14,6 @@ COPY . .
 #frontendot da komunicira so backendot.
 EXPOSE 8000
 
-#: Ja vkluchuva aplikacijata i ja pushta da raboti na Azure serverot
-# se odviva na porta 8000
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+#: Ja vkluchuva aplikacijata. Render (i sl.) zadava svoj $PORT — ako go nema, koristi 8000.
+# shell forma za da se prochita promenlivata $PORT
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
