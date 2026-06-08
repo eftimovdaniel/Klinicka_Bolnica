@@ -310,9 +310,8 @@ flowchart LR
 
 ## 9. AI чат виџет <a id="9-ai-chat"></a>
 
-На `index.html` има вграден **плутачки AI асистент** (`#kbs-ai-widget`) — копче во долниот агол што отвора панел за разговор.
-
-![AI икона на асистентот](../../frontend/assets/kbs-ai-icon-web.png)
+На `index.html` има вграден **лебдечки AI асистент** (`#kbs-ai-widget`) — копче во долниот агол што отвора панел за разговор.
+<img src="../../frontend/assets/kbs-ai-icon-web.png" alt="AI икона на асистентот" width="50" />
 
 - HTML структурата е во `index.html` (панел `#kbs-ai-panel`, пораки `#kbs-ai-messages`, input `#kbs-ai-input`)
 - Логиката (испраќање прашања, приказ на одговори, контекст) е во **`script.js`**
