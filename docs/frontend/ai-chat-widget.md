@@ -541,12 +541,12 @@ curl -X POST http://localhost:8000/ai-chat/ask \
 
 > **Напомена:** Серверот е на бесплатен план, па првиот одговор може да потрае до една минута додека се „разбуди". Следните прашања се брзи.
 
-<iframe 
-    src="https://klinicka-bolnica-stip2026.onrender.com/" 
-    width="100%" 
-    height="600px" 
-    style="border: 2px solid #e1e1e1; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-</iframe>
+<div style="text-align: center; padding: 20px; border: 2px dashed #ff4d4f; border-radius: 12px; background-color: #fff1f0;">
+    <h3>Тестирај го асистентот во живо</h3>
+    <p>Поради безбедносни поставки на серверот, апликацијата се отвора во нов прозорец за да можете непречено да ја тестирате.</p>
+    <a href="https://klinicka-bolnica-stip2026.onrender.com/" target="_blank" style="background-color: #ff4d4f; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">Отвори го Асистентот за тест</a>
+</div>
+
 
 **Како да тестираш:**
 1. Кликни на црвеното кругло копче во долниот десен агол на прозорецот погоре.
