@@ -550,7 +550,7 @@ curl -X POST http://localhost:8000/ai-chat/ask \
 Подолу е вградена живата верзија на сајтот. Кликнете на црвеното кругло копче во долниот десен агол за да го отворите AI асистентот и поставете прашање — на
 пример „Кои кардиолози работат кај вас?". Одговорот доаѓа од вистинскиот backend (Groq + базата на податоци).
 
-{% embed url="https://klinicka-bolnica-stip2026.onrender.com/app/" %}
+{% embed url="https://klinicka-bolnica-stip2026.onrender.com/" %}
 
 <div class="interactive-container">
     <iframe 
