@@ -2,12 +2,7 @@
 
 Сите endpoints за **пациенти** живеат под префиксот `/pacienti` и се дефинирани во `backend/routers/pacienti.py`. Овде се покриени регистрација, најава, ресет на лозинка, досие, и оценување на завршени прегледи.
 
-> **Интерактивно тестирање:** под секој endpoint има **жива форма** (`Испрати барање`) што праќа вистинско барање и го прикажува одговорот тука, во документацијата. Стандардно оди кон живиот сервер (`klinicka-bolnica-stip2026.onrender.com`); base URL-от може да се смени со „⚙" во виџетот (на пр. `http://localhost:8000`). Овие форми работат само кога docs се отворени преку Docsify — види [како](#kako-docsify).
->
-> Алтернативно, истите endpoints се и во самостојниот [API Playground](../../../frontend/api-playground.html).
-
-<a id="kako-docsify"></a>
-> **Како да ги отвориш интерактивните docs:** од папката `docs/` стартувај локален сервер, на пр. `python -m http.server 8080`, па отвори `http://localhost:8080/`. (Виџетите бараат http сервер — не работат со директно отворање на `.md` фајл.)
+> **Интерактивно тестирање:** под секој endpoint има вграден **OpenAPI блок** со копче **„Test it"** (powered by Scalar). Пополни ги параметрите/телото и испрати го барањето директно од документацијата кон живиот сервер (`klinicka-bolnica-stip2026.onrender.com`), без да ја напушташ страницата.
 
 ## Содржина
 
@@ -100,7 +95,9 @@ flowchart LR
 
 > Лозинката се чува како **bcrypt хеш** (`password_utils.hash_password`), никогаш како чист текст.
 
-<api-tester method="POST" path="/pacienti/register" write="true" body='{"ime":"Иван","prezime":"Ивановски","email":"ivan@example.com","password":"Lozinka1.","telefon":"070123456","embg":"0101990450012"}'></api-tester>
+{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/register" method="post" %}
+https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+{% endopenapi %}
 
 ---
 
@@ -138,7 +135,9 @@ Frontend-от го зачувува овој објект (на пр. во `loca
 
 **Можни грешки:** `400` (празна е-пошта или лозинка) · `401` (погрешна комбинација — намерно иста порака за email и лозинка) · `500`
 
-<api-tester method="POST" path="/pacienti/login" body='{"email":"ivan@example.com","password":"Lozinka1."}'></api-tester>
+{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/login" method="post" %}
+https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+{% endopenapi %}
 
 ---
 
@@ -166,7 +165,9 @@ Frontend-от го зачувува овој објект (на пр. во `loca
 
 **Можни грешки:** `400` (невалидна е-пошта) · `500`
 
-<api-tester method="POST" path="/pacienti/forgot-password" write="true" body='{"email":"ivan@example.com"}'></api-tester>
+{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/forgot-password" method="post" %}
+https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+{% endopenapi %}
 
 ---
 
@@ -196,7 +197,9 @@ Frontend-от го зачувува овој објект (на пр. во `loca
 
 **Можни грешки:** `400` (невалиден/истечен код, лозинка < 8 знаци) · `404` (пациент не постои) · `500`
 
-<api-tester method="POST" path="/pacienti/reset-password" write="true" body='{"email":"ivan@example.com","token":"код_од_терминал_или_лог","nova_lozinka":"Nova12345"}'></api-tester>
+{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/reset-password" method="post" %}
+https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+{% endopenapi %}
 
 ---
 
@@ -251,7 +254,9 @@ GET /pacienti/dosie?pacient_ID=42
 
 **Можни грешки:** `404` (непостоечки `pacient_ID`) · `500`
 
-<api-tester method="GET" path="/pacienti/dosie" query='[{"name":"pacient_ID","required":true,"example":"1"}]'></api-tester>
+{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/dosie" method="get" %}
+https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+{% endopenapi %}
 
 ---
 
@@ -287,7 +292,9 @@ GET /pacienti/zavrseni-za-ocenka?pacient_ID=42
 
 **Можни грешки:** `404` · `500`
 
-<api-tester method="GET" path="/pacienti/zavrseni-za-ocenka" query='[{"name":"pacient_ID","required":true,"example":"1"}]'></api-tester>
+{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/zavrseni-za-ocenka" method="get" %}
+https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+{% endopenapi %}
 
 ---
 
@@ -329,7 +336,9 @@ GET /pacienti/zavrseni-za-ocenka?pacient_ID=42
 
 **Можни грешки:** `400` (невалидна оцена, термин не е завршен) · `403` (термин не е на овој пациент) · `404` · `500`
 
-<api-tester method="POST" path="/pacienti/oceni-pregled" write="true" body='{"termin_id":1,"pacient_ID":1,"ocena":5,"komentar":"Многу сум задоволен од прегледот"}'></api-tester>
+{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/oceni-pregled" method="post" %}
+https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+{% endopenapi %}
 
 ---
 
@@ -346,5 +355,4 @@ GET /pacienti/zavrseni-za-ocenka?pacient_ID=42
 
 ---
 
-Следно: [Термини](termini.md) · [Автентикација](authentication.md) ·
-[API Playground](../../../frontend/api-playground.html)
+Следно: [Термини](termini.md) · [Автентикација](authentication.md)

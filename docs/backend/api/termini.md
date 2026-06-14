@@ -2,7 +2,7 @@
 
 Endpoints за **термини / прегледи** под префиксот `/termini`, дефинирани во `backend/routers/termini.py`. Покриваат слободни термини, закажување, внес на дијагноза/терапија и PDF извештај.
 
-> **Интерактивно тестирање:** под секој endpoint има жива форма. Base URL стандардно е живиот сервер (смени со „⚙"). Форми работат преку Docsify — види [Пациенти → како](pacienti.md#kako-docsify).
+> **Интерактивно тестирање:** под секој endpoint има вграден **OpenAPI блок** со копче **„Test it"** (powered by Scalar). Пополни ги параметрите/телото и испрати го барањето директно од документацијата кон живиот сервер (`klinicka-bolnica-stip2026.onrender.com`).
 
 ## Содржина
 
@@ -68,7 +68,9 @@ flowchart LR
 
 **Можни грешки:** `400` (неважечки датум) · `500`
 
-<api-tester method="GET" path="/termini/dostapni" query='[{"name":"lekar_id","required":true,"example":"28"},{"name":"datum","required":true,"example":"2026-06-16"}]'></api-tester>
+{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/termini/dostapni" method="get" %}
+https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+{% endopenapi %}
 
 ---
 
@@ -102,7 +104,9 @@ flowchart LR
 
 **Можни грешки:** `400` (викенд / неважечки датум) · `404` (лекар не постои) · `409` (слотот е зафатен) · `500`
 
-<api-tester method="POST" path="/termini" write="true" body='{"lekar_id":28,"ime":"Иван","prezime":"Ивановски","datum":"2026-06-16","vreme":"10:00","email":"ivan@example.com","telefon":"070123456","napomena":""}'></api-tester>
+{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/termini" method="post" %}
+https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+{% endopenapi %}
 
 ---
 
@@ -129,7 +133,9 @@ flowchart LR
 
 **Можни грешки:** `404` (термин не постои) · `500`
 
-<api-tester method="PATCH" path="/termini/{termin_id}" write="true" params='[{"name":"termin_id","example":"1"}]' body='{"dijagnoza":"Хипертензија","terapija":"Контрола за 3 месеци"}'></api-tester>
+{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/termini/{termin_id}" method="patch" %}
+https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+{% endopenapi %}
 
 ---
 
@@ -141,7 +147,9 @@ flowchart LR
 
 **Можни грешки:** `404` (термин не постои) · `500`
 
-<api-tester method="GET" path="/termini/izvestaj-pdf/{termin_id}" params='[{"name":"termin_id","example":"1"}]'></api-tester>
+{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/termini/izvestaj-pdf/{termin_id}" method="get" %}
+https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+{% endopenapi %}
 
 ---
 
@@ -162,7 +170,9 @@ flowchart LR
 
 **Можни грешки:** `400` (пациентот нема е-пошта) · `404` · `503` (SMTP не е конфигуриран) · `502` (грешка при праќање) · `500`
 
-<api-tester method="POST" path="/termini/{termin_id}/poslati-izvestaj" write="true" params='[{"name":"termin_id","example":"1"}]' body='{}'></api-tester>
+{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/termini/{termin_id}/poslati-izvestaj" method="post" %}
+https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+{% endopenapi %}
 
 ---
 
