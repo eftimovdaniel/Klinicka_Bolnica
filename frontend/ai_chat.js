@@ -9,8 +9,13 @@
  *  5) Frontend ја прикажува пораката на агентот + извршува акција/навигација
  */
 
-// Адреса на backend серверот (FastAPI на порт 8000)
-const API_URL = "http://localhost:8000/ai-chat/ask"; // URL на endpoint-от за AI прашања
+// API bazen URL: lokalno → direktno :8000; na server → ist host (nginx proksira kon backend)
+const API_BASE = (function() {
+  var h = window.location.hostname;
+  if (!h || h === 'localhost' || h === '127.0.0.1') return 'http://localhost:8000';
+  return window.location.protocol + '//' + window.location.host;
+})();
+const API_URL = API_BASE + "/ai-chat/ask"; // POST endpoint za AI prashanja
 
 // Конверзациски контекст — се памти меѓу пораки за повеќестепен дијалог.
 // Пр. „Закажи кај Захариев" → AI: „во кое време?" → корисник: „во 12:00".
