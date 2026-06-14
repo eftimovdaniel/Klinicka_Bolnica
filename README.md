@@ -1,0 +1,1 @@
+Целата документација за системот е достапна на: https://daniel-eftimov.gitbook.io/iklinicka-bolnica-stip-dokumentacija/
