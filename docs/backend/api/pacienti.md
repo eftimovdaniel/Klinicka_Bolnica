@@ -1,4 +1,4 @@
-# API — Пациенти
+# Пациенти
 
 Сите endpoints за **пациенти** живеат под префиксот `/pacienti` и се дефинирани во `backend/routers/pacienti.py`. Овде се покриени регистрација, најава, ресет на лозинка, досие, и оценување на завршени прегледи.
 
@@ -6,24 +6,22 @@
 
 ## Содржина
 
-* [1. Преглед](#1-pregled)
-* [2. Автентикација](#2-auth)
-* [3. POST `/pacienti/register`](#3-register)
-* [4. POST `/pacienti/login`](#4-login)
-* [5. POST `/pacienti/forgot-password`](#5-forgot)
-* [6. POST `/pacienti/reset-password`](#6-reset)
-* [7. GET `/pacienti/dosie`](#7-dosie)
-* [8. GET `/pacienti/zavrseni-za-ocenka`](#8-zavrseni)
-* [9. POST `/pacienti/oceni-pregled`](#9-oceni)
-* [10. Поврзани табели](#10-tabele)
+* [1. Преглед](pacienti.md#1-pregled)
+* [2. Автентикација](pacienti.md#2-auth)
+* [3. POST `/pacienti/register`](pacienti.md#3-register)
+* [4. POST `/pacienti/login`](pacienti.md#4-login)
+* [5. POST `/pacienti/forgot-password`](pacienti.md#5-forgot)
+* [6. POST `/pacienti/reset-password`](pacienti.md#6-reset)
+* [7. GET `/pacienti/dosie`](pacienti.md#7-dosie)
+* [8. GET `/pacienti/zavrseni-za-ocenka`](pacienti.md#8-zavrseni)
+* [9. POST `/pacienti/oceni-pregled`](pacienti.md#9-oceni)
+* [10. Поврзани табели](pacienti.md#10-tabele)
 
-> Поврзани: [Конвенции](conventions.md) · [Автентикација](authentication.md) ·
-> [Термини](termini.md) · [База — patient](../the_database.md#tab-patient) ·
-> [Преглед на backend](../pregled.md)
+> Поврзани: [Конвенции](conventions.md) · [Автентикација](authentication.md) · [Термини](termini.md) · [База — patient](../the_database.md#tab-patient) · [Преглед на backend](../pregled.md)
 
----
+***
 
-## 1. Преглед <a id="1-pregled"></a>
+## 1. Преглед <a href="#id-1-pregled" id="id-1-pregled"></a>
 
 ```mermaid
 flowchart LR
@@ -35,19 +33,19 @@ flowchart LR
 
 Сите барања се **JSON** (`Content-Type: application/json`), освен ако не е наведено поинаку. Одговорите се **JSON**. Грешките доаѓаат како `{"detail": "порака"}` со соодветен HTTP статус.
 
-| Метод | Патека | Намена |
-|-------|--------|--------|
-| `POST` | `/pacienti/register` | Нова регистрација |
-| `POST` | `/pacienti/login` | Најава |
-| `POST` | `/pacienti/forgot-password` | Барање код за ресет |
-| `POST` | `/pacienti/reset-password` | Нова лозинка со код |
-| `GET` | `/pacienti/dosie` | Комплетно досие |
-| `GET` | `/pacienti/zavrseni-za-ocenka` | Завршени прегледи за оцена |
-| `POST` | `/pacienti/oceni-pregled` | Остави/ажурирај оцена |
+| Метод  | Патека                         | Намена                     |
+| ------ | ------------------------------ | -------------------------- |
+| `POST` | `/pacienti/register`           | Нова регистрација          |
+| `POST` | `/pacienti/login`              | Најава                     |
+| `POST` | `/pacienti/forgot-password`    | Барање код за ресет        |
+| `POST` | `/pacienti/reset-password`     | Нова лозинка со код        |
+| `GET`  | `/pacienti/dosie`              | Комплетно досие            |
+| `GET`  | `/pacienti/zavrseni-za-ocenka` | Завршени прегледи за оцена |
+| `POST` | `/pacienti/oceni-pregled`      | Остави/ажурирај оцена      |
 
----
+***
 
-## 2. Автентикација <a id="2-auth"></a>
+## 2. Автентикација <a href="#id-2-auth" id="id-2-auth"></a>
 
 Системот **не користи JWT или сесиски cookies** за пациенти. По успешна најава, frontend-от го чува `pacient_ID` (и останатите податоци) во `localStorage` и го праќа како query параметар (`pacient_ID`) или во JSON тело каде што е потребно.
 
@@ -55,9 +53,9 @@ flowchart LR
 
 > За production би било подобро да се додаде серверска сесија или JWT — моментално ова е доволно за универзитетскиот проект.
 
----
+***
 
-## 3. POST `/pacienti/register` <a id="3-register"></a>
+## 3. POST `/pacienti/register` <a href="#id-3-register" id="id-3-register"></a>
 
 **Регистрација на нов пациент.** Внесува ред во табелата `patient`.
 
@@ -75,12 +73,13 @@ flowchart LR
 ```
 
 **Валидација:**
-- `ime`, `prezime`, `email` — задолжителни
-- `email` — мора да содржи `@` и домен со `.`
-- `password` — минимум **8** карактери
-- `embg` — точно **13** цифри (само бројки се земаат од внесот)
-- `telefon` — опционален; се нормализира (само цифри и `+`, макс. 20 знаци)
-- `email` и `embg` мора да бидат **уникатни** во базата
+
+* `ime`, `prezime`, `email` — задолжителни
+* `email` — мора да содржи `@` и домен со `.`
+* `password` — минимум **8** карактери
+* `embg` — точно **13** цифри (само бројки се земаат од внесот)
+* `telefon` — опционален; се нормализира (само цифри и `+`, макс. 20 знаци)
+* `email` и `embg` мора да бидат **уникатни** во базата
 
 **Успешен одговор (200):**
 
@@ -95,13 +94,13 @@ flowchart LR
 
 > Лозинката се чува како **bcrypt хеш** (`password_utils.hash_password`), никогаш како чист текст.
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/register" method="post" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/login" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
----
+***
 
-## 4. POST `/pacienti/login` <a id="4-login"></a>
+## 4. POST `/pacienti/login` <a href="#id-4-login" id="id-4-login"></a>
 
 **Најава на постоечки пациент** со е-пошта и лозинка.
 
@@ -136,12 +135,12 @@ Frontend-от го зачувува овој објект (на пр. во `loca
 **Можни грешки:** `400` (празна е-пошта или лозинка) · `401` (погрешна комбинација — намерно иста порака за email и лозинка) · `500`
 
 {% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/login" method="post" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+[https://klinicka-bolnica-stip2026.onrender.com/openapi.json](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi %}
 
----
+***
 
-## 5. POST `/pacienti/forgot-password` <a id="5-forgot"></a>
+## 5. POST `/pacienti/forgot-password` <a href="#id-5-forgot" id="id-5-forgot"></a>
 
 **Барање за ресет на лозинка.** Генерира привремен код (валиден **1 час**) и го зачувува во `password_reset_tokens` со `user_type = 'pacient'`.
 
@@ -161,17 +160,17 @@ https://klinicka-bolnica-stip2026.onrender.com/openapi.json
 }
 ```
 
-На **локално** развој, кодот се гледа во терминалот каде работи uvicorn. На **Render**, во табот *Logs*.
+На **локално** развој, кодот се гледа во терминалот каде работи uvicorn. На **Render**, во табот _Logs_.
 
 **Можни грешки:** `400` (невалидна е-пошта) · `500`
 
 {% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/forgot-password" method="post" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+[https://klinicka-bolnica-stip2026.onrender.com/openapi.json](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi %}
 
----
+***
 
-## 6. POST `/pacienti/reset-password` <a id="6-reset"></a>
+## 6. POST `/pacienti/reset-password` <a href="#id-6-reset" id="id-6-reset"></a>
 
 **Поставува нова лозинка** со код од чекорот погоре (без најава).
 
@@ -198,12 +197,12 @@ https://klinicka-bolnica-stip2026.onrender.com/openapi.json
 **Можни грешки:** `400` (невалиден/истечен код, лозинка < 8 знаци) · `404` (пациент не постои) · `500`
 
 {% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/reset-password" method="post" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+[https://klinicka-bolnica-stip2026.onrender.com/openapi.json](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi %}
 
----
+***
 
-## 7. GET `/pacienti/dosie` <a id="7-dosie"></a>
+## 7. GET `/pacienti/dosie` <a href="#id-7-dosie" id="id-7-dosie"></a>
 
 **Комплетно досие** на пациентот — профил, идни термини, завршени прегледи, дадени оцени и кратка статистика.
 
@@ -248,19 +247,19 @@ GET /pacienti/dosie?pacient_ID=42
 }
 ```
 
-- **`idni_termini`** — само `status_pregled = 'закажан'` и `datum_pregled >= денес`
-- **`zaverseni`** — `status_pregled = 'завршен'`, со оцена/коментар ако постои
-- **`oceni`** — подмножество од завршените што имаат запис во `Pregled_feedback`
+* **`idni_termini`** — само `status_pregled = 'закажан'` и `datum_pregled >= денес`
+* **`zaverseni`** — `status_pregled = 'завршен'`, со оцена/коментар ако постои
+* **`oceni`** — подмножество од завршените што имаат запис во `Pregled_feedback`
 
 **Можни грешки:** `404` (непостоечки `pacient_ID`) · `500`
 
 {% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/dosie" method="get" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+[https://klinicka-bolnica-stip2026.onrender.com/openapi.json](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi %}
 
----
+***
 
-## 8. GET `/pacienti/zavrseni-za-ocenka` <a id="8-zavrseni"></a>
+## 8. GET `/pacienti/zavrseni-za-ocenka` <a href="#id-8-zavrseni" id="id-8-zavrseni"></a>
 
 **Листа завршени прегледи** што пациентот може да ги оцени (или веќе ги оценил).
 
@@ -293,12 +292,12 @@ GET /pacienti/zavrseni-za-ocenka?pacient_ID=42
 **Можни грешки:** `404` · `500`
 
 {% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/zavrseni-za-ocenka" method="get" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+[https://klinicka-bolnica-stip2026.onrender.com/openapi.json](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi %}
 
----
+***
 
-## 9. POST `/pacienti/oceni-pregled` <a id="9-oceni"></a>
+## 9. POST `/pacienti/oceni-pregled` <a href="#id-9-oceni" id="id-9-oceni"></a>
 
 **Внесува или ажурира оцена** за завршен преглед. Еден термин = најмногу една оцена (`termin_ID` е уникатен во `Pregled_feedback`).
 
@@ -314,10 +313,11 @@ https://klinicka-bolnica-stip2026.onrender.com/openapi.json
 ```
 
 **Правила:**
-- `ocena` — цел број **од 1 до 5** (и CHECK во базата)
-- Терминот мора да има `status_pregled = 'завршен'`
-- `email_pacient` на терминот мора да одговара на е-поштата на пациентот (`403` ако не)
-- Ако веќе постои оцена за истиот `termin_ID`, се **ажурира** (`ON DUPLICATE KEY UPDATE`)
+
+* `ocena` — цел број **од 1 до 5** (и CHECK во базата)
+* Терминот мора да има `status_pregled = 'завршен'`
+* `email_pacient` на терминот мора да одговара на е-поштата на пациентот (`403` ако не)
+* Ако веќе постои оцена за истиот `termin_ID`, се **ажурира** (`ON DUPLICATE KEY UPDATE`)
 
 **Успешен одговор (200):**
 
@@ -337,22 +337,22 @@ https://klinicka-bolnica-stip2026.onrender.com/openapi.json
 **Можни грешки:** `400` (невалидна оцена, термин не е завршен) · `403` (термин не е на овој пациент) · `404` · `500`
 
 {% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/oceni-pregled" method="post" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
+[https://klinicka-bolnica-stip2026.onrender.com/openapi.json](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi %}
 
----
+***
 
-## 10. Поврзани табели <a id="10-tabele"></a>
+## 10. Поврзани табели <a href="#id-10-tabele" id="id-10-tabele"></a>
 
-| Табела | Улога во `/pacienti` |
-|--------|----------------------|
-| `patient` | Профил, лозинка, ЕМБГ |
+| Табела                  | Улога во `/pacienti`                                   |
+| ----------------------- | ------------------------------------------------------ |
+| `patient`               | Профил, лозинка, ЕМБГ                                  |
 | `password_reset_tokens` | Кодови за заборавена лозинка (`user_type = 'pacient'`) |
-| `Termin_pregled` | Прегледи (врска преку `email_pacient`) |
-| `Pregled_feedback` | Оцени по `termin_ID` |
+| `Termin_pregled`        | Прегледи (врска преку `email_pacient`)                 |
+| `Pregled_feedback`      | Оцени по `termin_ID`                                   |
 
 Детали за колони и врски: [База на податоци](../the_database.md).
 
----
+***
 
 Следно: [Термини](termini.md) · [Автентикација](authentication.md)
