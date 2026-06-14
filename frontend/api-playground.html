@@ -327,7 +327,7 @@ function buildList(filter) {
       const row = document.createElement("div");
       row.className = "ep" + (selected === i ? " active" : "");
       row.innerHTML = `<span class="method m-${ep.method}">${ep.method}</span><span class="path">${ep.path}</span>`;
-      row.onclick = () => { selected = i; buildList(filterEl.value); renderDetail(ep); };
+      row.onclick = () => { selectEndpoint(i, true); };
       listEl.appendChild(row);
     });
   });
@@ -467,8 +467,42 @@ async function send(ep) {
   }
 }
 
+// ── Deep-linking: избор на endpoint преку URL hash ─────────────────────────
+// Формат: #GET=/lekari  или  #POST=/pacienti/login (патеката се енкодира)
+function epHash(ep) { return "#" + ep.method + "=" + encodeURIComponent(ep.path); }
+
+function selectEndpoint(i, scrollIntoView) {
+  selected = i;
+  const ep = ENDPOINTS[i];
+  if (location.hash !== epHash(ep)) {
+    history.replaceState(null, "", epHash(ep));
+  }
+  buildList(filterEl.value);
+  renderDetail(ep);
+  if (scrollIntoView) {
+    const active = listEl.querySelector(".ep.active");
+    if (active) active.scrollIntoView({ block: "nearest" });
+  }
+}
+
+function applyHash() {
+  const h = decodeURIComponent(location.hash.replace(/^#/, "")).trim();
+  if (!h) return false;
+  const eq = h.indexOf("=");
+  if (eq === -1) return false;
+  const method = h.slice(0, eq).toUpperCase();
+  const path = h.slice(eq + 1);
+  const idx = ENDPOINTS.findIndex(e => e.method === method && e.path === path);
+  if (idx === -1) return false;
+  selectEndpoint(idx, true);
+  return true;
+}
+
 filterEl.addEventListener("input", () => buildList(filterEl.value));
+window.addEventListener("hashchange", applyHash);
+
 buildList("");
+applyHash();
 </script>
 </body>
 </html>

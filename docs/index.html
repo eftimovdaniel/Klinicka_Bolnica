@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="mk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Документација · ЈЗУ Клиничка Болница - Штип</title>
+  <meta name="description" content="Документација за системот на Клиничка Болница Штип" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/docsify@4/lib/themes/vue.css" />
+  <style>
+    :root {
+      --kb-accent: #e74c3c;
+      --kb-accent-dark: #c0392b;
+      --kb-heading: #2c3e50;
+    }
+    .sidebar-nav a { color: #364149; }
+    .app-name-link span { color: var(--kb-heading) !important; }
+    .sidebar > h1 a { color: var(--kb-accent); }
+    section.cover.show { background: linear-gradient(to bottom, #fff 0%, #f8f9fa 100%) !important; }
+    /* акцент на Docsify */
+    :root {
+      --theme-color: #e74c3c;
+    }
+    .markdown-section a { color: var(--kb-accent); }
+    .sidebar-nav li.active > a { color: var(--kb-accent); border-right: 2px solid var(--kb-accent); }
+  </style>
+</head>
+<body>
+  <div id="app">Се вчитува…</div>
+
+  <script>
+    // ── Docsify конфигурација ────────────────────────────────────────────
+    window.$docsify = {
+      name: '➕ КБ Штип · Docs',
+      repo: '',
+      loadSidebar: true,
+      subMaxLevel: 3,
+      auto2top: true,
+      maxLevel: 4,
+      search: {
+        placeholder: 'Пребарај…',
+        noData: 'Нема резултати.',
+        depth: 4
+      },
+      // дозволи го нашиот custom element да помине низ маркдаун рендерот
+      // (Docsify по дифолт пропушта raw HTML)
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/docsify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docsify@4/lib/plugins/search.min.js"></script>
+
+  <!-- ── Жив API тест-виџет: <api-tester> ─────────────────────────────────── -->
+  <script>
+  (function () {
+    const BASE_KEY = "kb_api_base";
+    const DEFAULT_BASE = "https://klinicka-bolnica-stip2026.onrender.com";
+    function getBase() { return localStorage.getItem(BASE_KEY) || DEFAULT_BASE; }
+    function setBase(v) { localStorage.setItem(BASE_KEY, v); window.dispatchEvent(new CustomEvent("kb-base-change", { detail: v })); }
+
+    const METHOD_COLORS = { GET: "#27ae60", POST: "#2980b9", PUT: "#8e44ad", PATCH: "#16a085", DELETE: "#e74c3c" };
+
+    function parseAttr(el, name, fallback) {
+      const raw = el.getAttribute(name);
+      if (raw == null || raw === "") return fallback;
+      try { return JSON.parse(raw); } catch (e) { return fallback; }
+    }
+
+    function highlight(json) {
+      return json
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+          let c = "#5dade2";
+          if (/^"/.test(m)) c = /:$/.test(m) ? "#f1948a" : "#2ecc71";
+          else if (/true|false/.test(m)) c = "#af7ac5";
+          else if (/null/.test(m)) c = "#95a5a6";
+          return '<span style="color:' + c + '">' + m + "</span>";
+        });
+    }
+
+    class ApiTester extends HTMLElement {
+      connectedCallback() {
+        if (this._mounted) return;
+        this._mounted = true;
+
+        this.method = (this.getAttribute("method") || "GET").toUpperCase();
+        this.path = this.getAttribute("path") || "/";
+        this.desc = this.getAttribute("desc") || "";
+        this.write = this.hasAttribute("write") && this.getAttribute("write") !== "false";
+        this.qparams = parseAttr(this, "query", []);
+        this.pparams = parseAttr(this, "params", []);
+        this.fparams = parseAttr(this, "form", []);
+        this.body = this.hasAttribute("body") ? parseAttr(this, "body", undefined) : undefined;
+
+        const root = this.attachShadow({ mode: "open" });
+        const mc = METHOD_COLORS[this.method] || "#7f8c9a";
+
+        let html = "";
+        html += style();
+        html += '<div class="card">';
+        html += '<div class="head">';
+        html += '<span class="m" style="background:' + mc + '">' + this.method + "</span>";
+        html += '<code class="path"></code>';
+        if (this.write) html += '<span class="warn">менува податоци</span>';
+        html += '<button class="gear" title="Base URL">⚙</button>';
+        html += "</div>";
+        if (this.desc) html += '<div class="desc">' + this.desc + "</div>";
+        html += '<div class="baserow" style="display:none"><label>Base URL</label><input class="base" spellcheck="false"></div>';
+
+        if (this.pparams.length) {
+          html += '<div class="lbl">Path параметри</div>';
+          this.pparams.forEach(p => { html += fieldHtml("p_" + p.name, p.name, true, p.example); });
+        }
+        if (this.qparams.length) {
+          html += '<div class="lbl">Query параметри</div>';
+          this.qparams.forEach(q => { html += fieldHtml("q_" + q.name, q.name, !!q.required, q.example); });
+        }
+        if (this.fparams.length) {
+          html += '<div class="lbl">Multipart форма</div>';
+          this.fparams.forEach(f => { html += fieldHtml("f_" + f.name, f.name, !!f.required, f.example); });
+        }
+        if (this.body !== undefined) {
+          html += '<div class="lbl">JSON тело</div>';
+          html += '<textarea class="body" rows="7" spellcheck="false">' + escapeHtml(JSON.stringify(this.body, null, 2)) + "</textarea>";
+        }
+        html += '<button class="send">Испрати барање</button>';
+        html += '<div class="resp"></div>';
+        html += "</div>";
+        root.innerHTML = html;
+
+        this._root = root;
+        this._baseInput = root.querySelector(".base");
+        this._baseInput.value = getBase();
+        root.querySelector(".gear").onclick = () => {
+          const r = root.querySelector(".baserow");
+          r.style.display = r.style.display === "none" ? "flex" : "none";
+        };
+        this._baseInput.addEventListener("input", () => setBase(this._baseInput.value));
+        window.addEventListener("kb-base-change", e => {
+          if (this._baseInput.value !== e.detail) this._baseInput.value = e.detail;
+          this._refreshUrl();
+        });
+        root.querySelectorAll("input").forEach(i => i.addEventListener("input", () => this._refreshUrl()));
+        root.querySelector(".send").onclick = () => this._send();
+        this._refreshUrl();
+      }
+
+      _buildUrl() {
+        let path = this.path;
+        this.pparams.forEach(p => {
+          const v = (this._root.querySelector("#p_" + cssEsc(p.name)) || {}).value || ("{" + p.name + "}");
+          path = path.replace("{" + p.name + "}", encodeURIComponent(v));
+        });
+        const qs = [];
+        this.qparams.forEach(q => {
+          const v = (this._root.querySelector("#q_" + cssEsc(q.name)) || {}).value;
+          if (v != null && v !== "") qs.push(encodeURIComponent(q.name) + "=" + encodeURIComponent(v));
+        });
+        return getBase().replace(/\/+$/, "") + path + (qs.length ? "?" + qs.join("&") : "");
+      }
+
+      _refreshUrl() {
+        const el = this._root.querySelector(".path");
+        if (el) el.textContent = this._buildUrl();
+      }
+
+      async _send() {
+        if (this.write && !confirm("Ова барање МЕНУВА податоци на живиот сервер. Продолжи?")) return;
+        const respEl = this._root.querySelector(".resp");
+        const btn = this._root.querySelector(".send");
+        const url = this._buildUrl();
+        const opts = { method: this.method, headers: {} };
+
+        try {
+          if (this.fparams.length) {
+            const fd = new FormData();
+            this.fparams.forEach(f => {
+              const v = (this._root.querySelector("#f_" + cssEsc(f.name)) || {}).value;
+              if (v != null && v !== "") fd.append(f.name, v);
+            });
+            opts.body = fd;
+          } else if (this.body !== undefined && this.method !== "GET") {
+            const raw = this._root.querySelector(".body").value.trim();
+            if (raw) { JSON.parse(raw); opts.headers["Content-Type"] = "application/json"; opts.body = raw; }
+          }
+        } catch (e) {
+          respEl.innerHTML = '<div class="st err">Грешка во JSON</div><pre>' + escapeHtml(e.message) + "</pre>";
+          return;
+        }
+
+        btn.disabled = true; btn.textContent = "Праќам…";
+        const t0 = performance.now();
+        try {
+          const res = await fetch(url, opts);
+          const ms = Math.round(performance.now() - t0);
+          const ct = res.headers.get("content-type") || "";
+          const ok = res.ok ? "ok" : "err";
+          let body = "";
+          if (ct.includes("application/json")) {
+            const d = await res.json();
+            body = "<pre>" + highlight(JSON.stringify(d, null, 2)) + "</pre>";
+          } else if (ct.includes("pdf") || ct.startsWith("image/") || ct.includes("octet-stream")) {
+            const b = await res.blob();
+            body = "<pre>Бинарен одговор (" + ct + ", " + b.size + " бајти). <a href='" + URL.createObjectURL(b) + "' target='_blank'>Отвори</a></pre>";
+          } else {
+            body = "<pre>" + escapeHtml(await res.text()) + "</pre>";
+          }
+          respEl.innerHTML = '<div class="rh"><span class="st ' + ok + '">' + res.status + " " + res.statusText + '</span><span class="meta">' + ms + " ms · " + (ct || "—") + "</span></div>" + body;
+        } catch (e) {
+          const ms = Math.round(performance.now() - t0);
+          respEl.innerHTML = '<div class="rh"><span class="st err">Барањето не успеа</span><span class="meta">' + ms + ' ms</span></div><pre>' + escapeHtml(e.message) + "\n\nМожни причини: серверот спие (Render cold start — пробај пак за 30–60s), мрежа или CORS.</pre>";
+        } finally {
+          btn.disabled = false; btn.textContent = "Испрати барање";
+        }
+      }
+    }
+
+    function fieldHtml(id, name, req, example) {
+      return '<div class="f"><label>' + name + (req ? ' <span class="req">*</span>' : ' <span class="opt">(опц.)</span>') +
+        '</label><input id="' + id + '" value="' + (req && example != null ? escapeAttr(String(example)) : "") +
+        '" placeholder="' + (example != null ? escapeAttr(String(example)) : "") + '" spellcheck="false"></div>';
+    }
+    function escapeHtml(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+    function escapeAttr(s) { return escapeHtml(s).replace(/"/g, "&quot;"); }
+    function cssEsc(s) { return String(s).replace(/[^a-zA-Z0-9_-]/g, "\\$&"); }
+
+    function style() {
+      return '<style>' +
+        ':host{display:block;margin:16px 0;font-family:"Segoe UI",Tahoma,sans-serif}' +
+        '.card{border:1px solid #e4e8ec;border-radius:8px;background:#fff;padding:14px 16px;box-shadow:0 1px 4px rgba(0,0,0,.05)}' +
+        '.head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}' +
+        '.m{color:#fff;font-size:11px;font-weight:700;padding:3px 8px;border-radius:4px;min-width:52px;text-align:center}' +
+        '.path{font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#2c3e50;word-break:break-all;flex:1}' +
+        '.warn{background:#fdecea;color:#c0392b;border:1px solid #f5b7b1;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600}' +
+        '.gear{background:none;border:none;cursor:pointer;font-size:15px;opacity:.6}.gear:hover{opacity:1}' +
+        '.desc{color:#7f8c9a;font-size:13px;margin:8px 0 0}' +
+        '.baserow{align-items:center;gap:8px;margin-top:10px}.baserow label{font-size:12px;color:#7f8c9a;font-weight:600}' +
+        '.lbl{font-size:12px;font-weight:700;color:#2c3e50;text-transform:uppercase;letter-spacing:.04em;margin:14px 0 8px;border-bottom:2px solid #e4e8ec;padding-bottom:4px}' +
+        '.f{margin-bottom:9px}.f label{display:block;font-size:12px;color:#2c3e50;font-weight:600;margin-bottom:3px}' +
+        '.req{color:#e74c3c}.opt{color:#95a5a6;font-weight:400}' +
+        'input,textarea{width:100%;box-sizing:border-box;border:1px solid #e4e8ec;border-radius:4px;padding:8px 10px;font-size:13px;font-family:inherit;color:#333}' +
+        'textarea{font-family:ui-monospace,Menlo,monospace;resize:vertical}' +
+        'input:focus,textarea:focus{outline:none;border-color:#e74c3c;box-shadow:0 0 0 2px rgba(231,76,60,.12)}' +
+        '.send{margin-top:14px;background:#e74c3c;color:#fff;border:none;padding:10px 24px;border-radius:4px;font-size:14px;font-weight:600;cursor:pointer}' +
+        '.send:hover{background:#c0392b}.send:disabled{opacity:.55;cursor:not-allowed}' +
+        '.resp{margin-top:16px}.rh{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px}' +
+        '.st{font-weight:700;padding:3px 10px;border-radius:4px;font-size:13px;font-family:ui-monospace,monospace}' +
+        '.st.ok{background:#eafaf1;color:#1e8449;border:1px solid #abebc6}.st.err{background:#fdecea;color:#c0392b;border:1px solid #f5b7b1}' +
+        '.meta{color:#7f8c9a;font-size:12px}' +
+        'pre{background:#2c3e50;color:#ecf0f1;border-radius:6px;padding:14px;overflow:auto;margin:0;max-height:420px;font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.5}' +
+        'pre a{color:#5dade2}' +
+        '</style>';
+    }
+
+    customElements.define("api-tester", ApiTester);
+  })();
+  </script>
+</body>
+</html>
