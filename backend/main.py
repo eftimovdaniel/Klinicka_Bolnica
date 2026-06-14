@@ -10,6 +10,10 @@ app = FastAPI(  # kreiranje na FastAPI aplikacijata
     title="Клиничка Болница Штип – API",  # naslov što se gleda vo /docs
     description="API за системот за управување со прегледи, термини и администрација",  # kratok opis na API
     version="1.0",  # verzija na API
+    servers=[  # base URL-ovi vo openapi.json (potrebno za GitBook "Test it" / Scalar)
+        {"url": "https://klinicka-bolnica-stip2026.onrender.com", "description": "Produkcija (Render)"},
+        {"url": "http://localhost:8000", "description": "Lokalen razvoj"},
+    ],
 )
 app.add_middleware(  # dodavanje na CORS sloj (pred sekoj odgovor)
     CORSMiddleware,  # tip na middleware za cross-origin baranja
