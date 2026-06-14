@@ -94,7 +94,7 @@ flowchart LR
 
 > Лозинката се чува како **bcrypt хеш** (`password_utils.hash_password`), никогаш како чист текст.
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/login" method="post" %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/register" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
 
@@ -134,9 +134,9 @@ Frontend-от го зачувува овој објект (на пр. во `loca
 
 **Можни грешки:** `400` (празна е-пошта или лозинка) · `401` (погрешна комбинација — намерно иста порака за email и лозинка) · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/login" method="post" %}
-[https://klinicka-bolnica-stip2026.onrender.com/openapi.json](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/login" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ***
 
@@ -164,9 +164,9 @@ Frontend-от го зачувува овој објект (на пр. во `loca
 
 **Можни грешки:** `400` (невалидна е-пошта) · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/forgot-password" method="post" %}
-[https://klinicka-bolnica-stip2026.onrender.com/openapi.json](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/forgot-password" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ***
 
@@ -196,9 +196,9 @@ Frontend-от го зачувува овој објект (на пр. во `loca
 
 **Можни грешки:** `400` (невалиден/истечен код, лозинка < 8 знаци) · `404` (пациент не постои) · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/reset-password" method="post" %}
-[https://klinicka-bolnica-stip2026.onrender.com/openapi.json](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/reset-password" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ***
 
@@ -253,9 +253,9 @@ GET /pacienti/dosie?pacient_ID=42
 
 **Можни грешки:** `404` (непостоечки `pacient_ID`) · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/dosie" method="get" %}
-[https://klinicka-bolnica-stip2026.onrender.com/openapi.json](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/dosie" method="get" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ***
 
@@ -291,9 +291,9 @@ GET /pacienti/zavrseni-za-ocenka?pacient_ID=42
 
 **Можни грешки:** `404` · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/zavrseni-za-ocenka" method="get" %}
-[https://klinicka-bolnica-stip2026.onrender.com/openapi.json](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/zavrseni-za-ocenka" method="get" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ***
 
@@ -336,9 +336,9 @@ GET /pacienti/zavrseni-za-ocenka?pacient_ID=42
 
 **Можни грешки:** `400` (невалидна оцена, термин не е завршен) · `403` (термин не е на овој пациент) · `404` · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/pacienti/oceni-pregled" method="post" %}
-[https://klinicka-bolnica-stip2026.onrender.com/openapi.json](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/oceni-pregled" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ***
 
