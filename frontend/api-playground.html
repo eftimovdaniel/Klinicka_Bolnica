@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="mk">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>КБ Штип — API Playground</title>
+<style>
+  :root {
+    --bg: #0f1419;
+    --panel: #161b22;
+    --panel2: #1c232c;
+    --border: #2a323d;
+    --text: #e6edf3;
+    --muted: #8b97a5;
+    --accent: #3b82f6;
+    --get: #22c55e;
+    --post: #f59e0b;
+    --put: #a855f7;
+    --patch: #06b6d4;
+    --delete: #ef4444;
+    --ok: #22c55e;
+    --err: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    padding: 12px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; white-space: nowrap; }
+  header .sub { color: var(--muted); font-size: 12px; }
+  .baseurl { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 280px; }
+  .baseurl label { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  input, textarea, select {
+    background: var(--panel2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: inherit;
+    width: 100%;
+  }
+  input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  textarea { font-family: "SF Mono", ui-monospace, Menlo, Consolas, monospace; resize: vertical; }
+  .layout { display: flex; flex: 1; min-height: 0; }
+  aside {
+    width: 320px;
+    border-right: 1px solid var(--border);
+    background: var(--panel);
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+  aside .search { padding: 10px; position: sticky; top: 0; background: var(--panel); border-bottom: 1px solid var(--border); }
+  .group-title {
+    padding: 10px 14px 4px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    color: var(--muted);
+    font-weight: 700;
+  }
+  .ep {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px;
+    cursor: pointer;
+    border-left: 3px solid transparent;
+  }
+  .ep:hover { background: var(--panel2); }
+  .ep.active { background: var(--panel2); border-left-color: var(--accent); }
+  .ep .path { font-size: 12.5px; font-family: ui-monospace, Menlo, monospace; word-break: break-all; }
+  .method {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    min-width: 50px;
+    text-align: center;
+    flex-shrink: 0;
+    color: #0b0e12;
+  }
+  .m-GET { background: var(--get); }
+  .m-POST { background: var(--post); }
+  .m-PUT { background: var(--put); }
+  .m-PATCH { background: var(--patch); }
+  .m-DELETE { background: var(--delete); }
+  main { flex: 1; overflow-y: auto; padding: 20px 26px; min-width: 0; }
+  .empty { color: var(--muted); margin-top: 40px; text-align: center; }
+  .url-bar {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 12px; margin-bottom: 6px;
+    font-family: ui-monospace, Menlo, monospace; font-size: 13px;
+    word-break: break-all;
+  }
+  .desc { color: var(--muted); margin: 4px 0 18px; }
+  .section-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin: 18px 0 8px; }
+  .field { margin-bottom: 10px; }
+  .field label { display: block; font-size: 12px; margin-bottom: 4px; }
+  .field label .req { color: var(--delete); }
+  .field label .opt { color: var(--muted); font-weight: 400; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .btn {
+    background: var(--accent); color: #fff; border: none;
+    padding: 10px 22px; border-radius: 7px; font-size: 14px; font-weight: 600;
+    cursor: pointer; margin-top: 16px;
+  }
+  .btn:hover { filter: brightness(1.1); }
+  .btn:disabled { opacity: .5; cursor: not-allowed; }
+  .warn-badge {
+    display: inline-block; background: rgba(239,68,68,.15); color: #fca5a5;
+    border: 1px solid rgba(239,68,68,.4); padding: 2px 8px; border-radius: 5px;
+    font-size: 11px; font-weight: 600; margin-left: 10px;
+  }
+  .resp { margin-top: 22px; }
+  .resp-head { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; flex-wrap: wrap; }
+  .status {
+    font-weight: 700; padding: 3px 10px; border-radius: 5px; font-size: 13px;
+    font-family: ui-monospace, monospace;
+  }
+  .status.ok { background: rgba(34,197,94,.15); color: #86efac; border: 1px solid rgba(34,197,94,.4); }
+  .status.err { background: rgba(239,68,68,.15); color: #fca5a5; border: 1px solid rgba(239,68,68,.4); }
+  .meta { color: var(--muted); font-size: 12px; }
+  pre {
+    background: #0b0e12; border: 1px solid var(--border); border-radius: 8px;
+    padding: 14px; overflow: auto; margin: 0; max-height: 460px;
+    font-family: ui-monospace, Menlo, monospace; font-size: 12.5px;
+  }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  a { color: var(--accent); }
+  .tok-str { color: #86efac; }
+  .tok-num { color: #93c5fd; }
+  .tok-bool { color: #f0abfc; }
+  .tok-key { color: #fca5a5; }
+  .tok-null { color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>КБ Штип · API Playground</h1>
+    <div class="sub">Интерактивно тестирање на endpoints — праќа вистински барања</div>
+  </div>
+  <div class="baseurl">
+    <label for="base">Base URL</label>
+    <input id="base" value="https://klinicka-bolnica-stip2026.onrender.com" spellcheck="false" />
+  </div>
+</header>
+
+<div class="layout">
+  <aside>
+    <div class="search"><input id="filter" placeholder="Пребарај endpoint…" spellcheck="false" /></div>
+    <div id="list"></div>
+  </aside>
+  <main id="main">
+    <div class="empty">Избери endpoint од левата страна за да го тестираш.</div>
+  </main>
+</div>
+
+<script>
+// ── Каталог на сите endpoints ──────────────────────────────────────────────
+// q = query параметри, p = path параметри, body = пример JSON тело,
+// form = multipart полиња, write = менува податоци (предупредување пред праќање)
+const ENDPOINTS = [
+  // ── Услуги ──
+  { group: "Услуги", method: "GET", path: "/specialnosti", desc: "Сите специјалности (distinct од лекарите)." },
+  { group: "Услуги", method: "GET", path: "/uslugi", desc: "Список на одделенија." },
+
+  // ── Лекари ──
+  { group: "Лекари", method: "GET", path: "/lekari", desc: "Сите лекари; опционално филтер по специјалност.",
+    q: [{ name: "specijalnost", required: false, example: "Кардиологија" }] },
+  { group: "Лекари", method: "POST", path: "/lekari/login", desc: "Најава на лекар (корисничко име = име.презиме на латиница).",
+    body: { username: "ana.stojanovska", password: "Test123.." } },
+  { group: "Лекари", method: "POST", path: "/lekari/register", desc: "Регистрација на нов лекар.", write: true,
+    body: { name: "Тест", prezime: "Лекар", specialty: "Кардиологија", email: "test.lekar@kbstip.mk", password: "Test123.." } },
+  { group: "Лекари", method: "PATCH", path: "/lekari/promeni-lozinka", desc: "Смена на лозинка за најавен лекар.", write: true,
+    body: { doctor_id: 2, trenutna_lozinka: "Test123..", nova_lozinka: "Nova123.." } },
+  { group: "Лекари", method: "POST", path: "/lekari/forgot-password", desc: "Бара код за ресет на лозинка (праќа е-пошта).", write: true,
+    body: { email: "ana.stojanovska@kbstip.mk" } },
+  { group: "Лекари", method: "POST", path: "/lekari/reset-password", desc: "Ресет на лозинка со код.", write: true,
+    body: { email: "ana.stojanovska@kbstip.mk", token: "123456", nova_lozinka: "Nova123.." } },
+  { group: "Лекари", method: "GET", path: "/lekari/termini", desc: "Термини на лекар по е-пошта.",
+    q: [{ name: "email", required: true, example: "ana.stojanovska@kbstip.mk" }] },
+  { group: "Лекари", method: "GET", path: "/lekari/{doctor_id}/dezurstva", desc: "Распоред на дежурства за лекар.",
+    p: [{ name: "doctor_id", example: "2" }] },
+
+  // ── Пациенти ──
+  { group: "Пациенти", method: "POST", path: "/pacienti/login", desc: "Најава на пациент.",
+    body: { email: "pacient@example.com", password: "lozinka" } },
+  { group: "Пациенти", method: "POST", path: "/pacienti/register", desc: "Регистрација на пациент.", write: true,
+    body: { ime: "Иван", prezime: "Ивановски", email: "ivan@example.com", password: "Lozinka1.", telefon: "070123456", embg: "0101990450012" } },
+  { group: "Пациенти", method: "POST", path: "/pacienti/forgot-password", desc: "Бара код за ресет (праќа е-пошта).", write: true,
+    body: { email: "pacient@example.com" } },
+  { group: "Пациенти", method: "POST", path: "/pacienti/reset-password", desc: "Ресет на лозинка со код.", write: true,
+    body: { email: "pacient@example.com", token: "123456", nova_lozinka: "Nova123." } },
+  { group: "Пациенти", method: "GET", path: "/pacienti/zavrseni-za-ocenka", desc: "Завршени прегледи што може да се оценат.",
+    q: [{ name: "pacient_ID", required: true, example: "1" }] },
+  { group: "Пациенти", method: "POST", path: "/pacienti/oceni-pregled", desc: "Оцени завршен преглед (1–5).", write: true,
+    body: { termin_id: 1, pacient_ID: 1, ocena: 5, komentar: "Одличен преглед" } },
+  { group: "Пациенти", method: "GET", path: "/pacienti/dosie", desc: "Досие на пациент (термини, оцени).",
+    q: [{ name: "pacient_ID", required: true, example: "1" }] },
+
+  // ── Термини ──
+  { group: "Термини", method: "GET", path: "/termini/dostapni", desc: "Слободни термини за лекар на даден датум.",
+    q: [{ name: "lekar_id", required: true, example: "2" }, { name: "datum", required: true, example: "2026-06-20" }] },
+  { group: "Термини", method: "POST", path: "/termini", desc: "Закажи нов преглед.", write: true,
+    body: { lekar_id: 2, ime: "Иван", prezime: "Ивановски", datum: "2026-06-20", vreme: "10:00", email: "ivan@example.com", telefon: "070123456", napomena: "" } },
+  { group: "Термини", method: "PATCH", path: "/termini/{termin_id}", desc: "Внеси дијагноза и терапија за термин.", write: true,
+    p: [{ name: "termin_id", example: "1" }], body: { dijagnoza: "Дијагноза…", terapija: "Терапија…" } },
+  { group: "Термини", method: "GET", path: "/termini/izvestaj-pdf/{termin_id}", desc: "PDF извештај за преглед (бинарен одговор).",
+    p: [{ name: "termin_id", example: "1" }] },
+  { group: "Термини", method: "POST", path: "/termini/{termin_id}/poslati-izvestaj", desc: "Прати PDF извештај на е-пошта.", write: true,
+    p: [{ name: "termin_id", example: "1" }], body: {} },
+
+  // ── Апарати ──
+  { group: "Апарати", method: "GET", path: "/aparati", desc: "Сите активни апарати." },
+  { group: "Апарати", method: "GET", path: "/aparati/termini/dostapnost", desc: "Дали апаратот е достапен за датум/време.",
+    q: [{ name: "aparat", required: true, example: "kt" }, { name: "datum", required: true, example: "2026-06-20" }, { name: "vreme", required: true, example: "10:00" }, { name: "lekar_id", required: false, example: "2" }] },
+  { group: "Апарати", method: "POST", path: "/aparati/termini", desc: "Закажи термин на апарат.", write: true,
+    body: { lekar_id: 2, lekar_ime: "Ана Стојановска", pacient_ime: "Иван", pacient_prezime: "Ивановски", aparat: "kt", aparat_ime: "КТ", datum_vreme: "2026-06-20T10:00", opis: "Потребна КТ снимка" } },
+
+  // ── Новости ──
+  { group: "Новости", method: "GET", path: "/novosti", desc: "Сите новости." },
+  { group: "Новости", method: "GET", path: "/novosti/{novost_id}", desc: "Една новост по ID.",
+    p: [{ name: "novost_id", example: "1" }] },
+  { group: "Новости", method: "POST", path: "/admin/novosti", desc: "Создади новост (само директор). Multipart форма.", write: true,
+    form: [{ name: "naslov", required: true, example: "Нов наслов" }, { name: "sodrzina", required: true, example: "Содржина на новоста" }, { name: "admin_doctor_id", required: true, example: "1" }, { name: "video_url", required: false, example: "" }] },
+  { group: "Новости", method: "PUT", path: "/admin/novosti/{novost_id}", desc: "Измени новост (само директор). Multipart.", write: true,
+    p: [{ name: "novost_id", example: "1" }], form: [{ name: "naslov", required: false, example: "Изменет наслов" }, { name: "sodrzina", required: false, example: "Нова содржина" }, { name: "admin_doctor_id", required: true, example: "1" }] },
+  { group: "Новости", method: "DELETE", path: "/admin/novosti/{novost_id}", desc: "Избриши новост (само директор).", write: true,
+    p: [{ name: "novost_id", example: "1" }], q: [{ name: "admin_doctor_id", required: true, example: "1" }] },
+
+  // ── Кариера ──
+  { group: "Кариера", method: "GET", path: "/kariera", desc: "Активни огласи за работа." },
+  { group: "Кариера", method: "POST", path: "/aplikacija", desc: "Поднеси апликација на оглас. Multipart форма.", write: true,
+    form: [{ name: "pozicija", required: true, example: "Лекар специјалист – кардиологија" }, { name: "ime", required: true, example: "Иван" }, { name: "prezime", required: true, example: "Ивановски" }, { name: "email", required: true, example: "ivan@example.com" }, { name: "telefon", required: false, example: "070123456" }, { name: "broj_med_licenca", required: false, example: "12345" }, { name: "id_oglas", required: false, example: "1" }] },
+  { group: "Кариера", method: "POST", path: "/oglas", desc: "Создади оглас (јавно).", write: true,
+    body: { pozicija: "Лекар специјалист – неврологија", oddel: "Неврологија", datum_na_objava: "2026-06-14", datum_na_prijavuvanje: "2026-08-14", status_oglas: "активен" } },
+
+  // ── Админ (директор) ──
+  { group: "Админ", method: "GET", path: "/admin/dezurstva", desc: "Сите дежурства (потребен admin_doctor_id = директор).",
+    q: [{ name: "admin_doctor_id", required: true, example: "1" }, { name: "datum", required: false, example: "2026-06-20" }, { name: "oddel", required: false, example: "Кардиологија" }] },
+  { group: "Админ", method: "POST", path: "/admin/dezurstva", desc: "Создади дежурство.", write: true,
+    body: { admin_doctor_id: 1, doctor_ID: 2, datum: "2026-06-20", oddel: "Кардиологија", vreme_od: "08:00", vreme_do: "20:00", napomena: "" } },
+  { group: "Админ", method: "PUT", path: "/admin/dezurstva/{dezurstvo_id}", desc: "Измени дежурство.", write: true,
+    p: [{ name: "dezurstvo_id", example: "1" }], body: { admin_doctor_id: 1, doctor_ID: 2, datum: "2026-06-21", oddel: "Кардиологија", vreme_od: "08:00", vreme_do: "20:00", napomena: "" } },
+  { group: "Админ", method: "DELETE", path: "/admin/dezurstva/{dezurstvo_id}", desc: "Избриши дежурство.", write: true,
+    p: [{ name: "dezurstvo_id", example: "1" }], q: [{ name: "admin_doctor_id", required: true, example: "1" }] },
+  { group: "Админ", method: "GET", path: "/admin/oglasi", desc: "Сите огласи (админ преглед).",
+    q: [{ name: "admin_doctor_id", required: true, example: "1" }] },
+  { group: "Админ", method: "POST", path: "/admin/oglasi", desc: "Создади оглас (админ).", write: true,
+    body: { admin_doctor_id: 1, pozicija: "Лекар специјалист – хирургија", oddel: "Хирургија", datum_na_objava: "2026-06-14", datum_na_prijavuvanje: "2026-08-14", status_oglas: "активен" } },
+  { group: "Админ", method: "PUT", path: "/admin/oglasi/{oglas_id}", desc: "Измени оглас.", write: true,
+    p: [{ name: "oglas_id", example: "1" }], body: { admin_doctor_id: 1, pozicija: "Лекар специјалист – хирургија", oddel: "Хирургија", status_oglas: "завршен" } },
+  { group: "Админ", method: "DELETE", path: "/admin/oglasi/{oglas_id}", desc: "Избриши оглас.", write: true,
+    p: [{ name: "oglas_id", example: "1" }], q: [{ name: "admin_doctor_id", required: true, example: "1" }] },
+  { group: "Админ", method: "GET", path: "/admin/statistika/optovaruvanje-oddeli", desc: "Статистика: оптовареност по оддели.",
+    q: [{ name: "admin_doctor_id", required: true, example: "1" }] },
+  { group: "Админ", method: "GET", path: "/admin/statistika/prosek-ocena-lekari", desc: "Статистика: просечна оцена по лекари.",
+    q: [{ name: "admin_doctor_id", required: true, example: "1" }] },
+
+  // ── AI чат ──
+  { group: "AI чат", method: "POST", path: "/ai-chat/ask", desc: "Прашај го AI асистентот.",
+    body: { prasanje: "Кои лекари ги имате на кардиологија?", pacient: null, lekar: null, kontekst: null } },
+  { group: "AI чат", method: "GET", path: "/ai-chat/sessions", desc: "Разговори на најавен корисник.",
+    q: [{ name: "pacient_id", required: false, example: "1" }, { name: "doctor_id", required: false, example: "2" }] },
+  { group: "AI чат", method: "GET", path: "/ai-chat/sessions/{session_id}/messages", desc: "Пораки во разговор.",
+    p: [{ name: "session_id", example: "1" }], q: [{ name: "pacient_id", required: false, example: "1" }] },
+  { group: "AI чат", method: "DELETE", path: "/ai-chat/sessions/{session_id}", desc: "Избриши разговор.", write: true,
+    p: [{ name: "session_id", example: "1" }], q: [{ name: "pacient_id", required: false, example: "1" }] },
+];
+
+// ── Состојба ──────────────────────────────────────────────────────────────
+let selected = null;
+
+const listEl = document.getElementById("list");
+const mainEl = document.getElementById("main");
+const baseEl = document.getElementById("base");
+const filterEl = document.getElementById("filter");
+
+function buildList(filter) {
+  listEl.innerHTML = "";
+  const f = (filter || "").toLowerCase();
+  const groups = {};
+  ENDPOINTS.forEach((ep, i) => {
+    if (f && !(ep.path.toLowerCase().includes(f) || ep.method.toLowerCase().includes(f) || ep.group.toLowerCase().includes(f))) return;
+    (groups[ep.group] = groups[ep.group] || []).push({ ep, i });
+  });
+  Object.keys(groups).forEach(g => {
+    const t = document.createElement("div");
+    t.className = "group-title";
+    t.textContent = g;
+    listEl.appendChild(t);
+    groups[g].forEach(({ ep, i }) => {
+      const row = document.createElement("div");
+      row.className = "ep" + (selected === i ? " active" : "");
+      row.innerHTML = `<span class="method m-${ep.method}">${ep.method}</span><span class="path">${ep.path}</span>`;
+      row.onclick = () => { selected = i; buildList(filterEl.value); renderDetail(ep); };
+      listEl.appendChild(row);
+    });
+  });
+}
+
+function field(labelHtml, inputId, value, placeholder) {
+  return `<div class="field"><label for="${inputId}">${labelHtml}</label>
+    <input id="${inputId}" value="${value != null ? String(value).replace(/"/g, "&quot;") : ""}" placeholder="${placeholder || ""}" spellcheck="false" /></div>`;
+}
+
+function renderDetail(ep) {
+  let html = "";
+  html += `<div class="url-bar"><span class="method m-${ep.method}">${ep.method}</span><span id="urlPreview"></span></div>`;
+  html += `<div class="desc">${ep.desc || ""}${ep.write ? '<span class="warn-badge">менува податоци на жив сервер</span>' : ""}</div>`;
+
+  if (ep.p && ep.p.length) {
+    html += `<div class="section-label">Path параметри</div>`;
+    ep.p.forEach(p => { html += field(`${p.name} <span class="req">*</span>`, "p_" + p.name, p.example, p.example); });
+  }
+  if (ep.q && ep.q.length) {
+    html += `<div class="section-label">Query параметри</div>`;
+    ep.q.forEach(q => {
+      const lab = `${q.name} ${q.required ? '<span class="req">*</span>' : '<span class="opt">(опц.)</span>'}`;
+      html += field(lab, "q_" + q.name, q.required ? q.example : "", q.example);
+    });
+  }
+  if (ep.form && ep.form.length) {
+    html += `<div class="section-label">Multipart форма</div>`;
+    ep.form.forEach(fm => {
+      const lab = `${fm.name} ${fm.required ? '<span class="req">*</span>' : '<span class="opt">(опц.)</span>'}`;
+      html += field(lab, "f_" + fm.name, fm.required ? fm.example : "", fm.example);
+    });
+    html += `<div class="hint">Прикачување фајлови (слики) не е поддржано тука — само текстуални полиња.</div>`;
+  }
+  if (ep.body !== undefined) {
+    html += `<div class="section-label">JSON тело</div>`;
+    html += `<textarea id="bodyEditor" rows="9">${JSON.stringify(ep.body, null, 2)}</textarea>`;
+  }
+
+  html += `<button class="btn" id="sendBtn">Испрати барање</button>`;
+  html += `<div class="resp" id="resp"></div>`;
+  mainEl.innerHTML = html;
+
+  const refresh = () => { document.getElementById("urlPreview").textContent = buildUrl(ep); };
+  mainEl.querySelectorAll("input").forEach(inp => inp.addEventListener("input", refresh));
+  refresh();
+  document.getElementById("sendBtn").onclick = () => send(ep);
+}
+
+function buildUrl(ep) {
+  let path = ep.path;
+  (ep.p || []).forEach(p => {
+    const v = (document.getElementById("p_" + p.name) || {}).value || `{${p.name}}`;
+    path = path.replace(`{${p.name}}`, encodeURIComponent(v));
+  });
+  const qs = [];
+  (ep.q || []).forEach(q => {
+    const v = (document.getElementById("q_" + q.name) || {}).value;
+    if (v != null && v !== "") qs.push(`${encodeURIComponent(q.name)}=${encodeURIComponent(v)}`);
+  });
+  return baseEl.value.replace(/\/+$/, "") + path + (qs.length ? "?" + qs.join("&") : "");
+}
+
+function syntaxHighlight(json) {
+  return json
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g, m => {
+      let cls = "tok-num";
+      if (/^"/.test(m)) cls = /:$/.test(m) ? "tok-key" : "tok-str";
+      else if (/true|false/.test(m)) cls = "tok-bool";
+      else if (/null/.test(m)) cls = "tok-null";
+      return `<span class="${cls}">${m}</span>`;
+    });
+}
+
+async function send(ep) {
+  if (ep.write && !confirm("Ова барање МЕНУВА податоци на живиот сервер. Продолжи?")) return;
+  const respEl = document.getElementById("resp");
+  const btn = document.getElementById("sendBtn");
+  const url = buildUrl(ep);
+  const opts = { method: ep.method, headers: {} };
+
+  try {
+    if (ep.form) {
+      const fd = new FormData();
+      ep.form.forEach(fm => {
+        const v = (document.getElementById("f_" + fm.name) || {}).value;
+        if (v != null && v !== "") fd.append(fm.name, v);
+      });
+      opts.body = fd;
+    } else if (ep.body !== undefined && ep.method !== "GET") {
+      const raw = document.getElementById("bodyEditor").value.trim();
+      if (raw) {
+        JSON.parse(raw); // валидација
+        opts.headers["Content-Type"] = "application/json";
+        opts.body = raw;
+      }
+    }
+  } catch (e) {
+    respEl.innerHTML = `<div class="status err">Грешка во JSON</div><pre>${e.message}</pre>`;
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Праќам…";
+  const t0 = performance.now();
+  try {
+    const res = await fetch(url, opts);
+    const ms = Math.round(performance.now() - t0);
+    const ct = res.headers.get("content-type") || "";
+    const okClass = res.ok ? "ok" : "err";
+    let bodyHtml = "";
+
+    if (ct.includes("application/json")) {
+      const data = await res.json();
+      bodyHtml = `<pre>${syntaxHighlight(JSON.stringify(data, null, 2))}</pre>`;
+    } else if (ct.includes("application/pdf") || ct.startsWith("image/") || ct.includes("octet-stream")) {
+      const blob = await res.blob();
+      const link = URL.createObjectURL(blob);
+      bodyHtml = `<pre>Бинарен одговор (${ct}, ${blob.size} бајти). <a href="${link}" target="_blank">Отвори / преземи</a></pre>`;
+    } else {
+      const txt = await res.text();
+      bodyHtml = `<pre>${txt.replace(/</g, "&lt;")}</pre>`;
+    }
+
+    respEl.innerHTML = `<div class="resp-head">
+        <span class="status ${okClass}">${res.status} ${res.statusText}</span>
+        <span class="meta">${ms} ms · ${ct || "—"}</span>
+      </div>${bodyHtml}`;
+  } catch (e) {
+    const ms = Math.round(performance.now() - t0);
+    respEl.innerHTML = `<div class="resp-head"><span class="status err">Барањето не успеа</span><span class="meta">${ms} ms</span></div>
+      <pre>${e.message}\n\nМожни причини: серверот спие (Render cold start — пробај пак за 30–60s), мрежа, или CORS.</pre>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Испрати барање";
+  }
+}
+
+filterEl.addEventListener("input", () => buildList(filterEl.value));
+buildList("");
+</script>
+</body>
+</html>
