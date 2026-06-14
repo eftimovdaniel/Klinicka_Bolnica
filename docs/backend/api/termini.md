@@ -39,6 +39,54 @@ flowchart LR
 | `GET` | `/termini/izvestaj-pdf/{termin_id}` | Генерира и враќа PDF извештај за завршен преглед |
 | `POST` | `/termini/{termin_id}/poslati-izvestaj` | Го испраќа генерираниот PDF извештај на е-пошта |
 
+### Тек на податоци — од закажување до оцена
+
+Следниот дијаграм го прикажува целиот животен циклус на еден преглед, чекор по чекор: од проверка на слободни слотови и закажување, преку внес на дијагноза и испраќање на PDF, до оценувањето од страна на пациентот.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Пациент
+    participant FE as Frontend
+    participant API as Backend (/termini)
+    participant DB as База (Termin_pregled)
+    participant SMTP as Е-пошта (SMTP)
+    actor L as Лекар
+
+    P->>FE: Избира лекар и датум
+    FE->>API: GET /termini/dostapni (lekar_id, datum)
+    API->>DB: SELECT зафатени слотови
+    DB-->>API: Листа зафатени времиња
+    API-->>FE: Слободни слотови за приказ
+
+    P->>FE: Избира слот и потврдува
+    FE->>API: POST /termini (тело со податоци)
+    API->>API: Провери лекар, викенд, дупликат слот
+    alt Слотот е зафатен / викенд
+        API-->>FE: 409 / 400 (грешка)
+    else Слободен
+        API->>DB: INSERT status=закажан
+        API->>SMTP: Потврда до пациент (ако е конфигуриран)
+        API-->>FE: 200 (термин закажан)
+    end
+
+    Note over L,DB: По завршен преглед
+    L->>API: PATCH /termini/{id} (дијагноза, терапија)
+    API->>DB: UPDATE status=завршен
+    L->>API: GET /termini/izvestaj-pdf/{id}
+    API->>DB: SELECT податоци за преглед
+    API-->>L: PDF извештај
+    L->>API: POST /termini/{id}/poslati-izvestaj
+    API->>SMTP: Испрати PDF на е-пошта
+
+    Note over P,DB: Оценување
+    P->>FE: Отвора „Завршени прегледи"
+    FE->>API: GET /pacienti/zavrseni-za-ocenka
+    P->>API: POST /pacienti/oceni-pregled (оцена, коментар)
+    API->>DB: INSERT во Pregled_feedback
+    API-->>P: Потврда за зачувана оцена
+```
+
 ---
 
 ## 2. Работно време и правила <a id="2-pravila"></a>

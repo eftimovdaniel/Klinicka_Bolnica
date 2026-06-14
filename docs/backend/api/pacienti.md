@@ -43,6 +43,51 @@ flowchart LR
 | `GET`  | `/pacienti/zavrseni-za-ocenka` | Завршени прегледи за оцена |
 | `POST` | `/pacienti/oceni-pregled`      | Остави/ажурирај оцена      |
 
+### Тек на податоци — од регистрација до оцена
+
+Дијаграмот го прикажува целиот пат на пациентот низ системот: регистрација, најава (со чување на податоци во `localStorage`), пристап до досие и оценување на завршен преглед.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor P as Пациент
+    participant FE as Frontend
+    participant API as Backend (/pacienti)
+    participant DB as База (patient · Termin_pregled · Pregled_feedback)
+    participant SMTP as Е-пошта (SMTP)
+
+    P->>FE: Пополнува форма за регистрација
+    FE->>API: POST /pacienti/register
+    API->>DB: INSERT во patient (хеширана лозинка)
+    API-->>FE: 200 (регистриран)
+
+    P->>FE: Внесува е-пошта и лозинка
+    FE->>API: POST /pacienti/login
+    API->>DB: Провери е-пошта + bcrypt лозинка
+    DB-->>API: Податоци за пациент
+    API-->>FE: 200 (профил + pacient_ID)
+    FE->>FE: Чување во localStorage
+
+    opt Заборавена лозинка
+        P->>API: POST /pacienti/forgot-password
+        API->>SMTP: Испрати код за ресет
+        P->>API: POST /pacienti/reset-password (код + нова)
+        API->>DB: UPDATE лозинка
+    end
+
+    P->>FE: Отвора „Мое досие"
+    FE->>API: GET /pacienti/dosie (pacient_ID)
+    API->>DB: SELECT закажани + завршени прегледи
+    API-->>FE: Комплетно досие
+
+    P->>FE: Оценува завршен преглед
+    FE->>API: GET /pacienti/zavrseni-za-ocenka
+    P->>API: POST /pacienti/oceni-pregled (оцена, коментар)
+    API->>API: Спореди email_pacient (заштита)
+    API->>DB: INSERT/UPDATE Pregled_feedback
+    API-->>P: Потврда за зачувана оцена
+```
+
 ***
 
 ## 2. Автентикација <a href="#id-2-auth" id="id-2-auth"></a>

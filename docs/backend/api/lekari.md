@@ -27,6 +27,15 @@
 
 Модулот користи  **осум endpoints**, логично групирани во три области: пристап до лекарски профили, автентикација и управување со лозинки, и пристап до работни податоци (термини и дежурства).
 
+```mermaid
+flowchart LR
+    F["Frontend"] -->|"GET /lekari"| API["/lekari"]
+    F -->|"POST /login"| API
+    F -->|"GET /termini"| API
+    F -->|"GET /{id}/dezurstva"| API
+    API --> DB[("Doctors · Termin_pregled · Dezurstva")]
+```
+
 | Метод | Патека | Намена |
 |-------|--------|--------|
 | `GET` | `/lekari` | Враќа листа на сите лекари, со опционален филтер по специјалност |
@@ -37,6 +46,50 @@
 | `POST` | `/lekari/reset-password` | Поставување нова лозинка со верификациски код |
 | `GET` | `/lekari/termini` | Термини на лекар пронајден по е-пошта |
 | `GET` | `/lekari/{doctor_id}/dezurstva` | Распоред на дежурства за конкретен лекар |
+
+### Тек на податоци — најава и пристап до распоред
+
+Дијаграмот го прикажува целиот тек: пресметка на корисничкото име од име и презиме, проверка на лозинка, задолжителна промена при прва најава, и пристап до термини и дежурства.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor L as Лекар
+    participant FE as Frontend
+    participant API as Backend (/lekari)
+    participant U as utils (транслитерација)
+    participant DB as База (Doctors · Termin_pregled · Dezurstva)
+    participant SMTP as Е-пошта (SMTP)
+
+    L->>FE: Внесува корисничко име (ime.prezime) и лозинка
+    FE->>API: POST /lekari/login
+    API->>DB: SELECT сите лекари
+    API->>U: Пресметај username за секој (кирилица → латиница)
+    U-->>API: Совпаѓање со внесот
+    API->>API: Провери bcrypt лозинка
+    alt Погрешни податоци
+        API-->>FE: 401 (неуспешна најава)
+    else Успешна
+        API->>DB: SELECT термини на лекарот
+        API-->>FE: 200 (профил + термини + must_change_password)
+    end
+
+    opt Прва најава (привремена лозинка)
+        L->>API: PATCH /lekari/promeni-lozinka (стара + нова)
+        API->>DB: UPDATE хеширана лозинка
+    end
+
+    opt Заборавена лозинка
+        L->>API: POST /lekari/forgot-password
+        API->>SMTP: Испрати верификациски код
+        L->>API: POST /lekari/reset-password (код + нова)
+        API->>DB: UPDATE лозинка
+    end
+
+    L->>API: GET /lekari/termini / {id}/dezurstva
+    API->>DB: SELECT термини и дежурства
+    API-->>L: Распоред за приказ
+```
 
 ---
 

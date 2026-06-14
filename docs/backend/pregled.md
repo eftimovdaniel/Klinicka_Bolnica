@@ -15,6 +15,10 @@ Backend-от е **срцето** на системот — делот што ј�
 * [7. AI модул (`ai/`)](#7-ai)
 * [8. Зависности](#8-zavisnosti)
 * [9. Конвенции](#9-konvencii)
+* [10. Животен циклус на преглед](#10-ciklus)
+* [11. API документација](#11-api-docs)
+* [12. OpenAPI и тестирање](#12-openapi)
+* [13. Променливи на околина](#13-env)
 
 > Поврзани страници: [Архитектура](../overview_na_sisitemot/architecture.md) ·
 > [База на податоци](the_database.md) · [API → Конвенции](api/conventions.md) ·
@@ -107,17 +111,17 @@ app.include_router(ai_chat.router)  # AI chat so Groq (asistentot)
 
 Секоја голема тема има свој фајл во `routers/`, со свој `APIRouter` и **префикс**. Префиксите директно одговараат на nginx regex-от и на routerите што frontend-от ги вика:
 
-| Router | Префикс | За што |
-|--------|---------|--------|
-| `lekari.py` | `/lekari` | Лекари: листа, најава, профил, лозинки, распоред |
-| `pacienti.py` | `/pacienti` | Пациенти: регистрација, најава, досие, оценки на прегледи |
-| `termini.py` | `/termini` | Термини/прегледи: слободни термини, закажување термини |
-| `admin.py` | `/admin` | Администрација: статистики, дежурства, огласи |
-| `aparati.py` | `/aparati` | Апарати и нивни термини, слободни и зафатени за закажување |
-| `uslugi.py` | `/uslugi` | Услуги на болницата |
-| `novosti.py` | `/novosti` | Новости / објави|
-| `kariera.py` | `/kariera`, `/aplikacija` | Огласи за работа и пријави |
-| `ai_chat.py` | `/ai-chat` | AI асистент (прашања, историја) |
+| Router | Префикс | За што | API док. |
+|--------|---------|--------|----------|
+| `lekari.py` | `/lekari` | Лекари: листа, најава, профил, лозинки, распоред | [Лекари](api/lekari.md) |
+| `pacienti.py` | `/pacienti` | Пациенти: регистрација, најава, досие, оценки на прегледи | [Пациенти](api/pacienti.md) |
+| `termini.py` | `/termini` | Термини/прегледи: слободни термини, закажување, дијагноза, PDF | [Термини](api/termini.md) |
+| `admin.py` | `/admin` | Администрација: статистики, дежурства, огласи | [Администрација](api/admin.md) |
+| `aparati.py` | `/aparati` | Апарати и нивни термини, слободни и зафатени за закажување | [Апарати](api/aparati.md) |
+| `uslugi.py` | `/uslugi` | Услуги на болницата | [Услуги](api/uslugi.md) |
+| `novosti.py` | `/novosti` | Новости / објави | [Новости](api/novosti.md) |
+| `kariera.py` | `/kariera`, `/aplikacija` | Огласи за работа и пријави | [Кариера](api/kariera.md) |
+| `ai_chat.py` | `/ai-chat` | AI асистент (прашања, историја) | [AI чат](api/ai-chat.md) |
 
 Префиксот се задава при создавањето на router-от, на пр.:
 
@@ -274,5 +278,118 @@ youtube-transcript-api
 
 ---
 
-Следно: [API → Конвенции](api/conventions.md) · [База на податоци](the_database.md) ·
-[AI асистент](ai-assistant/overview.md)
+## 10. Животен циклус на преглед <a id="10-ciklus"></a>
+
+Прегледот не живее во еден router — тој се движи низ повеќе модули. Централната табела е `Termin_pregled`; статусот `status_pregled` оди од `закажан` → `завршен` (или `откажан`).
+
+```mermaid
+sequenceDiagram
+    participant P as Пациент
+    participant F as Frontend
+    participant T as /termini
+    participant L as /lekari
+    participant Pa as /pacienti
+    participant DB as Termin_pregled
+
+    P->>F: Избира лекар и датум
+    F->>T: GET /dostapni
+    T->>DB: Зафатени слотови
+    F->>T: POST /termini (закажи)
+    T->>DB: INSERT status=закажан
+    T-->>P: Потврда (+ SMTP email)
+
+    Note over L,DB: По прегледот
+    L->>T: PATCH /{id} (дијагноза, терапија)
+    T->>DB: status=завршен
+    L->>T: GET /izvestaj-pdf/{id}
+    L->>T: POST /{id}/poslati-izvestaj
+
+    P->>Pa: GET /zavrseni-za-ocenka
+    P->>Pa: POST /oceni-pregled
+    Pa->>DB: Pregled_feedback
+    P->>Pa: GET /dosie
+```
+
+Клучни точки:
+
+- **Закажување** — `POST /termini` (види [Термини](api/termini.md)); frontend прво ги зема зафатените слотови преку `GET /termini/dostapni`.
+- **Завршување** — лекарот внесува дијагноза и терапија преку `PATCH /termini/{termin_id}`; статусот станува `завршен`.
+- **Извештај** — PDF преку `GET /termini/izvestaj-pdf/{id}`; испраќање на е-пошта преку `POST /termini/{id}/poslati-izvestaj` (потребен SMTP во `.env`).
+- **Оценување** — пациентот гледа завршени прегледи без оцена (`GET /pacienti/zavrseni-za-ocenka`) и остава оцена (`POST /pacienti/oceni-pregled`).
+- **Досие** — `GET /pacienti/dosie` враќа закажани и завршени прегледи за најавениот пациент.
+- **Лекарски поглед** — `GET /lekari/termini` ги листа термините на најавениот лекар со статус и медицински податоци.
+
+За административна аналитика (оптовареност, просечни оцени) види [Администрација → Статистики](api/admin.md#5-statistika).
+
+---
+
+## 11. API документација <a id="11-api-docs"></a>
+
+Секој router има посебна страница под `docs/backend/api/` со опис на endpoints, примери за барања/одговори и **интерактивни OpenAPI блокови** (копче „Test it" во GitBook).
+
+| Страница | Router | Статус |
+|----------|--------|--------|
+| [Конвенции](api/conventions.md) | заеднички правила | во подготовка |
+| [Автентикација](api/authentication.md) | најава, лозинки, admin | во подготовка |
+| [Лекари](api/lekari.md) | `/lekari` | готово |
+| [Пациенти](api/pacienti.md) | `/pacienti` | готово |
+| [Термини](api/termini.md) | `/termini` | готово |
+| [Новости](api/novosti.md) | `/novosti` | готово |
+| [Кариера](api/kariera.md) | `/kariera`, `/aplikacija` | готово |
+| [Администрација](api/admin.md) | `/admin` | готово |
+| [Услуги](api/uslugi.md) | `/uslugi` | во подготовка |
+| [Апарати](api/aparati.md) | `/aparati` | во подготовка |
+| [AI чат](api/ai-chat.md) | `/ai-chat` | во подготовка |
+
+Производната база на API: `https://klinicka-bolnica-stip2026.onrender.com`. Локално: `http://localhost:8000`.
+
+---
+
+## 12. OpenAPI и тестирање <a id="12-openapi"></a>
+
+FastAPI автоматски генерира OpenAPI спецификација:
+
+| URL | Намена |
+|-----|--------|
+| `/docs` | Swagger UI — интерактивно тестирање во прелистувач |
+| `/redoc` | ReDoc — читлива API документација |
+| `/openapi.json` | Raw OpenAPI 3.0 (користи GitBook и Scalar) |
+
+Во `main.py` е дефинирано полето `servers` со production и локален URL — тоа е **задолжително** за копчето „Test it" во GitBook:
+
+```9:16:backend/main.py
+app = FastAPI(
+    title="Клиничка Болница Штип – API",
+    description="API за системот за управување со прегледи, термини и администрација",
+    version="1.0",
+    servers=[
+        {"url": "https://klinicka-bolnica-stip2026.onrender.com", "description": "Produkcija (Render)"},
+        {"url": "http://localhost:8000", "description": "Lokalen razvoj"},
+    ],
+)
+```
+
+Endpoints што читаат `request.json()` наместо Pydantic модел добиваат `openapi_extra` на декораторот за да GitBook прикаже полиња за внес (пример: `POST /pacienti/register`). Детали: поединечните API страници.
+
+Во GitBook, OpenAPI спецификацијата се регистрира како **KlinickaBolnicaAPI**; по промена на backend, во GitBook → OpenAPI → **Check for updates**, па **Publish**.
+
+---
+
+## 13. Променливи на околина <a id="13-env"></a>
+
+Сите тајни и поставки за околина се во `backend/.env` (пример: `backend/.env.example`). Backend-от ги вчитува преку `python-dotenv` при стартување.
+
+**База на податоци** — `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`, `DB_PORT`. За Azure MySQL додади `DB_SSL=1`. За Docker Compose: `DB_HOST=mysql`.
+
+**AI (Groq)** — `GROQ_API_KEY`, `GROQ_MODEL`, `GROQ_MODEL_FALLBACK`. Опционално: `GROQ_DISABLED=1` (без AI), `GROQ_AUTO_OFFLINE=1` (по rate-limit локален режим).
+
+**Е-пошта (SMTP)** — `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_FROM`. Без SMTP, потврдите за термини се печатат само во терминал.
+
+**Azure Blob** — `AZURE_STORAGE_CONNECTION_STRING`, `AZURE_CONTAINER_NAME` за слики на новости во cloud. Без ова, сликите одат во `backend/static/uploads/novosti`.
+
+> Целосен пример и коментари: `backend/.env.example`. За SMTP чекор-по-чекор: `backend/SMTP_SETUP.md`. За деплојмент: [Продукција](../deployment/production.md).
+
+---
+
+Следно: [Термини (API)](api/termini.md) · [База на податоци](the_database.md) ·
+[AI асистент](ai-assistant/overview.md) · [Архитектура](../overview_na_sisitemot/architecture.md)
