@@ -12,7 +12,16 @@ router = APIRouter(
 
 # end point za logiranje
 
-@router.post("/login")
+@router.post("/login", openapi_extra={
+    "requestBody": {"required": True, "content": {"application/json": {"schema": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+            "email": {"type": "string", "example": "ivan@example.com"},
+            "password": {"type": "string", "example": "Lozinka1."},
+        },
+    }}}}
+})
 async def login_pacienti(request: Request):
     conn = None
     try:
@@ -60,7 +69,15 @@ async def login_pacienti(request: Request):
             conn.close()
 
 
-@router.post("/forgot-password")
+@router.post("/forgot-password", openapi_extra={
+    "requestBody": {"required": True, "content": {"application/json": {"schema": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+            "email": {"type": "string", "example": "ivan@example.com"},
+        },
+    }}}}
+})
 async def forgot_password_pacient(request: Request):
     """Барање за заборавена лозинка. Кодот се печати во терминалот на серверот."""
     data = await request.json()
@@ -102,7 +119,17 @@ async def forgot_password_pacient(request: Request):
             conn.close()
 
 
-@router.post("/reset-password")
+@router.post("/reset-password", openapi_extra={
+    "requestBody": {"required": True, "content": {"application/json": {"schema": {
+        "type": "object",
+        "required": ["email", "token", "nova_lozinka"],
+        "properties": {
+            "email": {"type": "string", "example": "ivan@example.com"},
+            "token": {"type": "string", "example": "код_од_терминал_или_лог"},
+            "nova_lozinka": {"type": "string", "minLength": 8, "example": "Nova12345"},
+        },
+    }}}}
+})
 async def reset_password_pacient(request: Request):
     """Промена на лозинка со код од заборавена лозинка (без најава)."""
     data = await request.json()
@@ -142,7 +169,20 @@ async def reset_password_pacient(request: Request):
             conn.close()
 
 
-@router.post("/register")
+@router.post("/register", openapi_extra={
+    "requestBody": {"required": True, "content": {"application/json": {"schema": {
+        "type": "object",
+        "required": ["ime", "prezime", "email", "password", "embg"],
+        "properties": {
+            "ime": {"type": "string", "example": "Иван"},
+            "prezime": {"type": "string", "example": "Ивановски"},
+            "email": {"type": "string", "example": "ivan@example.com"},
+            "password": {"type": "string", "minLength": 8, "example": "Lozinka1."},
+            "telefon": {"type": "string", "example": "070123456"},
+            "embg": {"type": "string", "example": "0101990450012"},
+        },
+    }}}}
+})
 async def register_pacienti(request: Request):
      
      conn = None
@@ -275,7 +315,18 @@ async def zavrseni_za_ocenka(pacient_ID: int = Query(..., description="ID на �
             conn.close()
 
 
-@router.post("/oceni-pregled")
+@router.post("/oceni-pregled", openapi_extra={
+    "requestBody": {"required": True, "content": {"application/json": {"schema": {
+        "type": "object",
+        "required": ["termin_id", "pacient_ID", "ocena"],
+        "properties": {
+            "termin_id": {"type": "integer", "example": 1},
+            "pacient_ID": {"type": "integer", "example": 1},
+            "ocena": {"type": "integer", "minimum": 1, "maximum": 5, "example": 5},
+            "komentar": {"type": "string", "example": "Многу сум задоволен од прегледот"},
+        },
+    }}}}
+})
 async def oceni_pregled(request: Request):
     """Внесува или ажурира оцена за завршен преглед. Еден термин = еден ред (termin_ID уникатен)."""
     conn = None
