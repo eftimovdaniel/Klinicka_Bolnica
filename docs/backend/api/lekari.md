@@ -69,9 +69,9 @@
 
 Лекарите без специјалност се враќаат со празно `specijalnost` (frontend прикажува „Н/П").
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/lekari" method="get" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari" method="get" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ---
 
@@ -121,9 +121,9 @@ https://klinicka-bolnica-stip2026.onrender.com/openapi.json
 
 **Можни грешки:** `400` (празно поле) · `401` (невалидно име/лозинка) · `403` (лекарот нема поставено лозинка — треба регистрација) · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/lekari/login" method="post" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/login" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ---
 
@@ -152,9 +152,9 @@ https://klinicka-bolnica-stip2026.onrender.com/openapi.json
 
 **Можни грешки:** `400` (невалидни полиња/лозинка, зафатена е-пошта) · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/lekari/register" method="post" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/register" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ---
 
@@ -176,9 +176,9 @@ https://klinicka-bolnica-stip2026.onrender.com/openapi.json
 
 **Можни грешки:** `400` (недостасува `doctor_id`, невалидна нова лозинка) · `401` (погрешна тековна лозинка) · `403` (нема поставено лозинка) · `404` · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/lekari/promeni-lozinka" method="patch" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/promeni-lozinka" method="patch" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ---
 
@@ -196,9 +196,9 @@ https://klinicka-bolnica-stip2026.onrender.com/openapi.json
 
 **Можни грешки:** `400` (невалидна е-пошта) · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/lekari/forgot-password" method="post" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/forgot-password" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ---
 
@@ -220,9 +220,9 @@ https://klinicka-bolnica-stip2026.onrender.com/openapi.json
 
 **Можни грешки:** `400` (невалиден код или лозинка) · `404` · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/lekari/reset-password" method="post" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/reset-password" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ---
 
@@ -250,9 +250,9 @@ https://klinicka-bolnica-stip2026.onrender.com/openapi.json
 
 **Можни грешки:** `400` (нема е-пошта) · `404` (нема лекар со таа е-пошта) · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/lekari/termini" method="get" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/termini" method="get" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ---
 
@@ -280,9 +280,9 @@ https://klinicka-bolnica-stip2026.onrender.com/openapi.json
 
 **Можни грешки:** `404` (лекар не постои) · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/lekari/{doctor_id}/dezurstva" method="get" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/{doctor_id}/dezurstva" method="get" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ---
 

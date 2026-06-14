@@ -68,9 +68,9 @@ flowchart LR
 
 **Можни грешки:** `400` (неважечки датум) · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/termini/dostapni" method="get" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/termini/dostapni" method="get" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ---
 
@@ -104,9 +104,9 @@ https://klinicka-bolnica-stip2026.onrender.com/openapi.json
 
 **Можни грешки:** `400` (викенд / неважечки датум) · `404` (лекар не постои) · `409` (слотот е зафатен) · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/termini" method="post" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/termini" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ---
 
@@ -133,9 +133,9 @@ https://klinicka-bolnica-stip2026.onrender.com/openapi.json
 
 **Можни грешки:** `404` (термин не постои) · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/termini/{termin_id}" method="patch" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/termini/{termin_id}" method="patch" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ---
 
@@ -147,9 +147,9 @@ https://klinicka-bolnica-stip2026.onrender.com/openapi.json
 
 **Можни грешки:** `404` (термин не постои) · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/termini/izvestaj-pdf/{termin_id}" method="get" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/termini/izvestaj-pdf/{termin_id}" method="get" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ---
 
@@ -170,9 +170,9 @@ https://klinicka-bolnica-stip2026.onrender.com/openapi.json
 
 **Можни грешки:** `400` (пациентот нема е-пошта) · `404` · `503` (SMTP не е конфигуриран) · `502` (грешка при праќање) · `500`
 
-{% openapi src="https://klinicka-bolnica-stip2026.onrender.com/openapi.json" path="/termini/{termin_id}/poslati-izvestaj" method="post" %}
-https://klinicka-bolnica-stip2026.onrender.com/openapi.json
-{% endopenapi %}
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/termini/{termin_id}/poslati-izvestaj" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ---
 
