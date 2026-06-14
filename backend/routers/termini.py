@@ -300,7 +300,22 @@ def get_dostapni_termini(lekar_id: int, datum: str):    # funkcija koja dava pri
             conn.close()
 
 
-@router.post("")
+@router.post("", openapi_extra={
+    "requestBody": {"required": True, "content": {"application/json": {"schema": {
+        "type": "object",
+        "required": ["lekar_id", "ime", "prezime", "datum", "vreme"],
+        "properties": {
+            "lekar_id": {"type": "integer", "example": 28},
+            "ime": {"type": "string", "example": "Иван"},
+            "prezime": {"type": "string", "example": "Ивановски"},
+            "datum": {"type": "string", "example": "2026-06-16"},
+            "vreme": {"type": "string", "example": "10:00"},
+            "email": {"type": "string", "example": "ivan@example.com"},
+            "telefon": {"type": "string", "example": "070123456"},
+            "napomena": {"type": "string", "example": ""},
+        },
+    }}}}
+})
 async def create_termini(request: Request):     # funkcija koja ceka podatoci od klientot 
     conn = None
     try:
@@ -379,7 +394,15 @@ async def create_termini(request: Request):     # funkcija koja ceka podatoci od
             conn.close()
 
 
-@router.patch("/{termin_id}")
+@router.patch("/{termin_id}", openapi_extra={
+    "requestBody": {"required": True, "content": {"application/json": {"schema": {
+        "type": "object",
+        "properties": {
+            "dijagnoza": {"type": "string", "example": "Хипертензија"},
+            "terapija": {"type": "string", "example": "Контрола за 3 месеци"},
+        },
+    }}}}
+})
 async def update_termin_dijagnoza_terapija(termin_id: int, request: Request):   # funkcija za update na dijagnoza i terapija so id na termin
     conn = None
     try:

@@ -61,7 +61,16 @@ def get_lekari(specijalnost: Optional[str] = None):                             
             conn.close()                    # istata taa konekcija se zatvara
 
 
-@router.post("/login")
+@router.post("/login", openapi_extra={
+    "requestBody": {"required": True, "content": {"application/json": {"schema": {
+        "type": "object",
+        "required": ["username", "password"],
+        "properties": {
+            "username": {"type": "string", "example": "ana.stojanovska"},
+            "password": {"type": "string", "example": "Test123.."},
+        },
+    }}}}
+})
 async def login_lekar(request: Request):
     """
     Endpoint за најава на лекар со корисничко име (име.презиме) и лозинка.
@@ -233,7 +242,17 @@ async def login_lekar(request: Request):
             conn.close()
 
 
-@router.patch("/promeni-lozinka")
+@router.patch("/promeni-lozinka", openapi_extra={
+    "requestBody": {"required": True, "content": {"application/json": {"schema": {
+        "type": "object",
+        "required": ["doctor_id", "trenutna_lozinka", "nova_lozinka"],
+        "properties": {
+            "doctor_id": {"type": "integer", "example": 2},
+            "trenutna_lozinka": {"type": "string", "example": "Test123.."},
+            "nova_lozinka": {"type": "string", "minLength": 8, "example": "Nova123.."},
+        },
+    }}}}
+})
 async def promeni_lozinka_lekar(request: Request):
     """
     Смена на лозинка за најавен лекар. Потребна е тековната лозинка за верификација.
@@ -289,7 +308,15 @@ async def promeni_lozinka_lekar(request: Request):
             conn.close()
 
 
-@router.post("/forgot-password")
+@router.post("/forgot-password", openapi_extra={
+    "requestBody": {"required": True, "content": {"application/json": {"schema": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+            "email": {"type": "string", "example": "ana.stojanovska@kbstip.mk"},
+        },
+    }}}}
+})
 async def forgot_password_lekar(request: Request):
     """Барање за заборавена лозинка. Кодот се печати во терминалот на серверот (SMTP не е задолжителен)."""
     data = await request.json()
@@ -331,7 +358,17 @@ async def forgot_password_lekar(request: Request):
             conn.close()
 
 
-@router.post("/reset-password")
+@router.post("/reset-password", openapi_extra={
+    "requestBody": {"required": True, "content": {"application/json": {"schema": {
+        "type": "object",
+        "required": ["email", "token", "nova_lozinka"],
+        "properties": {
+            "email": {"type": "string", "example": "ana.stojanovska@kbstip.mk"},
+            "token": {"type": "string", "example": "код_од_терминал_или_лог"},
+            "nova_lozinka": {"type": "string", "minLength": 8, "example": "Nova123.."},
+        },
+    }}}}
+})
 async def reset_password_lekar(request: Request):
     """Промена на лозинка со код од заборавена лозинка (без најава)."""
     data = await request.json()
@@ -823,7 +860,19 @@ def calculate_dezurstva(doctor_name: str, specialty: str):
     return dezurstva
 
 
-@router.post("/register")
+@router.post("/register", openapi_extra={
+    "requestBody": {"required": True, "content": {"application/json": {"schema": {
+        "type": "object",
+        "required": ["ime", "prezime", "specialty", "email", "password"],
+        "properties": {
+            "ime": {"type": "string", "example": "Тест"},
+            "prezime": {"type": "string", "example": "Лекар"},
+            "specialty": {"type": "string", "example": "Кардиологија"},
+            "email": {"type": "string", "example": "test.lekar@kbstip.mk"},
+            "password": {"type": "string", "minLength": 8, "example": "Nova123.."},
+        },
+    }}}}
+})
 async def register_lekar(request: Request):
     """
     Endpoint за регистрација на нов лекар.
