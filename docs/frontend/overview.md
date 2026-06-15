@@ -201,7 +201,7 @@ var MATICNI_LEKARI_URL = 'https://mojtermin.mk/health_workers';
 
 **Пробај ја формата за најава во живо** (истата што е на сајтот — повикува вистински backend):
 
-{% embed url="https://codepen.io/eftimovdaniel/pen/OPWRqLy" %}
+{% embed url="https://codepen.io/eftimovdaniel/pen/OPWRqLy"%}
 
 * **Пациент** — најава со **е-пошта и лозинка** (или регистрација)
 * **Лекар** — најава со **корисничко име** (`име.презиме`) и лозинка, секој лекар има првична лозинка која мора да се промени со првата најава на системот.
