@@ -59,7 +59,9 @@ graph TD
     click H1 href "stranici/index-html.md" "Детали за index.html"
 ```
 
-> **Кликни за детали:** [`index.html` — главна страница](stranici/index-html.md) · [Страници](pages.md)
+{% content-ref url="stranici/index-html.md" %}
+[index-html.md](stranici/index-html.md)
+{% endcontent-ref %}
 
 ### Редослед на вчитување (на `index.html`)
 

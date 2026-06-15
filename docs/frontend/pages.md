@@ -25,7 +25,9 @@ flowchart LR
     click INDEX href "stranici/index-html.md" "Детали за index.html"
 ```
 
-> **Кликни за детали:** [`index.html` — главна страница](stranici/index-html.md)
+{% content-ref url="stranici/index-html.md" %}
+[index-html.md](stranici/index-html.md)
+{% endcontent-ref %}
 
 ## Содржина
 
