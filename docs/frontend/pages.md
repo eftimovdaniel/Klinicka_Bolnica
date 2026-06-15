@@ -22,9 +22,10 @@ flowchart LR
     ODD -->|"Назад кон услуги"| INDEX
     ODD -->|"Закажи преглед"| INDEX
     NOV -->|"Вратете се"| INDEX
+    click INDEX href "stranici/index-html.md" "Детали за index.html"
 ```
 
-> 📄 **Детална страница:** [**`index.html` — главна страница**](stranici/index-html.md) ← кликни тука (квадратчињата во дијаграмот горе се само илустрација и не се кликабилни на GitBook)
+> **Кликни за детали:** [`index.html` — главна страница](stranici/index-html.md)
 
 ## Содржина
 
