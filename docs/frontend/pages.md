@@ -8,8 +8,8 @@
 | Страница | Фајл | Тип | Опис
 |----------|------|-----|------|
 | Главна | [`index.html`](stranici/index-html.md) | Single-page (повеќе секции на една датотека) | Содржи повеќе секции (лекари, закажување, најава) групирани во една датотека |
-| Новости | `novosti.html` | Самостојна страница |  Прикажува листа на новости и детали за секоја објава |
-| Детали за оддел | `oddel-details.html` | Посебна страница (динамичка, преку URL параметар) | Содржината се генерира во зависност од URL параметар |
+| Новости | [`novosti.html`](stranici/novosti-html.md) | Самостојна страница |  Прикажува листа на новости и детали за секоја објава |
+| Детали за оддел | [`oddel-details.html`](stranici/oddel-details-html.md) | Посебна страница (динамичка, преку URL параметар) | Содржината се генерира во зависност од URL параметар |
 
 ```mermaid
 flowchart LR
@@ -24,10 +24,6 @@ flowchart LR
     NOV -->|"Вратете се"| INDEX
     click INDEX href "stranici/index-html.md" "Детали за index.html"
 ```
-
-{% content-ref url="stranici/index-html.md" %}
-[index-html.md](stranici/index-html.md)
-{% endcontent-ref %}
 
 ## Содржина
 

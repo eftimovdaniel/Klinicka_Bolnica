@@ -39,6 +39,8 @@
 * [Преглед на frontend](frontend/overview.md)
 * [Страници](frontend/pages.md)
   * [index.html](frontend/stranici/index-html.md)
+  * [novosti.html](frontend/stranici/novosti-html.md)
+  * [oddel-details.html](frontend/stranici/oddel-details-html.md)
 * [AI чат виџет](frontend/ai-chat-widget.md)
 
 ## Деплојмент
