@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="mk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Најава — демо</title>
+
+  <!-- (а) Реупотреба на постоечките стилови -->
+  <link rel="stylesheet" href="/app/style.css" />
+  <style>
+    body { padding: 16px; background: #fff; }
+    #rez { background: #f7f7f7; padding: 10px; border-radius: 8px;
+           white-space: pre-wrap; word-break: break-word; margin-top: 12px; }
+  </style>
+</head>
+<body>
+
+  <!-- (б) Истата форма копирана од index.html -->
+  <div class="auth-form-container" style="max-width: 380px; margin: auto;">
+    <form id="auth-login-form">
+      <div class="form-group">
+        <label for="login-identifier">Е-пошта</label>
+        <input type="text" id="login-identifier" placeholder="Овде внесете го вашиот mail" required />
+      </div>
+      <div class="form-group">
+        <label for="login-password">Лозинка</label>
+        <input type="password" id="login-password" placeholder="Внесете ја вашата лозинка" required />
+      </div>
+      <button type="submit" class="btn-auth-submit">Најави се</button>
+    </form>
+    <pre id="rez"></pre>
+  </div>
+
+  <!-- (в) Малиот повик до истиот backend endpoint -->
+  <script>
+    const API = "https://klinicka-bolnica-stip2026.onrender.com";
+    document.getElementById("auth-login-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const rez = document.getElementById("rez");
+      rez.textContent = "Се испраќа…";
+      try {
+        const r = await fetch(API + "/pacienti/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: document.getElementById("login-identifier").value,
+            password: document.getElementById("login-password").value,
+          }),
+        });
+        const data = await r.json();
+        rez.textContent = "Статус " + r.status + "\n" + JSON.stringify(data, null, 2);
+      } catch (err) {
+        rez.textContent = "Грешка: " + err.message;
+      }
+    });
+  </script>
+</body>
+</html>

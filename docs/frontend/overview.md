@@ -199,10 +199,27 @@ var MATICNI_LEKARI_URL = 'https://mojtermin.mk/health_workers';
 
 ### Најава
 
+**Може да го видите процесот на најаваЧ**
+{% embed url="https://klinicka-bolnica-stip2026.onrender.com/app/embed/najava.html" %}
+
 * **Пациент** — најава со **е-пошта и лозинка** (или регистрација)
 * **Лекар** — најава со **корисничко име** (`име.презиме`) и лозинка, секој лекар има првична лозинка која мора да се промени со првата најава на системот.
 
 По успешна најава, податоците за корисникот се чуваат во `currentPacient` или `currentLekar`.
+
+> **Пробај ја најавата овде:** формите подолу го повикуваат **истиот** backend како и сајтот. Внеси е-пошта/лозинка (или корисничко име за лекар) и кликни **„Test it"** — ќе добиеш вистински одговор од серверот.
+
+**Најава на пациент** — `POST /pacienti/login`
+
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/login" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
+
+**Најава на лекар** — `POST /lekari/login`
+
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/login" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ### `session.js` — траење на сесијата
 
@@ -299,6 +316,20 @@ flowchart LR
 
 > За викенд денови календарот не нуди термини — усогласено со backend правилото.
 
+> **Пробај го закажувањето овде:** прво провери слободни термини за лекар и датум, потоа закажи.
+
+**Слободни термини** — `GET /termini/dostapni`
+
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/termini/dostapni" method="get" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
+
+**Закажување термин** — `POST /termini`
+
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/termini" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
+
 ***
 
 ## 9. AI чат виџет <a href="#id-9-ai-chat" id="id-9-ai-chat"></a>
@@ -327,6 +358,14 @@ sequenceDiagram
 ```
 
 Асистентот работи и за **гости** и за **најавени** корисници; за најавени се испраќаат `pacient` или `lekar` податоци за да може да изврши дејства (закажи термин, прикажи распоред и сл.).
+
+> **Пробај го асистентот овде:** внеси прашање во полето `prasanje` (на пр. „Кои лекари се на кардиологија?") и кликни **„Test it"**.
+
+**Прашање до асистентот** — `POST /ai-chat/ask`
+
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/ask" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 > Подетално: [AI чат виџет](ai-chat-widget.md) · [AI асистент (backend)](../backend/ai-assistant/overview.md)
 
