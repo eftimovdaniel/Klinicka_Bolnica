@@ -7,7 +7,7 @@
 
 | Страница | Фајл | Тип | Опис
 |----------|------|-----|------|
-| Главна | `index.html` | Single-page (повеќе секции на една датотека) | Содржи повеќе секции (лекари, закажување, најава) групирани во една датотека |
+| Главна | [`index.html`](stranici/index-html.md) | Single-page (повеќе секции на една датотека) | Содржи повеќе секции (лекари, закажување, најава) групирани во една датотека |
 | Новости | `novosti.html` | Самостојна страница |  Прикажува листа на новости и детали за секоја објава |
 | Детали за оддел | `oddel-details.html` | Посебна страница (динамичка, преку URL параметар) | Содржината се генерира во зависност од URL параметар |
 
@@ -44,6 +44,8 @@ flowchart LR
 ---
 
 ## 1. Главна страница (`index.html`) <a id="1-index"></a>
+
+> Посебна страница со целосно објаснување и приказ во живо: [`index.html` — главна страница](stranici/index-html.md).
 
 Главната страница е **централниот дел** на порталот — местото каде се одвива најголемиот дел од интеракцијата на корисникот со системот. Таа ги обединува сите клучни функционалности: од јавните информации достапни за секого, преку најавата и регистрацијата, па сè до закажувањето термини и лекарскиот панел.
 Иако делува како повеќе одделни страници, во основа сè е сместено во **една единствена HTML датотека**. Навигацијата меѓу нив не претставува вистинско преминување на нова страница, туку едноставно „лизгање" (scroll) до соодветната секција — означена со котви како `#home`, `#uslugi`, `#lekari` и слично. Ова обезбедува брзо и непречено искуство, без чекање на нови страници да се вчитаат.
@@ -122,6 +124,12 @@ flowchart TD
 oddel-details.html?oddel=ИмеНаОддел
 ```
 
+> **Пробај го endpoint-от за услуги:**
+
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/uslugi" method="get" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
+
 #### Лекари — `#lekari`
 
 | Елемент | ID | API |
@@ -134,6 +142,12 @@ oddel-details.html?oddel=ИмеНаОддел
 Секоја картичка има копче **„Закажи преглед"** кое го отвора модалот за закажување на преглед `#appointment-modal`.
 
 За **најавен пациент** се прикажува и `#lekari-pacient-callout` — кратка порака дека може директно да закаже термин.
+
+> **Пробај го endpoint-от за лекари** (со опционален филтер по специјалност):
+
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari" method="get" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 #### Оцени преглед — `#pacient-ocenki-section`
 
@@ -159,6 +173,16 @@ API: `GET /termini` (завршени прегледи) + `POST` за оценк
 | Форма за аплицирање | `#kariera-forma` | `POST /aplikacija` |
 
 Корисникот прво избира позиција од листата, потоа пополнува форма (име, е-пошта, CV како фајл).
+
+> **Пробај ги endpoints за кариера** — листа на огласи и аплицирање:
+
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/kariera" method="get" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
+
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/aplikacija" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 #### Footer
 
@@ -201,13 +225,35 @@ flowchart TD
 - Зафатени термини -> **сива** боја, клик не прави никаква акција
 - Викенд -> нема достапни термини, не се остваруваат термини преку сајтот, но постојано има лекари во болницата кој се дежурни
 
-#### Тестирај најава и регистрација во живо
+#### Тестирај ги модалите во живо
 
-Во вградениот сајт подолу кликнете на **„Најави се!"** во менито за да го отворите модалот за најава. За нов профил, во истиот модал изберете **„Регистрирајте се"**. Податоците одат до вистинскиот backend и базата.
+Секој модал повикува по еден endpoint. Пробај ги директно тука — пополни ги полињата и кликни **„Test it"** за вистински одговор од серверот.
 
-{% embed url="https://klinicka-bolnica-stip2026.onrender.com/app/" %}
+**Најава (пациент)** — `POST /pacienti/login`
 
-> Серверот е на бесплатен план, па првото вчитување може да потрае до една минута додека се „разбуди".
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/login" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
+
+**Регистрација** — `POST /pacienti/register`
+
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/register" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
+
+**Достапни термини** — `GET /termini/dostapni`
+
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/termini/dostapni" method="get" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
+
+**Закажување термин** — `POST /termini`
+
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/termini" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
+
+> Ако сакаш да го видиш **целиот сајт во живо**, тоа е достапно на дното на [Преглед на frontend](overview.md).
 
 ### 1.4 Лекарски панел <a id="1-4-lekar-panel"></a>
 
@@ -245,6 +291,12 @@ flowchart TD
 | Поле за внес | `#kbs-ai-input` |
 
 Логиката е во `script.js`. API: `POST /ai-chat/ask`.
+
+> **Пробај го асистентот** — внеси прашање во полето `prasanje` и кликни **„Test it"**:
+
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/ask" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 > Подетално: [AI чат виџет](ai-chat-widget.md)
 
@@ -287,6 +339,16 @@ novosti.html
 ```
 novosti.html?id=3
 ```
+
+> **Пробај ги endpoints за новости** — листа и една новост по `id`:
+
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/novosti" method="get" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
+
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/novosti/{novost_id}" method="get" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
 
 ### Безбедност на HTML содржина
 
