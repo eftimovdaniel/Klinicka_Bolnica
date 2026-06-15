@@ -45,21 +45,20 @@ flowchart LR
 | `ai_chat.js`         | Поедноставна верзија на AI чат (главната AI логика е во `script.js`)                                  |
 | `assets/`            | Слики — AI икона, икона за прикажи лозинка и сл.                                                      |
 
-```mermaid
-graph TD
-    F["frontend/"] --> H1["index.html"]
-    F --> H2["novosti.html"]
-    F --> H3["oddel-details.html"]
-    F --> J1["script.js<br/>(glavna logika)"]
-    F --> J2["session.js<br/>(sesii)"]
-    F --> J3["ai_chat.js"]
-    F --> J4["oddel-details.js"]
-    F --> C["style.css"]
-    F --> A["assets/<br/>(sliki)"]
-    click H1 href "stranici/index-html.md" "Детали за index.html"
-```
+**Структура на фајлови** (кликни на фајл за детали):
 
-> **Кликни за детали:** [`index.html` — главна страница](stranici/index-html.md) · [Страници](pages.md)
+* 📁 **`frontend/`**
+  * 📄 [**`index.html`**](stranici/index-html.md) — главна страница (single-page портал)
+  * 📄 `novosti.html` — новости
+  * 📄 `oddel-details.html` — детали за оддел
+  * 📜 `script.js` — главна логика
+  * 📜 `session.js` — сесии
+  * 📜 `ai_chat.js` — AI чат
+  * 📜 `oddel-details.js` — логика за оддел
+  * 🎨 `style.css` — стилови
+  * 🖼️ `assets/` — слики
+
+> Засега детална страница има за [**`index.html`**](stranici/index-html.md). Останатите фајлови ќе добијат свои страници постепено.
 
 ### Редослед на вчитување (на `index.html`)
 
