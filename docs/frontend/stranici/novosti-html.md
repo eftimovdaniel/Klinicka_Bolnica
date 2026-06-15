@@ -15,6 +15,7 @@
 * [6. Безбедност (sanitize на HTML)](#6-bezbednost)
 * [7. Како изгледа во живо](#7-zivo)
 * [8. Пробај ги функциите](#8-probaj)
+* [9. Код во CodePen](#9-codepen)
 
 > Поврзано: [Преглед на frontend](../overview.md) · [Страници](../pages.md) · [`index.html`](index-html.md) · [API: новости](../../backend/api/novosti.md)
 
@@ -127,11 +128,98 @@ flowchart LR
 
 ## 7. Како изгледа во живо <a id="7-zivo"></a>
 
-Подолу е вградена **вистинската страница за новости** од серверот:
+Подолу е приказ во **CodePen стил** — лево го гледаш изворниот код во табови (HTML / JS), а во „Резултат" е вистинската страница вградена во живо од серверот.
 
+{% tabs %}
+{% tab title="HTML" %}
+```html
+<header class="novosti-page-header">
+  <div class="container">
+    <div class="logo">
+      <span class="red-cross">+</span>
+      <h1>Новости поврзани со ЈЗУ Клиничка Болница Штип</h1>
+    </div>
+    <a href="index.html">← Вратете се на главната страница</a>
+  </div>
+</header>
+
+<main class="section novosti-section">
+  <div class="container">
+    <p class="novosti-subtitle">Најнови информации за нашата болница, и пациенти</p>
+    <div id="novosti-list" class="novosti-grid">
+      <div class="loading">Се вчитуваат новости... </div>
+    </div>
+  </div>
+</main>
+
+<!-- Модал за приказ на цела објава -->
+<div id="novost-view-modal" class="modal">
+  <div class="modal-content modal-content-wide">
+    <span class="close" onclick="closeNovostViewModal()">&times;</span>
+    <div id="novost-view-content"></div>
+  </div>
+</div>
+
+<script src="session.js"></script>
+```
+{% endtab %}
+
+{% tab title="JavaScript" %}
+```javascript
+// Адресата на API-то се одредува автоматски (локално vs продакшн)
+var API_BASE = (function() {
+  var proto = window.location.protocol;
+  var host = window.location.hostname;
+  if (proto === 'file:' || host === 'localhost' || host === '127.0.0.1' || host === '') {
+    return 'http://localhost:8000';
+  }
+  return proto + '//' + window.location.host;
+})();
+
+// 1) Вчитај ги сите новости и прикажи картички
+fetch(API_BASE + '/novosti')
+  .then(function(r) { return r.json(); })
+  .then(function(items) {
+    renderNovosti(items);
+    // Ако URL има ?id=, отвори ја таа новост веднаш
+    var openId = new URLSearchParams(window.location.search).get('id');
+    if (openId) openNovostViewModal(parseInt(openId, 10));
+  });
+
+// 2) Прикажи картичка за секоја новост (наслов, слика, извадок)
+function renderNovosti(items) {
+  var listEl = document.getElementById('novosti-list');
+  listEl.innerHTML = '';
+  items.forEach(function(n) {
+    var excerpt = stripHtmlForExcerpt(n.sodrzina || '').substring(0, 150);
+    var card = document.createElement('div');
+    card.className = 'novosti-card';
+    card.innerHTML =
+      '<h3>' + n.naslov + '</h3>' +
+      '<p>' + excerpt + '...</p>' +
+      '<button onclick="openNovostViewModal(' + n.id + ')">Прочитај повеќе</button>';
+    listEl.appendChild(card);
+  });
+}
+
+// 3) Отвори цела објава во модал
+function openNovostViewModal(id) {
+  fetch(API_BASE + '/novosti/' + id)
+    .then(function(r) { return r.json(); })
+    .then(function(n) {
+      // ... форматирање на текст, слики, галерија, видео ...
+      document.getElementById('novost-view-modal').style.display = 'block';
+    });
+}
+```
+{% endtab %}
+
+{% tab title="Резултат (во живо)" %}
 {% embed url="https://klinicka-bolnica-stip2026.onrender.com/app/novosti.html" %}
+{% endtab %}
+{% endtabs %}
 
-> Серверот е на бесплатен план, па првото вчитување може да потрае до една минута додека се „разбуди". Освежи ако страницата е празна.
+> Серверот е на бесплатен план, па првото вчитување може да потрае до една минута додека се „разбуди". Освежи ако страницата е празна. Кодот горе е скратен за прегледност — целосниот извор е во `frontend/novosti.html`.
 
 ***
 
@@ -150,6 +238,14 @@ flowchart LR
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/novosti/{novost_id}" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
+
+***
+
+## 9. Код во CodePen <a id="9-codepen"></a>
+
+Подолу е страницата за новости како **интерактивен CodePen** — можеш да го разгледаш кодот (HTML / CSS / JS) и веднаш да го видиш резултатот:
+
+{% embed url="https://codepen.io/eftimovdaniel/pen/OPWRGwo" %}
 
 ***
 
