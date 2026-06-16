@@ -41,9 +41,9 @@ flowchart TD
     Stat --> TP[("Termin_pregled · Pregled_feedback")]
 ```
 
-| Група        | Метод/Патека                                  | Намена                                |
-| ------------ | --------------------------------------------- | ------------------------------------- |
-| Дежурства    | `GET /admin/dezurstva`                         | Листа дежурства (со филтри)            |
+| Група        | Метод/Патека                                    | Намена                                |
+| ------------ | ----------------------------------------------- | ------------------------------------- |
+| Дежурства    | `GET /admin/dezurstva`                          | Листа дежурства (со филтри)           |
 | Дежурства    | `POST /admin/dezurstva`                         | Ново дежурство                        |
 | Дежурства    | `PUT /admin/dezurstva/{id}`                     | Ажурирање дежурство                   |
 | Дежурства    | `DELETE /admin/dezurstva/{id}`                  | Бришење дежурство                     |
@@ -93,13 +93,13 @@ sequenceDiagram
 
 ## 2. Авторизација — само директор <a href="#id-2-avtorizacija" id="id-2-avtorizacija"></a>
 
-Секој endpoint во овој модул е заштитен со функцијата `check_admin_access(admin_doctor_id)`, која верификува дали проследениот идентификатор припаѓа на директорот на болницата. Проверката не се базира само на ID — backend-от го валидира и името на лекарот (на пр. „Владко Захариев"), со вградена толеранција за неколку транслитерациски варијации. Само ако двете проверки поминат успешно, барањето продолжува кон извршување.
-Начинот на кој се проследува `admin_doctor_id` зависи од типот на барањето:
+Секој endpoint во овој модул е заштитен со функцијата check_admin_access(admin_doctor_id), која верификува дали проследениот идентификатор припаѓа на директорот на болницата. Проверката не се сведува само на постоење на ID во базата — backend-от дополнително го валидира името на лекарот (на пр. „Владко Захариев"), со вградена толеранција за неколку транслитерациски варијации на истото име. Барањето продолжува кон извршување само ако двете проверки — постоење на ID и совпаѓање на име — поминат успешно.
+Начинот на кој се проследува admin_doctor_id зависи од HTTP методот:
 
-- кај **GET** и **DELETE** — како **query параметар** (`?admin_doctor_id=...`);
-- кај **POST** и **PUT** — како поле во **JSON телото**.
+1. кај **GET** и **DELETE** — како **query параметар** (`?admin_doctor_id=...`);
+2. кај **POST** и **PUT** — како поле во **JSON телото**.
 
-Доколку `admin_doctor_id` недостасува, е невалиден или не припаѓа на директорот, backend-от враќа **`403 Forbidden`** без да изврши каква било операција врз базата.
+Доколку admin_doctor_id недостасува, не одговара на постоечки запис, или името не се совпаѓа со директорот, backend-от враќа `403 Forbidden` без да изврши каква било операција врз базата.
 
 > Сите барања со тело користат `Content-Type: application/json`. Одговорите се стандарден JSON; грешките се враќаат во формат `{"detail": "порака"}` со соодветен HTTP статус.
 
@@ -111,8 +111,7 @@ def check_admin_access(doctor_id: int) -> bool:
     doctor_name = f"{doctor['name']} {doctor['surname']}".strip()
     return doctor_name in ["Владко Захариев", "Влатко Захариев", ...]  # варијации на името
 ```
-
-- Секој admin endpoint прво повикува `check_admin_access(admin_doctor_id)` — без тоа → `403 Forbidden`.
+Функцијата се повикува на почетокот на секој `admin endpoint`, пред каква било операција врз базата — доколку `check_admin_access` врати False, извршувањето веднаш се прекинува со `403 Forbidden`.
 
 ***
 
@@ -123,7 +122,8 @@ Od корисничка перспектива, дежурствата се пр
 
 ### GET `/admin/dezurstva`
 
-Извршува `SELECT` врз табелата `Dezurstva`, сортиран по датум и час (`DESC`). Поддржува комбинација од опционални филтри кои се применуваат динамички во SQL барањето — само проследените параметри влијаат на резултатот, додека непроследените се игнорираат.
+Извршува SELECT врз табелата Dezurstva, сортиран по датум и час (DESC). Поддржува комбинација од опционални филтри кои се применуваат динамички во SQL барањето — само проследените параметри влијаат на резултатот, додека непроследените се игнорираат.
+
 
 **Query параметри:**
 
@@ -152,7 +152,7 @@ Od корисничка перспектива, дежурствата се пр
 
 **Можни грешки:** `403` (нема пристап) · `500` грешка настаната на серверска страна.
 
-**Каде се користи:** frontend — `script.js` (админ панел, листа дежурства).
+**Каде се користи**: На frontend страна, response-от го консумира script.js и го рендерира во табелата со дежурства во административниот панел. На AI страна, истиот податок се сервира преку намерата pregled_dezurstvo — единствената интенција во dežurstva-модулот без role-restriction, односно достапна е и за гостин и за пациент, не само за најавен директор.
 
 **Имплементација (FastAPI):**
 
@@ -171,7 +171,7 @@ def get_all_dezurstva(admin_doctor_id: int, doctor_id=None, datum=None, oddel=No
 
 ### POST `/admin/dezurstva` <a href="#id-32-post-dezurstva" id="id-32-post-dezurstva"></a>
 
-**Креирање ново дежурство.** Проверува дали лекарот постои и дали нема преклопување со постоечко дежурство.
+**Креирање ново дежурство**. Пред да се изврши `INSERT`, backend-от спроведува две проверки по ред: прво дали `doctor_ID` навистина постои во табелата `Doctors` (доколку не е пронајдено враќа 404), а потоа дали новото дежурство временски не се преклопува со постоечко дежурство на истиот лекар на истиот датум. Проверката за преклопување ги споредува `vreme_od/vreme_do` опсезите — ако новиот опсег го пресекува постоечкиот, без разлика дали почетокот, крајот или целиот опсег паѓа внатре, барањето се одбива со 400 и записот не се зачувува.
 
 **Тело (JSON):**
 
@@ -198,9 +198,31 @@ def get_all_dezurstva(admin_doctor_id: int, doctor_id=None, datum=None, oddel=No
 
 **Можни грешки:** `400` (недостасуваат полиња, преклопување, лош формат) · `403` · `404` (лекар не постои) · `500`
 
-**Каде се користи:** frontend — `script.js` (форма ново дежурство).
+**Каде се користи:** frontend — `script.js` (форма ново дежурство во админ панелот).
 
-**Имплементација (FastAPI):** `check_admin_access` → проверка лекар постои → проверка преклопување → `INSERT INTO Dezurstva` → `commit`.
+**Имплементација (FastAPI):**
+
+```python
+@router.post("/dezurstva")
+async def create_dezurstvo(request: Request):
+    data = await request.json()
+    if not check_admin_access(data.get("admin_doctor_id")): raise HTTPException(403, ...)
+    # валидација: doctor_ID, datum, oddel; парсирање vreme_od/vreme_do во time
+    db_cursor.execute("SELECT doctor_ID FROM Doctors WHERE doctor_ID = %s", (doctor_id,))
+    if not db_cursor.fetchone(): raise HTTPException(404, "Лекар не е пронајден")
+    # проверка за преклопување (interval-overlap)
+    db_cursor.execute("""
+        SELECT dezurstvo_ID FROM Dezurstva WHERE doctor_ID = %s AND datum = %s
+        AND ((vreme_od <= %s AND vreme_do >= %s) OR ...)
+    """, (...))
+    if db_cursor.fetchone(): raise HTTPException(400, "Лекарот веќе има дежурство за овој датум и време")
+    db_cursor.execute("INSERT INTO Dezurstva (doctor_ID, datum, oddel, vreme_od, vreme_do, napomena) VALUES (%s, ...)", (...))
+    conn.commit()
+    return {"message": "Дежурството е успешно креирано", "dezurstvo_ID": db_cursor.lastrowid}
+```
+
+- Чекорите се секвенцијални — секој следен се извршува само ако претходниот помине: `check_admin_access` → лекар постои → нема преклопување → `INSERT` → `commit`.
+- Преклопувањето е стандарден **interval-overlap** SQL услов: два опсега се преклопуваат ако едниот не завршува пред другиот да започне.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/dezurstva" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -218,7 +240,29 @@ def get_all_dezurstva(admin_doctor_id: int, doctor_id=None, datum=None, oddel=No
 
 **Каде се користи:** frontend — `script.js` (уредување дежурство).
 
-**Имплементација (FastAPI):** `PUT /dezurstva/{dezurstvo_id}` — `UPDATE Dezurstva SET ... WHERE dezurstvo_ID = %s` (со проверка за преклопување).
+**Имплементација (FastAPI):**
+
+
+```python
+@router.put("/dezurstva/{dezurstvo_id}")
+async def update_dezurstvo(dezurstvo_id: int, request: Request):
+    data = await request.json()
+    if not check_admin_access(data.get("admin_doctor_id")): raise HTTPException(403, ...)
+    # валидација: doctor_ID, datum, oddel; парсирање vreme_od/vreme_do
+    db_cursor.execute("SELECT dezurstvo_ID FROM Dezurstva WHERE dezurstvo_ID = %s", (dezurstvo_id,))
+    if not db_cursor.fetchone(): raise HTTPException(404, "Дежурство не е пронајдено")
+    # проверка за преклопување со други дежурства (dezurstvo_ID != тековното)
+    if conflict: raise HTTPException(400, "Лекарот веќе има дежурство за овој датум и време")
+    db_cursor.execute("""
+        UPDATE Dezurstva SET doctor_ID=%s, datum=%s, oddel=%s, vreme_od=%s, vreme_do=%s, napomena=%s
+        WHERE dezurstvo_ID=%s
+    """, (...))
+    conn.commit()
+    return {"message": "Дежурството е успешно ажурирано"}
+```
+
+- `admin_doctor_id` се чита од **JSON телото** (не query, како кај GET/DELETE) и се верификува со `check_admin_access`.
+- Проверката за преклопување го исклучува тековното дежурство (`dezurstvo_ID != %s`) за да не се конфликтира со самото себе.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/dezurstva/{dezurstvo_id}" method="put" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -240,7 +284,20 @@ DELETE /admin/dezurstva/5?admin_doctor_id=2
 
 **Каде се користи:** frontend — `script.js` (бришење дежурство).
 
-**Имплементација (FastAPI):** `DELETE` + `admin_doctor_id` како query → `DELETE FROM Dezurstva WHERE dezurstvo_ID = %s`.
+**Имплементација (FastAPI):**
+
+```python
+@router.delete("/dezurstva/{dezurstvo_id}")
+def delete_dezurstvo(dezurstvo_id: int, admin_doctor_id: Optional[int] = None):
+    if not check_admin_access(admin_doctor_id): raise HTTPException(403, ...)
+    db_cursor.execute("SELECT dezurstvo_ID FROM Dezurstva WHERE dezurstvo_ID = %s", (dezurstvo_id,))
+    if not db_cursor.fetchone(): raise HTTPException(404, "Дежурство не е пронајдено")
+    db_cursor.execute("DELETE FROM Dezurstva WHERE dezurstvo_ID = %s", (dezurstvo_id,))
+    conn.commit()
+    return {"message": "Дежурството е успешно избришано"}
+```
+
+- `admin_doctor_id` доаѓа како **query параметар** (не во тело); постоењето се проверува пред `DELETE`.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/dezurstva/{dezurstvo_id}" method="delete" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -277,7 +334,20 @@ DELETE /admin/dezurstva/5?admin_doctor_id=2
 
 **Каде се користи:** frontend — `script.js` (админ листа огласи).
 
-**Имплементација (FastAPI):** `SELECT * FROM Vrabotuvanje ORDER BY datum_na_objava DESC` (по `check_admin_access`).
+**Имплементација (FastAPI):**
+
+```python
+@router.get("/oglasi")
+def get_all_oglasi(admin_doctor_id: Optional[int] = None):
+    if not check_admin_access(admin_doctor_id): raise HTTPException(403, ...)
+    db_cursor.execute("""
+        SELECT id_oglas, pozicija, oddel, datum_na_objava, datum_na_prijavuvanje, status_oglas
+        FROM Vrabotuvanje ORDER BY datum_na_objava DESC
+    """)
+    return db_cursor.fetchall()
+```
+
+- За разлика од [јавниот `/kariera`](kariera.md#2-oglasi) (само активни), овој враќа **сите** огласи, вклучувајќи завршени.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/oglasi" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -308,7 +378,23 @@ DELETE /admin/dezurstva/5?admin_doctor_id=2
 
 **Каде се користи:** frontend — `script.js` (форма нов оглас).
 
-**Имплементација (FastAPI):** `INSERT INTO Vrabotuvanje (pozicija, oddel, ...) VALUES (...)` — иста табела како [Кариера](kariera.md#4-oglas), но со admin проверка.
+**Имплементација (FastAPI):**
+
+```python
+@router.post("/oglasi")
+async def create_oglas_admin(request: Request):
+    data = await request.json()
+    if not check_admin_access(data.get("admin_doctor_id")): raise HTTPException(403, ...)
+    # валидација: pozicija, oddel; парсирање датуми "YYYY-MM-DD"
+    db_cursor.execute("""
+        INSERT INTO Vrabotuvanje (pozicija, oddel, datum_na_objava, datum_na_prijavuvanje, status_oglas)
+        VALUES (%s, %s, %s, %s, %s)
+    """, (...))
+    conn.commit()
+    return {"message": "Огласот е успешно креиран", "id_oglas": db_cursor.lastrowid}
+```
+
+- Иста табела `Vrabotuvanje` како [Кариера](kariera.md#4-oglas), но со задолжителна admin проверка.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/oglasi" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -326,7 +412,24 @@ DELETE /admin/dezurstva/5?admin_doctor_id=2
 
 **Каде се користи:** frontend — `script.js` (уредување оглас).
 
-**Имплементација (FastAPI):** `UPDATE Vrabotuvanje SET ... WHERE id_oglas = %s`.
+**Имплементација (FastAPI):**
+
+```python
+@router.put("/oglasi/{oglas_id}")
+async def update_oglas(oglas_id: int, request: Request):
+    data = await request.json()
+    if not check_admin_access(data.get("admin_doctor_id")): raise HTTPException(403, ...)
+    db_cursor.execute("SELECT id_oglas FROM Vrabotuvanje WHERE id_oglas = %s", (oglas_id,))
+    if not db_cursor.fetchone(): raise HTTPException(404, "Оглас не е пронајден")
+    db_cursor.execute("""
+        UPDATE Vrabotuvanje SET pozicija=%s, oddel=%s, datum_na_objava=%s,
+            datum_na_prijavuvanje=%s, status_oglas=%s WHERE id_oglas=%s
+    """, (...))
+    conn.commit()
+    return {"message": "Огласот е успешно ажуриран"}
+```
+
+- Постоењето на огласот се проверува пред `UPDATE`; датумите се парсираат како кај создавање.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/oglasi/{oglas_id}" method="put" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -344,7 +447,20 @@ DELETE /admin/dezurstva/5?admin_doctor_id=2
 
 **Каде се користи:** frontend — `script.js` (бришење оглас).
 
-**Имплементација (FastAPI):** `DELETE FROM Vrabotuvanje WHERE id_oglas = %s`.
+**Имплементација (FastAPI):**
+
+```python
+@router.delete("/oglasi/{oglas_id}")
+def delete_oglas(oglas_id: int, admin_doctor_id: Optional[int] = None):
+    if not check_admin_access(admin_doctor_id): raise HTTPException(403, ...)
+    db_cursor.execute("SELECT id_oglas FROM Vrabotuvanje WHERE id_oglas = %s", (oglas_id,))
+    if not db_cursor.fetchone(): raise HTTPException(404, "Оглас не е пронајден")
+    db_cursor.execute("DELETE FROM Vrabotuvanje WHERE id_oglas = %s", (oglas_id,))
+    conn.commit()
+    return {"message": "Огласот е успешно избришан"}
+```
+
+- `admin_doctor_id` доаѓа како **query параметар**; постоењето се проверува пред `DELETE`.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/oglasi/{oglas_id}" method="delete" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)

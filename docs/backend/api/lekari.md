@@ -319,7 +319,23 @@ async def promeni_lozinka_lekar(request: Request):
 
 **Каде се користи:** frontend — `script.js` (форма „Заборавена лозинка" за лекар).
 
-**Имплементација (FastAPI):** иста логика како [`/pacienti/forgot-password`](pacienti.md#5-forgot), но `user_type = 'lekar'` и кодот се испраќа на SMTP (или се печати во терминал).
+**Имплементација (FastAPI):**
+
+```python
+@router.post("/forgot-password", openapi_extra={...})
+async def forgot_password_lekar(request: Request):
+    email = (data.get("email") or "").strip().lower()
+    posrednik.execute("SELECT doctor_ID FROM Doctors WHERE LOWER(email) = %s", (email,))
+    if not doctor:
+        return {"message": "Ако постои лекар со оваа е-пошта..."}   # неутрална порака
+    posrednik.execute("DELETE FROM password_reset_tokens WHERE email = %s AND user_type = 'lekar'", (email,))
+    token = secrets.token_urlsafe(12)   # валиден 1 час
+    posrednik.execute("INSERT INTO password_reset_tokens (email, token, user_type, expires_at) VALUES (%s, %s, 'lekar', %s)", ...)
+    print(f"Код: {token}")   # SMTP / терминал
+    conn.commit()
+```
+
+- Иста логика како [`/pacienti/forgot-password`](pacienti.md#5-forgot), но со `user_type = 'lekar'`.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/forgot-password" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -347,7 +363,24 @@ async def promeni_lozinka_lekar(request: Request):
 
 **Каде се користи:** frontend — `script.js` (форма за нова лозинка со код).
 
-**Имплементација (FastAPI):** иста логика како [`/pacienti/reset-password`](pacienti.md#6-reset) + `_validna_lozinka_lekar()` за новата лozинка.
+**Имплементација (FastAPI):**
+
+```python
+@router.post("/reset-password", openapi_extra={...})
+async def reset_password_lekar(request: Request):
+    ok, msg = _validna_lozinka_lekar(nova)   # ≥8, голема, број, интерпункција; не Test123..
+    if not ok: raise HTTPException(400, msg)
+    posrednik.execute("""
+        SELECT id FROM password_reset_tokens
+        WHERE token = %s AND user_type = 'lekar' AND expires_at > UTC_TIMESTAMP()
+    """, (token,))
+    if not row or row["email"].lower() != email: raise HTTPException(400, "Неважечки или истечен код")
+    posrednik.execute("UPDATE Doctors SET password = %s, must_change_password = 0 WHERE doctor_ID = %s", ...)
+    posrednik.execute("DELETE FROM password_reset_tokens WHERE token = %s", (token,))
+    conn.commit()
+```
+
+- Како [`/pacienti/reset-password`](pacienti.md#6-reset), но со `_validna_lozinka_lekar()` и `must_change_password = 0`.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/reset-password" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)

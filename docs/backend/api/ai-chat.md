@@ -180,7 +180,18 @@ def ask(data: PitanjeModel):   # Pydantic модел — не Request
 
 **Каде се користи:** frontend — `script.js` (листа претходни разговори во чат виџетот).
 
-**Имплементација (FastAPI):** `SELECT ... FROM Ai_chat_session WHERE pacient_id/doctor_id = ? ORDER BY updated_at DESC` (`ai_chat_store.py`).
+**Имплементација (FastAPI):**
+
+```python
+@router.get("/sessions")
+def get_chat_sessions(pacient_id: int | None = Query(None), doctor_id: int | None = Query(None)):
+    if not pacient_id and not doctor_id:
+        raise HTTPException(400, "Потребен е pacient_id или doctor_id.")
+    rows = list_sessions(pacient_id=pacient_id, doctor_id=doctor_id)   # ai_chat_store.py
+    return {"sessions": [{"session_id": ..., "naslov": ..., "created_at": ..., "updated_at": ...} for r in rows]}
+```
+
+- Бара барем еден сопственички ID; читањето е делегирано на `list_sessions()` во `ai_chat_store.py`.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/sessions" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -211,7 +222,18 @@ def ask(data: PitanjeModel):   # Pydantic модел — не Request
 
 **Каде се користи:** frontend — `script.js` (вчитување претходен разговор).
 
-**Имплементација (FastAPI):** `get_session_messages(session_id, pacient_id=..., doctor_id=...)` — враќа пораки + зачуван `kontekst`.
+**Имплементација (FastAPI):**
+
+```python
+@router.get("/sessions/{session_id}/messages")
+def get_chat_messages(session_id: int, pacient_id=Query(None), doctor_id=Query(None)):
+    if not pacient_id and not doctor_id: raise HTTPException(400, ...)
+    data = get_session_messages(session_id, pacient_id=pacient_id, doctor_id=doctor_id)
+    if not data: raise HTTPException(404, "Разговорот не е пронајден.")
+    return {"session_id": ..., "kontekst": data["kontekst"], "messages": [...]}
+```
+
+- Сопственоста се проверува внатре во `get_session_messages` (враќа празно ако не е твој → `404`); враќа и зачуван `kontekst` за продолжување на флоу.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/sessions/{session_id}/messages" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -231,7 +253,18 @@ def ask(data: PitanjeModel):   # Pydantic модел — не Request
 
 **Каде се користи:** frontend — `script.js` (бришење разговор од историја).
 
-**Имплементација (FastAPI):** `DELETE FROM Ai_chat_message` + `DELETE FROM Ai_chat_session` (само ако сопственикот совпаѓа).
+**Имплементација (FastAPI):**
+
+```python
+@router.delete("/sessions/{session_id}")
+def delete_chat_session(session_id: int, pacient_id=Query(None), doctor_id=Query(None)):
+    if not pacient_id and not doctor_id: raise HTTPException(400, ...)
+    if not delete_session(session_id, pacient_id=pacient_id, doctor_id=doctor_id):
+        raise HTTPException(404, "Разговорот не е пронајден.")
+    return {"ok": True, "session_id": session_id}
+```
+
+- `delete_session()` брише само ако сопственикот совпаѓа; враќа `False` → `404`.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/sessions/{session_id}" method="delete" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -267,7 +300,20 @@ def ask(data: PitanjeModel):   # Pydantic модел — не Request
 
 **Каде се користи:** frontend — `script.js` (по најава, гостинските пораки се префрлаат во нова сесија).
 
-**Имплементација (FastAPI):** `create_session()` + loop `INSERT INTO Ai_chat_message` за секоја порака од `messages` array.
+**Имплементација (FastAPI):**
+
+```python
+@router.post("/sessions/import-guest")
+def import_guest_chat(data: GuestImportModel):
+    pacient_id, doctor_id = _owner_ids(...)
+    if not pacient_id and not doctor_id: raise HTTPException(400, "Потребен е најавен пациент или лекар.")
+    msgs = [{"uloga": ..., "sodrzina": ...} for m in data.messages if m.sodrzina.strip()]
+    sid = import_guest_session(pacient_id=pacient_id, doctor_id=doctor_id, messages=msgs, kontekst=...)
+    if not sid: raise HTTPException(500, "Не успеав да ја зачувам сесијата.")
+    return {"session_id": sid, "kontekst": data.kontekst, "imported": len(msgs)}
+```
+
+- Празни пораки се отфрлаат; `import_guest_session()` креира нова сесија и ги запишува сите пораки одеднаш.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/sessions/import-guest" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)

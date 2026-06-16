@@ -216,7 +216,22 @@ async def create_novost(naslov: str = Form(...), sodrzina: str = Form(...),
     return {"message": "Новоста е додадена.", "id": lastrowid}
 ```
 
+```python
+@router.post("/admin/novosti")
+def create_novost(naslov: str = Form(...), sodrzina: str = Form(...),
+                  admin_doctor_id: int = Form(...), slika: UploadFile = File(None),
+                  slika_url: str = Form(None), sliki_extra: List[UploadFile] = File(default=[]), ...):
+    if not check_admin_access(admin_doctor_id): raise HTTPException(403, ...)
+    if not naslov.strip(): raise HTTPException(400, "Насловот е задолжителен.")
+    # слика: готов URL има предност, инаку _save_upload(slika) (Azure Blob / static)
+    slike_extra_json = json.dumps(extra_paths) if extra_paths else None
+    cur.execute("INSERT INTO Novosti (naslov, sodrzina, slika_path, ..., author_doctor_id) VALUES (%s, ...)", (...))
+    conn.commit()
+    return {"message": "Новоста е додадена.", "id": cur.lastrowid}
+```
+
 - Користи **`multipart/form-data`** (`Form(...)` + `UploadFile`), не JSON — за да се прикачи слика заедно со текстот.
+- Дополнителните слики се чуваат како JSON низа во колоната `slike_extra`; кодот има fallback на минимален `INSERT` ако недостасуваат колони.
 
 > Може да се зададе слика на **два начини**: со прикачување фајл (`slika`) или со готов URL (`slika_url`). Ако се зададе валиден URL, тој има предност.
 
@@ -253,7 +268,25 @@ async def create_novost(naslov: str = Form(...), sodrzina: str = Form(...),
 
 **Каде се користи:** frontend — `script.js` (админ уредување вест).
 
-**Имплементација (FastAPI):** парцијален `UPDATE` — само проследените полиња се менуваат; нова слика ја брише старата локална датотека.
+**Имплементација (FastAPI):**
+
+```python
+@router.put("/admin/novosti/{novost_id}")
+def update_novost(novost_id: int, naslov: str = Form(None), sodrzina: str = Form(None),
+                  admin_doctor_id: int = Form(...), remove_slika: str = Form(None), ...):
+    if not check_admin_access(admin_doctor_id): raise HTTPException(403, ...)
+    cur.execute("SELECT id, slika_path, ... FROM Novosti WHERE id = %s", (novost_id,))
+    if not row: raise HTTPException(404, "Новостта не е пронајдена.")
+    # само проследените полиња се менуваат; останатите ја задржуваат старата вредност
+    # remove_slika=1/true/yes → брише стара локална слика од диск
+    if not new_naslov: raise HTTPException(400, "Насловот е задолжителен.")
+    cur.execute("UPDATE Novosti SET naslov=%s, sodrzina=%s, slika_path=%s, ... WHERE id=%s", (...))
+    conn.commit()
+    return {"message": "Новоста е ажурирана.", "id": novost_id}
+```
+
+- Парцијален `UPDATE` — `Form(None)` значи дека неприсутно поле ја задржува постоечката вредност.
+- Нова слика (или `remove_slika`) ја брише старата локална датотека од диск пред зачувување.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/novosti/{novost_id}" method="put" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -281,7 +314,21 @@ DELETE /admin/novosti/12?admin_doctor_id=2
 
 **Каде се користи:** frontend — `script.js` (админ бришење вест).
 
-**Имплементација (FastAPI):** прво брише локални слики од диск, потоа `DELETE FROM Novosti WHERE novost_ID = %s`.
+**Имплементација (FastAPI):**
+
+```python
+@router.delete("/admin/novosti/{novost_id}")
+def delete_novost(novost_id: int, admin_doctor_id: Optional[int] = None):
+    if admin_doctor_id is None or not check_admin_access(admin_doctor_id): raise HTTPException(403, ...)
+    cur.execute("SELECT slika_path, slike_extra FROM Novosti WHERE id = %s", (novost_id,))
+    if not row: raise HTTPException(404, "Новостта не е пронајдена.")
+    cur.execute("DELETE FROM Novosti WHERE id = %s", (novost_id,))
+    conn.commit()
+    # потоа брише локални датотеки: главна слика + сите од slike_extra
+    return {"message": "Новоста е избришана."}
+```
+
+- Прво `DELETE` од базата, па отстранување на локалните слики (главна + `slike_extra`) од диск.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/novosti/{novost_id}" method="delete" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
