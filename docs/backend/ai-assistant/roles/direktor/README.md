@@ -24,9 +24,9 @@
 
 | Област | Намери (intents) | Што прави | Страница |
 |--------|------------------|-----------|----------|
-| **Вести** | `objavi_vest`, `izbrisi_vest_oglas` | Објавување вест од YouTube линк; бришење вест | [Вести](direktor/vesti.md) |
-| **Огласи** | `kreiraj_oglas`, `zatvori_oglas`, `izbrisi_vest_oglas`, `aplikanti_oglas` | Креирање, затворање и бришење огласи; листа апликанти | [Огласи за работа](direktor/oglasi.md) |
-| **Дежурства** | `promeni_dezurstvo` | Додавање и менување дежурства на лекари | [Дежурства](direktor/dezurstva.md) |
+| **Вести** | `objavi_vest`, `izbrisi_vest_oglas` | Објавување вест од YouTube линк; бришење вест | [Вести](vesti.md) |
+| **Огласи** | `kreiraj_oglas`, `zatvori_oglas`, `izbrisi_vest_oglas`, `aplikanti_oglas` | Креирање, затворање и бришење огласи; листа апликанти | [Огласи за работа](oglasi.md) |
+| **Дежурства** | `promeni_dezurstvo` | Додавање и менување дежурства на лекари | [Дежурства](dezurstva.md) |
 
 ```mermaid
 flowchart TB
@@ -100,11 +100,11 @@ def odgovori_za_kreiranje_oglas(prasanje: str, lekar: dict | None) -> str:
 
 За да не е сè натрупано на едно место, секоја област е документирана посебно — со код, реални примери и излез:
 
-* [**Вести**](direktor/vesti.md) — објавување вест од YouTube линк (`objavi_vest`) и бришење вест
-* [**Огласи за работа**](direktor/oglasi.md) — креирање (`kreiraj_oglas`), затворање (`zatvori_oglas`), бришење и листа апликанти (`aplikanti_oglas`)
-* [**Дежурства**](direktor/dezurstva.md) — додавање и менување дежурства (`promeni_dezurstvo`)
+* [**Вести**](vesti.md) — објавување вест од YouTube линк (`objavi_vest`) и бришење вест
+* [**Огласи за работа**](oglasi.md) — креирање (`kreiraj_oglas`), затворање (`zatvori_oglas`), бришење и листа апликанти (`aplikanti_oglas`)
+* [**Дежурства**](dezurstva.md) — додавање и менување дежурства (`promeni_dezurstvo`)
 
 ***
 
-Следно: [Вести](direktor/vesti.md) · [Огласи](direktor/oglasi.md) · [Дежурства](direktor/dezurstva.md) ·
-[Општо](opsto.md) · [Пациент](pacient.md) · [Лекар](lekar.md)
+Следно: [Вести](vesti.md) · [Огласи](oglasi.md) · [Дежурства](dezurstva.md) ·
+[Општо](../opsto/README.md) · [Пациент](../pacient/README.md) · [Лекар](../lekar/README.md)

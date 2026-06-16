@@ -21,9 +21,9 @@
 
 | Област | Намери (intents) | Што прави | Страница |
 |--------|------------------|-----------|----------|
-| **Распоред и прегледи** | `moj_raspored`, `zavrshi_pregled`, `otvori_lekar_panel` | Преглед на распоред; завршување преглед (со дијагноза/терапија); отворање панел | [Распоред](lekar/raspored.md) |
-| **Картон и пациенти** | `karton_pacient`, `istorija_pacient`, `zapishi_terapija` | Медицински картон; историја кај тековниот лекар; запис на терапија | [Картон и пациенти](lekar/pacienti.md) |
-| **Статистика** | `moja_statistika` | Лични бројки: прегледи, просечна оцена, топ пациенти | [Статистика](lekar/statistika.md) |
+| **Распоред и прегледи** | `moj_raspored`, `zavrshi_pregled`, `otvori_lekar_panel` | Преглед на распоред; завршување преглед (со дијагноза/терапија); отворање панел | [Распоред](raspored.md) |
+| **Картон и пациенти** | `karton_pacient`, `istorija_pacient`, `zapishi_terapija` | Медицински картон; историја кај тековниот лекар; запис на терапија | [Картон и пациенти](pacienti.md) |
+| **Статистика** | `moja_statistika` | Лични бројки: прегледи, просечна оцена, топ пациенти | [Статистика](statistika.md) |
 
 ```mermaid
 flowchart TB
@@ -93,11 +93,11 @@ def odgovori_za_karton(prasanje: str, lekar: dict | None) -> str:
 
 За да не е сè натрупано на едно место, секоја област е документирана посебно — со код, реални примери и излез:
 
-* [**Распоред и прегледи**](lekar/raspored.md) — `moj_raspored`, `zavrshi_pregled`, `otvori_lekar_panel`
-* [**Картон и пациенти**](lekar/pacienti.md) — `karton_pacient`, `istorija_pacient`, `zapishi_terapija`
-* [**Статистика**](lekar/statistika.md) — `moja_statistika`
+* [**Распоред и прегледи**](raspored.md) — `moj_raspored`, `zavrshi_pregled`, `otvori_lekar_panel`
+* [**Картон и пациенти**](pacienti.md) — `karton_pacient`, `istorija_pacient`, `zapishi_terapija`
+* [**Статистика**](statistika.md) — `moja_statistika`
 
 ***
 
-Следно: [Распоред](lekar/raspored.md) · [Картон и пациенти](lekar/pacienti.md) · [Статистика](lekar/statistika.md) ·
-[Директор](direktor.md) · [Општо](opsto.md) · [Пациент](pacient.md)
+Следно: [Распоред](raspored.md) · [Картон и пациенти](pacienti.md) · [Статистика](statistika.md) ·
+[Директор](../direktor/README.md) · [Општо](../opsto/README.md) · [Пациент](../pacient/README.md)

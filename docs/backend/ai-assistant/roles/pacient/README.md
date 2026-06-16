@@ -21,9 +21,9 @@
 
 | Област | Намери (intents) | Што прави | Страница |
 |--------|------------------|-----------|----------|
-| **Термини и потсетници** | `slobodni_termini`, `zakazi_termin`, `otkazi_termin`, `prenesi_termin`, `postavi_potsetnik` | Проверка на слободни часови; закажување (повеќестепено); откажување; пренесување; потсетник | [Термини](pacient/termini.md) |
-| **Прегледи и оцени** | `moi_pregledi`, `oceni_pregled`, `trgni_ocena` | Историја и идни прегледи; оцена за завршен преглед; бришење оцена | [Прегледи и оцени](pacient/oceni.md) |
-| **Аплицирање за работа** | `apliciraj_za_rabota` | AI аплицира за оглас во име на пациентот | [Аплицирање](pacient/aplikacija.md) |
+| **Термини и потсетници** | `slobodni_termini`, `zakazi_termin`, `otkazi_termin`, `prenesi_termin`, `postavi_potsetnik` | Проверка на слободни часови; закажување (повеќестепено); откажување; пренесување; потсетник | [Термини](termini.md) |
+| **Прегледи и оцени** | `moi_pregledi`, `oceni_pregled`, `trgni_ocena` | Историја и идни прегледи; оцена за завршен преглед; бришење оцена | [Прегледи и оцени](oceni.md) |
+| **Аплицирање за работа** | `apliciraj_za_rabota` | AI аплицира за оглас во име на пациентот | [Аплицирање](aplikacija.md) |
 
 ```mermaid
 flowchart TB
@@ -85,11 +85,11 @@ def odgovori_za_otkazuvanje(prasanje, pacient, kontekst=None):
 
 За да не е сè натрупано на едно место, секоја област е документирана посебно — со код, реални примери и излез:
 
-* [**Термини и потсетници**](pacient/termini.md) — `slobodni_termini`, `zakazi_termin`, `otkazi_termin`, `prenesi_termin`, `postavi_potsetnik`
-* [**Прегледи и оцени**](pacient/oceni.md) — `moi_pregledi`, `oceni_pregled`, `trgni_ocena`
-* [**Аплицирање за работа**](pacient/aplikacija.md) — `apliciraj_za_rabota`
+* [**Термини и потсетници**](termini.md) — `slobodni_termini`, `zakazi_termin`, `otkazi_termin`, `prenesi_termin`, `postavi_potsetnik`
+* [**Прегледи и оцени**](oceni.md) — `moi_pregledi`, `oceni_pregled`, `trgni_ocena`
+* [**Аплицирање за работа**](aplikacija.md) — `apliciraj_za_rabota`
 
 ***
 
-Следно: [Термини](pacient/termini.md) · [Прегледи и оцени](pacient/oceni.md) · [Аплицирање](pacient/aplikacija.md) ·
-[Лекар](lekar.md) · [Директор](direktor.md) · [Општо](opsto.md)
+Следно: [Термини](termini.md) · [Прегледи и оцени](oceni.md) · [Аплицирање](aplikacija.md) ·
+[Лекар](../lekar/README.md) · [Директор](../direktor/README.md) · [Општо](../opsto/README.md)

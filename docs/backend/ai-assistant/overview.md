@@ -15,7 +15,7 @@ AI асистентот на ЈЗУ Клиничка Болница Штип е 
 * [6. Groq и офлајн режим](#6-groq)
 * [7. Пробај го асистентот](#7-probaj)
 
-> Поврзано: [Kernel](kernel.md) · [Улоги: Пациент](roles/pacient/pacient.md) · [Лекар](roles/lekar/lekar.md) · [Директор](roles/direktor/direktor.md) · [Општо](roles/opsto/opsto.md) · [API: AI Agent](../api/ai-chat.md)
+> Поврзано: [Kernel](kernel.md) · [Улоги: Пациент](roles/pacient/README.md) · [Лекар](roles/lekar/README.md) · [Директор](roles/direktor/README.md) · [Општо](roles/opsto/README.md) · [API: AI Agent](../api/ai-chat.md)
 
 ***
 
@@ -94,10 +94,10 @@ graph TD
 
 | Улога | Достапни функции | Детали |
 |-------|----------|--------|
-| **Гостин / Пациент** | ТЗакажување и откажување термини, оцени, информации, аплицирање за работа | [roles/pacient/pacient.md](roles/pacient/pacient.md) |
-| **Лекар** | Преглед на распоред, читање картон на пациент, историја на прегледи, додавање терапија, статистика | [roles/lekar/lekar.md](roles/lekar/lekar.md) |
-| **Директор** |Управување со огласи и вести, дежурства, преглед на апликанти | [roles/direktor/direktor.md](roles/direktor/direktor.md) |
-| **Сите** | Информации за лекари по оддел, услуги, работно време, навигација низ порталот | [roles/opsto/opsto.md](roles/opsto/opsto.md) |
+| **Гостин / Пациент** | ТЗакажување и откажување термини, оцени, информации, аплицирање за работа | [roles/pacient/README.md](roles/pacient/README.md) |
+| **Лекар** | Преглед на распоред, читање картон на пациент, историја на прегледи, додавање терапија, статистика | [roles/lekar/README.md](roles/lekar/README.md) |
+| **Директор** |Управување со огласи и вести, дежурства, преглед на апликанти | [roles/direktor/README.md](roles/direktor/README.md) |
+| **Сите** | Информации за лекари по оддел, услуги, работно време, навигација низ порталот | [roles/opsto/README.md](roles/opsto/README.md) |
 
 ***
 
