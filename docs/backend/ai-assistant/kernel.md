@@ -13,7 +13,7 @@
 * [5. Транслитерација](#5-translit)
 * [6. Резолвери и helpers](#6-helpers)
 
-> Поврзано: [Преглед](overview.md) · [Улоги](roles/pacient.md) · [API: AI Agent](../api/ai-chat.md)
+> Поврзано: [Преглед](overview.md) · [Улоги](roles/pacient/pacient.md) · [API: AI Agent](../api/ai-chat.md)
 
 ***
 
@@ -125,4 +125,4 @@ flowchart TD
 
 ***
 
-Следно: [Улоги: Пациент](roles/pacient.md) · [Лекар](roles/lekar.md) · [Директор](roles/direktor.md) · [Општо](roles/opsto.md)
+Следно: [Улоги: Пациент](roles/pacient/pacient.md) · [Лекар](roles/lekar/lekar.md) · [Директор](roles/direktor/direktor.md) · [Општо](roles/opsto/opsto.md)
