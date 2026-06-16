@@ -228,8 +228,8 @@ def finaliziraj_zakazuvanje(doctor_id, datum_str, vreme_str, pacient, napomena):
 
     # Email potvrda (ne e fatalna ako padne — terminoot e veke zapisан) # Izvrshuvanje na naredba
     try: # Pocetok na blok za obrabotka na potencijalni greski
-        from routers.termini import _poslati_potvrda_na_email # Uvoz na email funkcija (dinamicki, za da izbegne cirkularni importi)
-        _poslati_potvrda_na_email( # Slanje na email potvrda do pacientot so detali za terminot
+        from routers.termini import _isprati_potvrda_na_email # Uvoz na email funkcija (dinamicki, za da izbegne cirkularni importi)
+        _isprati_potvrda_na_email( # Slanje na email potvrda do pacientot so detali za terminot
             to_email=email_pacient, # Zemanje na email adresata na pacientot
             ime_pacient=ime_pacient, # Dodeluvanje na vrednost
             ime_lekar=info["ime_lekar"], # Dodeluvanje na vrednost

@@ -55,7 +55,7 @@ def _isprati_email_poraka(to_email: str, subject: str, body: str, log_uspesno: s
         print("=" * 60 + "\n")
 
 
-def _poslati_potvrda_na_email(
+def _isprati_potvrda_na_email(
     to_email: str, ime_pacient: str, ime_lekar: str, datum: str, vreme: str,
     napomena: str | None = None,  # Opcionalna napomena za lekarot — vleguva vo mailot ako ja ima
 ):
@@ -77,7 +77,7 @@ def _poslati_potvrda_na_email(
     _isprati_email_poraka(to_email, subject, body, "Потврда за закажување испратена на")
 
 
-def _poslati_otkaz_na_email(
+def _isprati_otkaz_na_email(
     to_email: str,
     ime_pacient: str,
     ime_lekar: str,
@@ -379,7 +379,7 @@ async def create_termini(request: Request):     # funkcija koja ceka podatoci od
         if patient_email:
             ime_prezime = (data.get("ime", "") + " " + data.get("prezime", "")).strip()
             doctor_full = doctor["name"] + " " + doctor["surname"]
-            _poslati_potvrda_na_email(patient_email, ime_prezime, doctor_full, datum_str, vreme_str)
+            _isprati_potvrda_na_email(patient_email, ime_prezime, doctor_full, datum_str, vreme_str)
 
         return {
             "message": "Терминот е успешно закажан! Ќе добиете потврда на вашата е-пошта.",
@@ -474,8 +474,8 @@ async def generate_izvestaj_pdf(termin_id: int):
             conn.close()
 
 
-@router.post("/{termin_id}/poslati-izvestaj")
-async def poslati_izvestaj_na_pacient(termin_id: int):
+@router.post("/{termin_id}/isprati-izvestaj")
+async def isprati_izvestaj_na_pacient(termin_id: int):
     """
     Генерира PDF извештај за терминот и го испраќа на е-поштата на пациентот
     (email_pacient од терминот – истата адреса со која пациентот е најавен).

@@ -183,7 +183,7 @@ def formatiraj_termin_za_lista(termin: dict) -> str:  # Pravi „Среда 12.0
 def isprati_email_potvrda_za_otkaz(pacient: dict, termin: dict) -> None:  # SMTP potvrda za otkazan termin
     """Email potvrda za otkazan termin (ne e fatalna ako padne)."""
     try:  # Pocetok na blok za obrabotka na potencijalni greski
-        from routers.termini import _poslati_otkaz_na_email  # Lazy import — izbegnuvanje na ciklus
+        from routers.termini import _isprati_otkaz_na_email  # Lazy import — izbegnuvanje na ciklus
 
         ime_pacient = (  # Sostavuvanje na ime + prezime za email
             (pacient.get("ime") or "") + " " + (pacient.get("prezime") or "")
@@ -193,7 +193,7 @@ def isprati_email_potvrda_za_otkaz(pacient: dict, termin: dict) -> None:  # SMTP
         den_ime = DENOVI_VO_NEDELA[datum.weekday()]  # Ime na denot
         datum_lep = format_datum(datum)  # Formatiranje za prikaz
 
-        _poslati_otkaz_na_email(  # Prakjanje na email
+        _isprati_otkaz_na_email(  # Prakjanje na email
             to_email=pacient["email"],
             ime_pacient=ime_pacient,
             ime_lekar=f"Д-р {termin['ime_lekar']}",

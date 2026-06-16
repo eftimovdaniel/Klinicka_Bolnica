@@ -241,7 +241,7 @@ const ENDPOINTS = [
     p: [{ name: "termin_id", example: "1" }], body: { dijagnoza: "Дијагноза…", terapija: "Терапија…" } },
   { group: "Термини", method: "GET", path: "/termini/izvestaj-pdf/{termin_id}", desc: "PDF извештај за преглед (бинарен одговор).",
     p: [{ name: "termin_id", example: "1" }] },
-  { group: "Термини", method: "POST", path: "/termini/{termin_id}/poslati-izvestaj", desc: "Прати PDF извештај на е-пошта.", write: true,
+  { group: "Термини", method: "POST", path: "/termini/{termin_id}/isprati-izvestaj", desc: "Прати PDF извештај на е-пошта.", write: true,
     p: [{ name: "termin_id", example: "1" }], body: {} },
 
   // ── Апарати ──

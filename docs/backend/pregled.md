@@ -302,7 +302,7 @@ sequenceDiagram
     L->>T: PATCH /{id} (дијагноза, терапија)
     T->>DB: status=завршен
     L->>T: GET /izvestaj-pdf/{id}
-    L->>T: POST /{id}/poslati-izvestaj
+    L->>T: POST /{id}/isprati-izvestaj
 
     P->>Pa: GET /zavrseni-za-ocenka
     P->>Pa: POST /oceni-pregled
@@ -314,7 +314,7 @@ sequenceDiagram
 
 - **Закажување** — `POST /termini` (види [Термини](api/termini.md)); frontend прво ги зема зафатените слотови преку `GET /termini/dostapni`.
 - **Завршување** — лекарот внесува дијагноза и терапија преку `PATCH /termini/{termin_id}`; статусот станува `завршен`.
-- **Извештај** — PDF преку `GET /termini/izvestaj-pdf/{id}`; испраќање на е-пошта преку `POST /termini/{id}/poslati-izvestaj` (потребен SMTP во `.env`).
+- **Извештај** — PDF преку `GET /termini/izvestaj-pdf/{id}`; испраќање на е-пошта преку `POST /termini/{id}/isprati-izvestaj` (потребен SMTP во `.env`).
 - **Оценување** — пациентот гледа завршени прегледи без оцена (`GET /pacienti/zavrseni-za-ocenka`) и остава оцена (`POST /pacienti/oceni-pregled`).
 - **Досие** — `GET /pacienti/dosie` враќа закажани и завршени прегледи за најавениот пациент.
 - **Лекарски поглед** — `GET /lekari/termini` ги листа термините на најавениот лекар со статус и медицински податоци.
