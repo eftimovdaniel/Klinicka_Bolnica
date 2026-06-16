@@ -30,9 +30,21 @@
   * [Kernel](backend/ai-assistant/kernel.md)
   * [Улоги](backend/ai-assistant/roles/direktor.md)
     * [Директор](backend/ai-assistant/roles/direktor.md)
+      * [Вести](backend/ai-assistant/roles/direktor/vesti.md)
+      * [Огласи за работа](backend/ai-assistant/roles/direktor/oglasi.md)
+      * [Дежурства](backend/ai-assistant/roles/direktor/dezurstva.md)
     * [Лекар](backend/ai-assistant/roles/lekar.md)
+      * [Распоред и прегледи](backend/ai-assistant/roles/lekar/raspored.md)
+      * [Картон и пациенти](backend/ai-assistant/roles/lekar/pacienti.md)
+      * [Статистика](backend/ai-assistant/roles/lekar/statistika.md)
     * [Пациент](backend/ai-assistant/roles/pacient.md)
+      * [Термини и потсетници](backend/ai-assistant/roles/pacient/termini.md)
+      * [Прегледи и оцени](backend/ai-assistant/roles/pacient/oceni.md)
+      * [Аплицирање за работа](backend/ai-assistant/roles/pacient/aplikacija.md)
     * [Општо](backend/ai-assistant/roles/opsto.md)
+      * [Лекари и услуги](backend/ai-assistant/roles/opsto/lekari.md)
+      * [Информации](backend/ai-assistant/roles/opsto/informacii.md)
+      * [Навигација и поздрав](backend/ai-assistant/roles/opsto/navigacija.md)
 
 ## Frontend
 
@@ -48,3 +60,7 @@
 * [Docker](deployment/docker.md)
 * [Nginx](deployment/nginx.md)
 * [Продукција и одржување](deployment/production.md)
+
+## Одржување
+
+* [Подобрување на документацијата](podobruvanje-dokumentacija.md)

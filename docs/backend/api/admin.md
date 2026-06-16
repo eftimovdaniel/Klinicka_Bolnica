@@ -103,6 +103,17 @@ sequenceDiagram
 
 > Сите барања со тело користат `Content-Type: application/json`. Одговорите се стандарден JSON; грешките се враќаат во формат `{"detail": "порака"}` со соодветен HTTP статус.
 
+**Имплементација (FastAPI) — заштита:**
+
+```python
+def check_admin_access(doctor_id: int) -> bool:
+    db_cursor.execute("SELECT name, surname FROM Doctors WHERE doctor_ID = %s", (doctor_id,))
+    doctor_name = f"{doctor['name']} {doctor['surname']}".strip()
+    return doctor_name in ["Владко Захариев", "Влатко Захариев", ...]  # варијации на името
+```
+
+- Секој admin endpoint прво повикува `check_admin_access(admin_doctor_id)` — без тоа → `403 Forbidden`.
+
 ***
 
 ## 3. Дежурства <a href="#id-3-dezurstva" id="id-3-dezurstva"></a>
@@ -141,6 +152,19 @@ Od корисничка перспектива, дежурствата се пр
 
 **Можни грешки:** `403` (нема пристап) · `500` грешка настаната на серверска страна.
 
+**Каде се користи:** frontend — `script.js` (админ панел, листа дежурства).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.get("/dezurstva")
+def get_all_dezurstva(admin_doctor_id: int, doctor_id=None, datum=None, oddel=None):
+    if not check_admin_access(admin_doctor_id): raise HTTPException(403, ...)
+    query = "SELECT d.*, doc.name, doc.surname FROM Dezurstva d JOIN Doctors doc ... WHERE 1=1"
+    # динамички AND филтри за doctor_id, datum, oddel
+    return result
+```
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/dezurstva" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -174,6 +198,10 @@ Od корисничка перспектива, дежурствата се пр
 
 **Можни грешки:** `400` (недостасуваат полиња, преклопување, лош формат) · `403` · `404` (лекар не постои) · `500`
 
+**Каде се користи:** frontend — `script.js` (форма ново дежурство).
+
+**Имплементација (FastAPI):** `check_admin_access` → проверка лекар постои → проверка преклопување → `INSERT INTO Dezurstva` → `commit`.
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/dezurstva" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -187,6 +215,10 @@ Od корисничка перспектива, дежурствата се пр
 **Успешен одговор (200):** `{ "message": "Дежурството е успешно ажурирано" }`
 
 **Можни грешки:** `400` · `403` · `404` (дежурство не постои) · `500`
+
+**Каде се користи:** frontend — `script.js` (уредување дежурство).
+
+**Имплементација (FastAPI):** `PUT /dezurstva/{dezurstvo_id}` — `UPDATE Dezurstva SET ... WHERE dezurstvo_ID = %s` (со проверка за преклопување).
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/dezurstva/{dezurstvo_id}" method="put" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -205,6 +237,10 @@ DELETE /admin/dezurstva/5?admin_doctor_id=2
 **Успешен одговор (200):** `{ "message": "Дежурството е успешно избришано" }`
 
 **Можни грешки:** `403` · `404` · `500`
+
+**Каде се користи:** frontend — `script.js` (бришење дежурство).
+
+**Имплементација (FastAPI):** `DELETE` + `admin_doctor_id` како query → `DELETE FROM Dezurstva WHERE dezurstvo_ID = %s`.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/dezurstva/{dezurstvo_id}" method="delete" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -239,6 +275,10 @@ DELETE /admin/dezurstva/5?admin_doctor_id=2
 
 **Можни грешки:** `403` · `500`
 
+**Каде се користи:** frontend — `script.js` (админ листа огласи).
+
+**Имплементација (FastAPI):** `SELECT * FROM Vrabotuvanje ORDER BY datum_na_objava DESC` (по `check_admin_access`).
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/oglasi" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -266,6 +306,10 @@ DELETE /admin/dezurstva/5?admin_doctor_id=2
 
 **Можни грешки:** `400` · `403` · `500`
 
+**Каде се користи:** frontend — `script.js` (форма нов оглас).
+
+**Имплементација (FastAPI):** `INSERT INTO Vrabotuvanje (pozicija, oddel, ...) VALUES (...)` — иста табела како [Кариера](kariera.md#4-oglas), но со admin проверка.
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/oglasi" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -280,6 +324,10 @@ DELETE /admin/dezurstva/5?admin_doctor_id=2
 
 **Можни грешки:** `400` · `403` · `404` (оглас не постои) · `500`
 
+**Каде се користи:** frontend — `script.js` (уредување оглас).
+
+**Имплементација (FastAPI):** `UPDATE Vrabotuvanje SET ... WHERE id_oglas = %s`.
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/oglasi/{oglas_id}" method="put" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -293,6 +341,10 @@ DELETE /admin/dezurstva/5?admin_doctor_id=2
 **Успешен одговор (200):** `{ "message": "Огласот е успешно избришан" }`
 
 **Можни грешки:** `403` · `404` · `500`
+
+**Каде се користи:** frontend — `script.js` (бришење оглас).
+
+**Имплементација (FastAPI):** `DELETE FROM Vrabotuvanje WHERE id_oglas = %s`.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/oglasi/{oglas_id}" method="delete" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -325,6 +377,18 @@ DELETE /admin/dezurstva/5?admin_doctor_id=2
 ```
 
 **Можни грешки:** `403` · `500`
+
+**Каде се користи:** frontend — `script.js` (админ статистика, оптоварување по оддел).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.get("/statistika/optovaruvanje-oddeli")
+def statistika_optovaruvanje(admin_doctor_id: int, datum_od=None, datum_do=None):
+    # SELECT specijalnost, COUNT(*) FROM Termin_pregled JOIN Doctors
+    # WHERE status_pregled = 'завршен' GROUP BY specialty
+    return {"razdeli": [...], "vkupno_zavrseni": N}
+```
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/statistika/optovaruvanje-oddeli" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -359,6 +423,17 @@ DELETE /admin/dezurstva/5?admin_doctor_id=2
 ```
 
 **Можни грешки:** `403` · `404` (ако е зададен непостоечки `doctor_id`) · `500`
+
+**Каде се користи:** frontend — `script.js` (админ статистика, просек оцени).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.get("/statistika/prosek-ocena-lekari")
+def statistika_prosek_ocena(admin_doctor_id: int, doctor_id=None, ...):
+    # AVG(pf.ocena), COUNT(*) од Pregled_feedback → Termin_pregled → Doctors
+    return {"lekari": [{"prosek_ocena": 4.75, "broj_oceni": 12, ...}]}
+```
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/statistika/prosek-ocena-lekari" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)

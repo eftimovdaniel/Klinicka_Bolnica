@@ -133,6 +133,22 @@ sequenceDiagram
 
 > Endpoint-от секогаш враќа `200` — дури и при празно прашање или внатрешна грешка враќа учтива порака во `odgovor` (без HTTP грешка), за да не се прекине разговорот.
 
+**Каде се користи:** frontend — `script.js` (чат виџет, `AI_CHAT_BASE + "/ask"`).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.post("/ask")
+def ask(data: PitanjeModel):   # Pydantic модел — не Request
+    pitanje_norm = normaliziraj_prasanje(pitanje)
+    intent = _resolve_intent(pitanje_norm, kontekst, pacient, lekar)   # keywords + Groq fallback
+    rez = dispatch(intent, AiContext(...))   # ai/_kernel/handlers.py
+    if history_enabled: save_exchange(session_id, ...)   # Ai_chat_session / Ai_chat_message
+    return {"odgovor": rez["odgovor"], "kontekst": rez["kontekst"], "session_id": ..., ...}
+```
+
+- Единствениот endpoint што директно повикува AI kernel; handlers читаат/пишуваат во MySQL (термини, лекари, огласи…).
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/ask" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -162,6 +178,10 @@ sequenceDiagram
 
 **Можни грешки:** `400` (нема `pacient_id` ниту `doctor_id`)
 
+**Каде се користи:** frontend — `script.js` (листа претходни разговори во чат виџетот).
+
+**Имплементација (FastAPI):** `SELECT ... FROM Ai_chat_session WHERE pacient_id/doctor_id = ? ORDER BY updated_at DESC` (`ai_chat_store.py`).
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/sessions" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -189,6 +209,10 @@ sequenceDiagram
 
 **Можни грешки:** `400` (нема ID) · `404` (разговорот не е пронајден или не е твој)
 
+**Каде се користи:** frontend — `script.js` (вчитување претходен разговор).
+
+**Имплементација (FastAPI):** `get_session_messages(session_id, pacient_id=..., doctor_id=...)` — враќа пораки + зачуван `kontekst`.
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/sessions/{session_id}/messages" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -204,6 +228,10 @@ sequenceDiagram
 **Успешен одговор (200):** `{ "ok": true, "session_id": 12 }`
 
 **Можни грешки:** `400` (нема ID) · `404` (не е пронајден или не е твој)
+
+**Каде се користи:** frontend — `script.js` (бришење разговор од историја).
+
+**Имплементација (FastAPI):** `DELETE FROM Ai_chat_message` + `DELETE FROM Ai_chat_session` (само ако сопственикот совпаѓа).
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/sessions/{session_id}" method="delete" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -236,6 +264,10 @@ sequenceDiagram
 ```
 
 **Можни грешки:** `400` (нема најавен пациент/лекар) · `500` (неуспешно зачувување)
+
+**Каде се користи:** frontend — `script.js` (по најава, гостинските пораки се префрлаат во нова сесија).
+
+**Имплементација (FastAPI):** `create_session()` + loop `INSERT INTO Ai_chat_message` за секоја порака од `messages` array.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/sessions/import-guest" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)

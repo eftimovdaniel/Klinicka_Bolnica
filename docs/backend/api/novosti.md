@@ -136,6 +136,21 @@ sequenceDiagram
 
 **Можни грешки:** `500` доколку настане грешка на серверска страна. 
 
+**Каде се користи:** frontend — `script.js` (почетна страница и дел „Новости").
+
+**Имплементација (FastAPI):**
+
+```python
+@router.get("/novosti", response_model=List[dict])
+def list_novosti():
+    db_cursor.execute("""
+        SELECT n.*, d.name AS author_name, d.surname AS author_surname
+        FROM Novosti n LEFT JOIN Doctors d ON n.author_doctor_id = d.doctor_ID
+        ORDER BY n.created_at DESC
+    """)
+    return [format_row(r) for r in rows]   # slike_extra како JSON низа
+```
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/novosti" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -148,6 +163,10 @@ sequenceDiagram
 **Path параметар:** `novost_id` *(задолжителен, цел број)* — одговара на `novost_ID` во табелата `Novosti`
 **Успешен одговор (200):** ист JSON објект како записите во `/novosti`, но се враќа директно како објект, не како низа.
 **Можни грешки:** `404` (запис со дадениот `novost_ID` не постои во табелата) · `500` (грешка при извршување на SQL или конекција кон базата)
+
+**Каде се користи:** frontend — `script.js` (детален приказ на една вест).
+
+**Имплементација (FastAPI):** `SELECT ... FROM Novosti WHERE novost_ID = %s` — ист формат како елемент од листата `/novosti`.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/novosti/{novost_id}" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -183,7 +202,23 @@ sequenceDiagram
 
 **Можни грешки:** `400` (полето `naslov` е празно или недостасува — задолжително поле) · `403` (проследениот `admin_doctor_id` не постои или не припаѓа на овластен администратор) · `500` (грешка при запис во базата или при качување на слика)
 
-> Може да се зададе слика на **два начина**: со прикачување фајл (`slika`) или со готов URL (`slika_url`). Ако се зададе валиден URL, тој има предност.
+**Каде се користи:** frontend — `script.js` (админ форма за нова вест, `FormData`).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.post("/admin/novosti")
+async def create_novost(naslov: str = Form(...), sodrzina: str = Form(...),
+                        admin_doctor_id: int = Form(...), slika: UploadFile = None, ...):
+    if not check_admin_access(admin_doctor_id): raise HTTPException(403, ...)
+    slika_path = upload_slika(slika)   # Azure Blob или backend/static/uploads/novosti/
+    db_cursor.execute("INSERT INTO Novosti (...) VALUES (...)", (...))
+    return {"message": "Новоста е додадена.", "id": lastrowid}
+```
+
+- Користи **`multipart/form-data`** (`Form(...)` + `UploadFile`), не JSON — за да се прикачи слика заедно со текстот.
+
+> Може да се зададе слика на **два начини**: со прикачување фајл (`slika`) или со готов URL (`slika_url`). Ако се зададе валиден URL, тој има предност.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/novosti" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -216,6 +251,10 @@ sequenceDiagram
 
 **Можни грешки:** `400` (полето `naslov` е проследено, но е празно) · `403` (проследениот `admin_doctor_id` не постои или не припаѓа на овластен администратор) · `404` (запис со дадениот `novost_id` не постои во табелата) · `500` (грешка при запис во базата или при манипулација со слики на дискот)
 
+**Каде се користи:** frontend — `script.js` (админ уредување вест).
+
+**Имплементација (FastAPI):** парцијален `UPDATE` — само проследените полиња се менуваат; нова слика ја брише старата локална датотека.
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/novosti/{novost_id}" method="put" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -239,6 +278,10 @@ DELETE /admin/novosti/12?admin_doctor_id=2
 ```
 
 **Можни грешки:** `403` (проследениот `admin_doctor_id` недостасува или не припаѓа на овластен администратор — бришењето се одбива пред да се изврши каква било промена) · `404` (запис со дадениот `novost_id` не постои во табелата) · `500` (грешка при бришење на запис од базата или при отстранување на слики од дискот)
+
+**Каде се користи:** frontend — `script.js` (админ бришење вест).
+
+**Имплементација (FastAPI):** прво брише локални слики од диск, потоа `DELETE FROM Novosti WHERE novost_ID = %s`.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/novosti/{novost_id}" method="delete" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)

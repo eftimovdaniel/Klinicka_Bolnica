@@ -329,17 +329,17 @@ sequenceDiagram
 
 | Страница | Router | Статус |
 |----------|--------|--------|
-| [Конвенции](api/conventions.md) | заеднички правила | во подготовка |
-| [Автентикација](api/authentication.md) | најава, лозинки, admin | во подготовка |
+| [Конвенции](api/conventions.md) | заеднички правила | готово |
+| [Автентикација](api/authentication.md) | најава, лозинки, admin | готово |
 | [Лекари](api/lekari.md) | `/lekari` | готово |
 | [Пациенти](api/pacienti.md) | `/pacienti` | готово |
 | [Термини](api/termini.md) | `/termini` | готово |
 | [Новости](api/novosti.md) | `/novosti` | готово |
 | [Кариера](api/kariera.md) | `/kariera`, `/aplikacija` | готово |
 | [Администрација](api/admin.md) | `/admin` | готово |
-| [Услуги](api/uslugi.md) | `/uslugi` | во подготовка |
-| [Апарати](api/aparati.md) | `/aparati` | во подготовка |
-| [AI чат](api/ai-chat.md) | `/ai-chat` | во подготовка |
+| [Услуги](api/uslugi.md) | `/uslugi` | готово |
+| [Апарати](api/aparati.md) | `/aparati` | готово |
+| [AI чат](api/ai-chat.md) | `/ai-chat` | готово |
 
 Производната база на API: `https://klinicka-bolnica-stip2026.onrender.com`. Локално: `http://localhost:8000`.
 

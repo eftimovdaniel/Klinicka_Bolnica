@@ -114,6 +114,23 @@ Endpoint-от е имплементиран со вградена робусно
 
 **Можни грешки:** нема, при грешка враќа `[]` 
 
+**Каде се користи:** frontend — `script.js` (dropdown апарати во лекарскиот панел).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.get("")
+def get_aparati():
+    db_cursor.execute("""
+        SELECT aparat_id, ime, opis, kod FROM Aparati
+        WHERE aktiven = TRUE ORDER BY ime
+    """)
+    return db_cursor.fetchall()
+    # except: return []   # ако табелата не постои — празна листа наместо 500
+```
+
+- При SQL грешка (на пр. табелата уште не постои) endpoint-от враќа `[]` — frontend не паѓа при ран deploy.
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/aparati" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -145,6 +162,22 @@ GET /aparati/termini/dostapnost?aparat=mri&datum=2026-06-20&vreme=10:00&lekar_id
 Доколку има судир, `dostapen` е `false`, а `poraka` ги набројува причините (на пр. „Апаратот е зафатен…; Лекарот има закажан преглед…").
 
 **Можни грешки:** `400` (недостасуваат параметри или лош формат) · `500` грешка на серверска страна.
+
+**Каде се користи:** frontend — `script.js` (live проверка додека лекарот пополнува форма).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.get("/termini/dostapnost")
+def check_aparat_dostapnost(aparat: str, datum: str, vreme: str,
+                            lekar_id: int | None = None, pacient_ime: str | None = None, ...):
+    # 1) Aparati_termini — дали апаратот е зафатен
+    # 2) Termin_pregled — дали пациентот има преглед (ако се дадени ime/prezime)
+    # 3) Termin_pregled — дали лекарот има преглед (ако е даден lekar_id)
+    return {"dostapen": count == 0 and ..., "poraka": "; ".join(poraki) or "Апаратот е достапен"}
+```
+
+- Истата тројна логика како при `POST /termini`, но **без INSERT** — само проверка за UI feedback.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/aparati/termini/dostapnost" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -182,6 +215,24 @@ GET /aparati/termini/dostapnost?aparat=mri&datum=2026-06-20&vreme=10:00&lekar_id
 ```
 
 **Можни грешки:** `400` (недостасуваат полиња, лош формат, или судир со апарат/пациент/лекар) · `404` (лекар не постои) · `500`
+
+**Каде се користи:** frontend — `script.js` (форма за закажување апарат од лекарски панел).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.post("/termini")
+async def create_aparat_termin(request: Request):
+    data = await request.json()
+    dt = datetime.strptime(datum_vreme, "%Y-%m-%dT%H:%M")
+    # тројна проверка: Aparati_termini + Termin_pregled (пациент) + Termin_pregled (лекар)
+    if conflict: raise HTTPException(400, "Апаратот/пациентот/лекарот е зафатен...")
+    db_cursor.execute("INSERT INTO Aparati_termini (...) VALUES (%s, ...)", (...))
+    conn.commit()
+    return {"message": "Терминот за апарат е успешно закажан!", "termin_id": db_cursor.lastrowid}
+```
+
+- `datum_vreme` во ISO формат `YYYY-MM-DDTHH:MM`; записот оди во `Aparati_termini` (паралелен календар на `Termin_pregled`).
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/aparati/termini" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)

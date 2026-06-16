@@ -1,0 +1,112 @@
+# Општо: Навигација и поздрав
+
+Две „мазни" функции што го прават асистентот пријатен за користење: пренасочување до секции од сајтот и фиксни одговори за поздрав/идентитет (без AI, за да не се скрши македонскиот на кратки пораки).
+
+> Поврзано: [Општо (преглед)](../opsto.md) · [Лекари и услуги](lekari.md) · [Информации](informacii.md) ·
+> [Frontend: AI чат виџет](../../../../frontend/ai-chat-widget.md)
+
+## Содржина
+
+* [1. Преглед](#1-pregled)
+* [2. Навигација (`navigacija`)](#2-navigacija)
+* [3. Општ асистент / поздрав (`asistent_opsto`)](#3-fallback)
+* [4. Пробај](#4-probaj)
+
+***
+
+## 1. Преглед <a id="1-pregled"></a>
+
+| Намера | Фајл | Дејство |
+|--------|------|---------|
+| `navigacija` | `navigacija.py` | AI препознава дестинација → `navigacija` објект за frontend |
+| `asistent_opsto` | `asistent_opsto.py` | Фиксен поздрав / идентитет (fallback, без Groq) |
+
+***
+
+## 2. Навигација (`navigacija`) <a id="2-navigacija"></a>
+
+Groq препознава до која секција сака да оди корисникот и враќа `navigacija` објект (`target` + `label`) што frontend-от го користи за скрол/пренасочување. Резултатот е `kind="dict_nav"`.
+
+```python
+# backend/ai/opsto/navigacija.py (избор)
+DESTINACII = {
+    "lekari":  {"label": "Лекари",  "target": "index.html#lekari"},
+    "uslugi":  {"label": "Услуги",  "target": "index.html#uslugi"},
+    "kontakt": {"label": "Контакт", "target": "index.html#kontakt"},
+    "kariera": {"label": "Кариера", "target": "index.html#kariera"},
+    "novosti": {"label": "Новости", "target": "novosti.html"},
+    "pocetna": {"label": "Почетна", "target": "index.html"},
+}
+```
+
+| Корисник вели | Дестинација |
+|---------------|-------------|
+| „Однеси ме на услуги" | `index.html#uslugi` |
+| „Прикажи лекари" | `index.html#lekari` |
+| „Контакт" | `index.html#kontakt` |
+| „Сакам да аплицирам за работа" | `index.html#kariera` |
+| „Новости" | `novosti.html` |
+| „Почетна" | `index.html` |
+
+### Реален излез (кариера)
+
+```text
+Ве пренасочувам кон делот „Кариера" (работни позиции и пријавување) на почетната страница.
+
+Активни огласи (можете да се пријавите преку формата во секцијата):
+
+• Медицинска сестра — оддел: Кардиологија. Рок за пријава: 30.06.2026.
+
+За апликација отворете ја секцијата „Кариера" и пополнете ја формата подолу на страницата.
+```
+
+> Внимателно разликување: „**креирај/објави** оглас" **не** е навигација (тоа е директорска [акција](../direktor/oglasi.md)) → AI враќа `null`. Навигацијата кон „лекари" повторно ја користи логиката од [`lekari_oddel`](lekari.md) за да каже колку лекари има.
+
+***
+
+## 3. Општ асистент / поздрав (`asistent_opsto`) <a id="3-fallback"></a>
+
+Кога ниедна специфична намера не одговара, или за кратки поздрави, се користи `asistent_opsto.py` — **фиксни** одговори (без Groq, бидејќи AI често крши кратки македонски пораки).
+
+```python
+# backend/ai/opsto/asistent_opsto.py (избор)
+def odgovori_za_asistent_opsto(prasanje: str) -> str:
+    p = transliterijaj(prasanje or "").lower()
+    if any(x in p for x in ("благодар", "фала", "thanks", ...)):
+        return ODGOVOR_BLAGODARNOST
+    return ODGOVOR_IDENTITET
+```
+
+### Реален излез (идентитет)
+
+```text
+Здраво! Како виртуелен асистент на Клиничка Болница Штип, тука сум да ти помогнам со сите информации поврзани со закажување прегледи, одделите во болницата, најновите соопштенија или административните процедури.
+```
+
+> За податоци што мора да дојдат од база (лекари, термини) никогаш не се користи слободен AI одговор — само за општи/поздравни пораки.
+
+***
+
+## 4. Пробај <a id="4-probaj"></a>
+
+**Навигација**:
+
+```json
+{ "prasanje": "Однеси ме на услуги", "pacient": null, "lekar": null, "kontekst": null }
+```
+
+**Поздрав / идентитет**:
+
+```json
+{ "prasanje": "Здраво, кој си ти?", "pacient": null, "lekar": null, "kontekst": null }
+```
+
+> Обете работат за гости — `pacient` и `lekar` може да бидат `null`.
+
+{% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/ask" method="post" %}
+[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
+{% endopenapi-operation %}
+
+***
+
+Следно: [Лекари и услуги](lekari.md) · [Информации](informacii.md) · [Општо (преглед)](../opsto.md)

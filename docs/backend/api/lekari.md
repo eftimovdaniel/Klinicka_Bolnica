@@ -124,6 +124,22 @@ sequenceDiagram
 
 Лекарите без специјалност се враќаат со празно `specijalnost` (frontend прикажува „Н/П").
 
+**Каде се користи:** frontend — `script.js` (листа лекари, филтер по оддел, форма за закажување).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.get("")
+def get_lekari(specijalnost: Optional[str] = None):
+    if specijalnost and specijalnost.strip():
+        posrednik.execute("SELECT ... FROM Doctors WHERE specialty = %s ORDER BY name", (specijalnost.strip(),))
+    else:
+        posrednik.execute("SELECT ... FROM Doctors ORDER BY name, surname")
+    return posrednik.fetchall()
+```
+
+- `specijalnost` е опционален **query параметар**, без него се враќаат сите лекари од табелата `Doctors`.
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari" method="get" %} 
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json) {% endopenapi-operation %}
 
@@ -174,6 +190,28 @@ sequenceDiagram
 
 **Можни грешки:** `400` (едно или повеќе задолжителни полиња се празни) · `401` (невалидно корисничко ime или лозинка) · `403` (лекарот постои во базата, но нема поставено лозинка — потребна е прва регистрација) · `500` (внатрешна грешка на серверот)
 
+**Каде се користи:** frontend — `script.js` (форма за најава на лекар, зачувува `currentLekar`).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.post("/login", openapi_extra={...})
+async def login_lekar(request: Request):
+    username = (data.get("username") or "").strip().lower()
+    posrednik.execute("SELECT doctor_ID, name, surname, email, specialty, password FROM Doctors")
+    for doc in all_doctors:
+        doc_username = f"{transliterate_mk_to_lat(name)}.{transliterate_mk_to_lat(surname)}"
+        if doc_username == username or flexible_match(...):   # sh/s, zh/z, мали грешки
+            doctor = doc; break
+    if not verify_password(password, doctor["password"]): raise HTTPException(401, ...)
+    posrednik.execute("SELECT ... FROM Termin_pregled WHERE doctor_ID = %s AND status != 'откажан'", ...)
+    must_change = verify_password(DEFAULT_LOZINKA_LEKARI, stored_hash)   # Test123..
+    return {"doctor": {...}, "termini": [...], "must_change_password": must_change}
+```
+
+- Корисничкото име **не се чува** во базата — се пресметува со `transliterate_mk_to_lat()` од `routers/utils.py`.
+- Во еден одговор враќа и **термини** (за да frontend не прави втор повик) и `must_change_password`.
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/login" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -205,6 +243,21 @@ Endpoint кој служи за **иницијална регистрација 
 
 **Можни грешки**: `400` (едно или повеќе полиња не ги исполнуваат барањата, лозинката не ги задоволува правилата за сложеност, или внесената е-пошта веќе е зафатена од друг профил) · `500` (внатрешна грешка на серверот)
 
+**Каде се користи:** frontend — `script.js` (форма „Регистрирај се" за лекар).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.post("/register", openapi_extra={...})
+async def register_lekar(request: Request):
+    ok, msg = _validna_lozinka_lekar(password)   # ≥8, голема, број, интерпункција; не Test123..
+    if not ok: raise HTTPException(400, msg)
+    db_cursor.execute("UPDATE Doctors SET password=%s, email=%s, specialty=%s WHERE name=%s AND surname=%s", ...)
+    conn.commit()
+```
+
+- Лекарот мора **однапред** да постои во `Doctors` (внесен од админ); регистрацијата го активира профилот со хеширана лозинка.
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/register" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -229,6 +282,21 @@ Endpoint кој служи за **иницијална регистрација 
 
 **Можни грешки:** `400` (недостасува `doctor_id` или новата лозинка не ги исполнува правилата за сложеност) · `401` (внесената тековна лозинка е погрешна — промената е одбиена) · `403` (лекарот сè уште нема поставено лозинка — потребна е прва регистрација) · `404` (лекарот не постои во базата) · `500` (внатрешна грешка на серверот)
 
+**Каде се користи:** frontend — `script.js` (задолжителна промена по прва најава со `Test123..`).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.patch("/promeni-lozinka", openapi_extra={...})
+async def promeni_lozinka_lekar(request: Request):
+    if not verify_password(trenutna, stored_hash): raise HTTPException(401, ...)
+    ok, msg = _validna_lozinka_lekar(nova_lozinka)
+    db_cursor.execute("UPDATE Doctors SET password = %s, must_change_password = 0 WHERE doctor_ID = %s", ...)
+    conn.commit()
+```
+
+- По успешна промена `must_change_password` се ресетира на `0` — лекарот може да продолжи со работа.
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/promeni-lozinka" method="patch" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -246,7 +314,13 @@ Endpoint кој служи за **иницијална регистрација 
 ```
 
 Без разлика дали внесената е-пошта постои во системот или не, одговорот е секогаш иста неутрална порака. Ова е намерна безбедносна одлука — со која се спречува можноста некој да „тестира" дали одредена е-пошта е регистрирана во системот.
+
 **Можни грешки:** `400` (внесената е-пошта не е во валиден формат) · `500` (внатрешна грешка на серверот)
+
+**Каде се користи:** frontend — `script.js` (форма „Заборавена лозинка" за лекар).
+
+**Имплементација (FastAPI):** иста логика како [`/pacienti/forgot-password`](pacienti.md#5-forgot), но `user_type = 'lekar'` и кодот се испраќа на SMTP (или се печати во терминал).
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/forgot-password" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -270,6 +344,11 @@ Endpoint кој служи за **иницијална регистрација 
 Новата лозинка мора да ги исполнува истите правила за сложеност дефинирани при регистрација. По успешен ресет, верификацискиот код се брише од базата за да не може повторно да се искористи, а `must_change_password` се поставува на 0.
 
 **Можни грешки**: `400` (верификацискиот код е невалиден, истечен или новата лозинка не ги исполнува правилата за сложеност) · `404` (лекарот не постои во базата) · `500` (внатрешна грешка на серверот)
+
+**Каде се користи:** frontend — `script.js` (форма за нова лозинка со код).
+
+**Имплементација (FastAPI):** иста логика како [`/pacienti/reset-password`](pacienti.md#6-reset) + `_validna_lozinka_lekar()` за новата лozинка.
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/reset-password" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -300,6 +379,20 @@ Endpoint кој служи за **иницијална регистрација 
 
 **Можни грешки:** `400` (параметарот `email` не е проследен во барањето) · `404` (во базата не постои лекар регистриран со таа е-пошта) · `500` (внатрешна грешка на серверот)
 
+**Каде се користи:** frontend — `script.js` (лекарски панел, refresh на термини по email).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.get("/termini")
+def get_lekar_termini(email: str):
+    db_cursor.execute("SELECT doctor_ID, ... FROM Doctors WHERE LOWER(email) = %s", (email.lower(),))
+    db_cursor.execute("SELECT ... FROM Termin_pregled WHERE doctor_ID = %s AND status != 'откажан'", ...)
+    return {"doctor": {...}, "termini": [...]}
+```
+
+- Лекарот се наоѓа по **email query параметар**; структурата на `termini` е иста како кај `/lekari/login`.
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/termini" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -329,6 +422,21 @@ Endpoint кој служи за **иницијална регистрација 
 ```
 
 **Можни грешки:** `404` (лекар со дадениот `doctor_id` не постои во базата) · `500` (внатрешна грешка на серверот)
+
+**Каде се користи:** frontend — `script.js` (приказ дежурства на профилот на лекар).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.get("/{doctor_id}/dezurstva")
+def get_dezurstva_lekar(doctor_id: int):
+    db_cursor.execute("SELECT ... FROM Dezurstva WHERE doctor_ID = %s", (doctor_id,))
+    if rows: return formatted_rows
+    # fallback: presmetaj_raspored_dezurstva(name, specialty) — синтетички распоред
+    return fallback_schedule
+```
+
+- Прво се чита `Dezurstva`; ако нема записи, се активира **fallback** (`presmetaj_raspored_dezurstva`) по специјалност.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/{doctor_id}/dezurstva" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)

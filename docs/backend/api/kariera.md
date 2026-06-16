@@ -94,6 +94,19 @@ sequenceDiagram
 
 **Можни грешки:** `500` настаната грешка на серверска страна 
 
+**Каде се користи:** frontend — `script.js` (страница „Кариера").
+
+**Имплементација (FastAPI):**
+
+```python
+@router.get("")
+def get_kariera():
+    rows = fetch_aktivni_oglasi_rows(db_cursor)   # vrabotuvanje_helpers.py
+    return [row_to_oglas_public(r) for r in rows]  # status != 'завршен'
+```
+
+- Логиката за форматирање е издвоена во `vrabotuvanje_helpers.py` — router-от само повикува helper и враќа JSON.
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/kariera" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -126,6 +139,26 @@ Endpoint-от прима `multipart/form-data` наместо стандарде
 ```
 
 **Можни грешки:** `400` (нема позиција / име-презиме / е-пошта, или неважечки `id_oglas`) · `500` грешка настаната на серверска страна.
+
+**Каде се користи:** frontend — `script.js` (форма за аплицирање на страница „Кариера").
+
+**Имплементација (FastAPI):**
+
+```python
+app_router = APIRouter(tags=["kariera"])   # посебен router — патеката е /aplikacija, не /kariera/aplikacija
+
+@app_router.post("/aplikacija")
+async def create_aplikacija(request: Request):
+    form_data = await request.form()   # multipart/form-data
+    db_cursor.execute("""
+        INSERT INTO prijaveni_lekari (id_oglas, pozicija, ime_lekar, prezime_lekar, ...)
+        VALUES (%s, %s, %s, %s, ...)
+    """, (...))
+    conn.commit()
+    return {"message": "Апликацијата е успешно испратена!"}
+```
+
+- `app_router` е регистриран одделно во `main.py` — затоа URL-от е `/aplikacija`, не `/kariera/aplikacija`.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/aplikacija" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -162,6 +195,25 @@ Endpoint-от е резервиран исклучиво за администр
 ```
 
 **Можни грешки:** `400` (нема позиција/оддел, неважечки формат на датум) · `500` грешка настаната на серверска страна.
+
+**Каде се користи:** frontend — `script.js` (админ панел, креирање оглас).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.post("/oglas")
+async def create_oglas(request: Request):
+    data = await request.json()
+    # парсирање датуми: "YYYY-MM-DD" или "YYYY-MM-DD HH:MM:SS"
+    db_cursor.execute("""
+        INSERT INTO Vrabotuvanje (pozicija, oddel, datum_na_objava, datum_na_prijavuvanje, status_oglas)
+        VALUES (%s, %s, %s, %s, %s)
+    """, (...))
+    conn.commit()
+    return {"message": "Огласот е успешно креиран!", "id_oglas": db_cursor.lastrowid}
+```
+
+- За админ CRUD со `check_admin_access` види [Администрација — `/admin/oglasi`](admin.md#4-oglasi); овој endpoint е поедноставна јавна/alternativна патека.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/kariera/oglas" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)

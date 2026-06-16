@@ -82,6 +82,24 @@ Frontend-от го користи за **dropdown менија** при филт
 
 **Можни грешки:** `500` (внатрешна грешка на серверот)
 
+**Каде се користи:** frontend — `script.js` (dropdown за филтер по специјалност, форма за закажување).
+
+**Имплементација (FastAPI):**
+
+```python
+router = APIRouter(tags=["uslugi"])   # без prefix — монтиран на корен во main.py
+
+@router.get("/specialnosti")
+def get_specialnosti():
+    db_cursor.execute("""
+        SELECT DISTINCT specialty AS specijalnost FROM Doctors
+        WHERE specialty IS NOT NULL AND specialty != '' ORDER BY specialty
+    """)
+    return db_cursor.fetchall()   # [{"specijalnost": "Кардиологија"}, ...]
+```
+
+- Едноставен read-only endpoint: `SELECT DISTINCT` директно од `Doctors.specialty` — нови специјалности се појавуваат автоматски кога се додаде лекар.
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/specialnosti" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -106,6 +124,20 @@ Frontend-от го повикува овој endpoint при вчитување 
 ```
 
 **Можни грешки:** `500` (внатрешна грешка на серверот)
+
+**Каде се користи:** frontend — `script.js` (страница „Услуги", админ панел за избор на оддел).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.get("/uslugi")
+def get_uslugi():
+    db_cursor.execute("SELECT ime_na_oddel AS naziv FROM Oddeli ORDER BY ime_na_oddel")
+    rows = db_cursor.fetchall()
+    return [{"naziv": (r.get("naziv") or "").strip()} for r in rows]
+```
+
+- Чита од посебната табела `Oddeli` (не од лекарите); `TRIM` се прави во Python пред враќање.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/uslugi" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)

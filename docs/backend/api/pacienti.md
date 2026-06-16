@@ -138,6 +138,30 @@ sequenceDiagram
 
 > Лозинката се чува како **bcrypt хеш** (`password_utils.hash_password`), никогаш како чист текст.
 
+**Каде се користи:** frontend — `script.js` (форма за регистрација на пациент).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.post("/register", openapi_extra={...})
+async def register_pacienti(request: Request):
+    data = await request.json()
+    embg = "".join(c for c in str(data.get("embg") or "") if c.isdigit())  # само цифри
+    # валидација: ime/prezime, email (@ и домен), password ≥ 8, embg == 13
+    db_cursor.execute("SELECT patient_ID FROM patient WHERE LOWER(email) = %s", (email.lower(),))
+    if db_cursor.fetchone(): raise HTTPException(400, "email веќе користен")
+    db_cursor.execute("SELECT patient_ID FROM patient WHERE embg = %s", (embg,))
+    if db_cursor.fetchone(): raise HTTPException(400, "ЕМБГ веќе регистриран")
+    password_hash = hash_password(password)
+    db_cursor.execute("INSERT INTO patient (...) VALUES (%s, ...)", (...))
+    conn.commit()
+    return {"message": "...", "pacient_id": db_cursor.lastrowid}
+```
+
+- Телото се чита со `await request.json()`; `openapi_extra` ја опишува шемата за Swagger/Scalar.
+- ЕМБГ се нормализира (само цифри), телефонот се тримува; уникатност на `email` и `embg` се проверува пред `INSERT`.
+- Лозинката никогаш не се зачувува како plain text — `hash_password()` од `password_utils.py`.
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/register" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -178,6 +202,25 @@ Frontend-от го зачувува овој објект (на пр. во `loca
 
 **Можни грешки:** `400` (празна е-пошта или лозинка) · `401` (погрешна комбинација — намерно иста порака за email и лозинка) · `500`
 
+**Каде се користи:** frontend — `script.js` (форма за најава, зачувува `currentPacient` во `localStorage`).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.post("/login", openapi_extra={...})
+async def login_pacienti(request: Request):
+    data = await request.json()
+    email = (data.get("email") or "").strip().lower()
+    db_cursor.execute("SELECT patient_ID, ..., password FROM patient WHERE LOWER(email) = %s", (email,))
+    patient = db_cursor.fetchone()
+    if not patient or not verify_password(password, patient["password"]):
+        raise HTTPException(401, "невалидна е-пошта или лозинка")  # иста порака и за email и за лозинка
+    return {"pacient": {"pacient_ID": patient["patient_ID"], ...}}
+```
+
+- Е-поштата се нормализира (`strip().lower()`); лозинката се споредува со `verify_password()` (bcrypt).
+- Намerno иста `401` порака и кога email не постои и кога лозинката е погрешна — безбедносна практика (не открива дали email постои).
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/login" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -207,6 +250,27 @@ Frontend-от го зачувува овој објект (на пр. во `loca
 На **локално** развој, кодот се гледа во терминалот каде работи uvicorn. На **Render**, во табот _Logs_.
 
 **Можни грешки:** `400` (невалидна е-пошта) · `500`
+
+**Каде се користи:** frontend — `script.js` (форма „Заборавена лозинка").
+
+**Имплементација (FastAPI):**
+
+```python
+@router.post("/forgot-password", openapi_extra={...})
+async def forgot_password_pacient(request: Request):
+    email = (data.get("email") or "").strip().lower()
+    cur.execute("SELECT patient_ID FROM patient WHERE LOWER(email) = %s", (email,))
+    if not patient:
+        return {"message": "Ако постои пациент..."}   # иста порака — без откривање дали email постои
+    cur.execute("DELETE FROM password_reset_tokens WHERE email = %s AND user_type = 'pacient'", ...)
+    token = secrets.token_urlsafe(12)
+    cur.execute("INSERT INTO password_reset_tokens (email, token, user_type, expires_at) VALUES ...", ...)
+    print(f"Код: {token}")   # локално: кодот е во терминалот / Render Logs
+    conn.commit()
+```
+
+- Кодот е валиден **1 час** (`expires_at`); старите токени за ист email се бришат пред нов `INSERT`.
+- Одговорот е секогаш иста неутрална порака — без разлика дали email постои.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/forgot-password" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -239,6 +303,26 @@ Frontend-от го зачувува овој објект (на пр. во `loca
 По успех, кодот се **брише** од `password_reset_tokens`.
 
 **Можни грешки:** `400` (невалиден/истечен код, лозинка < 8 знаци) · `404` (пациент не постои) · `500`
+
+**Каде се користи:** frontend — `script.js` (форма за нова лозинка со код).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.post("/reset-password", openapi_extra={...})
+async def reset_password_pacient(request: Request):
+    cur.execute("""
+        SELECT id FROM password_reset_tokens
+        WHERE token = %s AND user_type = 'pacient' AND expires_at > UTC_TIMESTAMP()
+    """, (token,))
+    if not row or row["email"].lower() != email:
+        raise HTTPException(400, "Неважечки или истечен код")
+    cur.execute("UPDATE patient SET password = %s WHERE patient_ID = %s", (hash_password(nova), ...))
+    cur.execute("DELETE FROM password_reset_tokens WHERE token = %s", (token,))
+    conn.commit()
+```
+
+- Токенот мора да одговара на email **и** да не е истечен; по успех се брише од `password_reset_tokens`.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/reset-password" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -297,6 +381,24 @@ GET /pacienti/dosie?pacient_ID=42
 
 **Можни грешки:** `404` (непостоечки `pacient_ID`) · `500`
 
+**Каде се користи:** frontend — `script.js` (страница „Мое досие" по најава).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.get("/dosie")
+async def dosie_pacient(pacient_ID: int = Query(...)):
+    cur.execute("SELECT ... FROM patient WHERE patient_ID = %s", (pacient_ID,))
+    email_pac = profil["email"].strip().lower()
+    # врска со Termin_pregled преку email_pacient (не FK patient_ID)
+    cur.execute("SELECT ... FROM Termin_pregled WHERE LOWER(TRIM(email_pacient)) = %s AND status='закажан' AND datum >= CURDATE()", ...)
+    cur.execute("SELECT ... FROM Termin_pregled LEFT JOIN Pregled_feedback ... WHERE status='завршен'", ...)
+    return {"profil": {...}, "idni_termini": [...], "zaverseni": [...], "oceni": [...], "statistika": {...}}
+```
+
+- `pacient_ID` е **query параметар**; термините се поврзани преку `email_pacient`, не преку FK — види [База](../the_database.md#9-konvencii).
+- Четири одделни SQL барања: профил, идни, завршени (+ оцени), потоа се агрегира `statistika`.
+
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/dosie" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
 {% endopenapi-operation %}
@@ -334,6 +436,24 @@ GET /pacienti/zavrseni-za-ocenka?pacient_ID=42
 Се враќаат само термини со `status_pregled = 'завршен'` и `email_pacient` што одговара на е-поштата на пациентот.
 
 **Можни грешки:** `404` · `500`
+
+**Каде се користи:** frontend — `script.js` (листа завршени прегледи за оцена).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.get("/zavrseni-za-ocenka")
+async def zavrseni_za_ocenka(pacient_ID: int = Query(...)):
+    cur.execute("SELECT email FROM patient WHERE patient_ID = %s", (pacient_ID,))
+    cur.execute("""
+        SELECT tp.*, (pf.feedback_ID IS NOT NULL) AS veke_ocenat, pf.ocena, pf.komentar
+        FROM Termin_pregled tp LEFT JOIN Pregled_feedback pf ON pf.termin_ID = tp.termin_ID
+        WHERE LOWER(TRIM(tp.email_pacient)) = %s AND tp.status_pregled = 'завршен'
+    """, (email_pac,))
+    return {"pregledi": [...]}
+```
+
+- `LEFT JOIN Pregled_feedback` во еден query дава и дали прегледот е веќе оценет (`veke_ocenat`).
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/zavrseni-za-ocenka" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -379,6 +499,26 @@ GET /pacienti/zavrseni-za-ocenka?pacient_ID=42
 ```
 
 **Можни грешки:** `400` (невалидна оцена, термин не е завршен) · `403` (термин не е на овој пациент) · `404` · `500`
+
+**Каде се користи:** frontend — `script.js` (форма за оцена на преглед).
+
+**Имплементација (FastAPI):**
+
+```python
+@router.post("/oceni-pregled", openapi_extra={...})
+async def oceni_pregled(request: Request):
+    # 1) email на пациентот од patient; 2) email_pacient на терминот — мора да совпаѓаат
+    if em_termin != email_pac: raise HTTPException(403, "не одговара на вашиот профил")
+    if status != "завршен": raise HTTPException(400, "само за завршен преглед")
+    cur.execute("""
+        INSERT INTO Pregled_feedback (termin_ID, ocena, komentar) VALUES (%s, %s, %s)
+        ON DUPLICATE KEY UPDATE ocena=VALUES(ocena), komentar=VALUES(komentar), ...
+    """, (termin_id, ocena, komentar))
+    conn.commit()
+```
+
+- Заштита: `email_pacient` на терминот се споредува со email на пациентот — `403` ако не совпаѓаат.
+- `ON DUPLICATE KEY UPDATE` — еден термин = најмногу една оцена; повторен повик ја ажурира постоечката.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/oceni-pregled" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
