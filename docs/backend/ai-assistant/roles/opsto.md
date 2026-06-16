@@ -21,9 +21,9 @@
 
 | Област | Намери (intents) | Што прави | Страница |
 |--------|------------------|-----------|----------|
-| **Лекари и услуги** | `lekari_oddel`, `info_lekar`, `preporaka_lekar`, `preference_lekar`, `uslugi` | Листа лекари по оддел; инфо за лекар; препорака по симптом; преференци; услуги | [Лекари и услуги](lekari.md) |
-| **Информации** | `rabotno_vreme`, `lokacija`, `kontakti`, `faq_pregled`, `rezultati_testovi`, `novosti_rezime`, `pregled_dezurstvo` | Работно време, локации, контакти, ЧПП, резултати, новости, дежурства | [Информации](informacii.md) |
-| **Навигација и поздрав** | `navigacija`, `asistent_opsto` | Пренасочување до секции; поздрав/идентитет (fallback) | [Навигација](navigacija.md) |
+| **Лекари и услуги** | `lekari_oddel`, `info_lekar`, `preporaka_lekar`, `preference_lekar`, `uslugi` | Листа лекари по оддел; инфо за лекар; препорака по симптом; преференци; услуги | [Лекари и услуги](opsto/lekari.md) |
+| **Информации** | `rabotno_vreme`, `lokacija`, `kontakti`, `faq_pregled`, `rezultati_testovi`, `novosti_rezime`, `pregled_dezurstvo` | Работно време, локации, контакти, ЧПП, резултати, новости, дежурства | [Информации](opsto/informacii.md) |
+| **Навигација и поздрав** | `navigacija`, `asistent_opsto` | Пренасочување до секции; поздрав/идентитет (fallback) | [Навигација](opsto/navigacija.md) |
 
 ```mermaid
 flowchart TB
@@ -82,11 +82,11 @@ def odgovori_za_uslugi(prasanje: str) -> str:
 
 За да не е сè натрупано на едно место, секоја област е документирана посебно — со код, реални примери и излез:
 
-* [**Лекари и услуги**](lekari.md) — `lekari_oddel`, `info_lekar`, `preporaka_lekar`, `preference_lekar`, `uslugi`
-* [**Информации**](informacii.md) — `rabotno_vreme`, `lokacija`, `kontakti`, `faq_pregled`, `rezultati_testovi`, `novosti_rezime`, `pregled_dezurstvo`
-* [**Навигација и поздрав**](navigacija.md) — `navigacija`, `asistent_opsto`
+* [**Лекари и услуги**](opsto/lekari.md) — `lekari_oddel`, `info_lekar`, `preporaka_lekar`, `preference_lekar`, `uslugi`
+* [**Информации**](opsto/informacii.md) — `rabotno_vreme`, `lokacija`, `kontakti`, `faq_pregled`, `rezultati_testovi`, `novosti_rezime`, `pregled_dezurstvo`
+* [**Навигација и поздрав**](opsto/navigacija.md) — `navigacija`, `asistent_opsto`
 
 ***
 
-Следно: [Лекари и услуги](lekari.md) · [Информации](informacii.md) · [Навигација](navigacija.md) ·
-[Пациент](../pacient/README.md) · [Лекар](../lekar/README.md) · [Директор](../direktor/README.md)
+Следно: [Лекари и услуги](opsto/lekari.md) · [Информации](opsto/informacii.md) · [Навигација](opsto/navigacija.md) ·
+[Пациент](pacient.md) · [Лекар](lekar.md) · [Директор](direktor.md)

@@ -3,13 +3,3 @@ root: ./
 structure:
   readme: README.md
   summary: SUMMARY.md
-
-redirects:
-  backend/ai-assistant/roles/direktor.md: backend/ai-assistant/roles/direktor/README.md
-  backend/ai-assistant/roles/direktor/direktor.md: backend/ai-assistant/roles/direktor/README.md
-  backend/ai-assistant/roles/lekar.md: backend/ai-assistant/roles/lekar/README.md
-  backend/ai-assistant/roles/lekar/lekar.md: backend/ai-assistant/roles/lekar/README.md
-  backend/ai-assistant/roles/pacient.md: backend/ai-assistant/roles/pacient/README.md
-  backend/ai-assistant/roles/pacient/pacient.md: backend/ai-assistant/roles/pacient/README.md
-  backend/ai-assistant/roles/opsto.md: backend/ai-assistant/roles/opsto/README.md
-  backend/ai-assistant/roles/opsto/opsto.md: backend/ai-assistant/roles/opsto/README.md
