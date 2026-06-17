@@ -186,9 +186,7 @@ cur.execute("SELECT ime, opis FROM Aparati WHERE aktiven = 1 ORDER BY ime")
 
 > Сите функции работат и за **гости** — `pacient` и `lekar` може да бидат `null`.
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/ask" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/ai-chat/ask`](../../../api/ai-chat.md#3-ask)
 
 ***
 

@@ -134,9 +134,7 @@ Email: daniel@example.com
 
 > За аплицирање во име на корисникот, `pacient` мора да носи `email` (и идеално `ime`/`prezime`) — асистентот ги користи за пополнување на апликацијата.
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/ask" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/ai-chat/ask`](../../../api/ai-chat.md#3-ask)
 
 ***
 

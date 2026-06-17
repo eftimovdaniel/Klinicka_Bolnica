@@ -127,9 +127,7 @@ oddel-details.html?oddel=ИмеНаОддел
 
 > **Пробај го endpoint-от за услуги:**
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/uslugi" method="get" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [GET `/uslugi`](../backend/api/uslugi.md#3-uslugi)
 
 #### Лекари — `#lekari`
 
@@ -146,9 +144,7 @@ oddel-details.html?oddel=ИмеНаОддел
 
 > **Пробај го endpoint-от за лекари** (со опционален филтер по специјалност):
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari" method="get" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [GET `/lekari`](../backend/api/lekari.md#3-lista)
 
 #### Оцени преглед — `#pacient-ocenki-section`
 
@@ -177,13 +173,9 @@ API: `GET /termini` (завршени прегледи) + `POST` за оценк
 
 > **Пробај ги endpoints за кариера** — листа на огласи и аплицирање:
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/kariera" method="get" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [GET `/kariera`](../backend/api/kariera.md#2-oglasi)
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/aplikacija" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/aplikacija`](../backend/api/kariera.md#3-aplikacija)
 
 #### Footer
 
@@ -232,27 +224,19 @@ flowchart TD
 
 **Најава (пациент)** — `POST /pacienti/login`
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/login" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/pacienti/login`](../backend/api/pacienti.md#4-login)
 
 **Регистрација** — `POST /pacienti/register`
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/register" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/pacienti/register`](../backend/api/pacienti.md#3-register)
 
 **Достапни термини** — `GET /termini/dostapni`
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/termini/dostapni" method="get" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [GET `/termini/dostapni`](../backend/api/termini.md#3-dostapni)
 
 **Закажување термин** — `POST /termini`
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/termini" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/termini`](../backend/api/termini.md#4-zakazi)
 
 > Ако сакаш да го видиш **целиот сајт во живо**, тоа е достапно на дното на [Преглед на frontend](overview.md).
 
@@ -295,9 +279,7 @@ flowchart TD
 
 > **Пробај го асистентот** — внеси прашање во полето `prasanje` и кликни **„Test it"**:
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/ask" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/ai-chat/ask`](../backend/api/ai-chat.md#3-ask)
 
 > Подетално: [AI чат виџет](ai-chat-widget.md)
 
@@ -343,13 +325,9 @@ novosti.html?id=3
 
 > **Пробај ги endpoints за новости** — листа и една новост по `id`:
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/novosti" method="get" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [GET `/novosti`](../backend/api/novosti.md#3-list)
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/novosti/{novost_id}" method="get" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [GET `/novosti/{novost_id}`](../backend/api/novosti.md#4-edna)
 
 ### Безбедност на HTML содржина
 

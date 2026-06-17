@@ -145,21 +145,15 @@ flowchart LR
 
 **Најава на пациент** — `POST /pacienti/login`
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/login" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/pacienti/login`](../../backend/api/pacienti.md#4-login)
 
 **Листа на лекари** — `GET /lekari`
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari" method="get" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [GET `/lekari`](../../backend/api/lekari.md#3-lista)
 
 **Листа на услуги** — `GET /uslugi`
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/uslugi" method="get" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [GET `/uslugi`](../../backend/api/uslugi.md#3-uslugi)
 
 ***
 

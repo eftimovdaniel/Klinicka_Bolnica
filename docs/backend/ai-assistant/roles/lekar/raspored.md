@@ -156,9 +156,7 @@ ID: 42
 
 > `lekar.doctor_ID` мора да е валиден ID на лекар (терминот мора да му припаѓа), инаку `require_lekar` го одбива барањето или терминот нема да се најде.
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/ask" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/ai-chat/ask`](../../../api/ai-chat.md#3-ask)
 
 ***
 

@@ -236,9 +236,7 @@ cur.execute("""
 
 > `pacient.email` мора да е поставен за дејства што менуваат податоци (закажување, откажување, пренесување, потсетник) — инаку асистентот бара најава.
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/ask" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/ai-chat/ask`](../../../api/ai-chat.md#3-ask)
 
 ***
 

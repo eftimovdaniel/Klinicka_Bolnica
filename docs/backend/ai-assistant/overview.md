@@ -115,7 +115,7 @@ AI-то користи **Groq API** (модели од фамилијата Llam
 
 ## 7. Пробај го асистентот <a id="7-probaj"></a>
 
-Целиот AI асистент е достапен преку **еден endpoint** — `POST /ai-chat/ask`. Пополни го полето `prasanje` и кликни **„Test it"** за вистински одговор од живиот сервер.
+Целиот AI асистент е достапен преку **еден endpoint** — `POST /ai-chat/ask`. На [API страницата за AI Agent](../api/ai-chat.md#3-ask) има **„Test it"** — пополни го полето `prasanje` за вистински одговор од живиот сервер.
 
 > Пример тело:
 >
@@ -123,9 +123,7 @@ AI-то користи **Groq API** (модели од фамилијата Llam
 > { "prasanje": "Кои лекари се на кардиологија?", "pacient": null, "lekar": null, "kontekst": null, "session_id": null }
 > ```
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/ask" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/ai-chat/ask`](../api/ai-chat.md#3-ask)
 
 > За детали за сите AI endpoints (сесии, историја): [API: AI Agent](../api/ai-chat.md).
 

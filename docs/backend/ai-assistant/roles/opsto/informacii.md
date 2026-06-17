@@ -151,9 +151,7 @@ FROM Dezurstva WHERE datum BETWEEN ... ORDER BY datum, vreme_od
 
 > Сите овие работат и за гости (`pacient` / `lekar` = `null`).
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/ask" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/ai-chat/ask`](../../../api/ai-chat.md#3-ask)
 
 ***
 

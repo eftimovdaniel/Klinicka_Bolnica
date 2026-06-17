@@ -156,9 +156,7 @@ cur.execute(
 
 > Оцена и бришење оцена работат **само** за прегледи со статус „завршен" — ако нема таков, асистентот објаснува зошто и бара да се прецизира лекар и/или датум.
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/ask" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/ai-chat/ask`](../../../api/ai-chat.md#3-ask)
 
 ***
 

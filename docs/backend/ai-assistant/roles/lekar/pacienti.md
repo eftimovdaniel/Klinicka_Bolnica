@@ -158,9 +158,7 @@ def _update_terapija(termin_id, dijagnoza, terapija, avtomatski_zavrshi) -> bool
 
 > `lekar.doctor_ID` мора да е валиден ID на лекар, инаку `require_lekar` го одбива барањето.
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/ask" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/ai-chat/ask`](../../../api/ai-chat.md#3-ask)
 
 ***
 

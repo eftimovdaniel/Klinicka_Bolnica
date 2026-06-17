@@ -211,15 +211,11 @@ var MATICNI_LEKARI_URL = 'https://mojtermin.mk/health_workers';
 
 **Најава на пациент** — `POST /pacienti/login`
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/pacienti/login" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/pacienti/login`](../backend/api/pacienti.md#4-login)
 
 **Најава на лекар** — `POST /lekari/login`
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari/login" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/lekari/login`](../backend/api/lekari.md#4-login)
 
 ### `session.js` — траење на сесијата
 
@@ -320,15 +316,11 @@ flowchart LR
 
 **Слободни термини** — `GET /termini/dostapni`
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/termini/dostapni" method="get" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [GET `/termini/dostapni`](../backend/api/termini.md#3-dostapni)
 
 **Закажување термин** — `POST /termini`
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/termini" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/termini`](../backend/api/termini.md#4-zakazi)
 
 ***
 
@@ -363,9 +355,7 @@ sequenceDiagram
 
 **Прашање до асистентот** — `POST /ai-chat/ask`
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/ask" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/ai-chat/ask`](../backend/api/ai-chat.md#3-ask)
 
 > Подетално: [AI чат виџет](ai-chat-widget.md) · [AI асистент (backend)](../backend/ai-assistant/overview.md)
 

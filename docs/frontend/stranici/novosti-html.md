@@ -229,15 +229,11 @@ function openNovostViewModal(id) {
 
 **Сите новости** — `GET /novosti`
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/novosti" method="get" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [GET `/novosti`](../../backend/api/novosti.md#3-list)
 
 **Една новост по ID** — `GET /novosti/{id}`
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/novosti/{novost_id}" method="get" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [GET `/novosti/{novost_id}`](../../backend/api/novosti.md#4-edna)
 
 ***
 

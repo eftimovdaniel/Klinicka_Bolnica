@@ -103,9 +103,7 @@ def odgovori_za_asistent_opsto(prasanje: str) -> str:
 
 > Обете работат за гости — `pacient` и `lekar` може да бидат `null`.
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/ai-chat/ask" method="post" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [POST `/ai-chat/ask`](../../../api/ai-chat.md#3-ask)
 
 ***
 

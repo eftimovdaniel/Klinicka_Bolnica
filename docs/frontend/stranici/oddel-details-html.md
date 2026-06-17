@@ -166,9 +166,7 @@ flowchart LR
 
 **Лекари по специјалност** — `GET /lekari`
 
-{% openapi-operation spec="KlinickaBolnicaAPI" path="/lekari" method="get" %}
-[OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
-{% endopenapi-operation %}
+> **Тестирај го овде →** [GET `/lekari`](../../backend/api/lekari.md#3-lista)
 
 ***
 
