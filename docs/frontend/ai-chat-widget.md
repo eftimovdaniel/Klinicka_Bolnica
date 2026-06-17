@@ -310,12 +310,16 @@ AI:       Терминот е закажан. Потврда е испратен
 Без контекст, секоја порака би била изолирана. Затоа backend го враќа објектот `kontekst`, а frontend го праќа назад во следната порака. Кога разговорот ќе заврши, backend враќа `kontekst: null` со `clear_kontekst: true`. Контекстот се чисти и при нов чат, одјава или истек на сесија.
 
 ```mermaid
-flowchart LR
-    Q1["Порака 1"] -->|"kontekst=null"| BE1["Backend"]
-    BE1 -->|"kontekst: doctor_id"| Q2["Порака 2"]
-    Q2 -->|"kontekst: doctor_id"| BE2["Backend"]
-    BE2 -->|"kontekst: doctor_id, datum, vreme"| Q3["Порака 3"]
-    BE2 -->|"clear_kontekst=true"| RESET["Ресет"]
+sequenceDiagram
+    participant U as Корисник
+    participant BE as Backend
+
+    U->>BE: Порака 1 (kontekst null)
+    BE-->>U: kontekst doctor_id
+    U->>BE: Порака 2 (kontekst doctor_id)
+    BE-->>U: kontekst doctor_id datum vreme
+    U->>BE: Порака 3
+    BE-->>U: kontekst null + clear_kontekst
 ```
 
 ***
