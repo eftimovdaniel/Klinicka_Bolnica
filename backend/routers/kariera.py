@@ -1,7 +1,6 @@
 import traceback
 from collections.abc import Mapping
 from typing import Any
-
 from fastapi import APIRouter, HTTPException, Request
 from starlette.datastructures import UploadFile
 from datetime import datetime
@@ -31,7 +30,7 @@ def _parse_int_or_none(val: Any) -> int | None:
         return None
 
 @router.get("")
-def get_kariera():          # funkcija koja e nameneta za kariera
+def get_kariera():          # funkcija koja e namenuvana za da gi vrati site aktivni oglasi za rabota, soodvetno filtrirani i podredeni
     conn = None             # se postavuva konekcijata da e zatvorena
     try:
         conn = get_connection()     # ostvaruvanje so bazata na podatoci 
