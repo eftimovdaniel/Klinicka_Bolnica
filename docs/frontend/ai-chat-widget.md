@@ -311,11 +311,11 @@ AI:       Терминот е закажан. Потврда е испратен
 
 ```mermaid
 flowchart LR
-    Q1["Порака 1"] -->|kontekst=null| BE1["Backend"]
-    BE1 -->|kontekst={doctor_id}| Q2["Порака 2"]
-    Q2 -->|kontekst={doctor_id}| BE2["Backend"]
-    BE2 -->|kontekst={doctor_id,datum,vreme}| Q3["Порака 3"]
-    BE2 -->|clear_kontekst=true| RESET["Ресет"] 
+    Q1["Порака 1"] -->|"kontekst=null"| BE1["Backend"]
+    BE1 -->|"kontekst: doctor_id"| Q2["Порака 2"]
+    Q2 -->|"kontekst: doctor_id"| BE2["Backend"]
+    BE2 -->|"kontekst: doctor_id, datum, vreme"| Q3["Порака 3"]
+    BE2 -->|"clear_kontekst=true"| RESET["Ресет"]
 ```
 
 ***
