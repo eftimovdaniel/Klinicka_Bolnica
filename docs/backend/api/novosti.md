@@ -157,19 +157,42 @@ def list_novosti():
 
 ## 4. GET `/novosti/{novost_id}` <a href="#id-4-edna" id="id-4-edna"></a>
 
-За разлика од листата во претходната точка, овој endpoint враќа само еден конкретен запис, идентификуван по примарниот клуч novost_ID. Пребарувањето по индексирано поле значи дека брзината на одговорот не зависи од тоа колку новости вкупно постојат во базата — еден ред секогаш се наоѓа речиси веднаш, без оглед дали табелата има десет или десет илјади записи.
+За разлика од листата во претходната точка, овој endpoint враќа само еден конкретен запис, идентификуван по примарниот клуч `novost_ID`. Бидејќи пребарувањето се случува по индексирано поле, а не со скенирање ред по ред низ цела табела, MySQL го наоѓа соодветниот ред речиси веднаш, без забележителна разлика во брзината на одговор без оглед дали Novosti содржи десет или десет илјади записи.
 
 **Path параметар**: `novost_id` (задолжителен, цел број) — одговара на novost_ID во табелата Novosti.
-**Успешен одговор**(200): ист JSON облик како секој поединечен елемент од листата во`/novosti`, со разлика што се враќа директно како објект, не како низа со еден елемент.
+
+**Успешен одговор**(200): ист JSON облик како секој поединечен елемент од листата во `/novosti`, со разлика што се враќа директно како објект, не како низа со еден елемент.
 
 **Можни грешки**: 
 - `404` (запис со дадениот novost_ID не постои)
 - `500` (грешка при извршување на SQL или конекција кон базата). 
 Разликата меѓу нив е важна: `404` значи дека идентификаторот е валиден цел број, но просто не одговара на постоечки запис, додека `500` значи дека самото извршување на барањето пропаднало, без врска со конкретната вредност на ID.
 
-**Каде се користи:** На frontend страна, овој endpoint се повикува кога посетителот отвора посебна страница за конкретна вест, преку сопствен URL, а не преку клик внатре во веќе вчитаната листа. Бидејќи таа страница може да биде отворена директно, без претходно поминување низ `/novosti`, `script.js`s не може да се потпира на податоци веќе преземени во меморија и мора одделно да побара токму тој запис по ID.
+**Каде се користи:** Секоја вест на „Новости" страницата носи сопствен, директен URL — линк кој посетителот може да го отвори без претходно да поминал низ листата, на пример преку споделена врска или директен сигнал во прелистувачот. Во таков случај, ѝscript.jsѝ нема од каде да земе веќе преземени податоци во меморија, па мора одделно да го повика овој endpoint и да го пополни приказот само врз основа на novost_ID-то од URL-то.
 
-**Имплементација (FastAPI):** `SELECT ... FROM Novosti WHERE novost_ID = %s` — ист формат како елемент од листата `/novosti`.
+**Имплементација (FastAPI):**
+
+```python
+@router.get("/novosti/{novost_id}", response_model=dict)
+def get_novost(novost_id: int):
+    conn = get_connection()
+    cur = conn.cursor(dictionary=True)
+    cur.execute("""
+        SELECT n.id, n.naslov, n.sodrzina, n.slika_path, n.slika_position, n.slika_height,
+               n.video_url, n.slike_extra, n.created_at, n.updated_at,
+               d.name AS author_name, d.surname AS author_surname
+        FROM Novosti n
+        LEFT JOIN Doctors d ON n.author_doctor_id = d.doctor_ID
+        WHERE n.id = %s
+    """, (novost_id,))
+    row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Новостта не е пронајдена")
+    _normalize_novost_row(row)
+    return row
+```
+
+Истиот `SELECT` како кај листата `/novosti`, со `WHERE n.id = %s`. Кодот има fallback за постари бази без колони `video_url` / `slike_extra` (како кај точка 3).
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/novosti/{novost_id}" method="get" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
@@ -211,32 +234,40 @@ def list_novosti():
 
 ```python
 @router.post("/admin/novosti")
-async def create_novost(naslov: str = Form(...), sodrzina: str = Form(...),
-                        admin_doctor_id: int = Form(...), slika: UploadFile = None, ...):
-    if not check_admin_access(admin_doctor_id): raise HTTPException(403, ...)
-    slika_path = upload_slika(slika)   # Azure Blob или backend/static/uploads/novosti/
-    db_cursor.execute("INSERT INTO Novosti (...) VALUES (...)", (...))
-    return {"message": "Новоста е додадена.", "id": lastrowid}
-```
-
-```python
-@router.post("/admin/novosti")
-def create_novost(naslov: str = Form(...), sodrzina: str = Form(...),
-                  admin_doctor_id: int = Form(...), slika: UploadFile = File(None),
-                  slika_url: str = Form(None), sliki_extra: List[UploadFile] = File(default=[]), ...):
-    if not check_admin_access(admin_doctor_id): raise HTTPException(403, ...)
-    if not naslov.strip(): raise HTTPException(400, "Насловот е задолжителен.")
-    # слика: готов URL има предност, инаку _save_upload(slika) (Azure Blob / static)
+def create_novost(
+    naslov: str = Form(...),
+    sodrzina: str = Form(...),
+    admin_doctor_id: int = Form(...),
+    video_url: Optional[str] = Form(None),
+    slika_position: Optional[str] = Form(None),
+    slika_height: Optional[str] = Form(None),
+    slika_url: Optional[str] = Form(None),
+    slika: Optional[UploadFile] = File(None),
+    slike_extra_urls: Optional[str] = Form(None),
+    sliki_extra: List[UploadFile] = File(default=[]),
+):
+    if not check_admin_access(admin_doctor_id):
+        raise HTTPException(status_code=403, detail="...")
+    if not naslov.strip():
+        raise HTTPException(status_code=400, detail="Насловот е задолжителен.")
+    # главна слика: валиден slika_url има предност, инаку _save_upload(slika)
+    # → Azure Blob (production) или /static/uploads/novosti/ (локален dev)
+    slika_path = slika_url if _is_full_url(slika_url) else _save_upload(slika)
+    # дополнителни: slike_extra_urls (по еден URL во ред) + прикачени sliki_extra
     slike_extra_json = json.dumps(extra_paths) if extra_paths else None
-    cur.execute("INSERT INTO Novosti (naslov, sodrzina, slika_path, ..., author_doctor_id) VALUES (%s, ...)", (...))
+    cur.execute(
+        """INSERT INTO Novosti (naslov, sodrzina, slika_path, slika_position,
+           slika_height, video_url, slike_extra, author_doctor_id) VALUES (%s, ...)""",
+        (naslov, sodrzina, slika_path, slika_position, slika_height,
+         video_url, slike_extra_json, admin_doctor_id),
+    )
     conn.commit()
     return {"message": "Новоста е додадена.", "id": cur.lastrowid}
 ```
 
-- Користи **`multipart/form-data`** (`Form(...)` + `UploadFile`), не JSON — за да се прикачи слика заедно со текстот.
-- Дополнителните слики се чуваат како JSON низа во колоната `slike_extra`; кодот има fallback на минимален `INSERT` ако недостасуваат колони.
-
-> Може да се зададе слика на **два начини**: со прикачување фајл (`slika`) или со готов URL (`slika_url`). Ако се зададе валиден URL, тој има предност.
+- Користи **`multipart/form-data`** (`Form(...)` + `UploadFile`), не JSON.
+- Дополнителните слики се чуваат како JSON низа во `slike_extra`; има fallback на минимален `INSERT` ако недостасуваат колони.
+- Главната слика може преку **`slika_url`** (готов URL) или **`slika`** (прикачен фајл) — URL има предност.
 
 {% openapi-operation spec="KlinickaBolnicaAPI" path="/admin/novosti" method="post" %}
 [OpenAPI KlinickaBolnicaAPI](https://klinicka-bolnica-stip2026.onrender.com/openapi.json)
