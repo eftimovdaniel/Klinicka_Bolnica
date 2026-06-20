@@ -1,18 +1,45 @@
-# Добредојде
+# Документација — Клиничка Болница Штип
 
-Ова е официјалната техничка документација на веб-порталот на **ЈЗУ Клиничка Болница – Штип** — систем за онлајн закажување прегледи, управување со медицински персонал и комуникација со пациенти.
+Добредојде. Ова е документацијата на веб-порталот **ЈЗУ Клиничка Болница – Штип**.
 
-Порталот е изграден со FastAPI на backend-от, MySQL 8.0 база на податоци и HTML/CSS/JavaScript frontend без framework. Целото решение е пакувано во Docker контејнери и хостирано на облак инфраструктура. Документацијата го покрива и техничкиот и корисничкиот аспект — API endpoints, SQL логика и структура на код, но и она што корисникот го гледа и прави на екран.
+**Изберете што сакате да читате:**
 
-Содржина
+<table data-view="cards">
+  <thead>
+    <tr>
+      <th></th>
+      <th></th>
+      <th data-hidden data-card-target data-type="content-ref"></th>
+      <th data-hidden data-card-cover data-type="files"></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>👤 Кориснички водич</strong></td>
+      <td>За пациенти, лекари, директор и посетители. Како да се регистрирате, закажете преглед, користите панел и AI — без код.</td>
+      <td><a href="users/README.md">users/README.md</a></td>
+      <td><a href=".gitbook/assets/kbs-ai-icon-web.png">kbs-ai-icon-web.png</a></td>
+    </tr>
+    <tr>
+      <td><strong>⚙️ Техничка документација</strong></td>
+      <td>За програмери. API, база на податоци, frontend код, Docker, деплојмент на Render.</td>
+      <td><a href="tehnicka/README.md">tehnicka/README.md</a></td>
+      <td><a href=".gitbook/assets/kbs-ai-icon-small.png">kbs-ai-icon-small.png</a></td>
+    </tr>
+  </tbody>
+</table>
 
-Документацијата е поделена на четири дела:
+---
 
-1. **Кориснички водич** — како да се користи порталот (регистрација, закажување, лекарски панел, AI) без програмски код. Започнете тука: [users/README.md](users/README.md).
-2. **Преглед на системот** — архитектура, технологии, кориснички улоги и животен циклус на термин (tech преглед).
-3. **Backend API** — endpoints, JSON, SQL, интерактивно тестирање преку Scalar.
-4. **Frontend** — HTML структура, API повици, `script.js`.
+Ако картичките не се прикажуваат, кликнете директно:
 
-Live верзија
+| | |
+|--|--|
+| **Кориснички водич** | [Отвори →](users/README.md) |
+| **Техничка документација** | [Отвори →](tehnicka/README.md) |
 
-Порталот е достапен на: [klinicka-bolnica-stip2026.onrender.com](https://klinicka-bolnica-stip2026.onrender.com/app/)
+---
+
+## Live портал
+
+Самата апликација (не документацијата): [klinicka-bolnica-stip2026.onrender.com/app/](https://klinicka-bolnica-stip2026.onrender.com/app/)
