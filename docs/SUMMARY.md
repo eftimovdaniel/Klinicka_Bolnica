@@ -1,6 +1,7 @@
 # Table of contents
 
-* [Добредојде — изберете документација](README.md)
+* [Добредојде](README.md)
+* [Избор на документација](izbor-dokumentacija.md)
 
 ## Кориснички водич
 
