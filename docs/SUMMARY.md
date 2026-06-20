@@ -2,6 +2,25 @@
 
 * [Добредојде](README.md)
 
+## Кориснички водич
+
+* [Почетна](users/README.md)
+* [Сајт и навигација](users/sajt-i-navigacija.md)
+* [Посетител (без најава)](users/posetitel.md)
+* Пациент
+  * [Регистрација и најава](users/pacient/registracija-i-najava.md)
+  * [Закажување преглед](users/pacient/zakazuvanje-termin.md)
+  * [Мое досие и термини](users/pacient/moe-dosie-i-termini.md)
+  * [Оценување на преглед](users/pacient/ocenuvanje-pregled.md)
+  * [Кариера — апликација](users/pacient/kariera-aplikacija.md)
+* Лекар
+  * [Најава и панел](users/lekar/najava-i-panel.md)
+  * [Распоред и картон](users/lekar/raspored-i-karton.md)
+  * [Медицински апарати](users/lekar/aparati.md)
+* [Директор — администрација](users/direktor/administracija.md)
+* [AI асистент](users/ai-asistent.md)
+* [Често поставувани прашања](users/cesto-prasanja.md)
+
 ## Општо за системот
 
 * [Преглед на системот](overview_na_sisitemot/overview.md)
