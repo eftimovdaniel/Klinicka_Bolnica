@@ -95,6 +95,18 @@ AI асистентот служи како брз пристап до исти�
 
 > Заборавена лозинка: постои flow сличен на пациентот (код на е-пошта / reset).
 
+> За програмери:
+> [Автентикација — лекар](../../backend/api/authentication.md) ·
+> [API — Лекари](../../backend/api/lekari.md) ·
+> [AI — лекар](../../backend/ai-assistant/roles/lekar.md) ·
+> [AI — распоред](../../backend/ai-assistant/roles/lekar/raspored.md) ·
+> [AI — картон](../../backend/ai-assistant/roles/lekar/pacienti.md) ·
+> [AI — статистика](../../backend/ai-assistant/roles/lekar/statistika.md)
+
+***
+
+Следно: [Распоред и картон](raspored-i-karton.md) · [Апарати](aparati.md)
+
 ***
 
 Следно: [Распоред и картон](raspored-i-karton.md) · [Апарати](aparati.md)

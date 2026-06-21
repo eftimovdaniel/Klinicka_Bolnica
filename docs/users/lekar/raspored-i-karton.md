@@ -49,6 +49,14 @@ sequenceDiagram
 
 >Сите овие функции бараат активна лекарска најава — недостапни се за пациенти и гости.
 
+> За програмери:
+> [API — Термини](../../backend/api/termini.md) ·
+> [API — Пациенти](../../backend/api/pacienti.md) ·
+> [AI — распоред](../../backend/ai-assistant/roles/lekar/raspored.md) ·
+> [AI — картон и пациенти](../../backend/ai-assistant/roles/lekar/pacienti.md)
+
 ***
 
-Следно: [Медицински апарати](aparati.md) · [AI асистент](../ai-asistent.md)
+Следно: [Медицински апарати](aparati.md) · [AI асистент](../ai-asistent.md) · [Најава и панел](najava-i-panel.md)
+
+***
