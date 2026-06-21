@@ -1,0 +1,78 @@
+<div class="demo-banner">
+  ⚠️ Интерактивна демонстрација за документацијата „Закажување преглед". Сите лекари, датуми и термини подолу се измислени и живеат само во овој прелистувач — ништо не се испраќа до реален сервер или база на болницата. Во ова демо сте веќе најавени како <strong>Марија Петрова</strong> (marija@example.com) — во реалноста закажување е возможно само по претходна најава.
+</div>
+
+<div class="wrap">
+
+  <div class="topbar">
+    <span>Закажување — чекор <strong id="step-num">1</strong> од 4</span>
+    <button class="btn-outline small" onclick="restartFlow()">Почни одново</button>
+  </div>
+
+  <!-- ЧЕКОР 1: избор лекар -->
+  <div id="step-lekar" class="step">
+    <div class="card">
+      <h3>1. Изберете лекар</h3>
+      <label for="lekar-search">Пребарување</label>
+      <input type="text" id="lekar-search" placeholder="по име или специјалност..." oninput="renderLekari()">
+      <div id="lekari-list"></div>
+    </div>
+  </div>
+
+  <!-- ЧЕКОР 2: избор датум -->
+  <div id="step-datum" class="step hidden">
+    <div class="card">
+      <button class="link-back" onclick="goStep('lekar')">&larr; Промени лекар</button>
+      <h3>2. Изберете датум</h3>
+      <p class="meta">Кај <strong id="izbran-lekar-ime"></strong></p>
+      <div id="datumi-list" class="datumi-list"></div>
+      <p class="sub">Прегледи не се закажуваат во сабота и недела — тие датуми не се ниту понудени.</p>
+    </div>
+  </div>
+
+  <!-- ЧЕКОР 3: избор термин -->
+  <div id="step-slot" class="step hidden">
+    <div class="card">
+      <button class="link-back" onclick="goStep('datum')">&larr; Промени датум</button>
+      <h3>3. Изберете термин</h3>
+      <p class="meta" id="izbran-datum"></p>
+      <div id="sloti-grid" class="sloti-grid"></div>
+      <p class="sub" id="sloti-note"></p>
+    </div>
+  </div>
+
+  <!-- ЧЕКОР 4: потврда -->
+  <div id="step-potvrda" class="step hidden">
+    <div class="card">
+      <button class="link-back" onclick="goStep('slot')">&larr; Промени термин</button>
+      <h3>4. Потврда</h3>
+      <div id="pregled-rezime"></div>
+      <label for="zakaz-napomena">Напомена за лекарот <span class="opt">(опционално)</span></label>
+      <textarea id="zakaz-napomena" placeholder="На пример, причина за прегледот..."></textarea>
+      <button class="btn-red" onclick="potvrdiZakazuvanje()">Потврди закажување</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Ваши идни термини (во ова демо)</h3>
+    <div id="idni-demo-list"></div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- AI виџет -->
+  <button class="ai-fab" onclick="toggleAi()" title="AI асистент">💬</button>
+  <div id="ai-panel" class="ai-panel hidden">
+    <div class="ai-head">AI асистент <span class="ai-tag">демо</span></div>
+    <div id="ai-msgs" class="ai-msgs"></div>
+    <div class="ai-quick">
+      <button onclick="aiQuick('Закажи кај Стојановска за вторник во 10:00')">„Закажи кај Стојановска во вторник во 10:00"</button>
+      <button onclick="aiQuick('Кои термини ми се закажани?')">„Кои термини ми се закажани?"</button>
+    </div>
+    <div class="ai-input-row">
+      <input type="text" id="ai-in" placeholder="Напишете порака...">
+      <button onclick="sendAi()">➤</button>
+    </div>
+  </div>
+
+</div>

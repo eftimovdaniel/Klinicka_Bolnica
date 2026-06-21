@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="mk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Демо — Закажување преглед | Клиничка болница — Штип</title>
+<style>
+* { box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: #f4f5f7;
+  color: #222;
+  margin: 0;
+  padding: 0 0 4rem;
+}
+
+.demo-banner {
+  background: #fff3cd;
+  border-bottom: 1px solid #e9c46a;
+  color: #6b4e00;
+  font-size: 0.85rem;
+  padding: 0.7rem 1rem;
+  text-align: center;
+}
+
+.wrap {
+  max-width: 480px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.hidden { display: none !important; }
+
+.card {
+  background: #fff;
+  border: 1px solid #e3e3e3;
+  border-radius: 10px;
+  padding: 1.2rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.card h3 {
+  margin-top: 0;
+  color: #b3261e;
+  font-size: 1.05rem;
+}
+
+label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0.7rem 0 0.25rem;
+}
+
+.opt {
+  font-weight: 400;
+  color: #888;
+}
+
+input[type="text"], textarea {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+textarea {
+  margin-top: 0.4rem;
+  resize: vertical;
+  min-height: 50px;
+}
+
+.btn-red, .btn-outline {
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.btn-red {
+  background: #b3261e;
+  color: #fff;
+  border: none;
+  padding: 0.65rem 1rem;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.btn-red:hover { background: #931f18; }
+
+.btn-red.small {
+  width: auto;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.82rem;
+  margin-top: 0.6rem;
+}
+
+.btn-outline {
+  background: #fff;
+  color: #b3261e;
+  border: 1px solid #b3261e;
+  padding: 0.4rem 0.8rem;
+}
+
+.btn-outline.small {
+  width: auto;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.82rem;
+  margin-top: 0.6rem;
+}
+
+.sub {
+  font-size: 0.85rem;
+  color: #666;
+  text-align: center;
+  margin-top: 0.6rem;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+.link-back {
+  background: none;
+  border: none;
+  color: #b3261e;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 0.6rem;
+  display: block;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 0.3rem;
+}
+
+.meta {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 0.3rem;
+}
+
+.badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.badge.zakazan { background: #eaf0fb; color: #2952a3; }
+.badge.spec { background: #eef0f3; color: #4a5568; }
+
+.datumi-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.datum-btn {
+  flex: 1 1 30%;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 0.5rem 0.3rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.datum-btn:hover { border-color: #b3261e; color: #b3261e; }
+
+.sloti-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin: 0.6rem 0;
+}
+
+.slot-btn {
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+  padding: 0.5rem 0.2rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.slot-btn:hover { border-color: #b3261e; color: #b3261e; }
+
+.slot-btn.taken {
+  background: #f0f0f0;
+  color: #aaa;
+  border-color: #e3e3e3;
+  cursor: not-allowed;
+  text-decoration: line-through;
+}
+
+.toast {
+  position: fixed;
+  bottom: 1.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #222;
+  color: #fff;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  z-index: 50;
+  max-width: 90%;
+  text-align: center;
+}
+
+/* AI виџет */
+.ai-fab {
+  position: fixed;
+  bottom: 1.2rem;
+  right: 1.2rem;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: none;
+  background: #b3261e;
+  color: #fff;
+  font-size: 1.4rem;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+  cursor: pointer;
+  z-index: 40;
+}
+
+.ai-panel {
+  position: fixed;
+  bottom: 5.2rem;
+  right: 1.2rem;
+  width: 300px;
+  max-height: 420px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 40;
+}
+
+.ai-head {
+  background: #b3261e;
+  color: #fff;
+  padding: 0.6rem 0.8rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.ai-tag {
+  font-size: 0.65rem;
+  font-weight: 400;
+  background: rgba(255,255,255,0.25);
+  border-radius: 10px;
+  padding: 0.1rem 0.45rem;
+  margin-left: 0.4rem;
+}
+
+.ai-msgs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.85rem;
+  max-height: 220px;
+}
+
+.ai-msg {
+  margin-bottom: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  max-width: 85%;
+  line-height: 1.3;
+}
+
+.ai-msg.user {
+  background: #fbe5e3;
+  margin-left: auto;
+  text-align: right;
+}
+
+.ai-msg.bot {
+  background: #f0f0f0;
+}
+
+.ai-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0 0.7rem 0.5rem;
+}
+
+.ai-quick button {
+  font-size: 0.72rem;
+  background: #fbf3e6;
+  border: 1px solid #e9c46a;
+  border-radius: 12px;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+}
+
+.ai-input-row {
+  display: flex;
+  border-top: 1px solid #eee;
+  padding: 0.5rem;
+  gap: 0.4rem;
+}
+
+.ai-input-row input {
+  flex: 1;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.ai-input-row button {
+  border: none;
+  background: #b3261e;
+  color: #fff;
+  width: 36px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<div class="demo-banner">
+  ⚠️ Интерактивна демонстрација за документацијата „Закажување преглед". Сите лекари, датуми и термини подолу се измислени и живеат само во овој прелистувач — ништо не се испраќа до реален сервер или база на болницата. Во ова демо сте веќе најавени како <strong>Марија Петрова</strong> (marija@example.com) — во реалноста закажување е возможно само по претходна најава.
+</div>
+
+<div class="wrap">
+
+  <div class="topbar">
+    <span>Закажување — чекор <strong id="step-num">1</strong> од 4</span>
+    <button class="btn-outline small" onclick="restartFlow()">Почни одново</button>
+  </div>
+
+  <!-- ЧЕКОР 1: избор лекар -->
+  <div id="step-lekar" class="step">
+    <div class="card">
+      <h3>1. Изберете лекар</h3>
+      <label for="lekar-search">Пребарување</label>
+      <input type="text" id="lekar-search" placeholder="по име или специјалност..." oninput="renderLekari()">
+      <div id="lekari-list"></div>
+    </div>
+  </div>
+
+  <!-- ЧЕКОР 2: избор датум -->
+  <div id="step-datum" class="step hidden">
+    <div class="card">
+      <button class="link-back" onclick="goStep('lekar')">&larr; Промени лекар</button>
+      <h3>2. Изберете датум</h3>
+      <p class="meta">Кај <strong id="izbran-lekar-ime"></strong></p>
+      <div id="datumi-list" class="datumi-list"></div>
+      <p class="sub">Прегледи не се закажуваат во сабота и недела — тие датуми не се ниту понудени.</p>
+    </div>
+  </div>
+
+  <!-- ЧЕКОР 3: избор термин -->
+  <div id="step-slot" class="step hidden">
+    <div class="card">
+      <button class="link-back" onclick="goStep('datum')">&larr; Промени датум</button>
+      <h3>3. Изберете термин</h3>
+      <p class="meta" id="izbran-datum"></p>
+      <div id="sloti-grid" class="sloti-grid"></div>
+      <p class="sub" id="sloti-note"></p>
+    </div>
+  </div>
+
+  <!-- ЧЕКОР 4: потврда -->
+  <div id="step-potvrda" class="step hidden">
+    <div class="card">
+      <button class="link-back" onclick="goStep('slot')">&larr; Промени термин</button>
+      <h3>4. Потврда</h3>
+      <div id="pregled-rezime"></div>
+      <label for="zakaz-napomena">Напомена за лекарот <span class="opt">(опционално)</span></label>
+      <textarea id="zakaz-napomena" placeholder="На пример, причина за прегледот..."></textarea>
+      <button class="btn-red" onclick="potvrdiZakazuvanje()">Потврди закажување</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Ваши идни термини (во ова демо)</h3>
+    <div id="idni-demo-list"></div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- AI виџет -->
+  <button class="ai-fab" onclick="toggleAi()" title="AI асистент">💬</button>
+  <div id="ai-panel" class="ai-panel hidden">
+    <div class="ai-head">AI асистент <span class="ai-tag">демо</span></div>
+    <div id="ai-msgs" class="ai-msgs"></div>
+    <div class="ai-quick">
+      <button onclick="aiQuick('Закажи кај Стојановска за вторник во 10:00')">„Закажи кај Стојановска во вторник во 10:00"</button>
+      <button onclick="aiQuick('Кои термини ми се закажани?')">„Кои термини ми се закажани?"</button>
+    </div>
+    <div class="ai-input-row">
+      <input type="text" id="ai-in" placeholder="Напишете порака...">
+      <button onclick="sendAi()">➤</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ============================================================
+   ДЕМО ВЕРЗИЈА — само за документацијата (интерактивен преглед).
+   Сите податоци подолу (лекари, датуми, термини) живеат единствено
+   во меморијата на овој прелистувач, додека е отворена страницата.
+   Ништо од ова не комуницира со реален сервер, ниту со базата на
+   Клиничка болница — Штип. Освежување на страницата ги бриши сите
+   промени и враќа сè на почетната, демо состојба.
+   ============================================================ */
+
+var lekari = [
+  { ime: 'Ана Стојановска', prezime: 'стојановска', spec: 'Кардиолог' },
+  { ime: 'Петар Николов', prezime: 'николов', spec: 'Дерматолог' },
+  { ime: 'Сара Трајкова', prezime: 'трајкова', spec: 'Офталмолог' }
+];
+
+var SLOTOVI = ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30', '14:00', '14:30'];
+
+var DATUMI = generirajDatumi(6);
+
+// "зафатени" термини за демо (клуч: "<lekarIdx>-<datumIdx>")
+var zafateniSlots = {
+  '0-0': ['09:00', '09:30', '11:00'],
+  '1-0': ['10:00'],
+  '2-1': ['09:00', '09:30', '10:00', '10:30']
+};
+
+var zakazaniDemo = [];
+var izbor = { lekarIdx: null, datumIdx: null, vreme: null };
+
+/* ---------- Генерирање датуми (само работни дена, почнувајќи од денес) ---------- */
+function generirajDatumi(broj) {
+  var rezultat = [];
+  var denovi = ['нед', 'пон', 'вто', 'сре', 'чет', 'пет', 'саб'];
+  var cur = new Date();
+  while (rezultat.length < broj) {
+    cur.setDate(cur.getDate() + 1);
+    var d = cur.getDay();
+    if (d !== 0 && d !== 6) {
+      var den = ('0' + cur.getDate()).slice(-2);
+      var mes = ('0' + (cur.getMonth() + 1)).slice(-2);
+      rezultat.push({ label: denovi[d] + ' ' + den + '.' + mes, denNaziv: denovi[d] });
+    }
+  }
+  return rezultat;
+}
+
+/* ---------- Чекори ---------- */
+function goStep(name) {
+  var steps = ['lekar', 'datum', 'slot', 'potvrda'];
+  steps.forEach(function (s) {
+    document.getElementById('step-' + s).classList.toggle('hidden', s !== name);
+  });
+  document.getElementById('step-num').textContent = (steps.indexOf(name) + 1);
+}
+
+function restartFlow() {
+  izbor = { lekarIdx: null, datumIdx: null, vreme: null };
+  document.getElementById('lekar-search').value = '';
+  renderLekari();
+  goStep('lekar');
+}
+
+/* ---------- Чекор 1: лекари ---------- */
+function renderLekari() {
+  var q = document.getElementById('lekar-search').value.trim().toLowerCase();
+  var box = document.getElementById('lekari-list');
+  var html = '';
+  lekari.forEach(function (l, idx) {
+    if (q && l.ime.toLowerCase().indexOf(q) === -1 && l.spec.toLowerCase().indexOf(q) === -1) return;
+    html += '<div class="card"><div class="card-head"><b>д-р ' + esc(l.ime) + '</b>' +
+      '<span class="badge spec">' + esc(l.spec) + '</span></div>' +
+      '<button class="btn-red small" onclick="izberiLekar(' + idx + ')">Закажи преглед</button></div>';
+  });
+  box.innerHTML = html || '<p class="sub" style="text-align:center">Нема лекар според тоа пребарување.</p>';
+}
+
+function izberiLekar(idx) {
+  izbor.lekarIdx = idx;
+  izbor.datumIdx = null;
+  izbor.vreme = null;
+  document.getElementById('izbran-lekar-ime').textContent = 'д-р ' + lekari[idx].ime + ' (' + lekari[idx].spec + ')';
+  renderDatumi();
+  goStep('datum');
+}
+
+/* ---------- Чекор 2: датум ---------- */
+function renderDatumi() {
+  var box = document.getElementById('datumi-list');
+  var html = '';
+  DATUMI.forEach(function (d, idx) {
+    html += '<button type="button" class="datum-btn" onclick="izberiDatum(' + idx + ')">' + d.label + '</button>';
+  });
+  box.innerHTML = html;
+}
+
+function izberiDatum(idx) {
+  izbor.datumIdx = idx;
+  izbor.vreme = null;
+  document.getElementById('izbran-datum').textContent = DATUMI[idx].label + ' — д-р ' + lekari[izbor.lekarIdx].ime;
+  renderSloti();
+  goStep('slot');
+}
+
+/* ---------- Чекор 3: термини ---------- */
+function renderSloti() {
+  var box = document.getElementById('sloti-grid');
+  var key = izbor.lekarIdx + '-' + izbor.datumIdx;
+  var zafateni = zafateniSlots[key] || [];
+  var html = '';
+  SLOTOVI.forEach(function (t) {
+    var taken = zafateni.indexOf(t) !== -1;
+    html += '<button type="button" class="slot-btn' + (taken ? ' taken' : '') + '"' +
+      (taken ? ' disabled' : ' onclick="izberiSlot(\'' + t + '\')"') + '>' + t + '</button>';
+  });
+  box.innerHTML = html;
+  document.getElementById('sloti-note').textContent = zafateni.length
+    ? ('Засивените термини (' + zafateni.join(', ') + ') се веќе зафатени.')
+    : 'Сите термини за овој ден се слободни.';
+}
+
+function izberiSlot(t) {
+  izbor.vreme = t;
+  prikaziRezime();
+  goStep('potvrda');
+}
+
+/* ---------- Чекор 4: потврда ---------- */
+function prikaziRezime() {
+  var l = lekari[izbor.lekarIdx];
+  var d = DATUMI[izbor.datumIdx];
+  document.getElementById('pregled-rezime').innerHTML =
+    '<p class="meta"><strong>Лекар:</strong> д-р ' + esc(l.ime) + ' (' + esc(l.spec) + ')</p>' +
+    '<p class="meta"><strong>Датум:</strong> ' + d.label + '</p>' +
+    '<p class="meta"><strong>Време:</strong> ' + izbor.vreme + '</p>' +
+    '<p class="sub">Име, презиме, телефон и е-пошта се веќе познати од вашиот профил — не треба повторно да ги внесувате.</p>';
+}
+
+function potvrdiZakazuvanje() {
+  var key = izbor.lekarIdx + '-' + izbor.datumIdx;
+  var zafateni = zafateniSlots[key] || [];
+  if (zafateni.indexOf(izbor.vreme) !== -1) {
+    toast('Во меѓувреме некој друг го резервирал тој термин. Изберете друг.');
+    renderSloti();
+    goStep('slot');
+    return;
+  }
+  var l = lekari[izbor.lekarIdx];
+  var d = DATUMI[izbor.datumIdx];
+  var napomena = document.getElementById('zakaz-napomena').value.trim();
+
+  zakazaniDemo.push({
+    lekarIdx: izbor.lekarIdx, datumIdx: izbor.datumIdx,
+    lekar: l.ime, spec: l.spec, datumLabel: d.label, vreme: izbor.vreme, napomena: napomena
+  });
+  if (!zafateniSlots[key]) zafateniSlots[key] = [];
+  zafateniSlots[key].push(izbor.vreme);
+
+  document.getElementById('zakaz-napomena').value = '';
+  renderIdniDemo();
+  toast('Терминот е закажан! Потврда е „испратена" на marija@example.com.');
+  document.getElementById('lekar-search').value = '';
+  renderLekari();
+  goStep('lekar');
+}
+
+/* ---------- Идни термини (демо) ---------- */
+function renderIdniDemo() {
+  var box = document.getElementById('idni-demo-list');
+  if (!zakazaniDemo.length) {
+    box.innerHTML = '<p class="sub" style="text-align:center">Немате закажани термини во ова демо — закажете еден погоре.</p>';
+    return;
+  }
+  var html = '';
+  zakazaniDemo.forEach(function (p, i) {
+    html += '<div class="card"><div class="card-head"><b>д-р ' + esc(p.lekar) + '</b>' +
+      '<span class="badge zakazan">закажан</span></div>' +
+      '<div class="meta">' + p.datumLabel + ' · ' + p.vreme + ' · ' + esc(p.spec) + '</div>' +
+      (p.napomena ? '<div class="meta">Напомена: ' + esc(p.napomena) + '</div>' : '') +
+      '<button class="btn-outline small" onclick="otkaziDemo(' + i + ')">Откажи термин</button></div>';
+  });
+  box.innerHTML = html;
+}
+
+function otkaziDemo(i) {
+  if (!confirm('Дали сте сигурни дека сакате да го откажете овој термин?')) return;
+  var p = zakazaniDemo[i];
+  var key = p.lekarIdx + '-' + p.datumIdx;
+  if (zafateniSlots[key]) {
+    zafateniSlots[key] = zafateniSlots[key].filter(function (t) { return t !== p.vreme; });
+  }
+  zakazaniDemo.splice(i, 1);
+  renderIdniDemo();
+  toast('Терминот е откажан, слотот е повторно слободен.');
+}
+
+/* ---------- AI асистент (демо) ---------- */
+function toggleAi() {
+  document.getElementById('ai-panel').classList.toggle('hidden');
+}
+
+function aiQuick(t) {
+  document.getElementById('ai-in').value = t;
+  sendAi();
+}
+
+function sendAi() {
+  var input = document.getElementById('ai-in');
+  var text = input.value.trim();
+  if (!text) return;
+  var box = document.getElementById('ai-msgs');
+  box.innerHTML += '<div class="ai-msg user">' + esc(text) + '</div>';
+  input.value = '';
+  var reply = obradiAiPoraka(text);
+  setTimeout(function () {
+    box.innerHTML += '<div class="ai-msg bot">' + esc(reply) + '</div>';
+    box.scrollTop = box.scrollHeight;
+  }, 400);
+}
+
+function obradiAiPoraka(text) {
+  var low = text.toLowerCase();
+
+  if (low.indexOf('кои термини') !== -1 || low.indexOf('закажани') !== -1) {
+    if (!zakazaniDemo.length) return 'Немате закажани термини во ова демо.';
+    return zakazaniDemo.map(function (p) {
+      return 'д-р ' + p.lekar + ' — ' + p.datumLabel + ' во ' + p.vreme;
+    }).join('; ');
+  }
+
+  var lekarIdx = -1;
+  for (var i = 0; i < lekari.length; i++) {
+    if (low.indexOf(lekari[i].prezime) !== -1 || low.indexOf(lekari[i].spec.toLowerCase()) !== -1) {
+      lekarIdx = i;
+      break;
+    }
+  }
+  if (lekarIdx === -1) {
+    return 'Не препознавам лекар во пораката. Пробајте со презиме (на пример „Стојановска") или специјалност.';
+  }
+
+  var denMap = {
+    'понеделник': 'пон', 'пон': 'пон',
+    'вторник': 'вто', 'вто': 'вто',
+    'среда': 'сре', 'сре': 'сре',
+    'четврток': 'чет', 'чет': 'чет',
+    'петок': 'пет', 'пет': 'пет'
+  };
+  var trazenDen = null;
+  for (var key in denMap) {
+    if (low.indexOf(key) !== -1) { trazenDen = denMap[key]; break; }
+  }
+
+  var datumIdx = 0;
+  if (trazenDen) {
+    datumIdx = -1;
+    for (var j = 0; j < DATUMI.length; j++) {
+      if (DATUMI[j].denNaziv === trazenDen) { datumIdx = j; break; }
+    }
+    if (datumIdx === -1) {
+      return 'Нема понуден термин за тој ден во следните неколку работни дена. Пробајте друг ден.';
+    }
+  }
+
+  var match = text.match(/(\d{1,2})[:.](\d{2})/);
+  var vreme = match ? (('0' + match[1]).slice(-2) + ':' + match[2]) : null;
+  if (!vreme || SLOTOVI.indexOf(vreme) === -1) {
+    return 'Работното време е 09:00–14:30, на секои 30 минути. Кажете време од тој опсег, на пример „во 10:00".';
+  }
+
+  var key2 = lekarIdx + '-' + datumIdx;
+  var zafateni = zafateniSlots[key2] || [];
+  if (zafateni.indexOf(vreme) !== -1) {
+    var slobodni = SLOTOVI.filter(function (t) { return zafateni.indexOf(t) === -1; });
+    return 'Терминот во ' + vreme + ' е веќе зафатен кај д-р ' + lekari[lekarIdx].ime + '. Слободни се: ' +
+      (slobodni.length ? slobodni.join(', ') : 'нема слободни термини тој ден') + '.';
+  }
+
+  zakazaniDemo.push({
+    lekarIdx: lekarIdx, datumIdx: datumIdx,
+    lekar: lekari[lekarIdx].ime, spec: lekari[lekarIdx].spec,
+    datumLabel: DATUMI[datumIdx].label, vreme: vreme, napomena: ''
+  });
+  if (!zafateniSlots[key2]) zafateniSlots[key2] = [];
+  zafateniSlots[key2].push(vreme);
+  renderIdniDemo();
+  return 'Готово! Закажан преглед кај д-р ' + lekari[lekarIdx].ime + ' на ' + DATUMI[datumIdx].label + ' во ' + vreme + '.';
+}
+
+/* ---------- Помошни функции ---------- */
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function toast(msg) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  setTimeout(function () { el.classList.add('hidden'); }, 3000);
+}
+
+/* ---------- Почетно вчитување ---------- */
+renderLekari();
+renderIdniDemo();
+goStep('lekar');
+
+/* ----------------------------------------------------------------
+   Рачно прикачување на window: гарантира дека копчињата со
+   onclick="..." во HTML-то ги наоѓаат функциите без разлика на
+   начинот на вклучување на овој <script> (CodePen, Cursor,
+   обичен <script src="...">, со или без "wrap"/модул-опции).
+   ---------------------------------------------------------------- */
+window.goStep = goStep;
+window.restartFlow = restartFlow;
+window.renderLekari = renderLekari;
+window.izberiLekar = izberiLekar;
+window.izberiDatum = izberiDatum;
+window.izberiSlot = izberiSlot;
+window.potvrdiZakazuvanje = potvrdiZakazuvanje;
+window.otkaziDemo = otkaziDemo;
+window.toggleAi = toggleAi;
+window.aiQuick = aiQuick;
+window.sendAi = sendAi;
+</script>
+
+</body>
+</html>

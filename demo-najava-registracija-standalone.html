@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="mk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Демо — Регистрација и најава (Клиничка болница — Штип)</title>
+<style>
+* { box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  background: #f4f5f7;
+  color: #222;
+  margin: 0;
+  padding: 0 0 4rem;
+}
+
+.demo-banner {
+  background: #fff3cd;
+  border-bottom: 1px solid #e9c46a;
+  color: #6b4e00;
+  font-size: 0.85rem;
+  padding: 0.7rem 1rem;
+  text-align: center;
+}
+
+.wrap {
+  max-width: 480px;
+  margin: 2rem auto;
+  padding: 0 1rem;
+}
+
+.hidden { display: none !important; }
+
+.card {
+  background: #fff;
+  border: 1px solid #e3e3e3;
+  border-radius: 10px;
+  padding: 1.2rem;
+  margin-bottom: 1rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.auth-card h2 {
+  margin-top: 0;
+  color: #b3261e;
+}
+
+form label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0.7rem 0 0.25rem;
+}
+
+.opt {
+  font-weight: 400;
+  color: #888;
+}
+
+form input,
+form textarea {
+  width: 100%;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+textarea {
+  margin-top: 0.5rem;
+  resize: vertical;
+  min-height: 50px;
+}
+
+.btn-red,
+.btn-outline {
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.btn-red {
+  background: #b3261e;
+  color: #fff;
+  border: none;
+  padding: 0.65rem 1rem;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.btn-red:hover { background: #931f18; }
+
+.btn-red.small {
+  width: auto;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.82rem;
+  margin-top: 0.6rem;
+}
+
+.btn-outline {
+  background: #fff;
+  color: #b3261e;
+  border: 1px solid #b3261e;
+  padding: 0.4rem 0.8rem;
+}
+
+.btn-outline.small {
+  width: auto;
+  padding: 0.4rem 0.8rem;
+  font-size: 0.82rem;
+  margin-top: 0.6rem;
+}
+
+.sub {
+  font-size: 0.85rem;
+  color: #666;
+  text-align: center;
+  margin-top: 0.9rem;
+}
+
+.sub a { color: #b3261e; text-decoration: none; font-weight: 600; }
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.9rem;
+  margin-bottom: 1rem;
+}
+
+h2 { font-size: 1.1rem; }
+
+.tab-content h3 {
+  font-size: 1rem;
+  margin-top: 0;
+  color: #b3261e;
+}
+
+.card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.3rem;
+}
+
+.meta {
+  font-size: 0.85rem;
+  color: #666;
+  margin-bottom: 0.5rem;
+}
+
+.badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  border-radius: 20px;
+}
+
+.badge.ok { background: #e3f3e6; color: #21824a; }
+.badge.no { background: #f0f0f0; color: #888; }
+.badge.zakazan { background: #eaf0fb; color: #2952a3; }
+
+.card.disabled { opacity: 0.7; }
+
+.rated-box {
+  background: #fbf3e6;
+  border-radius: 6px;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.9rem;
+  margin-bottom: 0.3rem;
+}
+
+.stars {
+  display: flex;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.star-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid #ccc;
+  background: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.star-btn.active {
+  background: #b3261e;
+  color: #fff;
+  border-color: #b3261e;
+}
+
+.toast {
+  position: fixed;
+  bottom: 1.2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #222;
+  color: #fff;
+  padding: 0.6rem 1.1rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  z-index: 50;
+}
+
+/* Мое досие — статистика и табови */
+.stats-row {
+  display: flex;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.stat-box {
+  flex: 1;
+  background: #fff;
+  border: 1px solid #e3e3e3;
+  border-radius: 10px;
+  padding: 0.7rem 0.5rem;
+  text-align: center;
+}
+
+.stat-num {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #b3261e;
+}
+
+.stat-label {
+  font-size: 0.72rem;
+  color: #666;
+}
+
+.tabs {
+  display: flex;
+  gap: 0.2rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #e3e3e3;
+}
+
+.tab-btn {
+  flex: 1;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 0.6rem 0.2rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #888;
+  cursor: pointer;
+}
+
+.tab-btn.active {
+  color: #b3261e;
+  border-bottom-color: #b3261e;
+}
+
+/* AI виџет */
+.ai-fab {
+  position: fixed;
+  bottom: 1.2rem;
+  right: 1.2rem;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: none;
+  background: #b3261e;
+  color: #fff;
+  font-size: 1.4rem;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+  cursor: pointer;
+  z-index: 40;
+}
+
+.ai-panel {
+  position: fixed;
+  bottom: 5.2rem;
+  right: 1.2rem;
+  width: 300px;
+  max-height: 420px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  z-index: 40;
+}
+
+.ai-head {
+  background: #b3261e;
+  color: #fff;
+  padding: 0.6rem 0.8rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.ai-tag {
+  font-size: 0.65rem;
+  font-weight: 400;
+  background: rgba(255,255,255,0.25);
+  border-radius: 10px;
+  padding: 0.1rem 0.45rem;
+  margin-left: 0.4rem;
+}
+
+.ai-msgs {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.6rem 0.7rem;
+  font-size: 0.85rem;
+  max-height: 220px;
+}
+
+.ai-msg {
+  margin-bottom: 0.5rem;
+  padding: 0.45rem 0.6rem;
+  border-radius: 8px;
+  max-width: 85%;
+  line-height: 1.3;
+}
+
+.ai-msg.user {
+  background: #fbe5e3;
+  margin-left: auto;
+  text-align: right;
+}
+
+.ai-msg.bot {
+  background: #f0f0f0;
+}
+
+.ai-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0 0.7rem 0.5rem;
+}
+
+.ai-quick button {
+  font-size: 0.72rem;
+  background: #fbf3e6;
+  border: 1px solid #e9c46a;
+  border-radius: 12px;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+}
+
+.ai-input-row {
+  display: flex;
+  border-top: 1px solid #eee;
+  padding: 0.5rem;
+  gap: 0.4rem;
+}
+
+.ai-input-row input {
+  flex: 1;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+}
+
+.ai-input-row button {
+  border: none;
+  background: #b3261e;
+  color: #fff;
+  width: 36px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+</style>
+</head>
+<body>
+
+<div class="demo-banner">
+  ⚠️ Интерактивна демонстрација за документацијата. Сите податоци подолу се измислени и живеат само во овој прелистувач — ништо не се испраќа до реален сервер или база на болницата. Демо сметка за брзо тестирање: <strong>marija@example.com</strong> / <strong>Test1234</strong> — или регистрирајте нова, измислена сметка.
+</div>
+
+<div class="wrap">
+
+  <!-- НАЈАВА -->
+  <div id="screen-login" class="screen">
+    <div class="card auth-card">
+      <h2>Најава</h2>
+      <form id="form-login" onsubmit="event.preventDefault(); login();">
+        <label for="login-email">Е-пошта</label>
+        <input type="email" id="login-email" required placeholder="vasha@email.com">
+        <label for="login-lozinka">Лозинка</label>
+        <input type="password" id="login-lozinka" required placeholder="••••••••">
+        <button type="submit" class="btn-red">Најави се</button>
+      </form>
+      <p class="sub">Немате сметка? <a href="#" onclick="goRegister(); return false;">Регистрирајте се</a></p>
+    </div>
+  </div>
+
+  <!-- РЕГИСТРАЦИЈА -->
+  <div id="screen-register" class="screen hidden">
+    <div class="card auth-card">
+      <h2>Регистрација на нов пациент</h2>
+      <form id="form-register" onsubmit="event.preventDefault(); register();">
+        <label for="reg-ime">Име</label>
+        <input type="text" id="reg-ime" required>
+        <label for="reg-prezime">Презиме</label>
+        <input type="text" id="reg-prezime" required>
+        <label for="reg-email">Е-пошта</label>
+        <input type="email" id="reg-email" required>
+        <label for="reg-lozinka">Лозинка (минимум 8 карактери)</label>
+        <input type="password" id="reg-lozinka" required minlength="8">
+        <label for="reg-telefon">Телефон <span class="opt">(опционално)</span></label>
+        <input type="tel" id="reg-telefon">
+        <label for="reg-embg">ЕМБГ <span class="opt">(опционално, точно 13 цифри)</span></label>
+        <input type="text" id="reg-embg" inputmode="numeric" maxlength="13">
+        <button type="submit" class="btn-red">Регистрирај се</button>
+      </form>
+      <p class="sub">Веќе имате сметка? <a href="#" onclick="goLogin(); return false;">Најавете се</a></p>
+    </div>
+  </div>
+
+  <!-- "МОЕ ДОСИЕ" — ПАЦИЕНТСКИ ДЕЛ -->
+  <div id="screen-pacient" class="screen hidden">
+    <div class="topbar">
+      <span>Најавени како <strong id="pacient-ime"></strong></span>
+      <button class="btn-outline" onclick="logout()">Одјави се</button>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-box"><div class="stat-num" id="stat-idni">0</div><div class="stat-label">идни</div></div>
+      <div class="stat-box"><div class="stat-num" id="stat-zavrseni">0</div><div class="stat-label">завршени</div></div>
+      <div class="stat-box"><div class="stat-num" id="stat-oceneti">0</div><div class="stat-label">оценети</div></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn" data-tab="termini" onclick="showTab('termini')">Идни</button>
+      <button class="tab-btn" data-tab="ocenki" onclick="showTab('ocenki')">Завршени</button>
+      <button class="tab-btn" data-tab="profil" onclick="showTab('profil')">Профил</button>
+    </div>
+
+    <div id="tab-termini" class="tab-content">
+      <h3>Идни термини</h3>
+      <div id="termini-list"></div>
+    </div>
+
+    <div id="tab-ocenki" class="tab-content hidden">
+      <h3>Завршени прегледи — оценете ги</h3>
+      <div id="ocenki-list"></div>
+    </div>
+
+    <div id="tab-profil" class="tab-content hidden">
+      <h3>Мој профил</h3>
+      <div class="card" id="profil-card"></div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- AI виџет -->
+  <button class="ai-fab" onclick="toggleAi()" title="AI асистент">💬</button>
+  <div id="ai-panel" class="ai-panel hidden">
+    <div class="ai-head">AI асистент <span class="ai-tag">демо</span></div>
+    <div id="ai-msgs" class="ai-msgs"></div>
+    <div class="ai-quick">
+      <button onclick="aiQuick('Оцени 5 за Петровски')">„Оцени 5 за Петровски"</button>
+      <button onclick="aiQuick('Оцени 4, малку чекање')">„Оцени 4, малку чекање"</button>
+    </div>
+    <div class="ai-input-row">
+      <input type="text" id="ai-in" placeholder="Напишете порака...">
+      <button onclick="sendAi()">➤</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ============================================================
+   ДЕМО ВЕРЗИЈА — само за документацијата (интерактивен преглед).
+   Сите податоци подолу (пациенти, прегледи, оценки) живеат
+   единствено во меморијата на овој прелистувач, додека е отворена
+   страницата. Ништо од ова не комуницира со реален сервер, ниту со
+   базата на Клиничка болница — Штип. Освежување на страницата ги
+   бриши сите промени и враќа сè на почетната, демо состојба.
+   ============================================================ */
+
+// "база" на пациенти — само во меморија, само за демо
+var pacienti = [
+  { ime: 'Марија', prezime: 'Петрова', email: 'marija@example.com', lozinka: 'Test1234', telefon: '', embg: '' }
+];
+
+var trenutniPacient = null;
+
+var pregledi = [
+  { id: 1, lekar: 'Ана Стојановска', spec: 'Кардиолог', datum: '2026-06-10', vreme: '09:00', status: 'zavrsen', ocena: null, komentar: '' },
+  { id: 2, lekar: 'Петар Николов', spec: 'Дерматолог', datum: '2026-06-05', vreme: '11:00', status: 'zavrsen', ocena: 3, komentar: 'Добро, но чекав долго' },
+  { id: 3, lekar: 'Ана Стојановска', spec: 'Кардиолог', datum: '2026-06-17', vreme: '10:00', status: 'zakazan', ocena: null, komentar: '' }
+];
+var editingId = null;
+var selectedStars = {};
+
+/* ---------- Екрани ---------- */
+function showScreen(id) {
+  ['screen-login', 'screen-register', 'screen-pacient'].forEach(function (s) {
+    document.getElementById(s).classList.add('hidden');
+  });
+  document.getElementById(id).classList.remove('hidden');
+}
+
+function goRegister() {
+  showScreen('screen-register');
+}
+
+function goLogin() {
+  showScreen('screen-login');
+}
+
+/* ---------- Регистрација (демо) ---------- */
+function register() {
+  var ime = document.getElementById('reg-ime').value.trim();
+  var prezime = document.getElementById('reg-prezime').value.trim();
+  var email = document.getElementById('reg-email').value.trim().toLowerCase();
+  var lozinka = document.getElementById('reg-lozinka').value;
+  var telefon = document.getElementById('reg-telefon').value.trim();
+  var embg = document.getElementById('reg-embg').value.trim();
+
+  if (!ime || !prezime) {
+    toast('Име и презиме се задолжителни.');
+    return;
+  }
+  if (!email) {
+    toast('Е-поштата е задолжителна.');
+    return;
+  }
+  if (lozinka.length < 8) {
+    toast('Лозинката мора да има најмалку 8 карактери.');
+    return;
+  }
+  if (embg && !/^\d{13}$/.test(embg)) {
+    toast('ЕМБГ мора да содржи точно 13 цифри.');
+    return;
+  }
+  if (pacienti.some(function (p) { return p.email === email; })) {
+    toast('Веќе постои сметка со таа е-пошта.');
+    return;
+  }
+  if (embg && pacienti.some(function (p) { return p.embg === embg; })) {
+    toast('Веќе постои сметка со тој ЕМБГ.');
+    return;
+  }
+
+  pacienti.push({ ime: ime, prezime: prezime, email: email, lozinka: lozinka, telefon: telefon, embg: embg });
+  document.getElementById('form-register').reset();
+  toast('Регистрацијата е успешна. Сега се најавете.');
+  goLogin();
+}
+
+/* ---------- Најава (демо) ---------- */
+function login() {
+  var email = document.getElementById('login-email').value.trim().toLowerCase();
+  var lozinka = document.getElementById('login-lozinka').value;
+
+  // намерно иста, генеричка порака без разлика дали е-поштата или лозинката е погрешна
+  var pacient = pacienti.find(function (p) { return p.email === email && p.lozinka === lozinka; });
+  if (!pacient) {
+    toast('Погрешна е-пошта или лозинка.');
+    return;
+  }
+  trenutniPacient = pacient;
+  document.getElementById('form-login').reset();
+  openPacient();
+}
+
+function logout() {
+  trenutniPacient = null;
+  editingId = null;
+  selectedStars = {};
+  document.getElementById('ai-panel').classList.add('hidden');
+  goLogin();
+}
+
+/* ---------- "Мое досие" — пациентски панел (демо) ---------- */
+function openPacient() {
+  showScreen('screen-pacient');
+  document.getElementById('pacient-ime').textContent = trenutniPacient.ime + ' ' + trenutniPacient.prezime;
+  renderTermini();
+  renderOcenki();
+  renderProfil();
+  updateStats();
+  showTab('termini');
+}
+
+function showTab(name) {
+  ['termini', 'ocenki', 'profil'].forEach(function (t) {
+    document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
+  });
+  document.querySelectorAll('.tab-btn').forEach(function (b) {
+    b.classList.toggle('active', b.getAttribute('data-tab') === name);
+  });
+}
+
+function updateStats() {
+  document.getElementById('stat-idni').textContent = pregledi.filter(function (p) { return p.status === 'zakazan'; }).length;
+  document.getElementById('stat-zavrseni').textContent = pregledi.filter(function (p) { return p.status === 'zavrsen'; }).length;
+  document.getElementById('stat-oceneti').textContent = pregledi.filter(function (p) { return p.ocena != null; }).length;
+}
+
+function renderTermini() {
+  var box = document.getElementById('termini-list');
+  var idni = pregledi.filter(function (p) { return p.status === 'zakazan'; });
+  if (!idni.length) {
+    box.innerHTML = '<p class="sub" style="text-align:center">Немате закажани идни прегледи.</p>';
+    return;
+  }
+  var html = '';
+  idni.forEach(function (p) {
+    html += '<div class="card">' +
+      '<div class="card-head"><b>д-р ' + esc(p.lekar) + '</b><span class="badge zakazan">закажан</span></div>' +
+      '<div class="meta">' + fmt(p.datum) + ' · ' + p.vreme + ' · ' + esc(p.spec) + '</div>' +
+      '<button class="btn-outline small" onclick="otkaziTermin(' + p.id + ')">Откажи термин</button></div>';
+  });
+  box.innerHTML = html;
+}
+
+function otkaziTermin(id) {
+  if (!confirm('Дали сте сигурни дека сакате да го откажете овој термин?')) return;
+  pregledi = pregledi.filter(function (p) { return p.id !== id; });
+  renderTermini();
+  updateStats();
+  toast('Терминот е откажан.');
+}
+
+function renderProfil() {
+  var p = trenutniPacient;
+  var html = '<p><strong>Име и презиме:</strong> ' + esc(p.ime) + ' ' + esc(p.prezime) + '</p>' +
+    '<p><strong>Е-пошта:</strong> ' + esc(p.email) + '</p>' +
+    '<p><strong>Телефон:</strong> ' + (p.telefon ? esc(p.telefon) : '— не е внесен —') + '</p>' +
+    '<p><strong>ЕМБГ:</strong> ' + (p.embg ? esc(p.embg) : '— не е внесен —') + '</p>' +
+    '<p class="sub">Во ова демо профилот не може да се уредува.</p>';
+  document.getElementById('profil-card').innerHTML = html;
+}
+
+function getRateable() {
+  return pregledi.filter(function (p) { return p.status === 'zavrsen'; });
+}
+
+function renderOcenki() {
+  var box = document.getElementById('ocenki-list');
+  var html = '';
+  getRateable().forEach(function (p) {
+    var isEdit = editingId === p.id;
+    var hasOcena = p.ocena != null;
+    if (hasOcena && !isEdit) {
+      html += '<div class="card" id="card-' + p.id + '">' +
+        '<div class="card-head"><b>д-р ' + esc(p.lekar) + '</b><span class="badge ok">оценет</span></div>' +
+        '<div class="meta">' + fmt(p.datum) + ' · ' + p.vreme + '</div>' +
+        '<div class="rated-box">Ваша оцена: <strong>' + p.ocena + '</strong> / 5' +
+        (p.komentar ? '<br><em>„' + esc(p.komentar) + '"</em>' : '') + '</div>' +
+        '<button class="btn-red small" onclick="startEdit(' + p.id + ')">Промени оцена</button></div>';
+    } else {
+      var sel = selectedStars[p.id] != null ? selectedStars[p.id] : (p.ocena || null);
+      html += '<div class="card" id="card-' + p.id + '">' +
+        '<div class="card-head"><b>д-р ' + esc(p.lekar) + '</b><span class="badge ok">завршен</span></div>' +
+        '<div class="meta">' + fmt(p.datum) + ' · ' + p.vreme + '</div>' +
+        '<p class="sub" style="text-align:center;margin-bottom:0.3rem">Оцена (1–5)</p>' +
+        starsHtml(p.id, sel) +
+        '<textarea id="kom-' + p.id + '" placeholder="Коментар (опционално)...">' + esc(p.komentar || '') + '</textarea>' +
+        '<button class="btn-red" onclick="saveOcena(' + p.id + ')">Зачувај оцена</button></div>';
+    }
+  });
+  box.innerHTML = html || '<p class="sub" style="text-align:center">Нема завршени прегледи за оцена.</p>';
+}
+
+function starsHtml(id, selected) {
+  var s = '<div class="stars">';
+  for (var i = 1; i <= 5; i++) {
+    s += '<button type="button" class="star-btn' + (selected === i ? ' active' : '') + '" onclick="pickStar(' + id + ',' + i + ')">' + i + '</button>';
+  }
+  return s + '</div>';
+}
+
+function pickStar(id, n) {
+  selectedStars[id] = n;
+  renderOcenki();
+}
+
+function startEdit(id) {
+  editingId = id;
+  selectedStars[id] = pregledi.find(function (p) { return p.id === id; }).ocena;
+  renderOcenki();
+}
+
+function saveOcena(id) {
+  var p = pregledi.find(function (x) { return x.id === id; });
+  var ocena = selectedStars[id];
+  if (!ocena || ocena < 1 || ocena > 5) {
+    toast('Изберете оцена од 1 до 5');
+    return;
+  }
+  var old = p.ocena;
+  p.ocena = ocena;
+  p.komentar = (document.getElementById('kom-' + id) || {}).value || '';
+  editingId = null;
+  delete selectedStars[id];
+  updateStats();
+  toast(old ? 'Оцената е ажурирана (' + old + ' → ' + ocena + ')' : 'Оцената е зачувана');
+  renderOcenki();
+}
+
+/* ---------- AI асистент (демо) ---------- */
+function toggleAi() {
+  document.getElementById('ai-panel').classList.toggle('hidden');
+}
+
+function aiQuick(t) {
+  document.getElementById('ai-in').value = t;
+  sendAi();
+}
+
+function sendAi() {
+  var input = document.getElementById('ai-in');
+  var text = input.value.trim();
+  if (!text) return;
+  var box = document.getElementById('ai-msgs');
+  box.innerHTML += '<div class="ai-msg user">' + esc(text) + '</div>';
+  input.value = '';
+  var low = text.toLowerCase();
+  var reply = 'Не го разбирам барањето во демо режим.';
+  var target = null;
+  if (low.indexOf('петровск') !== -1) {
+    target = pregledi.find(function (p) { return p.lekar.indexOf('Петар') === 0 && p.status === 'zavrsen'; });
+  } else {
+    target = getRateable().sort(function (a, b) { return b.datum.localeCompare(a.datum); })[0];
+  }
+  var match = text.match(/([1-5])/);
+  var ocena = match ? parseInt(match[1], 10) : 5;
+  if (low.indexOf('оцен') !== -1 && target) {
+    var old = target.ocena;
+    target.ocena = ocena;
+    var km = text.match(/,\s*(.+)$/);
+    if (km) target.komentar = km[1];
+    renderOcenki();
+    updateStats();
+    reply = 'Оцена ' + ocena + '/5 за д-р ' + target.lekar + (old ? ' (заменета од ' + old + ')' : '') + '.';
+  }
+  setTimeout(function () {
+    box.innerHTML += '<div class="ai-msg bot">' + esc(reply) + '</div>';
+    box.scrollTop = box.scrollHeight;
+  }, 400);
+}
+
+/* ---------- Помошни функции ---------- */
+function fmt(iso) {
+  var p = iso.split('-');
+  return p[2] + '.' + p[1] + '.' + p[0];
+}
+
+function esc(s) {
+  return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function toast(msg) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.remove('hidden');
+  setTimeout(function () { el.classList.add('hidden'); }, 3000);
+}
+
+/* ----------------------------------------------------------------
+   Рачно прикачување на window: гарантира дека копчињата со
+   onclick="..." во HTML-то ги наоѓаат функциите без разлика на
+   начинот на вклучување на овој <script> (CodePen, Cursor,
+   обичен <script src="...">, со или без "wrap"/модул-опции).
+   ---------------------------------------------------------------- */
+window.goRegister = goRegister;
+window.goLogin = goLogin;
+window.register = register;
+window.login = login;
+window.logout = logout;
+window.showTab = showTab;
+window.otkaziTermin = otkaziTermin;
+window.startEdit = startEdit;
+window.saveOcena = saveOcena;
+window.pickStar = pickStar;
+window.toggleAi = toggleAi;
+window.aiQuick = aiQuick;
+window.sendAi = sendAi;
+</script>
+</body>
+</html>
