@@ -66,8 +66,9 @@ flowchart TD
 ## Интерактивен демо-водич
 
 Прегледајте огласи без најава, најавете се и поднесете апликација — директно тука:
-
 {% embed url="https://codepen.io/eftimovdaniel/pen/PwWpXqZ" %}
+
+
 ***
 
 Следно: [AI асистент](../ai-asistent.md) · [Директор — администрација](../direktor/administracija.md)

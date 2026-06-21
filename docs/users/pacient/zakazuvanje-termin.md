@@ -52,6 +52,5 @@ flowchart TD
 Доколку сакате практично да го тестирате горенапишаното, може да пробате веднаш:
 {% embed url="https://codepen.io/eftimovdaniel/pen/rajyPNg"%}
 
-***
 
 Следно: [Мое досие и термини](moe-dosie-i-termini.md) · [Оценување](ocenuvanje-pregled.md)
