@@ -55,8 +55,12 @@ sequenceDiagram
 > [AI — распоред](../../backend/ai-assistant/roles/lekar/raspored.md) ·
 > [AI — картон и пациенти](../../backend/ai-assistant/roles/lekar/pacienti.md)
 
+## Интерактивен демо-водич
+
+Тестирајте распоред, завршување на преглед, дијагноза/терапија и AI-команди — директно тука:
+
+{% embed url="https://codepen.io/eftimovdaniel/pen/BypWvyK" %}
+
 ***
 
 Следно: [Медицински апарати](aparati.md) · [AI асистент](../ai-asistent.md) · [Најава и панел](najava-i-panel.md)
-
-***
