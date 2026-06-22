@@ -1,41 +1,30 @@
-# Општо: Информации
+# Информации
 
 Информативни функции за сите корисници — работно време, локации, контакти, подготовка за преглед, резултати од тестови, новости и дежурства. Дел доаѓаат од `bolnica_info.json`, дел од база.
 
-> Поврзано: [Општо (преглед)](../opsto.md) · [Лекари и услуги](lekari.md) · [Навигација](navigacija.md) ·
-> [API: Новости](../../../api/novosti.md)
-
-## Содржина
-
-* [1. Преглед](#1-pregled)
-* [2. Работно време, локации, контакти (`bolnica_info`)](#2-info)
-* [3. Подготовка за преглед (`faq_pregled`)](#3-faq)
-* [4. Резултати од тестови (`rezultati_testovi`)](#4-rezultati)
-* [5. Новости (`novosti_rezime`)](#5-novosti)
-* [6. Дежурства (`pregled_dezurstvo`)](#6-dezurstva)
-* [7. Пробај](#7-probaj)
+> Поврзано: [Општо (преглед)](../opsto.md) · [Лекари и услуги](lekari.md) · [Навигација](navigacija.md) · [API: Новости](../../../api/novosti.md)
 
 ***
 
-## 1. Преглед <a id="1-pregled"></a>
+## 1. Преглед <a href="#id-1-pregled" id="id-1-pregled"></a>
 
-| Намера | Фајл | Извор |
-|--------|------|-------|
-| `rabotno_vreme`, `lokacija`, `kontakti` | `bolnica_info.py` | `bolnica_info.json` |
-| `faq_pregled` | `faq_pregled.py` | JSON + AI |
-| `rezultati_testovi` | `rezultati_testovi.py` | правила (детерминистички) |
-| `novosti_rezime` | `novosti_rezime.py` | `SELECT` од `Novosti` |
-| `pregled_dezurstvo` | `pregled_dezurstvo.py` | `SELECT` од `Dezurstva` |
+| Намера                                  | Фајл                   | Извор                     |
+| --------------------------------------- | ---------------------- | ------------------------- |
+| `rabotno_vreme`, `lokacija`, `kontakti` | `bolnica_info.py`      | `bolnica_info.json`       |
+| `faq_pregled`                           | `faq_pregled.py`       | JSON + AI                 |
+| `rezultati_testovi`                     | `rezultati_testovi.py` | правила (детерминистички) |
+| `novosti_rezime`                        | `novosti_rezime.py`    | `SELECT` од `Novosti`     |
+| `pregled_dezurstvo`                     | `pregled_dezurstvo.py` | `SELECT` од `Dezurstva`   |
 
 ***
 
-## 2. Работно време, локации, контакти (`bolnica_info`) <a id="2-info"></a>
+## 2. Работно време, локации, контакти (`bolnica_info`) <a href="#id-2-info" id="id-2-info"></a>
 
 Трите намери ги опслужува `bolnica_info.py`, читајќи од `backend/data/bolnica_info.json`. Ако прашањето спомнува конкретен оддел, Groq го извлекува и враќа само неговото време/локација; инаку се прикажува сè.
 
 ### Реален излез (работно време)
 
-```text
+```
 Работно време на Клиничка Болница Штип:
 
 Понеделник – Петок: 08:00 – 16:00
@@ -48,7 +37,7 @@
 
 ### Реален излез (контакти, итно)
 
-```text
+```
 Итна помош:
 
 Телефон: 194
@@ -60,11 +49,11 @@
 
 ***
 
-## 3. Подготовка за преглед (`faq_pregled`) <a id="3-faq"></a>
+## 3. Подготовка за преглед (`faq_pregled`) <a href="#id-3-faq" id="id-3-faq"></a>
 
 Често поставувани прашања за подготовка („дали на гладно", „што да понесам"). Одговорот комбинира фиксни ставки од извор и, по потреба, AI за поприроден текст.
 
-```text
+```
 Напишете го прашањето (на пр. дали на гладно, што да понесам на преглед).
 ```
 
@@ -72,17 +61,17 @@
 
 ***
 
-## 4. Резултати од тестови (`rezultati_testovi`) <a id="4-rezultati"></a>
+## 4. Резултати од тестови (`rezultati_testovi`) <a href="#id-4-rezultati" id="id-4-rezultati"></a>
 
 Кога се очекуваат резултати од тестови. Логиката е детерминистичка — препознава тип на испитување и враќа очекуван рок, со насочување кон лабораторија/рецепција за точен датум.
 
-```text
+```
 рокот зависи од типот на тест. Рецепција (032/ 605-001) или лабораторијата имаат точен датум.
 ```
 
 ***
 
-## 5. Новости (`novosti_rezime`) <a id="5-novosti"></a>
+## 5. Новости (`novosti_rezime`) <a href="#id-5-novosti" id="id-5-novosti"></a>
 
 Краток преглед на последните објави од табелата `Novosti`.
 
@@ -93,7 +82,7 @@ cur.execute("SELECT naslov FROM Novosti ORDER BY ... LIMIT ...")
 
 ### Реален излез
 
-```text
+```
 Последни објави на сајтот:
 
 • Нов МРТ апарат во болницата
@@ -103,7 +92,7 @@ cur.execute("SELECT naslov FROM Novosti ORDER BY ... LIMIT ...")
 
 ***
 
-## 6. Дежурства (`pregled_dezurstvo`) <a id="6-dezurstva"></a>
+## 6. Дежурства (`pregled_dezurstvo`) <a href="#id-6-dezurstva" id="id-6-dezurstva"></a>
 
 Преглед на **идни** дежурства — за цел тим или за конкретен лекар. Чита од `Dezurstva` и означува кој е „сега на дежурство".
 
@@ -115,7 +104,7 @@ FROM Dezurstva WHERE datum BETWEEN ... ORDER BY datum, vreme_od
 
 ### Реален излез
 
-```text
+```
 Идни дежурства на лекарите:
 
 Среда, 17.06.2026:
@@ -129,7 +118,7 @@ FROM Dezurstva WHERE datum BETWEEN ... ORDER BY datum, vreme_od
 
 ***
 
-## 7. Пробај <a id="7-probaj"></a>
+## 7. Пробај <a href="#id-7-probaj" id="id-7-probaj"></a>
 
 **Работно време / контакт**:
 

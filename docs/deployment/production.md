@@ -6,23 +6,6 @@
 
 Дополнително, проектот може да се хостира и на **Render** — едноставен cloud што гради од еден `Dockerfile`. Тоа е тековниот жив хостинг ([klinicka-bolnica-stip2026.onrender.com](https://klinicka-bolnica-stip2026.onrender.com)), вклучен откако истекоа студентските Azure кредити.
 
-## Содржина
-
-* [1. Двете архитектури](production.md#1-arhitekturi)
-* [2. Azure VM — продукција (главно)](production.md#2-azure)
-  * [Архитектура на стекот](production.md#2-arhitektura)
-  * [Мрежа и портови](production.md#2-mreza)
-  * [Docker стек (docker-compose)](production.md#2-stek)
-  * [Стартување и деплој](production.md#2-deploj)
-  * [Проверка](production.md#2-proverka)
-* [3. Render — тековен хостинг](production.md#3-render)
-* [4. База на податоци во продукција](production.md#4-baza)
-* [5. Тајни и околински променливи](production.md#5-tajni)
-* [6. Ажурирање / редеплој](production.md#6-azuriranje)
-* [7. Логови и следење](production.md#7-logovi)
-* [8. Безбедност](production.md#8-bezbednost)
-* [9. Чести проблеми](production.md#9-problemi)
-
 > Поврзани страници: [Docker](docker.md) · [Nginx](nginx.md) · [Поставување на сервер (Azure VM)](../../SERVER_DEPLOY.md) · [Конфигурација](/broken/pages/XVYrOXZKaZ9Xsgi4q88C)
 
 ***

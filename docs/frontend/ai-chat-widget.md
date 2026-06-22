@@ -6,25 +6,6 @@
 
 > Овој документ го покрива **frontend** делот. За тоа како backend ги обработува прашањата (intent, улоги, Groq), види [AI асистент (backend)](../backend/ai-assistant/overview.md).
 
-## Содржина
-
-* [1. Што е AI виџетот](ai-chat-widget.md#1-sto)
-* [2. Каде се наоѓа кодот](ai-chat-widget.md#2-kod)
-* [3. HTML структура](ai-chat-widget.md#3-html)
-* [4. Изглед и CSS](ai-chat-widget.md#4-css)
-* [5. Отворање, затворање и нов разговор](ai-chat-widget.md#5-ui)
-* [6. Тек на едно прашање](ai-chat-widget.md#6-flow)
-* [7. Прикажување пораки и typing](ai-chat-widget.md#7-poraki)
-* [8. Што се праќа до backend](ai-chat-widget.md#8-request)
-* [9. Што враќа backend](ai-chat-widget.md#9-response)
-* [9.1 Реален пример (request + response)](ai-chat-widget.md#9-1-primer)
-* [10. Контекст (повеќестепен дијалог)](ai-chat-widget.md#10-kontekst)
-* [11. Акции и навигација](ai-chat-widget.md#11-akcii)
-* [12. Историја на разговори](ai-chat-widget.md#12-istorija)
-* [13. Гостински чат и најава](ai-chat-widget.md#13-gostin)
-* [14. API endpoint-и](ai-chat-widget.md#14-api)
-* [15. `ai_chat.js` vs `script.js`](ai-chat-widget.md#16-poredba)
-
 > Поврзано: [Преглед на frontend](overview.md) · [Страници](pages.md)
 
 ***

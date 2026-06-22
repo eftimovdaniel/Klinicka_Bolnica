@@ -70,5 +70,3 @@
   * [Docker](deployment/docker.md)
   * [Nginx](deployment/nginx.md)
   * [Продукција и одржување](deployment/production.md)
-* [Одржување](tekhnichka-dokumentacija/odrzhuvanje/README.md)
-  * [Подобрување на документацијата](podobruvanje-dokumentacija.md)
