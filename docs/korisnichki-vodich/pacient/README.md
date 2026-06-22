@@ -10,3 +10,4 @@
 4. Како да оставите оценка и кратко мислење по извршен преглед, за да помогнете во подобрување на услугата
 5. Како да аплицирате за работно место во болницата директно преку секцијата Кариера, доколку сте заинтересирани да се приклучите на тимот
 
+<table data-view="cards"><thead><tr><th></th><th data-type="content-ref"></th></tr></thead><tbody><tr><td>Регистрација и најава</td><td><a href="../../users/pacient/registracija-i-najava.md">registracija-i-najava.md</a></td></tr><tr><td>Закажување преглед</td><td><a href="../../users/pacient/zakazuvanje-termin.md">zakazuvanje-termin.md</a></td></tr><tr><td>Мое досие и термини</td><td><a href="../../users/pacient/moe-dosie-i-termini.md">moe-dosie-i-termini.md</a></td></tr><tr><td>Оценување на преглед</td><td><a href="../../users/pacient/ocenuvanje-pregled.md">ocenuvanje-pregled.md</a></td></tr><tr><td>Кариера </td><td><a href="../../users/pacient/kariera-aplikacija.md">kariera-aplikacija.md</a></td></tr></tbody></table>
