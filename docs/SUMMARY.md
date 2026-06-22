@@ -8,29 +8,29 @@
 * [Почетна](users/README.md)
 * [Сајт и навигација](users/sajt-i-navigacija.md)
 * [Посетител (без најава)](users/posetitel.md)
-* Пациент
+* [Пациент](korisnichki-vodich/pacient/README.md)
   * [Регистрација и најава](users/pacient/registracija-i-najava.md)
   * [Закажување преглед](users/pacient/zakazuvanje-termin.md)
   * [Мое досие и термини](users/pacient/moe-dosie-i-termini.md)
   * [Оценување на преглед](users/pacient/ocenuvanje-pregled.md)
   * [Кариера — апликација](users/pacient/kariera-aplikacija.md)
-* Лекар
+* [Лекар](korisnichki-vodich/lekar/README.md)
   * [Најава и панел](users/lekar/najava-i-panel.md)
   * [Распоред и картон](users/lekar/raspored-i-karton.md)
   * [Медицински апарати](users/lekar/aparati.md)
 * [Директор — администрација](users/direktor/administracija.md)
 * [AI асистент](users/ai-asistent.md)
-* [Често поставувани прашања](users/cesto-prasanja.md)
+* [Често поставувани прашања](korisnichki-vodich/chesto-postavuvani-prashanja.md)
 
 ## Техничка документација
 
 * [Почетна](tehnicka/README.md)
-* Општо за системот
+* [Општо за системот](tekhnichka-dokumentacija/opshto-za-sistemot/README.md)
   * [Преглед на системот](overview_na_sisitemot/overview.md)
   * [Архитектура](overview_na_sisitemot/architecture.md)
   * [Инсталација](overview_na_sisitemot/installation.md)
   * [Конфигурација](overview_na_sisitemot/configuration.md)
-* Backend
+* [Backend](tekhnichka-dokumentacija/backend/README.md)
   * [Преглед на backend](backend/pregled.md)
   * [База на податоци](backend/the_database.md)
   * [API — Конвенции](backend/api/conventions.md)
@@ -62,16 +62,16 @@
       * [Лекари и услуги](backend/ai-assistant/roles/opsto/lekari.md)
       * [Информации](backend/ai-assistant/roles/opsto/informacii.md)
       * [Навигација и поздрав](backend/ai-assistant/roles/opsto/navigacija.md)
-* Frontend
+* [Frontend](tekhnichka-dokumentacija/frontend/README.md)
   * [Преглед на frontend](frontend/overview.md)
   * [Страници](frontend/pages.md)
     * [index.html](frontend/stranici/index-html.md)
     * [novosti.html](frontend/stranici/novosti-html.md)
     * [oddel-details.html](frontend/stranici/oddel-details-html.md)
   * [AI чат виџет](frontend/ai-chat-widget.md)
-* Деплојмент
+* [Деплојмент](tekhnichka-dokumentacija/deplojment/README.md)
   * [Docker](deployment/docker.md)
   * [Nginx](deployment/nginx.md)
   * [Продукција и одржување](deployment/production.md)
-* Одржување
+* [Одржување](tekhnichka-dokumentacija/odrzhuvanje/README.md)
   * [Подобрување на документацијата](podobruvanje-dokumentacija.md)
