@@ -23,7 +23,7 @@
 
 ## Техничка документација
 
-* [Почетна](tehnicka/README.md)
+* [Техничка документација](tehnicka/README.md)
 * [Општо за системот](tekhnichka-dokumentacija/opshto-za-sistemot/README.md)
   * [Преглед на системот](overview_na_sisitemot/overview.md)
   * [Архитектура](overview_na_sisitemot/architecture.md)
