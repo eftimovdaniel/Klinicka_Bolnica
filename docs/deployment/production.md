@@ -8,28 +8,26 @@
 
 ## Содржина
 
-* [1. Двете архитектури](#1-arhitekturi)
-* [2. Azure VM — продукција (главно)](#2-azure)
-  * [Архитектура на стекот](#2-arhitektura)
-  * [Мрежа и портови](#2-mreza)
-  * [Docker стек (docker-compose)](#2-stek)
-  * [Стартување и деплој](#2-deploj)
-  * [Проверка](#2-proverka)
-* [3. Render — тековен хостинг](#3-render)
-* [4. База на податоци во продукција](#4-baza)
-* [5. Тајни и околински променливи](#5-tajni)
-* [6. Ажурирање / редеплој](#6-azuriranje)
-* [7. Логови и следење](#7-logovi)
-* [8. Безбедност](#8-bezbednost)
-* [9. Чести проблеми](#9-problemi)
+* [1. Двете архитектури](production.md#1-arhitekturi)
+* [2. Azure VM — продукција (главно)](production.md#2-azure)
+  * [Архитектура на стекот](production.md#2-arhitektura)
+  * [Мрежа и портови](production.md#2-mreza)
+  * [Docker стек (docker-compose)](production.md#2-stek)
+  * [Стартување и деплој](production.md#2-deploj)
+  * [Проверка](production.md#2-proverka)
+* [3. Render — тековен хостинг](production.md#3-render)
+* [4. База на податоци во продукција](production.md#4-baza)
+* [5. Тајни и околински променливи](production.md#5-tajni)
+* [6. Ажурирање / редеплој](production.md#6-azuriranje)
+* [7. Логови и следење](production.md#7-logovi)
+* [8. Безбедност](production.md#8-bezbednost)
+* [9. Чести проблеми](production.md#9-problemi)
 
-> Поврзани страници: [Docker](docker.md) · [Nginx](nginx.md) ·
-> [Поставување на сервер (Azure VM)](../../SERVER_DEPLOY.md) ·
-> [Конфигурација](../overview_na_sisitemot/configuration.md)
+> Поврзани страници: [Docker](docker.md) · [Nginx](nginx.md) · [Поставување на сервер (Azure VM)](../../SERVER_DEPLOY.md) · [Конфигурација](/broken/pages/XVYrOXZKaZ9Xsgi4q88C)
 
----
+***
 
-## 1. Двете архитектури <a id="1-arhitekturi"></a>
+## 1. Двете архитектури <a href="#id-1-arhitekturi" id="id-1-arhitekturi"></a>
 
 Клучната разлика меѓу двете патеки е **кој ги сервира статичките датотеки** и **колку контејнери** работат.
 
@@ -51,13 +49,13 @@ flowchart TB
 
 > Бидејќи на **Render** `nginx.conf` **не се користи** воопшто, конфигурацијата на nginx е релевантна само за Azure патеката.
 
----
+***
 
-## 2. Azure VM — продукција (главно) <a id="2-azure"></a>
+## 2. Azure VM — продукција (главно) <a href="#id-2-azure" id="id-2-azure"></a>
 
 Ова е архитектурата за која е граден системот: виртуелна машина на Azure, на која со Docker Compose се креваат трите сервиси, а базата е управуван Azure MySQL сервис надвор од VM.
 
-### Архитектура на стекот <a id="2-arhitektura"></a>
+### Архитектура на стекот <a href="#id-2-arhitektura" id="id-2-arhitektura"></a>
 
 ```mermaid
 flowchart LR
@@ -75,13 +73,13 @@ flowchart LR
 
 Кога корисникот го отвора порталот, nginx го враќа `index.html` со целиот frontend. Кога страницата повикува API endpoint (`/lekari`, `/termini`, `/ai-chat/ask`…), nginx го препознава барањето по неговиот regex и го проксира кон backend-от на `backend:8000`, кој прави SQL до Azure MySQL и враќа JSON. Внатре во Docker мрежата сервисите се гледаат по **име** (`backend`, `mysql`), не по IP — затоа `nginx.conf` пишува `proxy_pass http://backend:8000`.
 
-### Мрежа и портови <a id="2-mreza"></a>
+### Мрежа и портови <a href="#id-2-mreza" id="id-2-mreza"></a>
 
 Во **NSG (Network Security Group)** на VM се отвораат само **22** (SSH) и **80** (HTTP). Портовите **8000** (backend) и **3306** (MySQL) **не** се изложуваат кон интернет — backend-от е достапен само внатре во Docker мрежата преку nginx, што е и побезбедно и поедноставно.
 
 Кога базата е **Azure Database for MySQL**, во **Firewall** на тој сервис се додава **јавната IP на VM** (или „Allow Azure services"), за backend-от да може да се поврзе. Во `backend/.env` на серверот тогаш стои `DB_HOST=...mysql.database.azure.com` и **`DB_SSL=1`**.
 
-### Docker стек (docker-compose) <a id="2-stek"></a>
+### Docker стек (docker-compose) <a href="#id-2-stek" id="id-2-stek"></a>
 
 `docker-compose.yml` дефинира три сервиси. Backend-от се гради од `backend/Dockerfile`, frontend-от е готова `nginx:alpine` слика на која се mount-нати `frontend/` и `nginx.conf`, а сите имаат `restart: unless-stopped` за да се кренат сами по рестарт на VM:
 
@@ -113,7 +111,7 @@ services:
 
 Системот работи во **два режима**: `local` го крева целиот стек вклучително MySQL контејнерот (база на истата VM), додека `azure-db` крева само `backend` + `frontend`, а базата е надворешен Azure MySQL. Целосен опис на сите фајлови, режими и команди: [Docker](docker.md). Конфигурацијата на проксирањето: [Nginx](nginx.md).
 
-### Стартување и деплој <a id="2-deploj"></a>
+### Стартување и деплој <a href="#id-2-deploj" id="id-2-deploj"></a>
 
 Кодот се клонира на VM, се поставува `backend/.env` (рачно копиран, никогаш во Git), и стекот се крева со скрипта од коренот на проектот:
 
@@ -129,7 +127,7 @@ chmod +x scripts/docker-up.sh scripts/deploy-vm.sh
 
 `deploy-vm.sh` прво прави `git pull` (ако има `.git`), па го повикува `docker-up.sh` кој гради и ги крева сервисите по редослед, чека MySQL да биде здрав преку healthcheck, и прави `curl` проверка. Полн водич чекор-по-чекор (мрежа, инсталација на Docker, копирање `.env`): [Поставување на сервер (Azure VM)](../../SERVER_DEPLOY.md).
 
-### Проверка <a id="2-proverka"></a>
+### Проверка <a href="#id-2-proverka" id="id-2-proverka"></a>
 
 На самата VM се проверува дека API-то одговара локално преку nginx, и се следат логовите:
 
@@ -140,9 +138,9 @@ docker compose logs -f backend
 
 Од прелистувач: `http://ТВОЈА_VM_IP/` ја отвора почетната страница, а `http://ТВОЈА_VM_IP/lekari` го враќа API одговорот преку nginx.
 
----
+***
 
-## 3. Render — тековен хостинг <a id="3-render"></a>
+## 3. Render — тековен хостинг <a href="#id-3-render" id="id-3-render"></a>
 
 Откако истекоа Azure кредитите, продукцијата е преместена на **Render**, кој гради **една** слика од `Dockerfile` во коренот (за разлика од трите контејнери на Azure). Таму FastAPI самиот го сервира фронтот — `main.py` го „качува" на патеката `/app`:
 
@@ -152,13 +150,13 @@ if FRONTEND_DIR.exists():  # ako frontend papkata postoi
     app.mount("/app", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")  # serviranje na sajtot na /app (html=True = index.html)
 ```
 
-Затоа на Render **истиот** домен служи сè: коренот ([/](https://klinicka-bolnica-stip2026.onrender.com)) враќа JSON статусна порака, а **самиот сајт е на [/app/](https://klinicka-bolnica-stip2026.onrender.com/app/)**. Поставувањето е: *New → Web Service* на [render.com](https://render.com), поврзи го GitHub репозиториумот, избери **Docker** build, внеси ги тајните во *Environment*, и Render гради автоматски при секој `git push`. Render задава свој `$PORT` кој `Dockerfile`-от веќе го почитува (`--port ${PORT:-8000}`).
+Затоа на Render **истиот** домен служи сè: коренот ([/](https://klinicka-bolnica-stip2026.onrender.com)) враќа JSON статусна порака, а **самиот сајт е на** [**/app/**](https://klinicka-bolnica-stip2026.onrender.com/app/). Поставувањето е: _New → Web Service_ на [render.com](https://render.com), поврзи го GitHub репозиториумот, избери **Docker** build, внеси ги тајните во _Environment_, и Render гради автоматски при секој `git push`. Render задава свој `$PORT` кој `Dockerfile`-от веќе го почитува (`--port ${PORT:-8000}`).
 
-> На бесплатниот план на Render има две важни ограничувања: сервисот **„заспива"** по ~15 мин неактивност (првото следно барање е бавно, cold start), а фајлсистемот е **ефемерен** — прикачените слики за новости (`backend/static/uploads/`) **се губат** при секој редеплој (базата е надвор, па нејзините податоци опстануваат). На Azure VM овие проблеми ги нема, бидејќи дискот и контејнерите се трајни.
+> На бесплатниот план на Render има две важни ограничувања: сервисот **„заспива"** по \~15 мин неактивност (првото следно барање е бавно, cold start), а фајлсистемот е **ефемерен** — прикачените слики за новости (`backend/static/uploads/`) **се губат** при секој редеплој (базата е надвор, па нејзините податоци опстануваат). На Azure VM овие проблеми ги нема, бидејќи дискот и контејнерите се трајни.
 
----
+***
 
-## 4. База на податоци во продукција <a id="4-baza"></a>
+## 4. База на податоци во продукција <a href="#id-4-baza" id="id-4-baza"></a>
 
 И на Azure VM (во `azure-db` режим) и на Render, базата е **надвор** од апликацискиот контејнер — управуван MySQL 8.x сервис (Azure Database for MySQL или сличен). Поврзувањето е преку `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` и задолжително **`DB_SSL=1`**. Во firewall на базата мора да се дозволи IP-та на серверот (јавната IP на VM, односно излезните IP на Render).
 
@@ -178,37 +176,37 @@ mysqldump -h <DB_HOST> -u <DB_USER> -p --ssl-mode=REQUIRED \
   Klinicka_Bolnica_Stip > backup_$(date +%F).sql
 ```
 
----
+***
 
-## 5. Тајни и околински променливи <a id="5-tajni"></a>
+## 5. Тајни и околински променливи <a href="#id-5-tajni" id="id-5-tajni"></a>
 
 > **Правило:** тајните **никогаш** не се комитуваат во Git. `backend/.env` е во `.gitignore` и `.dockerignore`.
 
-Каде се внесуваат тајните зависи од средината. На **Azure VM** се става рачно копиран `backend/.env` (`scp` од лаптоп), кој Compose го вчитува преку `env_file`. На **Render** се внесуваат преку *Environment* во контролната табла (не како фајл). **Локално** се користи `backend/.env`, направен од `backend/.env.example`.
+Каде се внесуваат тајните зависи од средината. На **Azure VM** се става рачно копиран `backend/.env` (`scp` од лаптоп), кој Compose го вчитува преку `env_file`. На **Render** се внесуваат преку _Environment_ во контролната табла (не како фајл). **Локално** се користи `backend/.env`, направен од `backend/.env.example`.
 
 Главните променливи се податоците за базата (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`), задолжително **`DB_SSL=1`** за надворешна база, и опционално `GROQ_API_KEY` (за AI) и `SMTP_*` (за е-пошта). На Azure во `local` режим се додава и `MYSQL_ROOT_PASSWORD` за MySQL контејнерот; на Render тоа не е потребно бидејќи нема MySQL контејнер.
 
-> Целосен список со објаснувања: [Конфигурација](../overview_na_sisitemot/configuration.md) и `backend/.env.example`.
+> Целосен список со објаснувања: [Конфигурација](/broken/pages/XVYrOXZKaZ9Xsgi4q88C) и `backend/.env.example`.
 
----
+***
 
-## 6. Ажурирање / редеплој <a id="6-azuriranje"></a>
+## 6. Ажурирање / редеплој <a href="#id-6-azuriranje" id="id-6-azuriranje"></a>
 
 На **Azure VM** ажурирањето е рачно: `git pull` на серверот, па `./scripts/deploy-vm.sh azure-db` (или `local`). По промена само во frontend/nginx доволен е `docker compose restart frontend`; по промена во backend код треба `docker compose up -d --build backend`.
 
-На **Render** редеплојот е автоматски — доволен е `git push` на поврзаната гранка. По потреба, рачно преку *Manual Deploy → Deploy latest commit* (или *Clear build cache & deploy* ако кешот прави проблем).
+На **Render** редеплојот е автоматски — доволен е `git push` на поврзаната гранка. По потреба, рачно преку _Manual Deploy → Deploy latest commit_ (или _Clear build cache & deploy_ ако кешот прави проблем).
 
----
+***
 
-## 7. Логови и следење <a id="7-logovi"></a>
+## 7. Логови и следење <a href="#id-7-logovi" id="id-7-logovi"></a>
 
-На **Azure VM** логовите се гледаат со `docker compose logs -f backend` (или `mysql`, `frontend`). На **Render** се гледаат во табот *Logs* во контролната табла (live stream од uvicorn).
+На **Azure VM** логовите се гледаат со `docker compose logs -f backend` (или `mysql`, `frontend`). На **Render** се гледаат во табот _Logs_ во контролната табла (live stream од uvicorn).
 
 За брза дијагностика, во двете средини помагаат три endpoints: `/` (дали API-то воопшто одговара), `/debug-db` (конекција до база и дали табелите постојат) и `/docs` (Swagger за рачно тестирање на повиците).
 
----
+***
 
-## 8. Безбедност <a id="8-bezbednost"></a>
+## 8. Безбедност <a href="#id-8-bezbednost" id="id-8-bezbednost"></a>
 
 На **Azure VM** јавно изложени се само портовите 22 (SSH) и 80 (HTTP); backend (8000) и MySQL (3306) остануваат скриени зад nginx. На **Render** е изложен само HTTPS (443), со автоматски сертификат. Базата во двата случаи е заштитена со `DB_SSL=1` и firewall ограничен на IP на серверот. Тајните живеат само во `backend/.env` на серверот или во Render Environment — никогаш во Git или во сликата.
 
@@ -222,21 +220,20 @@ app.add_middleware(  # dodavanje na CORS sloj (pred sekoj odgovor)
     allow_methods=["*"],  # dozvoleni HTTP metodi (GET, POST, ...)
 ```
 
----
+***
 
-## 9. Чести проблеми <a id="9-problemi"></a>
+## 9. Чести проблеми <a href="#id-9-problemi" id="id-9-problemi"></a>
 
 * **Празна страница / 502 Bad Gateway** (Azure) — backend не е `Up`; провери `docker compose ps` и `docker compose logs backend`.
 * **`/lekari` враќа HTML наместо JSON** (Azure) — nginx regex не ја фаќа патеката или стои по `location /` (види [nginx.md](nginx.md)).
 * **Сајтот не се отвора на `/`** (Render) — коренот враќа JSON; отвори **`/app/`**.
 * **Прв повик е многу бавен** (Render) — cold start откако сервисот бил заспан; нормално на бесплатен план.
 * **API враќа 500** — проблем со базата: провери `DB_HOST`, лозинка, **`DB_SSL=1`** и firewall на MySQL кон серверот. Тестирај со `/debug-db`.
-* **`Table doesn't exist`** — шемата не е увезена во базата (види [секција 4](#4-baza)).
+* **`Table doesn't exist`** — шемата не е увезена во базата (види [секција 4](production.md#4-baza)).
 * **Прикачени слики исчезнале** (Render) — ефемерен фајлсистем; на Azure VM ова не се случува.
 * **AI чатот не одговара** — провери `GROQ_API_KEY`; без клуч работи offline (правила + MySQL).
 * **CORS грешка во прелистувач** — ограничен `allow_origins`; додај го доменот на сајтот во `main.py`.
 
----
+***
 
-Следно: [Docker](docker.md) · [Nginx](nginx.md) ·
-[Поставување на сервер (Azure VM)](../../SERVER_DEPLOY.md)
+Следно: [Docker](docker.md) · [Nginx](nginx.md) · [Поставување на сервер (Azure VM)](../../SERVER_DEPLOY.md)
