@@ -20,7 +20,6 @@
   * [Медицински апарати](users/lekar/aparati.md)
 * [Директор — администрација](users/direktor/administracija.md)
 * [AI асистент](users/ai-asistent.md)
-* [Често поставувани прашања](korisnichki-vodich/chesto-postavuvani-prashanja.md)
 
 ## Техничка документација
 
@@ -28,8 +27,6 @@
 * [Општо за системот](tekhnichka-dokumentacija/opshto-za-sistemot/README.md)
   * [Преглед на системот](overview_na_sisitemot/overview.md)
   * [Архитектура](overview_na_sisitemot/architecture.md)
-  * [Инсталација](overview_na_sisitemot/installation.md)
-  * [Конфигурација](overview_na_sisitemot/configuration.md)
 * [Backend](tekhnichka-dokumentacija/backend/README.md)
   * [Преглед на backend](backend/pregled.md)
   * [База на податоци](backend/the_database.md)
