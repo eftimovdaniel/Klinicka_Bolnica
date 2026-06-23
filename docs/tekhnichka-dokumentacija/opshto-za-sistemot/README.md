@@ -4,4 +4,4 @@
 
 Доколку сте нов во проектот, овој дел е најдобра почетна точка — дава целосен контекст пред да навлезете во специфичните делови за Backend, Frontend или деплојмент.
 
-<table data-view="cards"><thead><tr><th></th><th data-type="content-ref"></th></tr></thead><tbody><tr><td>Преглед на системот</td><td><a href="../../overview_na_sisitemot/overview.md">overview.md</a></td></tr><tr><td>Архитектура</td><td><a href="../../overview_na_sisitemot/architecture.md">architecture.md</a></td></tr></tbody></table>
+<table data-view="cards"><thead><tr><th></th><th data-type="content-ref"></th></tr></thead><tbody><tr><td>Преглед на системот</td><td><a href="overview.md">overview.md</a></td></tr><tr><td>Архитектура</td><td><a href="architecture.md">architecture.md</a></td></tr></tbody></table>

@@ -4,4 +4,4 @@ Frontend слојot е напишан со чист HTML, CSS и JavaScript, б�
 
 Во продолжение е објаснета структурата на страниците, начинот на кој frontend-от комуницира со backend-от преку API повици, како и имплементацијата на AI чат виџетот.
 
-<table data-view="cards"><thead><tr><th></th><th data-type="content-ref"></th></tr></thead><tbody><tr><td>Преглед на frontend</td><td><a href="../../frontend/overview.md">overview.md</a></td></tr><tr><td>Страници</td><td><a href="../../frontend/pages.md">pages.md</a></td></tr><tr><td>AI </td><td><a href="../../frontend/ai-chat-widget.md">ai-chat-widget.md</a></td></tr></tbody></table>
+<table data-view="cards"><thead><tr><th></th><th data-type="content-ref"></th></tr></thead><tbody><tr><td>Преглед на frontend</td><td><a href="overview.md">overview.md</a></td></tr><tr><td>Страници</td><td><a href="pages/">pages</a></td></tr><tr><td>AI</td><td><a href="ai-chat-widget.md">ai-chat-widget.md</a></td></tr></tbody></table>
