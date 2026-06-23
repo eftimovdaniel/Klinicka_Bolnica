@@ -8,4 +8,4 @@
 2. Како да го прегледате својот распоред и картон со закажани прегледи и пациенти за денот
 3. Како да проверите достапност, статус и информации за медицинските апарати во болницата
 
-<table data-view="cards"><thead><tr><th></th><th data-type="content-ref"></th></tr></thead><tbody><tr><td>Најава и панел</td><td><a href="../../users/lekar/najava-i-panel.md">najava-i-panel.md</a></td></tr><tr><td>Распоред и картон</td><td><a href="../../users/lekar/raspored-i-karton.md">raspored-i-karton.md</a></td></tr><tr><td>Медицински апарати</td><td><a href="../../users/lekar/aparati.md">aparati.md</a></td></tr></tbody></table>
+<table data-view="cards"><thead><tr><th></th><th data-type="content-ref"></th></tr></thead><tbody><tr><td>Најава и панел</td><td><a href="najava-i-panel.md">najava-i-panel.md</a></td></tr><tr><td>Распоред и картон</td><td><a href="raspored-i-karton.md">raspored-i-karton.md</a></td></tr><tr><td>Медицински апарати</td><td><a href="aparati.md">aparati.md</a></td></tr></tbody></table>

@@ -4,4 +4,4 @@
 
 Во продолжение е објаснета конфигурацијата на Docker контејнерите, улогата на Nginx како reverse proxy кој ги насочува барањата кон точниот сервис, како и насоки за продукциско одржување и решавање на чести проблеми.
 
-<table data-view="cards"><thead><tr><th></th><th data-type="content-ref"></th></tr></thead><tbody><tr><td>Docker</td><td><a href="../../deployment/docker.md">docker.md</a></td></tr><tr><td>Nginx</td><td><a href="../../deployment/nginx.md">nginx.md</a></td></tr><tr><td>Продукција и одржување</td><td><a href="../../deployment/production.md">production.md</a></td></tr></tbody></table>
+<table data-view="cards"><thead><tr><th></th><th data-type="content-ref"></th></tr></thead><tbody><tr><td>Docker</td><td><a href="docker.md">docker.md</a></td></tr><tr><td>Nginx</td><td><a href="nginx.md">nginx.md</a></td></tr><tr><td>Продукција и одржување</td><td><a href="production.md">production.md</a></td></tr></tbody></table>
