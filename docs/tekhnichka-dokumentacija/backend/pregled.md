@@ -4,23 +4,9 @@ Backend-от е **срцето** на системот — делот што ј�
 
 Овој документ објаснува **како е организиран** backend-от: структурата на папките, главните фајлови, како функционираат routers и како е изграден слојот за пристап до базата. За самата шема на базата види [База на податоци](the_database.md); за AI асистентот види [AI асистент](overview/); за поширок контекст на трите слоја види [Архитектура](../opshto-za-sistemot/architecture.md).
 
-## Содржина
 
-* [1. Што е backend-от](pregled.md#1-sto)
-* [2. Структура на папки](pregled.md#2-struktura)
-* [3. Влезна точка — `main.py`](pregled.md#3-main)
-* [4. Routers (рути по теми)](pregled.md#4-routers)
-* [5. Слој за база — `database.py`](pregled.md#5-baza)
-* [6. Помошни модули](pregled.md#6-pomosni)
-* [7. AI модул (`ai/`)](pregled.md#7-ai)
-* [8. Зависности](pregled.md#8-zavisnosti)
-* [9. Конвенции](pregled.md#9-konvencii)
-* [10. Животен циклус на преглед](pregled.md#10-ciklus)
-* [11. API документација](pregled.md#11-api-docs)
-* [12. OpenAPI и тестирање](pregled.md#12-openapi)
-* [13. Променливи на околина](pregled.md#13-env)
 
-> Поврзани страници: [Архитектура](../opshto-za-sistemot/architecture.md) · [База на податоци](the_database.md) · [API → Конвенции](conventions/) · [AI асистент](overview/)
+Поврзани страници: [Архитектура](../opshto-za-sistemot/architecture.md) · [База на податоци](the_database.md) · [API → Конвенции](conventions/) · [AI асистент](overview/)
 
 ***
 
