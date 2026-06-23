@@ -16,7 +16,7 @@ flowchart LR
 
 ***
 
-## 1. Локација и структура на фајловите <a href="#id-1-lokacija" id="id-1-lokacija"></a>
+### Локација и структура на фајловите <a href="#id-1-lokacija" id="id-1-lokacija"></a>
 
 Целиот frontend се наоѓа во папката **`frontend/`**, а истиот фолдер е составен од неколку посебни фајлови. Во продолжение се дадение сите фајлови и која е нивната намена.
 
@@ -57,7 +57,7 @@ graph TD
 
 ***
 
-## 2. Технологии <a href="#id-2-tehnologii" id="id-2-tehnologii"></a>
+### Технологии <a href="#id-2-tehnologii" id="id-2-tehnologii"></a>
 
 | Слој            | Технологија                              |
 | --------------- | ---------------------------------------- |
@@ -72,7 +72,7 @@ graph TD
 
 ***
 
-## 3. Страници на сајтот <a href="#id-3-stranici" id="id-3-stranici"></a>
+### Страници на сајтот <a href="#id-3-stranici" id="id-3-stranici"></a>
 
 Системот има **три HTML страници**:
 
@@ -86,7 +86,7 @@ graph TD
 
 ***
 
-## 4. Главна страница (`index.html`) <a href="#id-4-index" id="id-4-index"></a>
+### Главна страница (`index.html`) <a href="#id-4-index" id="id-4-index"></a>
 
 > **Целосно објаснување + приказ во живо:** [`index.html` — главна страница](stranici/index-html.md)
 
@@ -136,7 +136,7 @@ flowchart TD
 
 ***
 
-## 5. Поврзување со backend <a href="#id-5-backend" id="id-5-backend"></a>
+### Поврзување со backend <a href="#id-5-backend" id="id-5-backend"></a>
 
 Сите API повици одат преку променливата `API_BASE` во `script.js`:
 
@@ -185,7 +185,7 @@ var MATICNI_LEKARI_URL = 'https://mojtermin.mk/health_workers';
 
 ***
 
-## 6. Најава и сесии <a href="#id-6-najava" id="id-6-najava"></a>
+### Најава и сесии <a href="#id-6-najava" id="id-6-najava"></a>
 
 ### Најава
 
@@ -236,7 +236,7 @@ stateDiagram-v2
 
 ***
 
-## 7. Интерфејс по улога <a href="#id-7-uloga" id="id-7-uloga"></a>
+### Интерфејс по улога <a href="#id-7-uloga" id="id-7-uloga"></a>
 
 После најава, интерфејсот се менува според соодветнала улогата.
 
@@ -275,7 +275,7 @@ flowchart TD
 
 ***
 
-## 8. Закажување на термин (UI) <a href="#id-8-zakazuvanje" id="id-8-zakazuvanje"></a>
+### Закажување на термин (UI) <a href="#id-8-zakazuvanje" id="id-8-zakazuvanje"></a>
 
 Закажувањето се одвива преку **модал** на главната страница:
 
@@ -311,7 +311,7 @@ flowchart LR
 
 ***
 
-## 9. AI чат виџет <a href="#id-9-ai-chat" id="id-9-ai-chat"></a>
+### AI чат виџет <a href="#id-9-ai-chat" id="id-9-ai-chat"></a>
 
 На `index.html` има вграден **плутачки AI асистент** (`#kbs-ai-widget`) — копче во долниот агол што отвора панел за разговор.
 
@@ -348,7 +348,7 @@ sequenceDiagram
 
 ***
 
-## 10. Стилови и responsive дизајн <a href="#id-10-stilovi" id="id-10-stilovi"></a>
+### Стилови и responsive дизајн <a href="#id-10-stilovi" id="id-10-stilovi"></a>
 
 Сите страници го користат **`style.css`** — еден централен CSS фајл.
 
@@ -369,7 +369,7 @@ sequenceDiagram
 
 ***
 
-## Тестирај го сајтот во живо
+### Тестирај го сајтот во живо
 
 {% embed url="https://klinicka-bolnica-stip2026.onrender.com/app/" %}
 

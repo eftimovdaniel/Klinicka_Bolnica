@@ -10,7 +10,7 @@
 
 ***
 
-## 1. Што е AI виџетот <a href="#id-1-sto" id="id-1-sto"></a>
+### Што е AI виџетот <a href="#id-1-sto" id="id-1-sto"></a>
 
 AI виџетот е **интелигентен асистент** што им помага на корисниците да најдат информации и да извршат дејства преку разговор на природен јазик — на пример:
 
@@ -26,7 +26,7 @@ AI виџетот е **интелигентен асистент** што им �
 
 ***
 
-## 2. Каде се наоѓа кодот <a href="#id-2-kod" id="id-2-kod"></a>
+### Каде се наоѓа кодот <a href="#id-2-kod" id="id-2-kod"></a>
 
 Виџетот е составен од неколку делови распределени низ проектот:
 
@@ -49,7 +49,7 @@ flowchart LR
 
 ***
 
-## 3. HTML структура <a href="#id-3-html" id="id-3-html"></a>
+### HTML структура <a href="#id-3-html" id="id-3-html"></a>
 
 Целиот виџет е во еден контејнер `#kbs-ai-widget` на крајот од `index.html`. Коренот има атрибут `data-open="true/false"` што кажува дали панелот е отворен.
 
@@ -68,7 +68,7 @@ flowchart LR
 
 ***
 
-## 4. Изглед и CSS <a href="#id-4-css" id="id-4-css"></a>
+### Изглед и CSS <a href="#id-4-css" id="id-4-css"></a>
 
 Стиловите се во `style.css`, во блок што почнува со коментарот „ИЗГЛЕД: КБ Штип AI асистент".
 
@@ -94,7 +94,7 @@ Launcher копчето е кругло (**66×66 px**) со црвен gradient
 
 ***
 
-## 5. Отворање, затворање и нов разговор <a href="#id-5-ui" id="id-5-ui"></a>
+### Отворање, затворање и нов разговор <a href="#id-5-ui" id="id-5-ui"></a>
 
 ### Отворање / затворање
 
@@ -122,7 +122,7 @@ const setOpen = function (open) {
 
 ***
 
-## 6. Тек на едно прашање <a href="#id-6-flow" id="id-6-flow"></a>
+### Тек на едно прашање <a href="#id-6-flow" id="id-6-flow"></a>
 
 ```mermaid
 sequenceDiagram
@@ -151,7 +151,7 @@ sequenceDiagram
 
 ***
 
-## 7. Прикажување пораки и typing <a href="#id-7-poraki" id="id-7-poraki"></a>
+### Прикажување пораки и typing <a href="#id-7-poraki" id="id-7-poraki"></a>
 
 Корисничките пораки се внесуваат со `textContent` (без HTML) — затоа се безбедни од инјекција:
 
@@ -171,7 +171,7 @@ function kbsAppendUserMsg(text) {
 
 ***
 
-## 8. Што се праќа до backend <a href="#id-8-request" id="id-8-request"></a>
+### Што се праќа до backend <a href="#id-8-request" id="id-8-request"></a>
 
 `pitajAI()` праќа JSON во body:
 
@@ -191,7 +191,7 @@ URL-то е `API_BASE + "/ai-chat" + "/ask"`.
 
 ***
 
-## 9. Што враќа backend <a href="#id-9-response" id="id-9-response"></a>
+### Што враќа backend <a href="#id-9-response" id="id-9-response"></a>
 
 Одговорот е JSON со следните полиња:
 
@@ -223,7 +223,7 @@ if (data.session_id) kbsAISessionId = data.session_id;
 
 ***
 
-## 9.1 Реален пример (request + response) <a href="#id-9-1-primer" id="id-9-1-primer"></a>
+### Реален пример (request + response) <a href="#id-9-1-primer" id="id-9-1-primer"></a>
 
 За да се види целиот тек во едно место, подолу е еден реален циклус кога **гостин** (не најавен) прашува за лекари по специјалност.
 
@@ -273,7 +273,7 @@ if (data.session_id) kbsAISessionId = data.session_id;
 
 ***
 
-## 10. Контекст (повеќестепен дијалог) <a href="#id-10-kontekst" id="id-10-kontekst"></a>
+### Контекст (повеќестепен дијалог) <a href="#id-10-kontekst" id="id-10-kontekst"></a>
 
 `kbsAIKontekst` овозможува **повеќечекорен разговор** — асистентот „памти" за што се зборува.
 
@@ -305,7 +305,7 @@ sequenceDiagram
 
 ***
 
-## 11. Акции и навигација <a href="#id-11-akcii" id="id-11-akcii"></a>
+### 11. Акции и навигација <a href="#id-11-akcii" id="id-11-akcii"></a>
 
 Backend може да **управува со интерфејсот** преку полињата `akcija` и `navigacija` во одговорот.
 
@@ -338,7 +338,7 @@ Frontend скролува до `#lekari` и го поставува филтер
 
 ***
 
-## 12. Историја на разговори <a href="#id-12-istorija" id="id-12-istorija"></a>
+### Историја на разговори <a href="#id-12-istorija" id="id-12-istorija"></a>
 
 За **најавени** корисници (пациент или лекар) разговорите се зачувуваат во **MySQL** преку backend. За гости историјата е оневозможена, па копчето `#kbs-ai-history` е скриено и се појавува дури по најава:
 
@@ -362,7 +362,7 @@ flowchart TD
 
 ***
 
-## 13. Гостински чат и најава <a href="#id-13-gostin" id="id-13-gostin"></a>
+### Гостински чат и најава <a href="#id-13-gostin" id="id-13-gostin"></a>
 
 Кога **гостин** сака дејство што бара најава (на пр. закажување), чатот не се губи — се зачувува и продолжува по најава.
 
@@ -395,7 +395,7 @@ flowchart LR
 
 ***
 
-## 14. API endpoint-и <a href="#id-14-api" id="id-14-api"></a>
+### API endpoint-и <a href="#id-14-api" id="id-14-api"></a>
 
 Сите endpoint-и се под префикс `/ai-chat` (проксирани преку Nginx):
 
@@ -417,13 +417,13 @@ curl -X POST http://localhost:8000/ai-chat/ask \
 
 ***
 
-## 15. `ai_chat.js` vs `script.js` <a href="#id-16-poredba" id="id-16-poredba"></a>
+### &#x20;`ai_chat.js` vs `script.js` <a href="#id-16-poredba" id="id-16-poredba"></a>
 
 Во проектот постојат **две верзии** на AI логиката. Онаа во **`script.js`** е вистинската — таа се вчитува на `index.html` и ги има сите можности: динамичен `API_BASE`, историја на разговори, typing анимација, форматирање со линкови и потпис, напредна навигација (лекарски панел, филтер на лекари) и продолжување на гостински чат по најава.
 
 Фајлот **`ai_chat.js`** е поедноставен **учебен пример** што не се вчитува на сајтот. Тој ги покажува шесте основни функции на текот: `zemi_najaven_korisnik()` (податоци за најава), `prati_prasanje()` (POST на backend), `prikaz_i_porak_a()` (прикажување balon), `izvrsi_akcija()` (UI акции), `izvrsi_navigacija()` (скрол / redirect) и `isprati_porak_a()` (submit handler). Користи фиксен URL `http://localhost:8000` и нема историја, typing, ниту гостински resume.
 
-## Тестирај го асистентот во живо
+### Тестирај го асистентот во живо
 
 > **Напомена:** Серверот е на бесплатен план, па првиот одговор може да потрае до една минута додека се „разбуди". Следните прашања се брзи.
 
