@@ -4,19 +4,6 @@
 
 Архитектурата е поделена на три јасно одделени слоја: **презентациски** (она што корисникот го гледа), **логички** (она што системот го пресметува и обработува) и **податочен** (местото каде сè се чува). Секој слој има своја улога и своја одговорност, а нивната синхронизирана работа е она што го прави системот брз, сигурен и лесен за одржување. Документот содржи конкретни примери и парчиња код директно преземени од проектот, со цел да се даде јасна и веродостојна слика за тоа како функционира системот во пракса.
 
-## Содржина
-
-* [1. Висок преглед](architecture.md#1-visok-pregled)
-* [2. Зошто ваква архитектура](architecture.md#2-zoshto-vakva-arhitektura)
-* [3. Frontend слој](architecture.md#3-frontend-sloj)
-* [4. Backend слој](architecture.md#4-backend-sloj)
-* [5. База на податоци](architecture.md#5-baza-na-podatoci)
-* [6. Nginx (reverse proxy)](architecture.md#6-nginx-reverse-proxy)
-* [7. Тек на барање — чекор по чекор](architecture.md#7-tek-na-baranje)
-* [8. AI асистент](architecture.md#8-ai-asistent)
-* [9. Сесии и безбедност](architecture.md#9-sesii-i-bezbednost)
-* [10. Docker деплојмент](architecture.md#10-docker-deploj)
-
 > Поврзани страници: [Преглед на системот](overview.md) · [Инсталација](/broken/pages/9GwekAMr3zPSem97lYhd) · [Конфигурација](/broken/pages/XVYrOXZKaZ9Xsgi4q88C) · [База на податоци](../backend/the_database.md) · [AI асистент](../backend/ai-assistant/overview.md)
 
 ## 1. Висок преглед <a href="#id-1-visok-pregled" id="id-1-visok-pregled"></a>
