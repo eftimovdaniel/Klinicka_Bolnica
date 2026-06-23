@@ -59,6 +59,7 @@
       * [Лекари и услуги](backend/ai-assistant/roles/opsto/lekari.md)
       * [Информации](backend/ai-assistant/roles/opsto/informacii.md)
       * [Навигација и поздрав](backend/ai-assistant/roles/opsto/navigacija.md)
+  * [Безбедност на системот](tekhnichka-dokumentacija/backend/bezbednost-na-sistemot.md)
 * [Frontend](tekhnichka-dokumentacija/frontend/README.md)
   * [Преглед на frontend](frontend/overview.md)
   * [Страници](frontend/pages.md)
