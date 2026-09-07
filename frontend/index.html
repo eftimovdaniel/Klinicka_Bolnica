@@ -379,7 +379,7 @@
 
       <div id="forgot-password-container" class="auth-form-container" style="display: none;">
         <h3 id="forgot-title">Заборавена лозинка</h3>
-        <p class="form-hint">Внесете ја е-поштата на вашиот профил. Кодот за промена на лозинка ќе се испечати во <strong>терминалот каде што работи backend-от</strong> (не се праќа по е-пошта).</p>
+        <p class="form-hint">Внесете ја е-поштата на вашиот профил. Кодот за промена на лозинка ќе се прикаже подолу (не се праќа по е-пошта).</p>
         <form id="forgot-password-form">
           <div class="form-group">
             <label for="forgot-email">Е-пошта</label>
@@ -395,8 +395,8 @@
           <form id="reset-password-form">
             <input type="hidden" id="reset-email" />
             <div class="form-group">
-              <label for="reset-token">Код (од терминалот на серверот)</label>
-              <input type="text" id="reset-token" placeholder="Внесете го кодот" required />
+              <label for="reset-token">Код</label>
+              <input type="text" id="reset-token" placeholder="Кодот се пополнува автоматски" required />
             </div>
             <div class="form-group">
               <label for="reset-nova">Нова лозинка</label>
