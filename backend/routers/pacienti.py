@@ -108,8 +108,11 @@ async def forgot_password_pacient(request: Request):
             f"  Валиден до: {expires.isoformat()}\n"
             f"{'='*60}\n"
         )
-        print(msg)
-        return {"message": "Ако постои пациент со оваа е-пошта, кодот е испечатен во терминалот каде што работи backend-от. Внесете го кодот и новата лозинка."}
+        print(msg, flush=True)
+        return {
+            "message": f"Вашиот код за промена на лозинка е: {token}",
+            "token": token,
+        }
     except HTTPException:
         raise
     except Exception as e:

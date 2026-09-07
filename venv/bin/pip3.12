@@ -1,4 +1,4 @@
-#!/Users/danieleftimov/Desktop/Klinicka_Bolnica_Stip_XML/venv/bin/python3
+#!/Users/danieleftimov/Desktop/UGD/XML/Klinicka_Bolnica_Stip_XML/venv/bin/python3.12
 # -*- coding: utf-8 -*-
 import re
 import sys

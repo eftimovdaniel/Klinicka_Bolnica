@@ -4940,7 +4940,12 @@ function setupAuth() {
         if (btnText) btnText.style.display = 'inline-block';
         if (btnLoad) btnLoad.style.display = 'none';
         document.getElementById('reset-email').value = email;
-        document.getElementById('forgot-code-msg').textContent = data.message || 'Погледнете го терминалот на серверот за кодот. Внесете го подолу.';
+        if (data.token) {
+          document.getElementById('reset-token').value = data.token;
+          document.getElementById('forgot-code-msg').textContent = data.message || ('Вашиот код е: ' + data.token);
+        } else {
+          document.getElementById('forgot-code-msg').textContent = data.message || 'Ако постои профил со оваа е-пошта, кодот ќе се прикаже овде.';
+        }
         document.getElementById('forgot-reset-block').style.display = 'block';
       } catch (err) {
         if (btnText) btnText.style.display = 'inline-block';
