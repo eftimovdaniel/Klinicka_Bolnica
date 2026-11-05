@@ -1,10 +1,39 @@
 from pathlib import Path  # biblioteka za patеки do papki i fajlovi
 from typing import Any, cast  # tipovi za Python (Any = bilo što, cast = pretvorba na tip)
 
-from fastapi import FastAPI  # glavnata klasa za web API
+from fastapi import FastAPI, Request  # glavnata klasa za web API
 from fastapi.middleware.cors import CORSMiddleware  # dozvoluva frontend od drug domen da povikuva API
+from fastapi.responses import JSONResponse, RedirectResponse  # preusmeruvanje i JSON greski
 from fastapi.staticfiles import StaticFiles  # serviranje na sliki, CSS, HTML kako statički fajlovi
+from starlette.middleware.base import BaseHTTPMiddleware
 from routers import lekari, pacienti, termini, admin, aparati, uslugi, novosti, kariera, ai_chat  # site router moduli so ruti
+from runtime_env import ENABLE_DEBUG, cors_settings
+
+_cors_origins, _cors_credentials = cors_settings()
+
+
+class AdminSessionMiddleware(BaseHTTPMiddleware):
+    """/admin bara potpisan lekarski znak od naјава, ne samo doctor_ID od klientot."""
+
+    async def dispatch(self, request, call_next):
+        path = request.url.path or ""
+        if request.method != "OPTIONS" and path.startswith("/admin"):
+            from routers.admin import check_admin_access
+            from session_auth import read_token
+
+            payload = read_token(request, "lekar")
+            if not payload or not check_admin_access(payload["id"]):
+                return JSONResponse(
+                    status_code=401,
+                    content={"detail": "Најавете се како директор за да продолжите."},
+                )
+            claimed = request.query_params.get("admin_doctor_id")
+            if claimed and str(claimed) != str(payload["id"]):
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "Немате пристап до административниот панел."},
+                )
+        return await call_next(request)
 
 app = FastAPI(  # kreiranje na FastAPI aplikacijata
     title="Клиничка Болница Штип – API",  # naslov što se gleda vo /docs
@@ -15,10 +44,11 @@ app = FastAPI(  # kreiranje na FastAPI aplikacijata
         {"url": "http://localhost:8000", "description": "Lokalen razvoj"},
     ],
 )
+app.add_middleware(AdminSessionMiddleware)
 app.add_middleware(  # dodavanje na CORS sloj (pred sekoj odgovor)
     CORSMiddleware,  # tip na middleware za cross-origin baranja
-    allow_origins=["*"],  # dozvoleni izvori (* = site, samo za razvoj)
-    allow_credentials=True,  # dozvoluva cookies / credentials vo baranjata
+    allow_origins=_cors_origins,  # lokalno *; vo produkcija samo CORS_ORIGINS ili Render domenot
+    allow_credentials=_cors_credentials,  # * ne smee da ide so credentials
     allow_methods=["*"],  # dozvoleni HTTP metodi (GET, POST, ...)
     allow_headers=["*"],  # dozvoleni HTTP zaglavja
 )
@@ -43,84 +73,93 @@ app.include_router(ai_chat.router)  # AI chat so Groq (asistentot)
 
 
 @app.get("/")  # HTTP GET na korenot na API (/)
-def root():  # funkcija koja go obrabotuva baranjeto
-    return {"message": "Клиничка Болница Штип – API", "docs": "/docs"}  # JSON odgovor so poraka i link do dokumentacija
+def root(request: Request):  # funkcija koja go obrabotuva baranjeto
+    # Pregleduvacot na Render go otvora korenot. Sajtot e na /app/, API ostanuva JSON za curl i health-check.
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept and FRONTEND_DIR.exists():
+        return RedirectResponse(url="/app/", status_code=302)
+    return {
+        "message": "Клиничка Болница Штип – API",
+        "docs": "/docs",
+        "site": "/app/",
+    }
 
 
-@app.get("/debug-novosti")  # privremen endpoint za test na novosti (debug)
-def debug_novosti():  # funkcija za čitanje na novosti od baza
-    """Приказ на slika_path и slike_extra за сите новости – за проверка што е во базата."""
-    from database import get_connection  # funkcija za konekcija so MySQL
-    try:  # probaj da se povrzeš so bazata
-        conn = get_connection()  # otvori konekcija
-        cur = conn.cursor(dictionary=True)  # kursor so rezultati kako rečnici (kluč = ime na kolona)
-        cur.execute("SELECT id, naslov, slika_path, slike_extra FROM Novosti ORDER BY id")  # SQL: site novosti
-        rows = cur.fetchall()  # zemi gi site redovi
-        cur.close()  # zatvori kursor
-        conn.close()  # zatvori konekcija
-        return {"novosti": rows}  # vrati gi podatocite kako JSON
-    except Exception as e:  # ako nešto padne (baza, SQL, ...)
-        return {"error": str(e)}  # vrati ja greškata kako tekst
+if ENABLE_DEBUG:
+    @app.get("/debug-novosti")  # privremen endpoint za test na novosti (debug)
+    def debug_novosti():  # funkcija za čitanje na novosti od baza
+        """Приказ на slika_path и slike_extra за сите новости – за проверка што е во базата."""
+        from database import get_connection  # funkcija za konekcija so MySQL
+        try:  # probaj da se povrzeš so bazata
+            conn = get_connection()  # otvori konekcija
+            cur = conn.cursor(dictionary=True)  # kursor so rezultati kako rečnici (kluč = ime na kolona)
+            cur.execute("SELECT id, naslov, slika_path, slike_extra FROM Novosti ORDER BY id")  # SQL: site novosti
+            rows = cur.fetchall()  # zemi gi site redovi
+            cur.close()  # zatvori kursor
+            conn.close()  # zatvori konekcija
+            return {"novosti": rows}  # vrati gi podatocite kako JSON
+        except Exception as e:  # ako nešto padne (baza, SQL, ...)
+            return {"error": str(e)}  # vrati ja greškata kako tekst
 
 
-@app.get("/debug-kariera")  # privremen endpoint za oglasi za rabota
-def debug_kariera():  # funkcija za lista na oglasi
-    """Приказ на огласи од Vrabotuvanje – за проверка зошто кариера не се прикажува."""
-    from database import get_connection  # konekcija so baza
-    try:  # obidi se da čitaš
-        conn = get_connection()  # konekcija
-        cur = conn.cursor(dictionary=True)  # kursor so dict redovi
-        cur.execute("""  # SQL so poveke redovi
-            SELECT id_oglas, pozicija, oddel, datum_na_prijavuvanje, status_oglas
-            FROM Vrabotuvanje
-            ORDER BY datum_na_prijavuvanje ASC
-        """)
-        rows = cur.fetchall()  # site oglasi
-        out = []  # prazna lista za formatiran izlez
-        for r in rows:  # za sekoj red od bazata
-            row = cast(dict[str, Any], r)  # pretvori go redot vo dict so tipovi
-            d = row.get("datum_na_prijavuvanje")  # zemi go datumot na prijava
-            rok = d.strftime("%d.%m.%Y") if d and hasattr(d, "strftime") else (str(d)[:10] if d else "")  # formatiraj datum ili prazno
-            out.append({**row, "rok_str": rok})  # dodadi go formatiraniot datum vo rečnikot
-        cur.close()  # zatvori kursor
-        conn.close()  # zatvori konekcija
-        return {"count": len(out), "oglasi": out}  # kolku oglasi + lista
-    except Exception as e:  # greška
-        return {"error": str(e)}  # vrati greška
+    @app.get("/debug-kariera")  # privremen endpoint za oglasi za rabota
+    def debug_kariera():  # funkcija za lista na oglasi
+        """Приказ на огласи од Vrabotuvanje – за проверка зошто кариера не се прикажува."""
+        from database import get_connection  # konekcija so baza
+        try:  # obidi se da čitaš
+            conn = get_connection()  # konekcija
+            cur = conn.cursor(dictionary=True)  # kursor so dict redovi
+            cur.execute("""  # SQL so poveke redovi
+                SELECT id_oglas, pozicija, oddel, datum_na_prijavuvanje, status_oglas
+                FROM Vrabotuvanje
+                ORDER BY datum_na_prijavuvanje ASC
+            """)
+            rows = cur.fetchall()  # site oglasi
+            out = []  # prazna lista za formatiran izlez
+            for r in rows:  # za sekoj red od bazata
+                row = cast(dict[str, Any], r)  # pretvori go redot vo dict so tipovi
+                d = row.get("datum_na_prijavuvanje")  # zemi go datumot na prijava
+                rok = d.strftime("%d.%m.%Y") if d and hasattr(d, "strftime") else (str(d)[:10] if d else "")  # formatiraj datum ili prazno
+                out.append({**row, "rok_str": rok})  # dodadi go formatiraniot datum vo rečnikot
+            cur.close()  # zatvori kursor
+            conn.close()  # zatvori konekcija
+            return {"count": len(out), "oglasi": out}  # kolku oglasi + lista
+        except Exception as e:  # greška
+            return {"error": str(e)}  # vrati greška
 
 
-@app.get("/debug-db")  # proverka dali bazata i tabelite rabotat
-def debug_db():  # funkcija za test na konekcija i tabeli
-    """Проверка на конекција и табели – прикажува точна грешка при проблем."""
-    from database import get_connection  # konekcija so MySQL
-    results = {}  # rečnik za rezultati od testovite
-    try:  # glaven try blok
-        conn = get_connection()  # konekcija
-        results["connection"] = "OK"  # konekcijata e uspešna
-        cur = conn.cursor(dictionary=True)  # kursor
-        tests = [  # lista na tabeli i SQL što ke se izvršat
-            ("Doctors", "SELECT COUNT(*) as c FROM Doctors"),
-            ("Oddeli", "SELECT ime_na_oddel FROM Oddeli LIMIT 1"),
-            ("Vrabotuvanje", "SELECT id_oglas, pozicija, oddel, datum_na_prijavuvanje FROM Vrabotuvanje LIMIT 1"),
-            ("Novosti", "SELECT id, naslov FROM Novosti LIMIT 1"),
-        ]
-        for name, sql in tests:  # za sekoja tabela
-            try:  # probaj query
-                cur.execute(sql)  # izvrši SQL
-                rows = cur.fetchall()  # rezultati
-                cnt = (  # brojka za prikaz
-                    cast(dict[str, Any], rows[0]).get("c", len(rows))  # COUNT ili broj na redovi
-                    if rows  # ako ima baranje eden red
-                    else 0  # inaku 0
-                )
-                results[name] = {"ok": True, "count": cnt}  # tabelata e OK
-            except Exception as e:  # greška na konkretna tabela
-                results[name] = {"ok": False, "error": str(e)}  # zabeleži greška
-        cur.close()  # zatvori kursor
-        conn.close()  # zatvori konekcija
-    except Exception as e:  # ne može da se povrze so bazata
-        results["connection"] = f"ГРЕШКА: {e}"  # zabeleži greška na konekcija
-    return results  # vrati gi site test rezultati
+    @app.get("/debug-db")  # proverka dali bazata i tabelite rabotat
+    def debug_db():  # funkcija za test na konekcija i tabeli
+        """Проверка на конекција и табели – прикажува точна грешка при проблем."""
+        from database import get_connection  # konekcija so MySQL
+        results = {}  # rečnik za rezultati od testovite
+        try:  # glaven try blok
+            conn = get_connection()  # konekcija
+            results["connection"] = "OK"  # konekcijata e uspešna
+            cur = conn.cursor(dictionary=True)  # kursor
+            tests = [  # lista na tabeli i SQL što ke se izvršat
+                ("Doctors", "SELECT COUNT(*) as c FROM Doctors"),
+                ("Oddeli", "SELECT ime_na_oddel FROM Oddeli LIMIT 1"),
+                ("Vrabotuvanje", "SELECT id_oglas, pozicija, oddel, datum_na_prijavuvanje FROM Vrabotuvanje LIMIT 1"),
+                ("Novosti", "SELECT id, naslov FROM Novosti LIMIT 1"),
+            ]
+            for name, sql in tests:  # za sekoja tabela
+                try:  # probaj query
+                    cur.execute(sql)  # izvrši SQL
+                    rows = cur.fetchall()  # rezultati
+                    cnt = (  # brojka za prikaz
+                        cast(dict[str, Any], rows[0]).get("c", len(rows))  # COUNT ili broj na redovi
+                        if rows  # ako ima baranje eden red
+                        else 0  # inaku 0
+                    )
+                    results[name] = {"ok": True, "count": cnt}  # tabelata e OK
+                except Exception as e:  # greška na konkretna tabela
+                    results[name] = {"ok": False, "error": str(e)}  # zabeleži greška
+            cur.close()  # zatvori kursor
+            conn.close()  # zatvori konekcija
+        except Exception as e:  # ne može da se povrze so bazata
+            results["connection"] = f"ГРЕШКА: {e}"  # zabeleži greška na konekcija
+        return results  # vrati gi site test rezultati
 
 
 if __name__ == "__main__":  # samo ako go startuvaš so: python main.py

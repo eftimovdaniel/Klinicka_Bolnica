@@ -16,10 +16,12 @@ except ImportError:
 
 
 def hash_password(plain: str) -> str:
-    """Хеширај лозинка со bcrypt (нов запис). Ако bcrypt не е инсталиран, користи SHA-256 (legacy)."""
+    """Хеширај лозинка со bcrypt. SHA-256 е само локален fallback, не за продукција."""
     if HAS_BCRYPT:
         return bcrypt.hashpw(plain.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
-    # Fallback за окружувања каде bcrypt не е инсталиран
+    from runtime_env import IS_PRODUCTION
+    if IS_PRODUCTION:
+        raise RuntimeError("bcrypt не е инсталиран. Продукцијата не смее да чува лозинки со SHA-256.")
     return hashlib.sha256(plain.encode("utf-8")).hexdigest()
 
 

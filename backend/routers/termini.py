@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import Response
 from datetime import datetime
 from database import get_connection
+from session_auth import read_token
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
@@ -319,6 +320,8 @@ def get_dostapni_termini(lekar_id: int, datum: str):    # funkcija koja dava pri
 async def create_termini(request: Request):     # funkcija koja ceka podatoci od klientot 
     conn = None
     try:
+        if not read_token(request, "pacient"):
+            raise HTTPException(status_code=401, detail="Најавете се како пациент за да закажете преглед.")
         data = await request.json()     # gi zema podatocite od frontend vo vid JSON
         datum_str = data.get("datum", "")       # se zema datumot od formata 
         if "T" in datum_str:               # se pravi proverka dali e vo ISO format 
@@ -406,6 +409,9 @@ async def create_termini(request: Request):     # funkcija koja ceka podatoci od
 async def update_termin_dijagnoza_terapija(termin_id: int, request: Request):   # funkcija za update na dijagnoza i terapija so id na termin
     conn = None
     try:
+        lekar = read_token(request, "lekar")
+        if not lekar:
+            raise HTTPException(status_code=401, detail="Најавете се како лекар за да продолжите.")
         data = await request.json()  # gi zema podatocite od frontend (JSON)
         dijagnoza = data.get("dijagnoza")  # dijagnoza moze da bide string ili None
         terapija = data.get("terapija")    # terapija moze da bide string ili None
@@ -413,11 +419,14 @@ async def update_termin_dijagnoza_terapija(termin_id: int, request: Request):   
         conn = get_connection()         # konekcija so bazata na podatoci
         db_cursor = conn.cursor(dictionary=True)
         db_cursor.execute(
-            "SELECT termin_ID FROM Termin_pregled WHERE termin_ID = %s",
+            "SELECT termin_ID, doctor_ID FROM Termin_pregled WHERE termin_ID = %s",
             (termin_id,)
         )
-        if not db_cursor.fetchone():
+        row = db_cursor.fetchone()
+        if not row:
             raise HTTPException(status_code=404, detail="Термин не е пронајден")
+        if int(row.get("doctor_ID") or 0) != int(lekar["id"]):
+            raise HTTPException(status_code=403, detail="Можете да ги менувате само своите прегледи.")
         dij_n = (dijagnoza or "").strip() or None
         ter_n = (terapija or "").strip() or None
         # Кога лекарот ги зачува дијагноза/терапија, прегледот се смета за завршен (пациентот може да оцени).
@@ -447,13 +456,15 @@ async def update_termin_dijagnoza_terapija(termin_id: int, request: Request):   
 
 
 @router.get("/izvestaj-pdf/{termin_id}")
-async def generate_izvestaj_pdf(termin_id: int):
+async def generate_izvestaj_pdf(termin_id: int, request: Request):
     """
     Генерира PDF извештај за одреден термин.
     Вклучува податоци за пациентот, лекарот, дијагноза и терапија.
     """
     conn = None
     try:
+        if not read_token(request, "lekar"):
+            raise HTTPException(status_code=401, detail="Најавете се како лекар за да го преземете извештајот.")
         conn = get_connection()
         db_cursor = conn.cursor(dictionary=True)
         termin = _get_termin_za_izvestaj(db_cursor, termin_id)
@@ -475,7 +486,7 @@ async def generate_izvestaj_pdf(termin_id: int):
 
 
 @router.post("/{termin_id}/isprati-izvestaj")
-async def isprati_izvestaj_na_pacient(termin_id: int):
+async def isprati_izvestaj_na_pacient(termin_id: int, request: Request):
     """
     Генерира PDF извештај за терминот и го испраќа на е-поштата на пациентот
     (email_pacient од терминот – истата адреса со која пациентот е најавен).
@@ -483,6 +494,8 @@ async def isprati_izvestaj_na_pacient(termin_id: int):
     """
     conn = None
     try:
+        if not read_token(request, "lekar"):
+            raise HTTPException(status_code=401, detail="Најавете се како лекар за да го испратите извештајот.")
         conn = get_connection()
         db_cursor = conn.cursor(dictionary=True)
         termin = _get_termin_za_izvestaj(db_cursor, termin_id)

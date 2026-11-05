@@ -4,6 +4,8 @@ import secrets
 
 from database import get_connection
 from password_utils import hash_password, verify_password
+from runtime_env import IS_PRODUCTION
+from session_auth import issue_token, require_role
 
 router = APIRouter(
     prefix="/pacienti",
@@ -50,6 +52,7 @@ async def login_pacienti(request: Request):
         if not patient.get("password") or not verify_password(password, patient["password"]):
             raise HTTPException(status_code=401, detail="Внесена е невалидна електронска пошта или лозинка, проверете го вашиот внес.")
         
+        session_token = issue_token("pacient", int(patient["patient_ID"]))
         return {
             "pacient": {
                 "pacient_ID": patient["patient_ID"],
@@ -58,7 +61,9 @@ async def login_pacienti(request: Request):
                 "email": patient.get("email") or "",
                 "telefon": patient.get("telefon") or "",
                 "embg": patient.get("embg") or "",
-            }
+                "session_token": session_token,
+            },
+            "session_token": session_token,
         }
     except HTTPException as e:
                 raise
@@ -109,6 +114,8 @@ async def forgot_password_pacient(request: Request):
             f"{'='*60}\n"
         )
         print(msg, flush=True)
+        if IS_PRODUCTION:
+            return {"message": "Ако постои пациент со оваа е-пошта, кодот е запишан само во логот на серверот."}
         return {
             "message": f"Вашиот код за промена на лозинка е: {token}",
             "token": token,
@@ -263,8 +270,9 @@ async def register_pacienti(request: Request):
 
 
 @router.get("/zavrseni-za-ocenka")
-async def zavrseni_za_ocenka(pacient_ID: int = Query(..., description="ID на најавениот пациент")):
+async def zavrseni_za_ocenka(request: Request, pacient_ID: int = Query(..., description="ID на најавениот пациент")):
     """Завршени прегледи за е-поштата на пациентот (за приказ и оцена)."""
+    require_role(request, "pacient", pacient_ID)
     conn = None
     try:
         conn = get_connection()
@@ -350,6 +358,7 @@ async def oceni_pregled(request: Request):
             pacient_id = int(pacient_id)
         except (TypeError, ValueError):
             raise HTTPException(status_code=400, detail="termin_id и pacient_ID мора да бидат цели броеви.")
+        require_role(request, "pacient", pacient_id)
 
         try:
             ocena = int(ocena_raw)
@@ -436,7 +445,7 @@ async def oceni_pregled(request: Request):
 
 
 @router.get("/dosie")
-async def dosie_pacient(pacient_ID: int = Query(..., description="ID на најавениот пациент")):
+async def dosie_pacient(request: Request, pacient_ID: int = Query(..., description="ID на најавениот пациент")):
     """
     Враќа комплетно досие на пациентот:
     - profil: лични податоци (име, презиме, мејл, телефон, дата на регистрација)
@@ -445,6 +454,7 @@ async def dosie_pacient(pacient_ID: int = Query(..., description="ID на нај
     - oceni: дадени оцени
     - statistika: бројки за брз преглед
     """
+    require_role(request, "pacient", pacient_ID)
     conn = None
     try:
         conn = get_connection()

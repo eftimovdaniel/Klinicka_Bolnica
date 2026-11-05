@@ -291,9 +291,26 @@
     // Освежи активност при секој fetch (вистинско користење на сајтот)
     if (window.fetch) {
       var origFetch = window.fetch.bind(window);
-      window.fetch = function () {
+      function tokenFromKey(key) {
+        var raw = null;
+        try {
+          raw = sessionStorage.getItem(key) || localStorage.getItem(key);
+        } catch (e) { return ''; }
+        var parsed = safeParse(raw);
+        if (!parsed) return '';
+        var data = isWrapped(parsed) ? parsed.data : parsed;
+        return (data && data.session_token) ? String(data.session_token) : '';
+      }
+      window.fetch = function (input, init) {
         throttledTouch();
-        return origFetch.apply(null, arguments);
+        var next = init ? Object.assign({}, init) : {};
+        var headers = new Headers(next.headers || {});
+        var lekarToken = tokenFromKey(KEY_LEKAR);
+        var pacientToken = tokenFromKey(KEY_PACIENT);
+        if (lekarToken && !headers.has('X-Lekar-Token')) headers.set('X-Lekar-Token', lekarToken);
+        if (pacientToken && !headers.has('X-Pacient-Token')) headers.set('X-Pacient-Token', pacientToken);
+        next.headers = headers;
+        return origFetch.call(window, input, next);
       };
     }
   }

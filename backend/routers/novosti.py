@@ -30,6 +30,14 @@ router = APIRouter(tags=["novosti"])
 # pateka do kade ke odat slikite i site dozvoleni formati koj moze da se stavat kako slika video od strana na admin bez da se naprave prob 
 UPLOAD_DIR = Path(__file__).resolve().parent.parent / "static" / "uploads" / "novosti"
 ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".gif", ".webp"}
+MAX_UPLOAD_BYTES = 5 * 1024 * 1024
+_MAGIC = {
+    ".jpg": (b"\xff\xd8\xff",),
+    ".jpeg": (b"\xff\xd8\xff",),
+    ".png": (b"\x89PNG\r\n\x1a\n",),
+    ".gif": (b"GIF87a", b"GIF89a"),
+    ".webp": (b"RIFF",),
+}
 
 
 def _ensure_upload_dir():
@@ -45,6 +53,12 @@ def _save_upload(file: UploadFile) -> Optional[str]:        # prima objekti od t
     name = f"{uuid.uuid4().hex}{ext}"       # generiranje na novo, unikatno ime za fajlot. Korisni e koga dvajca korisnici ke prikacat slika so isto ime
 
     contents = file.file.read()     # go cita fajlot od memorijata na serverot, binarna forma
+    if not contents or len(contents) > MAX_UPLOAD_BYTES:
+        return None
+    if not any(contents.startswith(sig) for sig in _MAGIC.get(ext, ())):
+        return None
+    if ext == ".webp" and contents[8:12] != b"WEBP":
+        return None
     if blob_service_client and CONTAINER_NAME:
         try:
             blob_client = blob_service_client.get_blob_client(container=CONTAINER_NAME, blob=name)      # povrzuvanje so cloud provajderot i se koriste za save na fajlovi vo kontenjeri so unikatno ime
