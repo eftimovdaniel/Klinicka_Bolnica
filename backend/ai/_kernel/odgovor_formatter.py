@@ -55,29 +55,30 @@ def formatiraj_odgovor_so_ai(
     """
     tip: info_lekar | zakazi_potvrda | lekari_oddel | uslugi | novosti_rezime
     podatoci: структурирани факти од handler
-    sablon_fallback: задржан за компатибилност со повици; не се користи како fallback.
+    sablon_fallback: локален текст ако Groq не одговори
     """
-    _ = sablon_fallback  # API compat — AI-only режим
-    # Parametar samo za nazadna kompatibilnost - se ignorira
+    lokalen = (sablon_fallback or "").strip()
+
+    def _bez_ai(poraka: str) -> str:
+        if lokalen:
+            print(f"[odgovor_formatter] AI fail tip={tip!r}, lokalen tekst")
+            return lokalen
+        return (poraka or "").strip() or GROQ_OFFLINE_MSG
 
     if groq_e_isklucen():
-        return GROQ_OFFLINE_MSG
-    # Ako e isklucheno Groq - vrati standardna offline poraka
+        return _bez_ai(GROQ_OFFLINE_MSG)
 
     try:
         system = load_prompt("formatiraj_odgovor")
     except KeyError:
-        return "Недостасува prompt formatiraj_odgovor."
-    # Ako fali promptot vo bundle - vrati greshka korisnichka
+        return lokalen or "Недостасува prompt formatiraj_odgovor."
 
     facts_json = json.dumps(podatoci, ensure_ascii=False, indent=2, default=_json_default)
-    # ensure_ascii=False - kirilica direktno, indent=2 za chitlivost
     user_parts = [
         f"Тип одговор: {tip}",
     ]
     if prasanje and prasanje.strip():
         user_parts.append(f'Прашање на корисникот: „{prasanje.strip()}"')
-        # Originalnoto prasanje pomaga na AI da formira sootveten odgovor
     user_parts.extend(
         [
             "",
@@ -85,17 +86,13 @@ def formatiraj_odgovor_so_ai(
             facts_json,
         ]
     )
-    # Klucna instrukcija - AI da ne izmisluva fakti shto gi nema vo JSON
     if podatoci.get("sledna_akcija"):
         user_parts.append(f"\nСледна акција (задржи ја смислата): {podatoci['sledna_akcija']}")
-        # Akciska poraka - shto sledno korisnikot treba da pravi
 
     ai = ask_ai("\n".join(user_parts), system_prompt=system)
     if _e_groq_greska(ai):
-        print(f"[odgovor_formatter] AI fail tip={tip!r}")
-        return (ai or "").strip() or GROQ_OFFLINE_MSG
-        # Pri greshka - vrati ja greshkata ili offline porakata
+        return _bez_ai(ai)
     ai = ai.strip()
     if not ai:
-        return GROQ_OFFLINE_MSG
+        return _bez_ai(GROQ_OFFLINE_MSG)
     return ai

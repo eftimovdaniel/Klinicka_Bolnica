@@ -421,8 +421,63 @@ def _izberi_eden_od_rangiran(prezime: str, rows: list[dict]) -> list[dict]:
     return top
 
 
+def _razlika_najmnogu_edna(a: str, b: str) -> bool:
+    """Една замена, додавање или бришење. „хибрева“ и „хубрева“ се совпаѓаат."""
+    if a == b:
+        return True
+    la, lb = len(a), len(b)
+    if abs(la - lb) > 1:
+        return False
+    i = j = razliki = 0
+    while i < la and j < lb:
+        if a[i] == b[j]:
+            i += 1
+            j += 1
+            continue
+        razliki += 1
+        if razliki > 1:
+            return False
+        if la == lb:
+            i += 1
+            j += 1
+        elif la < lb:
+            j += 1
+        else:
+            i += 1
+    return razliki + (la - i) + (lb - j) <= 1
+
+
+def _redovi_so_slicno_prezime(prezime: str) -> list[dict]:
+    """Презиме со најмногу една погрешна буква. Празно ако базата не е достапна."""
+    if len(prezime) < 5:
+        return []
+    try:
+        conn = get_connection()
+        cur = conn.cursor(dictionary=True)
+        try:
+            cur.execute(
+                """
+                SELECT doctor_ID, name, surname, specialty, email
+                FROM Doctors
+                ORDER BY surname, name
+                """
+            )
+            site = cur.fetchall()
+        finally:
+            cur.close()
+            conn.close()
+    except Exception as greska:
+        print(f"[lekar_lookup] slicno prezime: {greska}")
+        return []
+    return [
+        r
+        for r in site
+        if _razlika_najmnogu_edna(prezime, (r.get("surname") or "").strip().lower())
+    ]
+
+
 def najdi_lekari_po_prezime(prezime: str) -> list[dict]:
-    """Сите лекари чие презиме одговара (точно или по почеток)."""
+    """Сите лекари чие презиме одговара (точно, по почеток, или една погрешна буква)."""
     prezime = (prezime or "").strip().lower()
     if len(prezime) < 2:
         return []
@@ -444,6 +499,8 @@ def najdi_lekari_po_prezime(prezime: str) -> list[dict]:
         cur.close()
         conn.close()
 
+    if not rows:
+        rows = _redovi_so_slicno_prezime(prezime)
     if not rows:
         return []
 
@@ -580,6 +637,18 @@ def najdi_lekar_od_delovi(delovi: list[str]) -> dict | None:
     finally:
         cur.close()
         conn.close()
+
+    bliski = [
+        r
+        for r in _redovi_so_slicno_prezime(prezime)
+        if ime in (r.get("name") or "").lower()
+        or (
+            len(ime) >= 4
+            and _razlika_najmnogu_edna(ime, (r.get("name") or "").strip().lower())
+        )
+    ]
+    if len(bliski) == 1:
+        return _lekar_od_red(bliski[0])
     return None
 
 
