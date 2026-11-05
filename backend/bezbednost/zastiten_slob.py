@@ -4,13 +4,18 @@ from urllib.parse import parse_qsl, urlencode
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from bezbednost.cistenje_na_vlez import iscisteni_json, sanitize_question
-from bezbednost.ogranicuvac import napravi_limit
-from bezbednost.postavki import MAX_TEXT_CHARS, RATE_LIMIT, RATE_LIMIT_IP, RATE_LIMIT_LOGIN
+from bezbednost.ogranicuvac import napravi_ogranicuvac
+from bezbednost.postavki import (
+    MAKS_TEKST as MAX_TEXT_CHARS,
+    OGRANICUVANJE_PO_SESIJA as RATE_LIMIT,
+    OGRANICUVANJE_PO_ADRESA as RATE_LIMIT_IP,
+    OGRANICUVANJE_NA_NAJAVA as RATE_LIMIT_LOGIN,
+)
 from bezbednost.proverka_na_kluc import dozvolen_pristap
 
-ip_rate_limiter = napravi_limit(RATE_LIMIT_IP)
-session_rate_limiter = napravi_limit(RATE_LIMIT)
-login_rate_limiter = napravi_limit(RATE_LIMIT_LOGIN)
+ip_rate_limiter = napravi_ogranicuvac(RATE_LIMIT_IP)
+session_rate_limiter = napravi_ogranicuvac(RATE_LIMIT)
+login_rate_limiter = napravi_ogranicuvac(RATE_LIMIT_LOGIN)
 
 _PRESKOKNI = ("/app", "/static", "/docs", "/redoc")
 
@@ -46,19 +51,19 @@ class ZastitenSloj:
             await self.app(scope, receive, send)
             return
         ip = _ip(request)
-        if not ip_rate_limiter.allow("ip:" + ip):
+        if not ip_rate_limiter.dozvoleno("ip:" + ip):
             await self._odbij(scope, receive, send, 429, "Премногу барања од оваа адреса. Почекај една минута.")
             return
-        if _login_path(path) and not login_rate_limiter.allow("login:" + ip):
+        if _login_path(path) and not login_rate_limiter.dozvoleno("login:" + ip):
             await self._odbij(scope, receive, send, 429, "Премногу обиди за најава. Почекај една минута.")
             return
-        if not session_rate_limiter.allow(_session_key(request, ip)):
+        if not session_rate_limiter.dozvoleno(_session_key(request, ip)):
             await self._odbij(scope, receive, send, 429, "Премногу барања за оваа сесија. Почекај една минута.")
             return
         if not dozvolen_pristap(request.headers.get("origin"), request.headers.get("x-api-key")):
             await self._odbij(scope, receive, send, 401, "Немате пристап до системот.")
             return
-        self._ocisti_query(scope)
+        self._iscisteni_query(scope)
         content_type = request.headers.get("content-type", "")
         if "application/json" in content_type and request.method in ("POST", "PUT", "PATCH"):
             raw = await request.body()

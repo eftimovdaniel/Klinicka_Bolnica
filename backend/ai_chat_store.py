@@ -270,7 +270,6 @@ def save_exchange(session_id: int,*,pacient_id: int | None,doctor_id: int | None
             """,
             (session_id, assistant_text, _json_dump(navigacija), akcija),
         )
-
         updates = ["kontekst_json = %s", "updated_at = CURRENT_TIMESTAMP"]
         params: list[Any] = [_json_dump(kontekst)]
         if set_naslov:

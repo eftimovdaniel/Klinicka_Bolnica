@@ -1,5 +1,5 @@
 import hmac
-from bezbednost.postavki import API_ACCESS_KEY
+from bezbednost.postavki import KLUC_ZA_PRISTAP as API_ACCESS_KEY
 from runtime_env import cors_settings
 
 def verify_api_key(provided: str | None) -> bool:

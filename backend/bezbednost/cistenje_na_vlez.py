@@ -1,7 +1,7 @@
 from __future__ import annotations
 import json
 import re
-from bezbednost import MAX_QUESTION_CHARS, MAX_TEXT_CHARS
+from bezbednost.postavki import MAKS_PRASANJE as MAX_QUESTION_CHARS, MAKS_TEKST as MAX_TEXT_CHARS
 
 _CONTROL_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _INJECTION_RE = re.compile(
