@@ -4726,7 +4726,6 @@ async function handleLogin(e) {
         throw new Error('За да продолжите со најава, ве молиме внесете го вашето корисничко име во форма име.презиме(на латиница).');
       }
       body = { username: username, password: password };
-      console.log('[DEBUG lekar login] username:', username, '| password length:', password ? password.length : 0, '| endpoint:', endpoint);
     } else {
       // За пациенти: користи email
       endpoint = API_BASE + '/pacienti/login';

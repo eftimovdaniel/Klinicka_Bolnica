@@ -9,7 +9,8 @@ AI чат рутер — POST /ai-chat/ask
 import re
 from datetime import datetime
 from typing import Any
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from session_auth import require_role
 from pydantic import BaseModel, Field
 from ai._kernel.handlers import AiContext, dispatch
 from ai._kernel.intent_detector import detektiraj_intent
@@ -65,7 +66,6 @@ def _pacient_dict(p: PacientModel | None) -> dict | None:
         "prezime": p.prezime or "",
         "email": p.email,
         "telefon": p.telefon or "",
-        "embg": p.embg or "",
     }
 
 
@@ -382,8 +382,15 @@ def _resolve_intent(
     return _intent_strukturiran_za_lekar(pitanje_norm, aktiven_kontekst, intent)
 
 
+def _assert_owner(request: Request, pacient_id: int | None, doctor_id: int | None) -> None:
+    if pacient_id:
+        require_role(request, "pacient", pacient_id)
+    if doctor_id:
+        require_role(request, "lekar", doctor_id)
+
+
 @router.post("/sessions/import-guest")
-def import_guest_chat(data: GuestImportModel):
+def import_guest_chat(data: GuestImportModel, request: Request):
     """
     По најава: пренеси гостински разговор во нова DB сесија за најавениот корисник.
     """
@@ -392,6 +399,7 @@ def import_guest_chat(data: GuestImportModel):
     pacient_id, doctor_id = _owner_ids(pacient_dict, lekar_dict)
     if not pacient_id and not doctor_id:
         raise HTTPException(status_code=400, detail="Потребен е најавен пациент или лекар.")
+    _assert_owner(request, pacient_id, doctor_id)
 
     msgs = []
     for m in data.messages or []:
@@ -420,12 +428,14 @@ def import_guest_chat(data: GuestImportModel):
 
 @router.get("/sessions")
 def get_chat_sessions(
+    request: Request,
     pacient_id: int | None = Query(None),
     doctor_id: int | None = Query(None),
 ):
     """Листа на претходни разговори за најавен корисник."""
     if not pacient_id and not doctor_id:
         raise HTTPException(status_code=400, detail="Потребен е pacient_id или doctor_id.")
+    _assert_owner(request, pacient_id, doctor_id)
     rows = list_sessions(pacient_id=pacient_id, doctor_id=doctor_id)
     return {
         "sessions": [
@@ -443,12 +453,14 @@ def get_chat_sessions(
 @router.get("/sessions/{session_id}/messages")
 def get_chat_messages(
     session_id: int,
+    request: Request,
     pacient_id: int | None = Query(None),
     doctor_id: int | None = Query(None),
 ):
     """Пораки од избрана сесија (+ контекст за продолжување на флоу)."""
     if not pacient_id and not doctor_id:
         raise HTTPException(status_code=400, detail="Потребен е pacient_id или doctor_id.")
+    _assert_owner(request, pacient_id, doctor_id)
     data = get_session_messages(
         session_id, pacient_id=pacient_id, doctor_id=doctor_id
     )
@@ -475,19 +487,21 @@ def get_chat_messages(
 @router.delete("/sessions/{session_id}")
 def delete_chat_session(
     session_id: int,
+    request: Request,
     pacient_id: int | None = Query(None),
     doctor_id: int | None = Query(None),
 ):
     """Опционално бришење на зачуван разговор (само сопственик)."""
     if not pacient_id and not doctor_id:
         raise HTTPException(status_code=400, detail="Потребен е pacient_id или doctor_id.")
+    _assert_owner(request, pacient_id, doctor_id)
     if not delete_session(session_id, pacient_id=pacient_id, doctor_id=doctor_id):
         raise HTTPException(status_code=404, detail="Разговорот не е пронајден.")
     return {"ok": True, "session_id": session_id}
 
 
 @router.post("/ask")
-def ask(data: PitanjeModel):
+def ask(data: PitanjeModel, request: Request):
     pitanje = (data.prasanje or "").strip()
     if not pitanje:
         return {"odgovor": "Те молам внеси прашање."}
@@ -499,6 +513,7 @@ def ask(data: PitanjeModel):
     lekar_dict = _lekar_dict(data.lekar)
     aktiven_kontekst = data.kontekst if isinstance(data.kontekst, dict) else None
     pacient_id, doctor_id = _owner_ids(pacient_dict, lekar_dict)
+    _assert_owner(request, pacient_id, doctor_id)
     history_enabled = bool(pacient_id or doctor_id)
 
     session_id: int | None = None

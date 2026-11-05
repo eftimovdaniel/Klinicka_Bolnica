@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING, Any
 
 from dotenv import load_dotenv
 
+from runtime_env import IS_PRODUCTION
+
 _env_path = Path(__file__).resolve().parent / ".env"
 load_dotenv(_env_path)
 
@@ -87,8 +89,9 @@ def get_connection() -> "MySQLConnection":
                 pass
         return conn
     except MySQLError as e:
-        if DEBUG_DB:
-            print(f"[DEBUG_DB] Грешка при конекција: {e}")
+        print(f"[database] Грешка при конекција: {e}")
+        if IS_PRODUCTION:
+            raise RuntimeError("Не може да се поврзе со базата.") from e
         raise RuntimeError(f"Не може да се поврзе со базата: {e}") from e
 
 # voa mi trebase bidejki ne mi gi davase site lekari
