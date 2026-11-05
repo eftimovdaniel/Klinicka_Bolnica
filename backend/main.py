@@ -1,6 +1,5 @@
 from pathlib import Path  # biblioteka za patеки do papki i fajlovi
 from typing import Any, cast  # tipovi za Python (Any = bilo što, cast = pretvorba na tip)
-
 from fastapi import FastAPI, Request  # glavnata klasa za web API
 from fastapi.middleware.cors import CORSMiddleware  # dozvoluva frontend od drug domen da povikuva API
 from fastapi.responses import JSONResponse, RedirectResponse  # preusmeruvanje i JSON greski
@@ -8,13 +7,12 @@ from fastapi.staticfiles import StaticFiles  # serviranje na sliki, CSS, HTML ka
 from starlette.middleware.base import BaseHTTPMiddleware
 from routers import lekari, pacienti, termini, admin, aparati, uslugi, novosti, kariera, ai_chat  # site router moduli so ruti
 from runtime_env import ENABLE_DEBUG, cors_settings
+from bezbednost.zastiten_slob import ZastitenSloj
 
 _cors_origins, _cors_credentials = cors_settings()
 
 
 class AdminSessionMiddleware(BaseHTTPMiddleware):
-    """/admin bara potpisan lekarski znak od naјава, ne samo doctor_ID od klientot."""
-
     async def dispatch(self, request, call_next):
         path = request.url.path or ""
         if request.method != "OPTIONS" and path.startswith("/admin"):
@@ -44,6 +42,7 @@ app = FastAPI(  # kreiranje na FastAPI aplikacijata
         {"url": "http://localhost:8000", "description": "Lokalen razvoj"},
     ],
 )
+app.add_middleware(ZastitenSloj)
 app.add_middleware(AdminSessionMiddleware)
 app.add_middleware(  # dodavanje na CORS sloj (pred sekoj odgovor)
     CORSMiddleware,  # tip na middleware za cross-origin baranja

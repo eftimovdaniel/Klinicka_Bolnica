@@ -1,24 +1,16 @@
-"""
-Зачувување на AI чат сесии и пораки (само најавени пациент / лекар).
-"""
-
 from __future__ import annotations
-
 import json
 from typing import Any
-
 from database import get_connection
 from ai._kernel.db_helpers import as_dict
 
 _MAX_NASLOV = 120
 _MAX_SESSIONS = 50
 
-
 def _json_dump(obj: Any) -> str | None:
     if obj is None:
         return None
     return json.dumps(obj, ensure_ascii=False)
-
 
 def _json_load(raw: Any) -> Any:
     if raw is None or raw == "":
@@ -30,13 +22,11 @@ def _json_load(raw: Any) -> Any:
     except (json.JSONDecodeError, TypeError):
         return None
 
-
 def _naslov_od_prasanje(text: str) -> str:
     t = (text or "").strip().replace("\n", " ")
     if len(t) <= _MAX_NASLOV:
         return t
     return t[: _MAX_NASLOV - 1].rstrip() + "…"
-
 
 def _session_owned(cur, session_id: int, pacient_id: int | None, doctor_id: int | None) -> bool:
     cur.execute(
@@ -54,12 +44,7 @@ def _session_owned(cur, session_id: int, pacient_id: int | None, doctor_id: int 
     return bool(cur.fetchone())
 
 
-def list_sessions(
-    *,
-    pacient_id: int | None = None,
-    doctor_id: int | None = None,
-    limit: int = _MAX_SESSIONS,
-) -> list[dict[str, Any]]:
+def list_sessions(*,pacient_id: int | None = None,doctor_id: int | None = None,limit: int = _MAX_SESSIONS,) -> list[dict[str, Any]]:
     if not pacient_id and not doctor_id:
         return []
     conn = None
@@ -99,12 +84,7 @@ def list_sessions(
             conn.close()
 
 
-def get_session_messages(
-    session_id: int,
-    *,
-    pacient_id: int | None = None,
-    doctor_id: int | None = None,
-) -> dict[str, Any] | None:
+def get_session_messages(session_id: int,*,pacient_id: int | None = None,doctor_id: int | None = None,) -> dict[str, Any] | None:
     if not pacient_id and not doctor_id:
         return None
     conn = None
@@ -155,12 +135,7 @@ def get_session_messages(
             conn.close()
 
 
-def create_session(
-    *,
-    pacient_id: int | None = None,
-    doctor_id: int | None = None,
-    naslov: str | None = None,
-) -> int | None:
+def create_session(*,pacient_id: int | None = None,doctor_id: int | None = None,naslov: str | None = None,) -> int | None:
     if not pacient_id and not doctor_id:
         return None
     conn = None
@@ -190,14 +165,7 @@ def create_session(
         if conn and conn.is_connected():
             conn.close()
 
-
-def delete_session(
-    session_id: int,
-    *,
-    pacient_id: int | None = None,
-    doctor_id: int | None = None,
-) -> bool:
-    """Брише сесија и сите пораки (CASCADE). Само сопственик."""
+def delete_session(session_id: int,*,pacient_id: int | None = None,doctor_id: int | None = None,) -> bool:
     if not pacient_id and not doctor_id:
         return False
     conn = None
@@ -225,34 +193,20 @@ def delete_session(
         if conn and conn.is_connected():
             conn.close()
 
-
-def import_guest_session(
-    *,
-    pacient_id: int | None = None,
-    doctor_id: int | None = None,
-    messages: list[dict[str, Any]] | None = None,
-    kontekst: dict | None = None,
-) -> int | None:
-    """
-    По најава: креира сесија и ги внесува пораки од гостинскиот чат (без AI).
-    messages: [{ "uloga": "user"|"assistant", "sodrzina": "..." }, ...]
-    """
+def import_guest_session(*,pacient_id: int | None = None,doctor_id: int | None = None,messages: list[dict[str, Any]] | None = None,kontekst: dict | None = None,) -> int | None:
     if not pacient_id and not doctor_id:
         return None
     msgs = messages or []
     if not msgs:
         return create_session(pacient_id=pacient_id, doctor_id=doctor_id)
-
     naslov = None
     for m in msgs:
         if (m.get("uloga") or "").lower() == "user":
             naslov = _naslov_od_prasanje(m.get("sodrzina") or "")
             break
-
     sid = create_session(pacient_id=pacient_id, doctor_id=doctor_id, naslov=naslov)
     if not sid:
         return None
-
     conn = None
     try:
         conn = get_connection()
@@ -294,19 +248,7 @@ def import_guest_session(
         if conn and conn.is_connected():
             conn.close()
 
-
-def save_exchange(
-    session_id: int,
-    *,
-    pacient_id: int | None,
-    doctor_id: int | None,
-    user_text: str,
-    assistant_text: str,
-    kontekst: dict | None,
-    navigacija: dict | None = None,
-    akcija: str | None = None,
-    set_naslov: bool = False,
-) -> bool:
+def save_exchange(session_id: int,*,pacient_id: int | None,doctor_id: int | None,user_text: str,assistant_text: str,kontekst: dict | None,navigacija: dict | None = None,akcija: str | None = None,set_naslov: bool = False,) -> bool:
     if not pacient_id and not doctor_id:
         return False
     conn = None
@@ -315,14 +257,12 @@ def save_exchange(
         cur = conn.cursor(dictionary=True)
         if not _session_owned(cur, session_id, pacient_id, doctor_id):
             return False
-
         cur.execute(
             """
             INSERT INTO Ai_chat_message (session_id, uloga, sodrzina)
             VALUES (%s, 'user', %s)
             """,
-            (session_id, user_text),
-        )
+            (session_id, user_text),)
         cur.execute(
             """
             INSERT INTO Ai_chat_message (session_id, uloga, sodrzina, navigacija_json, akcija)

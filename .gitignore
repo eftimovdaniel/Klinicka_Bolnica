@@ -1,6 +1,9 @@
-# Тајни — не качувај на git
+
 .env
 backend/.env
+backend/baza_so_podatoci.sql
+backend/migrations
+
 
 # Python
 __pycache__/
