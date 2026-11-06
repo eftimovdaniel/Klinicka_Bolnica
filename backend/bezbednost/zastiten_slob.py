@@ -28,6 +28,11 @@ def _ip(request: Request) -> str:
     return "unknown"
 
 def _session_key(request: Request, ip: str) -> str:
+    for name in ("kb_lekar", "kb_pacient"):
+        token = (request.cookies.get(name) or "").strip()
+        if token:
+            digest = hashlib.sha256(token.encode("utf-8")).hexdigest()[:16]
+            return name + ":" + digest
     for header in ("x-lekar-token", "x-pacient-token", "x-session-token"):
         token = (request.headers.get(header) or "").strip()
         if token:
@@ -36,7 +41,12 @@ def _session_key(request: Request, ip: str) -> str:
     return "ip:" + ip
 
 def _login_path(path: str) -> bool:
-    return path.endswith("/login") or "forgot-password" in path or "reset-password" in path
+    return (
+        path.endswith("/login")
+        or path.endswith("/register")
+        or "forgot-password" in path
+        or "reset-password" in path
+    )
 
 class ZastitenSloj:
     def __init__(self, app) -> None:

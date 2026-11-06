@@ -5,7 +5,7 @@ import secrets
 from database import get_connection
 from password_utils import hash_password, verify_password
 from runtime_env import IS_PRODUCTION
-from session_auth import issue_token, require_role
+from session_auth import odgovor_bez_sesija, odgovor_so_sesija, require_role
 
 router = APIRouter(
     prefix="/pacienti",
@@ -52,8 +52,7 @@ async def login_pacienti(request: Request):
         if not patient.get("password") or not verify_password(password, patient["password"]):
             raise HTTPException(status_code=401, detail="Внесена е невалидна електронска пошта или лозинка, проверете го вашиот внес.")
         
-        session_token = issue_token("pacient", int(patient["patient_ID"]))
-        return {
+        return odgovor_so_sesija({
             "pacient": {
                 "pacient_ID": patient["patient_ID"],
                 "ime": patient.get("ime") or "",
@@ -61,10 +60,8 @@ async def login_pacienti(request: Request):
                 "email": patient.get("email") or "",
                 "telefon": patient.get("telefon") or "",
                 "embg": patient.get("embg") or "",
-                "session_token": session_token,
             },
-            "session_token": session_token,
-        }
+        }, "pacient", int(patient["patient_ID"]), request)
     except HTTPException as e:
                 raise
     except Exception as e:
@@ -72,6 +69,11 @@ async def login_pacienti(request: Request):
     finally:
          if conn and conn.is_connected():
             conn.close()
+
+
+@router.post("/logout")
+async def logout_pacient():
+    return odgovor_bez_sesija("pacient")
 
 
 @router.post("/forgot-password", openapi_extra={
@@ -241,10 +243,18 @@ async def register_pacienti(request: Request):
           conn.commit()
           pacient_id = db_cursor.lastrowid
 
-          return {
-               "message": "Направена е успешна регистрација. Можете да се најавите со вашата електронска пошта и лозинка.",
-               "pacient_id": pacient_id
-          }
+          return odgovor_so_sesija({
+               "message": "Направена е успешна регистрација.",
+               "pacient_id": pacient_id,
+               "pacient": {
+                    "pacient_ID": pacient_id,
+                    "ime": ime,
+                    "prezime": prezime,
+                    "email": email.lower(),
+                    "telefon": telefon or "",
+                    "embg": embg,
+               },
+          }, "pacient", int(pacient_id), request)
      except HTTPException as e:
           raise
      except Exception as e:

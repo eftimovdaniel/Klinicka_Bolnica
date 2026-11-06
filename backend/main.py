@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware  # dozvoluva frontend od drug
 from fastapi.responses import JSONResponse, RedirectResponse  # preusmeruvanje i JSON greski
 from fastapi.staticfiles import StaticFiles  # serviranje na sliki, CSS, HTML kako statički fajlovi
 from starlette.middleware.base import BaseHTTPMiddleware
-from routers import lekari, pacienti, termini, admin, aparati, uslugi, novosti, kariera, ai_chat  # site router moduli so ruti
+from routers import lekari, pacienti, termini, admin, aparati, uslugi, novosti, kariera, ai_chat, sesija  # site router moduli so ruti
 from runtime_env import ENABLE_DEBUG, cors_settings
 from bezbednost.zastiten_slob import ZastitenSloj
 
@@ -59,6 +59,7 @@ FRONTEND_DIR = Path(__file__).resolve().parent.parent / "frontend"  # pateka do 
 if FRONTEND_DIR.exists():  # ako frontend papkata postoi
     app.mount("/app", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")  # serviranje na sajtot na /app (html=True = index.html)
 
+app.include_router(sesija.router)
 app.include_router(lekari.router)  # ruti za lekari (login, lista, profil, ...)
 app.include_router(pacienti.router)  # ruti za pacienti
 app.include_router(termini.router)  # ruti za termini / pregledi

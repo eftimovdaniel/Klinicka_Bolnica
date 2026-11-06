@@ -3,7 +3,11 @@
 // API базен URL: локално → директно :8000; на сервер → ист хост/порт како страницата (nginx проксира кон backend)
 var API_BASE = (function() {
   var h = window.location.hostname;
-  if (!h || h === 'localhost' || h === '127.0.0.1') return 'http://localhost:8000';
+  if (!h) return 'http://localhost:8000';
+  if (h === 'localhost' || h === '127.0.0.1') {
+    if (!window.location.port || window.location.port === '8000') return window.location.origin;
+    return 'http://localhost:8000';
+  }
   return window.location.protocol + '//' + window.location.host;
 })();
 
@@ -96,22 +100,19 @@ function clearLekarFromStorage() {
   }
 }
 
-// Врати го најавениот пациент - проверува дали сесијата е валидна (не експирирана)
-(function restorePacientSession() {
-  if (!window.KBSession) return;
-  var data = window.KBSession.get('pacient');
-  if (data && (data.pacient_ID || data.email)) {
-    currentPacient = data;
-  }
-})();
-
-// Врати го најавениот лекар - проверува дали сесијата е валидна
-(function restoreLekarSession() {
-  if (!window.KBSession) return;
-  var data = window.KBSession.get('lekar');
-  if (data && data.doctor_ID) {
-    currentLekar = data;
-  }
+(function restoreFromCookie() {
+  if (!window.KBSession || !window.KBSession.ready) return;
+  window.KBSession.ready.then(function (sesija) {
+    sesija = sesija || {};
+    if (sesija.pacient && (sesija.pacient.pacient_ID || sesija.pacient.email)) {
+      currentPacient = sesija.pacient;
+    }
+    if (sesija.lekar && sesija.lekar.doctor_ID) {
+      currentLekar = sesija.lekar;
+    }
+    if (typeof updateAuthHeader === 'function') updateAuthHeader();
+    if (typeof updateLekarAdminTabVisibility === 'function') updateLekarAdminTabVisibility();
+  });
 })();
 
 // Реагирај на автоматска одјава (експирација) или промена во друг таб
@@ -2935,6 +2936,12 @@ async function loginLekar() {
     return;
   }
 
+  if (!window.KBKolacinja || !window.KBKolacinja.prifateni()) {
+    if (window.KBKolacinja) window.KBKolacinja.pokazhi();
+    showLoginError('Прифатете ги колачињата за да се најавите. Најавата се чува во колаче.');
+    return;
+  }
+
   // Прикажи loading state
   submitBtn.disabled = true;
   btnText.style.display = 'none';
@@ -2945,6 +2952,7 @@ async function loginLekar() {
     // Backend-от ќе провери дали комбинацијата е валидна
     const res = await fetch(API_BASE + '/lekari/login', {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
@@ -4707,6 +4715,12 @@ async function handleLogin(e) {
     return;
   }
 
+  if (!window.KBKolacinja || !window.KBKolacinja.prifateni()) {
+    if (window.KBKolacinja) window.KBKolacinja.pokazhi();
+    showAuthError('login-error', 'Прифатете ги колачињата за да се најавите. Најавата се чува во колаче.');
+    return;
+  }
+
   if (submitBtn) submitBtn.disabled = true;
   if (btnText) btnText.style.display = 'none';
   if (btnLoading) btnLoading.style.display = 'inline-block';
@@ -4734,6 +4748,7 @@ async function handleLogin(e) {
     
     const res = await fetch(endpoint, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
@@ -4827,6 +4842,12 @@ async function handleRegister(e) {
     showAuthError('register-error', 'Пополнете ги сите задолжителни полиња');
     return;
   }
+
+  if (!window.KBKolacinja || !window.KBKolacinja.prifateni()) {
+    if (window.KBKolacinja) window.KBKolacinja.pokazhi();
+    showAuthError('register-error', 'Прифатете ги колачињата за да се регистрирате. Најавата се чува во колаче.');
+    return;
+  }
   
   if (password !== passwordConfirm) {
     showAuthError('register-error', 'Лозинките не се совпаѓаат');
@@ -4888,6 +4909,7 @@ async function handleRegister(e) {
     
     const res = await fetch(endpoint, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     });
@@ -4900,6 +4922,25 @@ async function handleRegister(e) {
       throw new Error(detail);
     }
     
+    const data = await res.json();
+    if (data.pacient) {
+      currentPacient = data.pacient;
+      persistPacientToStorage();
+      closeAuthModal();
+      updateAuthHeader();
+      alert('Регистрацијата е успешна. Најавени сте како ' + data.pacient.ime + ' ' + data.pacient.prezime + '.');
+      return;
+    }
+    if (data.doctor) {
+      currentLekar = data.doctor;
+      persistLekarToStorage();
+      closeAuthModal();
+      displayLekarDashboard(data);
+      openLekarDashboardModal();
+      updateAuthHeader();
+      alert('Регистрацијата е успешна. Најавени сте. Корисничко име: ' + (data.username || ''));
+      return;
+    }
     alert('Успешно се регистриравте! Сега можете да се најавите.');
     showLogin();
     
