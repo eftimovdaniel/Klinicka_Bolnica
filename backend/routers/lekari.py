@@ -9,7 +9,7 @@ from database import get_connection
 from routers.utils import transliterate_mk_to_lat
 from password_utils import hash_password, verify_password
 from runtime_env import IS_PRODUCTION
-from session_auth import issue_token
+from session_auth import odgovor_bez_sesija, odgovor_so_sesija
 
 router = APIRouter(prefix="/lekari", tags=["lekari"])
 
@@ -224,20 +224,17 @@ async def login_lekar(request: Request):
         must_change = verify_password(DEFAULT_LOZINKA_LEKARI, stored_password_hash)
 
         # Враќаме JSON објект со податоци за лекарот и неговите термини
-        session_token = issue_token("lekar", int(doctor_id))
-        return {
+        return odgovor_so_sesija({
             "doctor": {
                 "doctor_ID": doctor["doctor_ID"],
                 "name": doctor["name"],
                 "surname": doctor["surname"],
                 "email": doctor.get("email") or "",
                 "specijalnost": (doctor.get("specijalnost") or "").strip(),
-                "session_token": session_token,
             },
-            "session_token": session_token,
             "termini": termini,
-            "must_change_password": must_change,  # при прва најава – задолжителна смена на лозинка
-        }
+            "must_change_password": must_change,
+        }, "lekar", int(doctor_id), request)
     except HTTPException as e:  # форматирана грешка
         raise  # се продолжува
     except Exception as e:  # доколку се јави било која друга грешка
@@ -245,6 +242,11 @@ async def login_lekar(request: Request):
     finally:  # се проверува дали има конекција, ако има се затвора, се извршува без разлика дали има или нема грешка
         if conn and conn.is_connected():
             conn.close()
+
+
+@router.post("/logout")
+async def logout_lekar():
+    return odgovor_bez_sesija("lekar")
 
 
 @router.patch("/promeni-lozinka", openapi_extra={
@@ -950,11 +952,20 @@ async def register_lekar(request: Request):
         conn.commit()
         doctor_id = posrednik.lastrowid
         
-        return {
-            "message": "Успешно се регистриравте!",
+        return odgovor_so_sesija({
+            "message": "Успешно се регистриравте.",
             "doctor_ID": doctor_id,
-            "username": username
-        }
+            "username": username,
+            "doctor": {
+                "doctor_ID": doctor_id,
+                "name": ime,
+                "surname": prezime,
+                "email": email,
+                "specijalnost": specialty,
+            },
+            "termini": [],
+            "must_change_password": False,
+        }, "lekar", int(doctor_id), request)
     except HTTPException as e:
         raise
     except Exception as e:
