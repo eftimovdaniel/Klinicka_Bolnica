@@ -284,23 +284,34 @@ def obrabotka_na_napomena(prasanje: str, pacient: dict, cekanje: dict) -> dict: 
 
 
 # ───────────────── GLAVNA FUNKCIJA ───────────────── # Izvrshuvanje na naredba
+def _podatoci_lokalno(prasanje: str, kontekst: dict | None):
+    """Лекар, датум и час од текстот и од претходната порака, без повик до модел."""
+    from ai._kernel.lekar_lookup import najdi_lekar_od_prasanje
+    from ai.pacient.slobodni_termini import datum_od_prasanje_lokalno, vreme_od_prasanje_lokalno
+
+    lekar = najdi_lekar_od_prasanje(prasanje, koristi_ai=False)
+    doctor_id = int(lekar["doctor_ID"]) if lekar else None
+    datum = datum_od_prasanje_lokalno(prasanje)
+    datum_str = datum.isoformat() if datum else None
+    vreme_str = vreme_od_prasanje_lokalno(prasanje)
+    return dopolni_od_kontekst(doctor_id, datum_str, vreme_str, kontekst)
+
+
 def odgovori_za_zakazuvanje(prasanje: str, pacient: dict | None, kontekst: dict | None = None):  # Vlezna tocka — povikana od router # GLAVNA FUNKCIJA: vlezna tocka za celiot zakazuvacki proces
     # 1) Ako vo prethodnata poraka prashavme za napomena — ovaa poraka e nejziniot odgovor # Izvrshuvanje na naredba
     cekanje_napomena = proveri_dali_cekame_napomena(kontekst) # Dodeluvanje na vrednost
     if cekanje_napomena and pacient and pacient.get("email"): # Uslovna proverka
         return obrabotka_na_napomena(prasanje, pacient, cekanje_napomena) # Vrakjanje na rezultat
 
-    # 2) AI ekstrakcija na podatoci od prashanjeto # Izvrshuvanje na naredba
-    podatoci_od_ai = izvlechi_podatoci_so_ai(prasanje) # Dodeluvanje na vrednost
-    if podatoci_od_ai.get("_error"): # Uslovna proverka
-        return {"odgovor": str(podatoci_od_ai["_error"]), "kontekst": kontekst} # Vrakjanje na prazna struktura so error flag pri neuspeh
-
-    doctor_id = podatoci_od_ai.get("doctor_id") # Dodeluvanje na vrednost
-    datum_str = podatoci_od_ai.get("datum") # Dodeluvanje na vrednost
-    vreme_str = podatoci_od_ai.get("vreme") # Dodeluvanje na vrednost
-
-    # Dopolni gi nedostasuvackite podatoci od zachuvan pending kontekst (od prethodna poraka) # Izvrshuvanje na naredba
-    doctor_id, datum_str, vreme_str = dopolni_od_kontekst(doctor_id, datum_str, vreme_str, kontekst) # Dodeluvanje na vrednost
+    # 2) AI ekstrakција, а ако моделот не одговори — лекар/датум/час од текстот и контекстот
+    podatoci_od_ai = izvlechi_podatoci_so_ai(prasanje)
+    if podatoci_od_ai.get("_error"):
+        doctor_id, datum_str, vreme_str = _podatoci_lokalno(prasanje, kontekst)
+    else:
+        doctor_id = podatoci_od_ai.get("doctor_id")
+        datum_str = podatoci_od_ai.get("datum")
+        vreme_str = podatoci_od_ai.get("vreme")
+        doctor_id, datum_str, vreme_str = dopolni_od_kontekst(doctor_id, datum_str, vreme_str, kontekst)
 
     # 3) Dali pacientot e najaven (e-posta e zadolzitelna za INSERT) # Izvrshuvanje na naredba
     if not pacient or not pacient.get("email"): # Proverka dali pacientot e najaven (ima email)

@@ -9,15 +9,18 @@ from __future__ import annotations
 
 import os
 import time
+from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
 
 from ai._kernel.prompts import CHAT_SYSTEM_PROMPT
 
-load_dotenv()
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+OPENAI_URL = "https://api.openai.com/v1/chat/completions"
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
 
 GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 GROQ_MODEL_FALLBACK = os.getenv("GROQ_MODEL_FALLBACK", "llama-3.1-8b-instant")
@@ -48,9 +51,27 @@ _circuit_open_until: float = 0.0
 _circuit_logged: bool = False
 
 
-def _post_chat(model: str, payload: dict, headers: dict) -> requests.Response:
+def _post_chat(model: str, payload: dict, headers: dict, url: str = GROQ_URL) -> requests.Response:
     payload = {**payload, "model": model}
-    return requests.post(GROQ_URL, json=payload, headers=headers, timeout=30)
+    return requests.post(url, json=payload, headers=headers, timeout=30)
+
+
+def _ai_cel() -> tuple[str, str, str, bool] | None:
+    """Враќа (url, клуч, модел, дали е Groq). Клучот од .env не се печати."""
+    gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
+    gemini_model = os.getenv("GEMINI_MODEL", "").strip()
+    if gemini_key:
+        if gemini_key.startswith("sk-"):
+            model = gemini_model if gemini_model and not gemini_model.startswith("gemini") else "gpt-4o-mini"
+            if model != gemini_model:
+                print("[groq_client] OpenAI клуч со Gemini модел → gpt-4o-mini")
+            return OPENAI_URL, gemini_key, model, False
+        return GEMINI_URL, gemini_key, gemini_model or "gemini-2.5-flash", False
+    groq_key = os.getenv("GROQ_API_KEY", "").strip()
+    if groq_key:
+        model = GROQ_MODEL_FALLBACK if GROQ_FAST_ONLY else GROQ_MODEL
+        return GROQ_URL, groq_key, model, True
+    return None
 
 
 def _circuit_e_aktiven() -> bool:
@@ -119,9 +140,10 @@ def ask_ai(prasanje: str, system_prompt: str = CHAT_SYSTEM_PROMPT) -> str:
     if _circuit_e_aktiven():
         return GROQ_OFFLINE_MSG
 
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        return "Не е поставен GROQ_API_KEY во backend/.env фајлот."
+    cel = _ai_cel()
+    if not cel:
+        return "Не е поставен API клуч во backend/.env фајлот."
+    url, api_key, primary, e_groq = cel
 
     prasanje = (prasanje or "").strip()
     if not prasanje:
@@ -150,23 +172,27 @@ def ask_ai(prasanje: str, system_prompt: str = CHAT_SYSTEM_PROMPT) -> str:
     }
 
     try:
-        primary = GROQ_MODEL_FALLBACK if GROQ_FAST_ONLY else GROQ_MODEL
-        response = _post_chat(primary, payload, headers)
+        response = _post_chat(primary, payload, headers, url)
 
-        if response.status_code == 429 and GROQ_MODEL_FALLBACK and not GROQ_FAST_ONLY:
+        if (
+            e_groq
+            and response.status_code == 429
+            and GROQ_MODEL_FALLBACK
+            and not GROQ_FAST_ONLY
+        ):
             print(
                 f"[groq_client] RATE LIMIT (429) на {primary} → "
                 f"пробувам {GROQ_MODEL_FALLBACK}"
             )
-            response = _post_chat(GROQ_MODEL_FALLBACK, payload, headers)
+            response = _post_chat(GROQ_MODEL_FALLBACK, payload, headers, url)
 
         if response.status_code == 429:
             _aktiviraj_auto_offline()
             return GROQ_OFFLINE_MSG
 
         if response.status_code == 401:
-            print("[groq_client] AUTH (401) - проверете го GROQ_API_KEY")
-            return "Невалиден API клуч. Проверете го GROQ_API_KEY во .env."
+            print("[groq_client] AUTH (401) - проверете го API клучот во .env")
+            return "Невалиден API клуч. Проверете го клучот во backend/.env."
 
         response.raise_for_status()
         result = response.json()
